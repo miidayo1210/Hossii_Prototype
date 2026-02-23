@@ -1,0 +1,64 @@
+.controlBar {
+  position: fixed;
+  left: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 85;
+  display: none; /* Hidden on mobile */
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  border-radius: 9999px; /* Pill shape */
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.controlButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  gap: 0.125rem;
+  position: relative;
+}
+
+.scaleLabel {
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  position: absolute;
+  bottom: 0.25rem;
+}
+
+.controlButton:hover {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+  transform: scale(1.1);
+}
+
+.controlButton.active {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
+}
+
+.controlButton:active {
+  transform: scale(0.95);
+}
+
+/* Desktop only: Show control bar */
+@media (min-width: 769px) {
+  .controlBar {
+    display: flex;
+  }
+}

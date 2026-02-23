@@ -1,0 +1,141 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9fafb; /* gray-50 */
+}
+
+/* ヘッダー */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e5e7eb; /* gray-200 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+}
+
+.headerTop {
+  max-width: 80rem;
+  margin: 0 auto;
+  margin-bottom: 0.75rem;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937; /* gray-800 */
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.75rem;
+  color: #6b7280; /* gray-500 */
+  margin: 0.25rem 0 0 0;
+}
+
+.count {
+  font-size: 0.75rem;
+  color: #6b7280;
+  max-width: 80rem;
+  margin: 0 auto;
+}
+
+.filterContainer {
+  max-width: 80rem;
+  margin: 0.75rem auto 0;
+}
+
+/* メインコンテンツ */
+.main {
+  flex: 1;
+  max-width: 80rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem 0;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+/* カード */
+.card {
+  background: #faf5ff; /* purple-50 */
+  border-radius: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #f3e8ff; /* gray-100 相当だが purple系に */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.cardInner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.emoji {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.cardContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.authorName {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  opacity: 0.8;
+  margin-bottom: 0.25rem;
+}
+
+.message {
+  font-size: 0.875rem;
+  color: #1f2937;
+  line-height: 1.5;
+  word-break: break-word;
+  margin-bottom: 0.5rem;
+}
+
+.logIcon {
+  font-size: 1rem;
+  margin-right: 0.375rem;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.time {
+  color: #9ca3af;
+}
+
+/* TODO: 将来的に channel に応じてカード背景色を変える */
+/* .cardSupport { background: #fdf2f8; } pink-50 */
+/* .cardQa { background: #eff6ff; } blue-50 */
+/* .cardEmotion { background: #faf5ff; } purple-50 */
+
+/* Mobile: Bottom nav padding */
+@media (max-width: 768px) {
+  .container {
+    padding-bottom: 5rem;
+  }
+}

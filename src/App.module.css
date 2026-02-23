@@ -1,0 +1,44 @@
+/* App root wrapper for display scaling */
+.appRoot {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Chromium (Chrome/Edge): use zoom for best compatibility */
+.appRoot[data-scale="1"] {
+  zoom: 1;
+}
+
+.appRoot[data-scale="1.25"] {
+  zoom: 1.25;
+}
+
+.appRoot[data-scale="1.5"] {
+  zoom: 1.5;
+}
+
+/* Fallback for Safari and browsers that don't support zoom */
+@supports not (zoom: 1) {
+  .appRoot {
+    transform-origin: top left;
+  }
+
+  .appRoot[data-scale="1"] {
+    transform: scale(1);
+  }
+
+  .appRoot[data-scale="1.25"] {
+    transform: scale(1.25);
+    /* Compensate for scale to prevent scrolling issues */
+    width: calc(100% / 1.25);
+    min-height: calc(100vh / 1.25);
+  }
+
+  .appRoot[data-scale="1.5"] {
+    transform: scale(1.5);
+    /* Compensate for scale to prevent scrolling issues */
+    width: calc(100% / 1.5);
+    min-height: calc(100vh / 1.5);
+  }
+}

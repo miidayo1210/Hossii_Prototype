@@ -1,0 +1,54 @@
+/* Display Scale Toggle - Top-left unobtrusive UI */
+.container {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  font-size: 12px;
+}
+
+.label {
+  color: #666;
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+.buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.button {
+  padding: 4px 10px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: white;
+  color: #666;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.button:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.button.active {
+  background: #007aff;
+  color: white;
+  border-color: #007aff;
+}
+
+.button:active {
+  transform: scale(0.95);
+}

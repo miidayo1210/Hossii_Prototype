@@ -1,0 +1,325 @@
+/**
+ * HossiiLive - スペースを泳ぐ生き物
+ * 3レイヤー: BaseMotion / ReactionMotion / TapMotion
+ */
+
+/* ============================================
+   Hossii本体コンテナ
+   左上基準 + transform で泳ぐ
+   ============================================ */
+.container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  /* 固定サイズ（表情切替時にサイズが変わらないように） */
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* GPU accelerated */
+  will-change: transform;
+  /* 画像クリップ用 */
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+/* BaseMotion: ふわふわ泳ぐ transition（duration は JS から動的に設定） */
+.swimming {
+  transition: transform 6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============================================
+   ReactionMotion: 投稿時のにこっ
+   ============================================ */
+.reacting {
+  /* コンテナ全体で軽く拡大（縮む方向は使わない） */
+  /* scale はメインの transform と合成されるので、ここでは filter のみ */
+}
+
+/* ============================================
+   TapMotion: 押された時のゆらぎ（ふわっと穏やかに）
+   ============================================ */
+.tapped {
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* ============================================
+   Hossii画像
+   ============================================ */
+.hossiiImage {
+  /* コンテナいっぱいに表示（異なるアスペクト比でも同サイズに見える） */
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.18));
+  transition: filter 0.3s ease;
+  /* transform は使わない（コンテナ側で制御） */
+}
+
+/* リアクション時の輝き（scale は縮む方向を避けるため軽い拡大のみ） */
+.reacting .hossiiImage {
+  filter: drop-shadow(0 6px 16px rgba(245, 158, 11, 0.35));
+  /* 画像自体の scale は使わない（サイズ変化を防ぐ） */
+}
+
+/* フォールバック絵文字（画像がない場合） */
+.fallbackEmoji {
+  position: absolute;
+  font-size: 4rem;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.12));
+}
+
+/* 画像が読み込まれたらフォールバックを隠す */
+.hossiiImage:not([style*="display: none"]) + .fallbackEmoji {
+  display: none;
+}
+
+/* ============================================
+   吹き出し（共通）
+   ============================================ */
+.bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(233, 213, 255, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  max-width: 12rem;
+  white-space: nowrap;
+  animation: bubbleIn 0.3s ease-out;
+}
+
+.bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border-right: 1px solid rgba(233, 213, 255, 0.5);
+  border-bottom: 1px solid rgba(233, 213, 255, 0.5);
+}
+
+.bubbleText {
+  font-size: 0.875rem;
+  color: #6d28d9;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* 長い吹き出し（タップ時、5秒表示） */
+.longBubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  border-radius: 1.5rem;
+  border: 2px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+  max-width: 16rem;
+  min-width: 10rem;
+  animation: longBubbleIn 0.4s ease-out;
+}
+
+.longBubble::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 16px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  border-right: 2px solid rgba(245, 158, 11, 0.4);
+  border-bottom: 2px solid rgba(245, 158, 11, 0.4);
+}
+
+.longBubbleEmoji {
+  font-size: 1.5rem;
+  margin-right: 0.625rem;
+}
+
+.longBubbleText {
+  font-size: 0.9375rem;
+  color: #78350f;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@keyframes longBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* アイドル吹き出し（自発セリフ） */
+.idleBubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 1rem;
+  border: 1px solid rgba(200, 200, 200, 0.3);
+  animation: idleBubbleIn 0.5s ease-out;
+  opacity: 0.85;
+}
+
+.idleBubble::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  border-right: 1px solid rgba(200, 200, 200, 0.3);
+  border-bottom: 1px solid rgba(200, 200, 200, 0.3);
+}
+
+.idleBubbleText {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+@keyframes idleBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.92);
+  }
+  to {
+    opacity: 0.85;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* AI Brain 吹き出し（AI からのメッセージ） */
+.brainBubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(243, 232, 255, 0.95) 100%);
+  backdrop-filter: blur(12px);
+  border-radius: 1.25rem;
+  border: 2px solid rgba(167, 139, 250, 0.4);
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.2);
+  max-width: 16rem;
+  animation: brainBubbleIn 0.4s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brainBubble::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(243, 232, 255, 0.95) 100%);
+  border-right: 2px solid rgba(167, 139, 250, 0.4);
+  border-bottom: 2px solid rgba(167, 139, 250, 0.4);
+}
+
+.brainBubbleIcon {
+  font-size: 1.125rem;
+  flex-shrink: 0;
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+.brainBubbleText {
+  font-size: 0.875rem;
+  color: #6d28d9;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  font-weight: 500;
+}
+
+@keyframes brainBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+/* ============================================
+   エフェクト絵文字（画面中央付近）
+   ============================================ */
+.effect {
+  position: fixed;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  font-size: 5rem;
+  pointer-events: none;
+}
+
+/* ============================================
+   レスポンシブ対応（モバイル）
+   ============================================ */
+@media (max-width: 768px) {
+  .container {
+    width: 120px;
+    height: 120px;
+  }
+}

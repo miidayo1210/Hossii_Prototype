@@ -1,0 +1,86 @@
+/* Space Background Styles - Patterns, Colors, Images */
+
+/* Base background container */
+.bgBase {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+}
+
+/* Pattern: Mist - Gentle radial gradient with soft fog effect */
+.pattern_mist {
+  background:
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(ellipse at bottom left, rgba(200, 220, 240, 0.4), transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(220, 230, 250, 0.3), transparent 50%),
+    linear-gradient(to bottom, #f0f4f8, #e8f0f8);
+}
+
+/* Pattern: Dots - Subtle polka dots */
+.pattern_dots {
+  background-color: #f5f8fa;
+  background-image: radial-gradient(circle, rgba(200, 220, 240, 0.3) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Pattern: Grid - Minimal grid lines */
+.pattern_grid {
+  background-color: #f8f9fa;
+  background-image:
+    linear-gradient(rgba(200, 210, 220, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 210, 220, 0.15) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Pattern: Waves - Soft wave pattern */
+.pattern_waves {
+  background-color: #f0f7ff;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 35px,
+    rgba(180, 210, 240, 0.08) 35px,
+    rgba(180, 210, 240, 0.08) 70px
+  );
+}
+
+/* Pattern: Stars - Gentle star field */
+.pattern_stars {
+  background-color: #0a1628;
+  background-image:
+    radial-gradient(2px 2px at 20% 30%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(2px 2px at 60% 70%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 80% 10%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(2px 2px at 90% 60%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 33% 80%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 15% 90%, rgba(255, 255, 255, 0.5), transparent);
+  background-size: 200% 200%;
+  background-position: 0% 0%;
+}
+
+/* Image background support */
+.bgImage {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Optional: Overlay for better bubble/text visibility */
+.bgOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(1px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ensure content is above background */
+.bgContent {
+  position: relative;
+  z-index: 1;
+}

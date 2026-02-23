@@ -1,0 +1,146 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9fafb;
+}
+
+/* ヘッダー */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  padding-top: 4rem;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+/* メインコンテンツ */
+.main {
+  flex: 1;
+  max-width: 32rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+/* セクション */
+.section {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.25rem 0;
+}
+
+.sectionDescription {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0 0 0.75rem 0;
+}
+
+.inputRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input {
+  flex: 1;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #1f2937;
+  background: #fff;
+  transition: border-color 0.2s;
+  min-width: 0;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+}
+
+.input::placeholder {
+  color: #9ca3af;
+}
+
+.saveButton {
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+
+.saveButton:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.saveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.currentValue {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0.5rem 0 0 0;
+}
+
+/* 森情報 */
+.spaceInfo {
+  padding: 0.5rem 0;
+}
+
+.spaceName {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+/* Mobile: Bottom nav padding */
+@media (max-width: 768px) {
+  .container {
+    padding-bottom: 5rem;
+  }
+}
+
+/* スマホ対応 */
+@media (max-width: 480px) {
+  .header {
+    padding-top: 5rem;
+  }
+
+  .inputRow {
+    flex-direction: column;
+  }
+
+  .saveButton {
+    width: 100%;
+  }
+}

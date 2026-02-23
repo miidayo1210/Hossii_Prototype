@@ -1,0 +1,120 @@
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 1.5rem;
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+}
+
+.stamp {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  transform: translate(-50%, -50%);
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.stamp.filled {
+  animation: stampPop 0.5s ease-out both;
+}
+
+.stamp.empty {
+  width: 32px;
+  height: 32px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+}
+
+@keyframes stampPop {
+  0% {
+    transform: translate(-50%, -50%) scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3) rotate(180deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(360deg);
+    opacity: 1;
+  }
+}
+
+/* Theme-specific animations */
+.card.grid .stamp {
+  transition-delay: calc(var(--index, 0) * 0.02s);
+}
+
+.card.spiral .stamp.filled {
+  animation: stampPop 0.5s ease-out both, spiralIn 0.8s ease-out both;
+}
+
+@keyframes spiralIn {
+  from {
+    transform: translate(-50%, -50%) scale(0) rotate(-360deg);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+}
+
+.card.wave .stamp.filled {
+  animation: stampPop 0.5s ease-out both, waveFloat 3s ease-in-out infinite;
+}
+
+@keyframes waveFloat {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-8px);
+  }
+}
+
+.card.starry .stamp.filled {
+  animation: stampPop 0.5s ease-out both, starTwinkle 2s ease-in-out infinite;
+}
+
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.6;
+    filter: brightness(1.5);
+  }
+}
+
+.card.circle .stamp.filled {
+  animation: stampPop 0.5s ease-out both, circleRotate 20s linear infinite;
+}
+
+@keyframes circleRotate {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Mobile: Smaller stamps */
+@media (max-width: 768px) {
+  .stamp {
+    width: 36px;
+    height: 36px;
+    font-size: 1.5rem;
+  }
+
+  .stamp.empty {
+    width: 24px;
+    height: 24px;
+  }
+}

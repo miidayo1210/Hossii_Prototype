@@ -1,0 +1,324 @@
+/* Container - background is now dynamic via forest settings */
+.container {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  /* Background is applied dynamically via forestBackgrounds.module.css */
+}
+
+/* PC版: トップバー分の上部パディング */
+@media (min-width: 769px) {
+  .container {
+    padding-top: 4rem;
+  }
+}
+
+/* もりタイトル（左上・情報レイヤー） */
+.forestTitle {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10; /* 操作UIより下 */
+
+  font-size: clamp(14px, 2vw, 20px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(6px);
+
+  padding: 6px 10px;
+  border-radius: 8px;
+
+  pointer-events: none; /* 操作の邪魔をしない */
+}
+
+/* 操作パネル（左上・操作レイヤー） */
+.controlPanel {
+  position: fixed;
+  top: 12px;
+  left: 160px; /* タイトルと被らない */
+  z-index: 20;
+
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* 共有ボタン */
+.shareButton {
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.shareButton:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ヘッダー（フィルター、スペース名、メニュー） */
+.header {
+  position: fixed;
+  top: 1rem;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 1rem;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.headerLeft {
+  justify-self: start;
+}
+
+.headerCenter {
+  justify-self: center;
+}
+
+.headerRight {
+  justify-self: end;
+}
+
+/* 🎀 可愛く優しいスペース名のスタイル */
+.spaceName {
+  font-family: 'Zen Maru Gothic', 'Rounded Mplus 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(to right, #8b5cf6, #d946ef);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  letter-spacing: 0.05em;
+  filter: drop-shadow(0 2px 4px rgba(139, 92, 246, 0.2));
+  white-space: nowrap;
+}
+
+.sparkle {
+  font-size: 1rem;
+  -webkit-text-fill-color: initial;
+  animation: sparkle 2s infinite ease-in-out;
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2) rotate(15deg);
+  }
+}
+
+/* バブルエリア */
+.bubbleArea {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* 個別バブル */
+.bubble {
+  position: absolute;
+  max-width: 280px;
+  background: rgba(255, 251, 235, 0.85);
+  backdrop-filter: blur(4px);
+  border-radius: 1.5rem;
+  padding: 0.875rem 1rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(254, 215, 170, 0.6);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  animation: bubbleFloat 5s ease-in-out infinite;
+}
+
+.bubble:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  background: rgba(255, 251, 235, 0.95);
+  z-index: 10;
+}
+
+.bubbleActive {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(217, 119, 6, 0.2);
+  background: rgba(255, 251, 235, 0.98);
+  border-color: #f59e0b;
+  z-index: 20;
+}
+
+@keyframes bubbleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+/* バブル内コンテンツ */
+.bubbleInner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.bubbleEmoji {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.bubbleContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.bubbleMeta {
+  margin-bottom: 0.25rem;
+}
+
+.bubbleMetaText {
+  font-size: 0.625rem;
+  color: #92400e;
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 100%;
+}
+
+.bubbleText {
+  font-size: 0.875rem;
+  color: #451a03;
+  line-height: 1.5;
+  word-break: break-word;
+  margin: 0;
+}
+
+/* 空状態 */
+.empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #92400e;
+  z-index: 1;
+}
+
+.emptyIcon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+
+.emptyText {
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+/* カケラ粒子（置くエフェクト） */
+.particle {
+  position: fixed;
+  font-size: 1.5rem;
+  z-index: 150;
+  pointer-events: none;
+  animation: particleDrop 1.2s ease-out forwards;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+@keyframes particleDrop {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  40% {
+    transform: translateY(8px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.8);
+  }
+}
+
+/* Listening インジケーター */
+.listeningIndicator {
+  position: fixed;
+  bottom: 6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 2rem;
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  animation: indicatorPulse 2s ease-in-out infinite;
+}
+
+.listeningIcon {
+  font-size: 1rem;
+  animation: micPulse 1.5s ease-in-out infinite;
+}
+
+.listeningText {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #ec4899;
+  letter-spacing: 0.02em;
+}
+
+@keyframes indicatorPulse {
+  0%, 100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes micPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+/* Mobile: Bottom nav padding */
+@media (max-width: 768px) {
+  .container {
+    padding-bottom: 5rem; /* Space for bottom nav */
+  }
+}

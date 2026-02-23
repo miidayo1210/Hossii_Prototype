@@ -1,0 +1,61 @@
+/**
+ * HossiiToast - トーストUI
+ * 旧Leapdayスタイルを踏襲
+ */
+
+.container {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+  pointer-events: none;
+}
+
+.container.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 9999px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+.icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.message {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* タイプ別スタイル */
+.success {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.95) 0%, rgba(236, 72, 153, 0.95) 100%);
+  color: white;
+}
+
+.error {
+  background: rgba(239, 68, 68, 0.95);
+  color: white;
+}
+
+.info {
+  background: rgba(255, 255, 255, 0.95);
+  color: #6d28d9;
+  border: 1px solid rgba(233, 213, 255, 0.8);
+}

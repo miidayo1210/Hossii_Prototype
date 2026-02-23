@@ -1,0 +1,311 @@
+/* 背景：ピンク〜パープル〜ブルーのグラデーション */
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #fdf2f8 0%, #faf5ff 50%, #eff6ff 100%);
+}
+
+/* ヘッダー：Hossii */
+.header {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #e9d5ff; /* purple-200 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.greetingArea {
+  flex: 1;
+  min-width: 0;
+}
+
+.greeting {
+  font-size: 0.875rem;
+  color: #7c3aed; /* purple-600 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* メインコンテンツ */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  max-width: 42rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #6d28d9; /* purple-700 */
+  text-align: center;
+  margin: 0 0 1.5rem 0;
+}
+
+.section {
+  margin-bottom: 1.5rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  color: #7c3aed; /* purple-600 */
+  margin-bottom: 0.5rem;
+}
+
+/* クイック感情バー（Slack風、横並び） */
+.emotionBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(233, 213, 255, 0.5);
+}
+
+.emotionChip {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.625rem;
+  border: 1px solid transparent;
+  background: rgba(250, 245, 255, 0.8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.emotionChip:hover {
+  background: rgba(243, 232, 255, 1);
+  transform: scale(1.08);
+}
+
+.emotionChip:active {
+  transform: scale(0.95);
+}
+
+.emotionChipSelected {
+  background: linear-gradient(135deg, #e9d5ff 0%, #fbcfe8 100%);
+  border-color: #a855f7;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.25);
+  transform: scale(1.05);
+}
+
+.emotionChipSelected:hover {
+  transform: scale(1.08);
+}
+
+.emotionChipEmoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* 選択中の感情ヒント */
+.selectedEmotionHint {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: #7c3aed;
+  text-align: center;
+  animation: hintFadeIn 0.2s ease-out;
+}
+
+@keyframes hintFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* メッセージ入力 */
+.textarea {
+  width: 100%;
+  height: 6rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e9d5ff; /* purple-200 */
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: none;
+  background: rgba(255, 255, 255, 0.8);
+  color: #1f2937;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+}
+
+.textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* 写真添付エリア */
+.imageUploadArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 2px dashed #c4b5fd; /* purple-300 */
+  border-radius: 0.75rem;
+  background: rgba(250, 245, 255, 0.5);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.imageUploadArea:hover {
+  background: rgba(243, 232, 255, 0.5);
+}
+
+.imageUploadIcon {
+  font-size: 1.875rem;
+}
+
+.imageUploadText {
+  font-size: 0.875rem;
+  color: #7c3aed;
+}
+
+.imageInput {
+  display: none;
+}
+
+.imagePreviewContainer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #f3f4f6;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.imagePreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imageRemoveButton {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s;
+}
+
+.imageRemoveButton:hover {
+  background: white;
+}
+
+/* 送信ボタン */
+.submitButton {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: white;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.submitButton:hover:not(:disabled) {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.submitButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submitButton:disabled {
+  background: #d8b4fe;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 50;
+  text-align: center;
+  font-size: 0.875rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toastSuccess {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: white;
+}
+
+.toastError {
+  background: #ef4444;
+  color: white;
+}
+
+/* Disabled notice */
+.disabledNotice {
+  padding: 1rem;
+  margin: 1rem 0;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  color: #991b1b;
+  font-size: 0.875rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Mobile: Bottom nav padding */
+@media (max-width: 768px) {
+  .container {
+    padding-bottom: 5rem;
+  }
+}

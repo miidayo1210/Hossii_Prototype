@@ -1,0 +1,50 @@
+/**
+ * HossiiBackground - 背景UI
+ * ピンク〜紫〜青のグラデーション背景
+ */
+
+.background {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  transition: opacity 0.6s ease, background 0.6s ease;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+}
+
+/* ============================================
+   グラデーションバリアント
+   ============================================ */
+
+/* warm: ピンク〜紫〜青（デフォルト） */
+.warm.landscape {
+  background: linear-gradient(135deg, #fdf2f8 0%, #faf5ff 50%, #eff6ff 100%);
+}
+
+.warm.portrait {
+  background: linear-gradient(180deg, #fdf2f8 0%, #faf5ff 40%, #eff6ff 100%);
+}
+
+/* cool: 青〜紫〜ピンク */
+.cool.landscape {
+  background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 50%, #fdf2f8 100%);
+}
+
+.cool.portrait {
+  background: linear-gradient(180deg, #eff6ff 0%, #f5f3ff 40%, #fdf2f8 100%);
+}
+
+/* neutral: 白〜薄紫 */
+.neutral.landscape {
+  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 50%, #f5f3ff 100%);
+}
+
+.neutral.portrait {
+  background: linear-gradient(180deg, #ffffff 0%, #faf5ff 40%, #f5f3ff 100%);
+}
