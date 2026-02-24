@@ -138,7 +138,7 @@
   }
 }
 
-/* カードヘッダー（1行目: 森ピル + 時間） */
+/* カードヘッダー（1行目: スペースピル + 時間） */
 .cardHeader {
   display: flex;
   align-items: center;

@@ -96,7 +96,7 @@ export const MyLogsScreen = () => {
               {!profile?.id
                 ? 'まだ投稿がありません'
                 : filter === 'current'
-                ? 'この森への投稿はまだありません'
+                ? 'このスペースへの投稿はまだありません'
                 : '投稿履歴がありません'}
             </div>
           ) : (

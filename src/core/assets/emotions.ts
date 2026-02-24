@@ -28,8 +28,8 @@ export type LegacyEmotionKey13 =
 /** 現行8種（core/types から再利用） */
 export type EmotionKey8 = EmotionKey;
 
-/** 森演出メタ（最小版） */
-export type ForestObjectStyleMin = {
+/** スペース演出メタ（最小版） */
+export type SpaceObjectStyleMin = {
   count?: number | [number, number];
   float?: 'slow' | 'normal' | 'none';
   priority?: number;
@@ -66,10 +66,10 @@ export const BUBBLE_BY_EMOTION: Record<EmotionKey8, string[]> = {
 };
 
 // ============================================
-// 森演出メタ（最小版）
+// スペース演出メタ（最小版）
 // ============================================
 
-export const FOREST_OBJECT_STYLE_MIN: Partial<Record<EmotionKey8, ForestObjectStyleMin>> = {
+export const SPACE_OBJECT_STYLE_MIN: Partial<Record<EmotionKey8, SpaceObjectStyleMin>> = {
   wow: { count: [3, 5], float: 'normal', priority: 2 },
   empathy: { count: [1, 2], float: 'slow', priority: 1 },
   inspire: { count: 1, float: 'none', priority: 5 },
@@ -93,10 +93,10 @@ export function getRandomBubble8(emotion: EmotionKey8): string {
 }
 
 /**
- * 森オブジェクトの出現数を計算
+ * スペースオブジェクトの出現数を計算
  */
-export function getForestObjectCount8(emotion: EmotionKey8): number {
-  const style = FOREST_OBJECT_STYLE_MIN[emotion];
+export function getSpaceObjectCount8(emotion: EmotionKey8): number {
+  const style = SPACE_OBJECT_STYLE_MIN[emotion];
   if (!style?.count) return 1;
 
   const count = style.count;

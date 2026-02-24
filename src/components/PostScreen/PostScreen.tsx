@@ -186,7 +186,7 @@ export const PostScreen = () => {
 
     setSending(false);
 
-    // 少し待ってから森へ遷移
+    // 少し待ってからスペースへ遷移
     setTimeout(() => {
       navigate('screen');
     }, 800);

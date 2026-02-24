@@ -1,10 +1,10 @@
-/* Container - background is now dynamic via forest settings */
+/* Container - background is now dynamic via space settings */
 .container {
   min-height: 100vh;
   width: 100%;
   position: relative;
   overflow: hidden;
-  /* Background is applied dynamically via forestBackgrounds.module.css */
+  /* Background is applied dynamically via spaceBackgrounds.module.css */
 }
 
 /* PC版: トップバー分の上部パディング */
@@ -14,8 +14,8 @@
   }
 }
 
-/* もりタイトル（左上・情報レイヤー） */
-.forestTitle {
+/* スペースタイトル（左上・情報レイヤー） */
+.spaceTitle {
   position: fixed;
   top: 12px;
   left: 12px;

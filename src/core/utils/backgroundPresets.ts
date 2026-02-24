@@ -8,7 +8,7 @@ import type { PatternKey, SpaceBackground } from '../types/space';
 // Color Presets
 export const COLOR_PRESETS: Array<{ key: string; label: string; value: string }> = [
   { key: 'sky', label: '空色', value: '#EAF4FF' },
-  { key: 'forest', label: '森色', value: '#E8F5E9' },
+  { key: 'space', label: 'スペース色', value: '#E8F5E9' },
   { key: 'sunset', label: '夕焼け', value: '#FFF3E0' },
   { key: 'lavender', label: 'ラベンダー', value: '#F3E5F5' },
   { key: 'mint', label: 'ミント', value: '#E0F2F1' },

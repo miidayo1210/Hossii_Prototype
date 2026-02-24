@@ -58,14 +58,14 @@
   margin: 0 0 0.75rem 0;
 }
 
-/* 森一覧 */
-.forestList {
+/* スペース一覧 */
+.spaceList {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.forestCard {
+.spaceCard {
   background: #fff;
   border-radius: 0.75rem;
   padding: 1rem;
@@ -76,7 +76,7 @@
   gap: 0;
 }
 
-.forestCardMain {
+.spaceCardMain {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -84,24 +84,24 @@
   width: 100%;
 }
 
-.forestCardActive {
+.spaceCardActive {
   border-color: #a78bfa;
   background: linear-gradient(135deg, #faf5ff 0%, #fdf4ff 100%);
 }
 
-.forestInfo {
+.spaceInfo {
   flex: 1;
   min-width: 0;
 }
 
-.forestName {
+.spaceName {
   font-size: 0.9375rem;
   font-weight: 500;
   color: #1f2937;
   word-break: break-word;
 }
 
-.forestMeta {
+.spaceMeta {
   font-size: 0.75rem;
   color: #6b7280;
   margin-top: 0.25rem;
@@ -119,19 +119,19 @@
   border-radius: 999px;
 }
 
-.forestId {
+.spaceId {
   display: flex;
   align-items: center;
   gap: 0.25rem;
   margin-top: 0.375rem;
 }
 
-.forestIdLabel {
+.spaceIdLabel {
   font-size: 0.625rem;
   color: #9ca3af;
 }
 
-.forestIdValue {
+.spaceIdValue {
   font-size: 0.625rem;
   color: #6b7280;
   background: #f3f4f6;
@@ -140,7 +140,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.forestActions {
+.spaceActions {
   display: flex;
   gap: 0.5rem;
   flex-shrink: 0;
@@ -312,12 +312,12 @@
     padding-top: 5rem;
   }
 
-  .forestCard {
+  .spaceCard {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .forestActions {
+  .spaceActions {
     width: 100%;
     justify-content: flex-end;
   }
