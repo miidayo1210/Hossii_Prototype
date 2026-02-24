@@ -30,18 +30,20 @@ export function saveSpaces(spaces: Space[]): void {
     const toSave = spaces.map((f) => {
       // 一時画像の場合は background を除外
       if (f.background?.kind === 'image' && f.background.source === 'temp') {
-        return {
-          id: f.id,
-          name: f.name,
-          cardType: f.cardType,
-          quickEmotions: f.quickEmotions,
-          createdAt: f.createdAt.toISOString(),
-          // background は保存しない（一時画像のため）
-        };
+      return {
+        id: f.id,
+        spaceURL: f.spaceURL,
+        name: f.name,
+        cardType: f.cardType,
+        quickEmotions: f.quickEmotions,
+        createdAt: f.createdAt.toISOString(),
+        // background は保存しない（一時画像のため）
+      };
       }
 
       return {
         id: f.id,
+        spaceURL: f.spaceURL,
         name: f.name,
         cardType: f.cardType,
         quickEmotions: f.quickEmotions,

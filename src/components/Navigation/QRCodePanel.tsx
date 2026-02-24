@@ -3,12 +3,15 @@ import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import styles from './QRCodePanel.module.css';
 
 export const QRCodePanel = () => {
-  const { state } = useHossiiStore();
+  const { state, getActiveSpace } = useHossiiStore();
+  const activeSpace = getActiveSpace();
 
-  // Generate space URL with current space ID
-  const spaceUrl = state.activeSpaceId
-    ? `${window.location.origin}?space=${state.activeSpaceId}`
-    : window.location.origin;
+  // /s/[spaceURL] 形式を優先。未設定の場合は旧 ?space=xxx にフォールバック
+  const spaceUrl = activeSpace?.spaceURL
+    ? `${window.location.origin}/s/${activeSpace.spaceURL}`
+    : state.activeSpaceId
+      ? `${window.location.origin}?space=${state.activeSpaceId}`
+      : window.location.origin;
 
   return (
     <aside className={styles.qrPanel}>

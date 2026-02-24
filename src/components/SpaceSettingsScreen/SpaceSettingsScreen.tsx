@@ -7,9 +7,10 @@ import type { SpaceSettings } from '../../core/types/settings';
 import { GeneralTab } from './GeneralTab';
 import { HossiiCustomTab } from './HossiiCustomTab';
 import { BackgroundTab } from './BackgroundTab';
+import { ShareTab } from './ShareTab';
 import styles from './SpaceSettingsScreen.module.css';
 
-type Tab = 'general' | 'hossii' | 'background';
+type Tab = 'general' | 'hossii' | 'background' | 'share';
 
 export const SpaceSettingsScreen = () => {
   const { navigate } = useRouter();
@@ -93,6 +94,12 @@ export const SpaceSettingsScreen = () => {
             >
               背景設定
             </button>
+            <button
+              className={`${styles.tab} ${activeTab === 'share' ? styles.activeTab : ''}`}
+              onClick={() => setActiveTab('share')}
+            >
+              シェア / QR
+            </button>
           </nav>
         </aside>
 
@@ -105,6 +112,9 @@ export const SpaceSettingsScreen = () => {
           )}
           {activeTab === 'background' && (
             <BackgroundTab settings={settings} onUpdate={setSettings} />
+          )}
+          {activeTab === 'share' && (
+            <ShareTab />
           )}
         </main>
       </div>

@@ -28,6 +28,7 @@ export type SpaceBackground =
 // 投稿自体は quickEmotions に含まれない emotion も許可
 export type Space = {
   id: SpaceId;
+  spaceURL?: string;            // パブリックURL用スラッグ（変更可）例: "mornings-team"
   name: string;
   cardType: CardType;
   quickEmotions: EmotionKey[]; // 最大8（UI用、制限ではない）
@@ -59,6 +60,7 @@ export const DEFAULT_BACKGROUND: SpaceBackground = {
 // デフォルトスペース
 export const DEFAULT_SPACE: Space = {
   id: DEFAULT_SPACE_ID,
+  spaceURL: 'my-space',
   name: 'わたしのスペース',
   cardType: 'constellation',
   quickEmotions: DEFAULT_QUICK_EMOTIONS,

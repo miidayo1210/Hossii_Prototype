@@ -115,7 +115,10 @@ const normalizeSpace = (f: unknown): Space => {
     ? (raw.background as SpaceBackground)
     : DEFAULT_BACKGROUND;
 
-  return { id, name, cardType, quickEmotions, createdAt, background };
+  // spaceURL: 存在すれば保持、なければ undefined のまま（設定画面で後から設定可能）
+  const spaceURL = typeof raw.spaceURL === 'string' && raw.spaceURL ? raw.spaceURL : undefined;
+
+  return { id, spaceURL, name, cardType, quickEmotions, createdAt, background };
 };
 
 // 初期化: localStorage からスペースを読み込み、なければデフォルトスペースを作成

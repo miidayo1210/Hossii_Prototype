@@ -29,6 +29,7 @@ const AppContent = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userProfile, setUserProfile] = useState<{ userId: string; nickname: string } | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
 
   // 処理済みの spaceId を追跡（二重処理防止）
   const processedSpaceIdRef = useRef<string | null>(null);
@@ -57,6 +58,29 @@ const AppContent = () => {
       }
     }
   }, [currentUser, userProfile, showOnboarding]);
+
+  // /s/[slug] パスでスペースに直接アクセス
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/);
+    if (!match) return;
+
+    const slug = match[1];
+    const targetSpace = state.spaces.find((s) => s.spaceURL === slug);
+
+    if (targetSpace) {
+      setActiveSpace(targetSpace.id);
+      // ニックネーム未設定ならモーダル表示
+      if (!hasNicknameForSpace(targetSpace.id)) {
+        setPendingSpaceId(targetSpace.id);
+        setShowNicknameModal(true);
+      }
+      // パスをクリアしてハッシュベースのスペース画面へ
+      window.history.replaceState({}, '', '/#screen');
+    } else {
+      setSpaceURLNotFound(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.spaces]);
 
   // ?space=xxx でスペースを切り替え（招待リンク対応）
   useEffect(() => {
@@ -110,6 +134,48 @@ const AppContent = () => {
     // Save to localStorage (TODO: Save to Firestore)
     localStorage.setItem(`profile_${currentUser.uid}`, JSON.stringify(profile));
   };
+
+  // /s/[slug] にアクセスしたがスペースが見つからない場合
+  if (spaceURLNotFound) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100dvh',
+        gap: '16px',
+        color: '#6b7280',
+        fontFamily: 'sans-serif',
+      }}>
+        <div style={{ fontSize: '48px' }}>🔍</div>
+        <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#1f2937', margin: 0 }}>
+          スペースが見つかりません
+        </h1>
+        <p style={{ fontSize: '14px', margin: 0 }}>
+          このURLのスペースは存在しないか、削除された可能性があります。
+        </p>
+        <button
+          onClick={() => {
+            setSpaceURLNotFound(false);
+            window.history.replaceState({}, '', '/');
+          }}
+          style={{
+            marginTop: '8px',
+            padding: '10px 24px',
+            borderRadius: '8px',
+            border: 'none',
+            background: '#6366f1',
+            color: '#fff',
+            fontSize: '14px',
+            cursor: 'pointer',
+          }}
+        >
+          トップへ戻る
+        </button>
+      </div>
+    );
+  }
 
   // Show start screen if not authenticated
   if (!currentUser) {
