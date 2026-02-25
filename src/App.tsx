@@ -25,7 +25,7 @@ import styles from './App.module.css';
 const AppContent = () => {
   const { currentUser } = useAuth();
   const { screen, navigate } = useRouter();
-  const { state, setActiveSpace, addSpace, hasNicknameForSpace } = useHossiiStore();
+  const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -106,12 +106,12 @@ const AppContent = () => {
           setGuestSpaceId(targetSpace.id);
         }
       }
-    } else if (state.spaces.length > 0) {
-      // スペースが読み込まれた上で見つからない場合のみ "not found" にする
+    } else if (spacesLoadedFromSupabase) {
+      // Supabase からのスペース読み込みが完了した上で見つからない場合のみ "not found" にする
       setSpaceURLNotFound(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.spaces, currentUser]);
+  }, [state.spaces, currentUser, spacesLoadedFromSupabase]);
 
   // ?space=xxx でスペースを切り替え（招待リンク対応）
   useEffect(() => {

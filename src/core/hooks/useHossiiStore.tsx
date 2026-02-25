@@ -6,6 +6,7 @@ import {
   useMemo,
   useEffect,
   useRef,
+  useState,
   type ReactNode,
 } from 'react';
 import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
@@ -516,6 +517,7 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
 
 type HossiiContextValue = {
   state: ExtendedHossiiState;
+  spacesLoadedFromSupabase: boolean;
   addHossii: (input: AddHossiiInput) => void;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -592,6 +594,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // Supabase からのスペース読み込みが完了したかどうか
+  // Supabase 未設定の場合は localStorage のみを使うため即 true
+  const [spacesLoadedFromSupabase, setSpacesLoadedFromSupabase] = useState(!isSupabaseConfigured);
+
   // ===== Supabase: スペースをマウント時に同期 =====
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -600,6 +606,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       if (supabaseSpaces.length > 0) {
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
       }
+      setSpacesLoadedFromSupabase(true);
     });
   }, []);
 
@@ -841,6 +848,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     <HossiiContext.Provider
       value={{
         state,
+        spacesLoadedFromSupabase,
         addHossii,
         selectHossii,
         clearAll,
