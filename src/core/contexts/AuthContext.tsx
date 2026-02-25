@@ -15,6 +15,7 @@ type AuthContextType = {
   signUp: (email: string, password: string) => Promise<MockUser>;
   login: (email: string, password: string) => Promise<MockUser>;
   adminLogin: (email: string, password: string) => Promise<MockUser>;
+  adminSignUp: (email: string, password: string, communityName: string) => Promise<MockUser>;
   logout: () => Promise<void>;
   loginWithGoogle: (asAdmin?: boolean) => Promise<MockUser>;
   loginWithFacebook: () => Promise<MockUser>;
@@ -122,6 +123,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return user;
   };
 
+  // Admin sign up with email and password (MOCK - creates admin user)
+  // communityName is stored in displayName for now
+  // Future: use supabase.auth.signUp() then set app_metadata.role = "admin" via service role
+  const adminSignUp = async (email: string, _password: string, communityName: string): Promise<MockUser> => {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    const user: MockUser = {
+      uid: `admin-${Date.now()}`,
+      email,
+      displayName: communityName,
+      isAdmin: true,
+    };
+    setCurrentUser(user);
+    saveMockUser(user);
+
+    return user;
+  };
+
   // Logout (MOCK)
   const logout = async (): Promise<void> => {
     // Simulate network delay
@@ -161,6 +180,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     signUp,
     login,
     adminLogin,
+    adminSignUp,
     logout,
     loginWithGoogle,
     loginWithFacebook,

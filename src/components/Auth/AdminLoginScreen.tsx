@@ -1,19 +1,36 @@
 import { useState } from 'react';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, Building2 } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import styles from './LoginScreen.module.css';
 import adminStyles from './AdminLoginScreen.module.css';
+
+type Tab = 'login' | 'register';
 
 type Props = {
   onLoginSuccess: () => void;
 };
 
 export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
-  const { adminLogin, loginWithGoogle, logout } = useAuth();
+  const { adminLogin, adminSignUp, loginWithGoogle, logout } = useAuth();
+
+  const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [communityName, setCommunityName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setCommunityName('');
+    setError(null);
+  };
+
+  const handleTabChange = (next: Tab) => {
+    setTab(next);
+    resetForm();
+  };
 
   const handleAdminCheck = async (isAdmin: boolean) => {
     if (isAdmin) {
@@ -40,7 +57,23 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleEmailRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const user = await adminSignUp(email, password, communityName);
+      await handleAdminCheck(user.isAdmin);
+    } catch (err: unknown) {
+      console.error('Admin sign up error:', err);
+      setError('登録に失敗しました。入力内容をご確認ください。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
     setError(null);
     setLoading(true);
 
@@ -48,7 +81,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
       const user = await loginWithGoogle(true);
       await handleAdminCheck(user.isAdmin);
     } catch (err: unknown) {
-      console.error('Google login error:', err);
+      console.error('Google auth error:', err);
       setError('Googleログインに失敗しました。');
     } finally {
       setLoading(false);
@@ -64,7 +97,29 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
       <div className={styles.card}>
         <div className={styles.header}>
           <h1 className={styles.title}>✨ Hossii</h1>
-          <p className={styles.subtitle}>管理者ログイン</p>
+          <p className={styles.subtitle}>
+            {tab === 'login' ? '管理者ログイン' : 'コミュニティを登録'}
+          </p>
+        </div>
+
+        {/* タブ切り替え */}
+        <div className={styles.tabs}>
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === 'login' ? styles.tabActive : ''}`}
+            onClick={() => handleTabChange('login')}
+            disabled={loading}
+          >
+            ログイン
+          </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === 'register' ? styles.tabActive : ''}`}
+            onClick={() => handleTabChange('register')}
+            disabled={loading}
+          >
+            コミュニティを登録
+          </button>
         </div>
 
         {error && (
@@ -73,11 +128,11 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
           </div>
         )}
 
-        {/* Google login */}
+        {/* Google ボタン */}
         <div className={styles.socialButtons}>
           <button
             className={`${styles.socialButton} ${styles.googleButton}`}
-            onClick={handleGoogleLogin}
+            onClick={handleGoogleAuth}
             disabled={loading}
           >
             <svg className={styles.socialIcon} viewBox="0 0 24 24">
@@ -86,7 +141,9 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            <span>Googleでログイン</span>
+            <span>
+              {tab === 'login' ? 'Googleでログイン' : 'Googleで登録'}
+            </span>
           </button>
         </div>
 
@@ -94,42 +151,97 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
           <span className={styles.dividerText}>または</span>
         </div>
 
-        {/* Email/Password form */}
-        <form onSubmit={handleEmailLogin} className={styles.form}>
-          <div className={styles.inputGroup}>
-            <Mail size={18} className={styles.inputIcon} />
-            <input
-              type="email"
-              className={styles.input}
-              placeholder="メールアドレス"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
+        {/* ログインフォーム */}
+        {tab === 'login' && (
+          <form onSubmit={handleEmailLogin} className={styles.form}>
+            <div className={styles.inputGroup}>
+              <Mail size={18} className={styles.inputIcon} />
+              <input
+                type="email"
+                className={styles.input}
+                placeholder="メールアドレス"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
 
-          <div className={styles.inputGroup}>
-            <Lock size={18} className={styles.inputIcon} />
-            <input
-              type="password"
-              className={styles.input}
-              placeholder="パスワード"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
+            <div className={styles.inputGroup}>
+              <Lock size={18} className={styles.inputIcon} />
+              <input
+                type="password"
+                className={styles.input}
+                placeholder="パスワード"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
 
-          <button
-            type="submit"
-            className={styles.submitButton}
-            disabled={loading}
-          >
-            {loading ? '処理中...' : 'ログイン'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              className={styles.submitButton}
+              disabled={loading}
+            >
+              {loading ? '処理中...' : 'ログイン'}
+            </button>
+          </form>
+        )}
+
+        {/* コミュニティ登録フォーム */}
+        {tab === 'register' && (
+          <form onSubmit={handleEmailRegister} className={styles.form}>
+            <div className={styles.inputGroup}>
+              <Building2 size={18} className={styles.inputIcon} />
+              <input
+                type="text"
+                className={styles.input}
+                placeholder="コミュニティ名"
+                value={communityName}
+                onChange={(e) => setCommunityName(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className={styles.inputGroup}>
+              <Mail size={18} className={styles.inputIcon} />
+              <input
+                type="email"
+                className={styles.input}
+                placeholder="メールアドレス"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className={styles.inputGroup}>
+              <Lock size={18} className={styles.inputIcon} />
+              <input
+                type="password"
+                className={styles.input}
+                placeholder="パスワード"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                minLength={8}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className={styles.submitButton}
+              disabled={loading || !communityName.trim()}
+            >
+              {loading ? '処理中...' : 'コミュニティを登録'}
+            </button>
+          </form>
+        )}
 
         <p className={adminStyles.notice}>
           ※ このページは管理者専用です

@@ -1,258 +1,608 @@
+/* ================================================
+   SpacesScreen — 管理者スペース管理画面（PC 前提）
+   ================================================ */
+
 .container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f9fafb;
+  background-color: #f3f4f6;
 }
 
-/* ヘッダー */
-.header {
+/* ------------------------------------------------
+   管理者ヘッダー
+   ------------------------------------------------ */
+.adminHeader {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  padding: 1rem;
-  padding-top: 4rem;
-}
-
-.title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1f2937;
-  margin: 0;
-}
-
-.subtitle {
-  font-size: 0.75rem;
-  color: #6b7280;
-  margin: 0.25rem 0 0 0;
-}
-
-/* メインコンテンツ */
-.main {
-  flex: 1;
-  max-width: 40rem;
-  width: 100%;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
-}
-
-/* セクション */
-.section {
-  margin-bottom: 2rem;
-}
-
-.sectionTitle {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
-  margin: 0 0 0.75rem 0;
-}
-
-.sectionDescription {
-  font-size: 0.75rem;
-  color: #6b7280;
-  margin: 0 0 0.75rem 0;
-}
-
-/* スペース一覧 */
-.spaceList {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 0 1.5rem;
+  height: 60px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.adminHeaderLeft {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
 }
 
+.adminLogo {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #7c3aed;
+  letter-spacing: -0.01em;
+}
+
+.adminPageTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.adminHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* 新規作成ボタン */
+.createSpaceButton {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.625rem;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.createSpaceButton:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+/* アカウントドロップダウン */
+.accountDropdown {
+  position: relative;
+}
+
+.accountButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.625rem;
+  background: #fff;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.accountButton:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.accountMenu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 220px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.accountMenuInfo {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.accountMenuName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.125rem 0;
+}
+
+.accountMenuEmail {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+  word-break: break-all;
+}
+
+.accountMenuLogout {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  color: #ef4444;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.accountMenuLogout:hover {
+  background: #fef2f2;
+}
+
+/* ------------------------------------------------
+   メインコンテンツ
+   ------------------------------------------------ */
+.main {
+  flex: 1;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ------------------------------------------------
+   スペースグリッド
+   ------------------------------------------------ */
+.spaceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+@media (max-width: 1279px) {
+  .spaceGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 899px) {
+  .spaceGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 599px) {
+  .spaceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------------
+   スペースカード
+   ------------------------------------------------ */
 .spaceCard {
   background: #fff;
-  border-radius: 0.75rem;
-  padding: 1rem;
+  border-radius: 1rem;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
-.spaceCardMain {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
+.spaceCard:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* 背景サムネイル */
+.cardBg {
+  height: 72px;
   width: 100%;
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
 }
 
-.spaceCardActive {
-  border-color: #a78bfa;
-  background: linear-gradient(135deg, #faf5ff 0%, #fdf4ff 100%);
+.cardBgImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.spaceInfo {
+.cardBgOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.2s;
+}
+
+.cardBg:hover .cardBgOverlay {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.cardBgEditHint {
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.cardBg:hover .cardBgEditHint {
+  opacity: 1;
+}
+
+/* カード本体 */
+.cardBody {
+  padding: 0.875rem 1rem;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+/* スペース名 */
+.cardNameRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cardName {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardNameInput {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+  border: 1px solid #a78bfa;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  outline: none;
+  background: #faf5ff;
   min-width: 0;
 }
 
-.spaceName {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: #1f2937;
-  word-break: break-word;
+.cardNameInput:focus {
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15);
 }
 
-.spaceMeta {
+.iconButton {
+  flex-shrink: 0;
+  padding: 0.25rem;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.iconButton:hover {
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+
+/* カードタイプ */
+.cardTypeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cardTypeLabel {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.cardTypeSelect {
+  flex: 1;
+  font-size: 0.75rem;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.375rem;
+  background: #f9fafb;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cardTypeSelect:focus {
+  border-color: #a78bfa;
+}
+
+/* スペースURL (slug) */
+.cardSlugRow {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.cardSlugLabel {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.cardSlug {
+  flex: 1;
   font-size: 0.75rem;
   color: #6b7280;
-  margin-top: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.activeBadge {
-  background: linear-gradient(135deg, #e9d5ff 0%, #fbcfe8 100%);
-  color: #7c3aed;
-  font-size: 0.625rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-}
-
-.spaceId {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.375rem;
-}
-
-.spaceIdLabel {
-  font-size: 0.625rem;
-  color: #9ca3af;
-}
-
-.spaceIdValue {
-  font-size: 0.625rem;
-  color: #6b7280;
   background: #f3f4f6;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
-.spaceActions {
+.cardSlugInput {
+  flex: 1;
+  font-size: 0.75rem;
+  color: #1f2937;
+  border: 1px solid #a78bfa;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: #faf5ff;
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  min-width: 0;
+}
+
+.cardSlugInput:focus {
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15);
+}
+
+.cardSlugError {
+  font-size: 0.625rem;
+  color: #ef4444;
+  margin-top: 0.125rem;
+}
+
+/* カードアクション */
+.cardActions {
+  padding: 0 1rem 0.875rem 1rem;
   display: flex;
   gap: 0.5rem;
-  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
-.copyButton,
-.openButton,
-.deleteButton,
-.createButton,
-.addButton,
-.idCopyButton {
-  padding: 0.5rem 0.875rem;
+.copyButton {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.copyButton:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.copyButtonCopied {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.deleteButton {
+  padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   border: none;
-}
-
-.idCopyButton {
-  background: #fff;
-  color: #6b7280;
-  border: 1px solid #d1d5db;
-}
-
-.idCopyButton:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
-}
-
-.copyButton {
-  background: #f3f4f6;
-  color: #4b5563;
-}
-
-.copyButton:hover {
-  background: #e5e7eb;
-}
-
-.openButton {
-  background: linear-gradient(135deg, #a78bfa 0%, #c084fc 100%);
-  color: #fff;
-}
-
-.openButton:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.deleteButton {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: #fff;
+  background: #fef2f2;
+  color: #ef4444;
+  white-space: nowrap;
 }
 
 .deleteButton:hover {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  transform: translateY(-1px);
+  background: #fee2e2;
+  color: #dc2626;
 }
 
-/* フォーム */
-.form {
-  background: #fff;
-  border-radius: 0.75rem;
-  padding: 1rem;
-  border: 1px solid #e5e7eb;
+/* 背景セレクター展開エリア */
+.bgSelectorContainer {
+  border-top: 1px solid #f3f4f6;
+  padding: 0.875rem 1rem;
 }
 
-.formRow {
-  margin-bottom: 0.75rem;
+/* ------------------------------------------------
+   空の状態
+   ------------------------------------------------ */
+.emptyState {
+  grid-column: 1 / -1;
+  padding: 4rem 2rem;
+  text-align: center;
+  color: #9ca3af;
 }
 
-.formRow:last-child {
-  margin-bottom: 0;
+.emptyStateIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
 }
 
-.label {
-  display: block;
-  font-size: 0.75rem;
+.emptyStateText {
+  font-size: 1rem;
   font-weight: 500;
-  color: #374151;
-  margin-bottom: 0.375rem;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
 }
 
-.input {
+.emptyStateSubtext {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* ------------------------------------------------
+   スペース作成モーダル
+   ------------------------------------------------ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 1.25rem;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.modalHeader {
+  padding: 1.25rem 1.5rem 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.modalCloseButton {
+  padding: 0.25rem;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.modalCloseButton:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
+.modalBody {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.formLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.formInput {
   width: 100%;
   padding: 0.625rem 0.75rem;
   border: 1px solid #d1d5db;
   border-radius: 0.5rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: #1f2937;
   background: #fff;
   transition: border-color 0.2s;
   box-sizing: border-box;
-}
-
-.input:focus {
   outline: none;
-  border-color: #a78bfa;
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
 }
 
-.input::placeholder {
+.formInput:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.12);
+}
+
+.formInput::placeholder {
   color: #9ca3af;
 }
 
-.radioGroup {
+.formSlugRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.formSlugPrefix {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.formError {
+  font-size: 0.75rem;
+  color: #ef4444;
+  margin-top: 0.125rem;
+}
+
+.formRadioGroup {
   display: flex;
   gap: 1rem;
 }
 
-.radioLabel {
+.formRadioLabel {
   display: flex;
   align-items: center;
   gap: 0.375rem;
@@ -261,89 +611,69 @@
   cursor: pointer;
 }
 
-.radioLabel input[type="radio"] {
+.formRadioLabel input[type="radio"] {
   accent-color: #7c3aed;
 }
 
-.createButton {
-  width: 100%;
+.modalFooter {
+  padding: 0 1.5rem 1.25rem 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.modalCancelButton {
+  padding: 0.625rem 1.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.625rem;
+  background: #fff;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modalCancelButton:hover {
+  background: #f9fafb;
+}
+
+.modalSubmitButton {
+  padding: 0.625rem 1.5rem;
+  border: none;
+  border-radius: 0.625rem;
   background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
   color: #fff;
-  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.createButton:hover:not(:disabled) {
+.modalSubmitButton:hover:not(:disabled) {
   opacity: 0.9;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
 }
 
-.createButton:disabled {
+.modalSubmitButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.addButton {
-  width: 100%;
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
-  margin-top: 0.5rem;
-}
-
-.addButton:hover:not(:disabled) {
-  background: #e5e7eb;
-}
-
-.addButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Mobile: Bottom nav padding */
+/* ------------------------------------------------
+   モバイル補正
+   ------------------------------------------------ */
 @media (max-width: 768px) {
   .container {
     padding-bottom: 5rem;
   }
-}
 
-/* スマホ対応 */
-@media (max-width: 480px) {
-  .header {
-    padding-top: 5rem;
+  .adminHeader {
+    padding: 0 1rem;
   }
 
-  .spaceCard {
-    flex-direction: column;
-    align-items: flex-start;
+  .main {
+    padding: 1.25rem 1rem;
   }
-
-  .spaceActions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
-
-/* Background Button */
-.bgButton {
-  padding: 0.5rem 0.875rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #6b7280;
-}
-
-.bgButton:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
-}
-
-/* Background Selector Container */
-.bgSelectorContainer {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
 }
