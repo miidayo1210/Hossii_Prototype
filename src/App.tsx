@@ -13,6 +13,7 @@ import { SpaceSettingsScreen } from './components/SpaceSettingsScreen/SpaceSetti
 import { StampCardScreen } from './components/StampCardScreen/StampCardScreen';
 import { StartScreen } from './components/StartScreen/StartScreen';
 import { AdminLoginScreen } from './components/Auth/AdminLoginScreen';
+import { GuestEntryScreen } from './components/Auth/GuestEntryScreen';
 import { OnboardingModal } from './components/Auth/OnboardingModal';
 import { TutorialOverlay } from './components/Tutorial/TutorialOverlay';
 import { NicknameModal } from './components/NicknameModal/NicknameModal';
@@ -32,19 +33,33 @@ const AppContent = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
 
+  // /s/[slug] ゲスト入室フロー用 state
+  // guestSpaceId: 未ログインで /s/[slug] にアクセスしたときのスペースID
+  // isGuestMode: ゲストとして入室済み（ニックネーム入力完了後）
+  const [guestSpaceId, setGuestSpaceId] = useState<string | null>(null);
+  const [isGuestMode, setIsGuestMode] = useState(false);
+
   // /admin/login パスを検出（pathname ベース）
-  const [appRoute] = useState<'admin-login' | 'default'>(() =>
+  const [appRoute, setAppRoute] = useState<'admin-login' | 'default'>(() =>
     window.location.pathname === '/admin/login' ? 'admin-login' : 'default'
   );
+
+  // 管理者ログイン済みで /admin/login にアクセスした場合は useEffect でリダイレクト
+  useEffect(() => {
+    if (appRoute === 'admin-login' && currentUser?.isAdmin) {
+      window.history.replaceState({}, '', '/');
+      navigate('spaces');
+      setAppRoute('default');
+    }
+  }, [appRoute, currentUser, navigate]);
 
   // 処理済みの spaceId を追跡（二重処理防止）
   const processedSpaceIdRef = useRef<string | null>(null);
 
   // Check if user needs onboarding (new user without profile)
+  // 管理者はオンボーディング不要（コミュニティ名が表示名を兼ねる）
   useEffect(() => {
-    if (currentUser && !userProfile) {
-      // TODO: Check Firestore for existing profile
-      // For now, show onboarding for all new users
+    if (currentUser && !currentUser.isAdmin && !userProfile) {
       const hasProfile = localStorage.getItem(`profile_${currentUser.uid}`);
       if (!hasProfile) {
         setShowOnboarding(true);
@@ -74,19 +89,29 @@ const AppContent = () => {
     const targetSpace = state.spaces.find((s) => s.spaceURL === slug);
 
     if (targetSpace) {
-      setActiveSpace(targetSpace.id);
-      // ニックネーム未設定ならモーダル表示
-      if (!hasNicknameForSpace(targetSpace.id)) {
-        setPendingSpaceId(targetSpace.id);
-        setShowNicknameModal(true);
+      // スペースが見つかった場合は "not found" をリセット
+      setSpaceURLNotFound(false);
+
+      if (currentUser) {
+        // ログイン済み: そのまま入室
+        setActiveSpace(targetSpace.id);
+        if (!hasNicknameForSpace(targetSpace.id)) {
+          setPendingSpaceId(targetSpace.id);
+          setShowNicknameModal(true);
+        }
+        window.history.replaceState({}, '', '/#screen');
+      } else {
+        // 未ログイン: ゲスト入室画面を表示（isGuestMode でなければ）
+        if (!isGuestMode) {
+          setGuestSpaceId(targetSpace.id);
+        }
       }
-      // パスをクリアしてハッシュベースのスペース画面へ
-      window.history.replaceState({}, '', '/#screen');
-    } else {
+    } else if (state.spaces.length > 0) {
+      // スペースが読み込まれた上で見つからない場合のみ "not found" にする
       setSpaceURLNotFound(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.spaces]);
+  }, [state.spaces, currentUser]);
 
   // ?space=xxx でスペースを切り替え（招待リンク対応）
   useEffect(() => {
@@ -183,26 +208,44 @@ const AppContent = () => {
     );
   }
 
-  // /admin/login パスの場合: 認証状態に関わらず管理者ログイン画面を表示
+  // /admin/login パスの場合: 管理者ログイン画面を表示
   if (appRoute === 'admin-login') {
-    // すでに管理者としてログイン済みなら管理画面へ
     if (currentUser?.isAdmin) {
-      window.history.replaceState({}, '', '/');
-      navigate('spaces');
-    } else {
-      return (
-        <AdminLoginScreen
-          onLoginSuccess={() => {
-            window.history.replaceState({}, '', '/');
-            navigate('spaces');
-          }}
-        />
-      );
+      // useEffect でリダイレクト中 → 一時的に何も表示しない（すぐに遷移する）
+      return null;
     }
+    return (
+      <AdminLoginScreen
+        onLoginSuccess={() => {
+          window.history.replaceState({}, '', '/');
+          setAppRoute('default');
+          navigate('spaces');
+        }}
+      />
+    );
   }
 
-  // Show start screen if not authenticated
-  if (!currentUser) {
+  // /s/[slug] アクセス: 未ログインかつゲスト入室前 → ゲスト入室画面
+  if (!currentUser && guestSpaceId && !isGuestMode) {
+    return (
+      <GuestEntryScreen
+        spaceId={guestSpaceId}
+        onEnterAsGuest={() => {
+          setActiveSpace(guestSpaceId);
+          setIsGuestMode(true);
+          window.history.replaceState({}, '', '/#screen');
+          navigate('screen');
+        }}
+        onLoginRequested={() => {
+          // ログイン選択 → guestSpaceId をクリアして StartScreen（ログイン画面）へ
+          setGuestSpaceId(null);
+        }}
+      />
+    );
+  }
+
+  // Show start screen if not authenticated (guest mode でない場合)
+  if (!currentUser && !isGuestMode) {
     return <StartScreen />;
   }
 

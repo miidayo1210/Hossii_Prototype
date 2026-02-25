@@ -1,24 +1,27 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import type { Session, User } from '@supabase/supabase-js';
+import { supabase, isSupabaseConfigured } from '../supabase';
+import { getAdminCommunity, createCommunity } from '../utils/communitiesApi';
 
-// Mock User type (similar to Firebase User but simplified)
-export type MockUser = {
+export type AppUser = {
   uid: string;
   email: string | null;
   displayName: string | null;
   isAdmin: boolean;
+  communityName?: string;
 };
 
 type AuthContextType = {
-  currentUser: MockUser | null;
+  currentUser: AppUser | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<MockUser>;
-  login: (email: string, password: string) => Promise<MockUser>;
-  adminLogin: (email: string, password: string) => Promise<MockUser>;
-  adminSignUp: (email: string, password: string, communityName: string) => Promise<MockUser>;
+  signUp: (email: string, password: string) => Promise<AppUser>;
+  login: (email: string, password: string) => Promise<AppUser>;
+  adminLogin: (email: string, password: string) => Promise<AppUser>;
+  adminSignUp: (email: string, password: string, communityName: string) => Promise<AppUser>;
   logout: () => Promise<void>;
-  loginWithGoogle: (asAdmin?: boolean) => Promise<MockUser>;
-  loginWithFacebook: () => Promise<MockUser>;
+  loginWithGoogle: (asAdmin?: boolean) => Promise<AppUser>;
+  loginWithFacebook: () => Promise<AppUser>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,143 +38,230 @@ type AuthProviderProps = {
   children: ReactNode;
 };
 
-// localStorage key for mock authentication
+/**
+ * Supabase User → AppUser（非同期: communities テーブルで管理者チェック）
+ * app_metadata.role = "admin" でも判定（Supabase Dashboard で手動設定した場合）
+ */
+async function resolveAppUser(user: User): Promise<AppUser> {
+  // app_metadata に role が設定されていれば優先
+  const roleFromMetadata = user.app_metadata?.role as string | undefined;
+  const displayName = user.user_metadata?.display_name as string | null ?? null;
+
+  if (roleFromMetadata === 'admin') {
+    return { uid: user.id, email: user.email ?? null, displayName, isAdmin: true };
+  }
+
+  // communities テーブルで管理者チェック
+  const community = await getAdminCommunity(user.id);
+  return {
+    uid: user.id,
+    email: user.email ?? null,
+    displayName: displayName ?? community?.name ?? null,
+    isAdmin: community !== null,
+    communityName: community?.name,
+  };
+}
+
+// ===== Mock 認証（Supabase 未設定時のフォールバック）=====
+
 const MOCK_AUTH_KEY = 'mock_auth_user';
 
-// Helper to create a mock user
-const createMockUser = (email: string, uid?: string, isAdmin = false): MockUser => {
-  return {
-    uid: uid || `user-${Date.now()}`,
-    email,
-    displayName: email.split('@')[0] || 'Demo User',
-    isAdmin,
-  };
-};
+type MockUser = AppUser;
 
-// Mock admin check: email containing "admin" is treated as admin
-// Future: replace with app_metadata.role === "admin" from Supabase
-const checkIsAdmin = (email: string): boolean => {
-  return email.toLowerCase().includes('admin');
-};
+const createMockUser = (email: string, uid?: string, isAdmin = false, communityName?: string): MockUser => ({
+  uid: uid || `user-${Date.now()}`,
+  email,
+  displayName: communityName ?? email.split('@')[0] ?? 'Demo User',
+  isAdmin,
+  communityName,
+});
 
-// Helper to save user to localStorage
-const saveMockUser = (user: MockUser) => {
+const checkIsAdmin = (email: string): boolean =>
+  email.toLowerCase().includes('admin');
+
+const saveMockUser = (user: MockUser) =>
   localStorage.setItem(MOCK_AUTH_KEY, JSON.stringify(user));
-};
 
-// Helper to load user from localStorage
 const loadMockUser = (): MockUser | null => {
   const stored = localStorage.getItem(MOCK_AUTH_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch { return null; }
 };
 
-// Helper to clear user from localStorage
-const clearMockUser = () => {
-  localStorage.removeItem(MOCK_AUTH_KEY);
-};
+const clearMockUser = () => localStorage.removeItem(MOCK_AUTH_KEY);
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // ===== セッション初期化 =====
   useEffect(() => {
-    const user = loadMockUser();
-    setCurrentUser(user);
-    setLoading(false);
+    if (!isSupabaseConfigured) {
+      setCurrentUser(loadMockUser());
+      setLoading(false);
+      return;
+    }
+
+    // 既存セッションを取得して管理者チェック
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (session) {
+          const appUser = await resolveAppUser(session.user);
+          setCurrentUser(appUser);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('[AuthContext] getSession error:', err);
+        setLoading(false);
+      });
+
+    // 認証状態の変化を監視
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event: string, session: Session | null) => {
+        if (session) {
+          const appUser = await resolveAppUser(session.user);
+          setCurrentUser(appUser);
+        } else {
+          setCurrentUser(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Sign up with email and password (MOCK)
-  const signUp = async (email: string, _password: string): Promise<MockUser> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  // ===== 参加者サインアップ =====
+  const signUp = async (email: string, password: string): Promise<AppUser> => {
+    if (!isSupabaseConfigured) {
+      const user = createMockUser(email);
+      setCurrentUser(user);
+      saveMockUser(user);
+      return user;
+    }
 
-    const user = createMockUser(email);
-    setCurrentUser(user);
-    saveMockUser(user);
-
-    return user;
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error || !data.user) throw error ?? new Error('Sign up failed');
+    return resolveAppUser(data.user);
   };
 
-  // Login with email and password (MOCK - participant login, isAdmin always false)
-  const login = async (email: string, _password: string): Promise<MockUser> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  // ===== 参加者ログイン =====
+  const login = async (email: string, password: string): Promise<AppUser> => {
+    if (!isSupabaseConfigured) {
+      const user = createMockUser(email);
+      setCurrentUser(user);
+      saveMockUser(user);
+      return user;
+    }
 
-    const user = createMockUser(email);
-    setCurrentUser(user);
-    saveMockUser(user);
-
-    return user;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) throw error ?? new Error('Login failed');
+    return resolveAppUser(data.user);
   };
 
-  // Admin login with email and password (MOCK - checks admin role)
-  // Future: use supabase.auth.signInWithPassword() then check app_metadata.role
-  const adminLogin = async (email: string, _password: string): Promise<MockUser> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  // ===== 管理者ログイン =====
+  const adminLogin = async (email: string, password: string): Promise<AppUser> => {
+    if (!isSupabaseConfigured) {
+      const isAdmin = checkIsAdmin(email);
+      const user = createMockUser(email, undefined, isAdmin);
+      setCurrentUser(user);
+      saveMockUser(user);
+      return user;
+    }
 
-    const isAdmin = checkIsAdmin(email);
-    const user = createMockUser(email, undefined, isAdmin);
-    setCurrentUser(user);
-    saveMockUser(user);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) throw error ?? new Error('Admin login failed');
 
-    return user;
+    const appUser = await resolveAppUser(data.user);
+    if (!appUser.isAdmin) throw new Error('管理者権限がありません。コミュニティ登録が必要です。');
+    return appUser;
   };
 
-  // Admin sign up with email and password (MOCK - creates admin user)
-  // communityName is stored in displayName for now
-  // Future: use supabase.auth.signUp() then set app_metadata.role = "admin" via service role
-  const adminSignUp = async (email: string, _password: string, communityName: string): Promise<MockUser> => {
-    await new Promise((resolve) => setTimeout(resolve, 600));
+  // ===== 管理者サインアップ（コミュニティ登録）=====
+  const adminSignUp = async (
+    email: string,
+    password: string,
+    communityName: string
+  ): Promise<AppUser> => {
+    if (!isSupabaseConfigured) {
+      const user: AppUser = {
+        uid: `admin-${Date.now()}`,
+        email,
+        displayName: communityName,
+        isAdmin: true,
+        communityName,
+      };
+      setCurrentUser(user);
+      saveMockUser(user);
+      return user;
+    }
 
-    const user: MockUser = {
-      uid: `admin-${Date.now()}`,
+    // 1. Supabase Auth でユーザー作成
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: communityName } },
+    });
+    if (error || !data.user) throw error ?? new Error('Sign up failed');
+
+    // 2. communities テーブルに登録
+    const community = await createCommunity(data.user.id, communityName);
+    if (!community) throw new Error('コミュニティの作成に失敗しました。');
+
+    return {
+      uid: data.user.id,
       email,
       displayName: communityName,
       isAdmin: true,
+      communityName,
     };
-    setCurrentUser(user);
-    saveMockUser(user);
-
-    return user;
   };
 
-  // Logout (MOCK)
+  // ===== ログアウト =====
   const logout = async (): Promise<void> => {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (!isSupabaseConfigured) {
+      setCurrentUser(null);
+      clearMockUser();
+      return;
+    }
 
-    setCurrentUser(null);
-    clearMockUser();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   };
 
-  // Login with Google (MOCK)
-  // asAdmin: true when called from AdminLoginScreen
-  const loginWithGoogle = async (asAdmin = false): Promise<MockUser> => {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  // ===== Google ログイン =====
+  const loginWithGoogle = async (_asAdmin = false): Promise<AppUser> => {
+    if (!isSupabaseConfigured) {
+      const user = createMockUser('google-user@example.com', 'google-user-demo', _asAdmin);
+      setCurrentUser(user);
+      saveMockUser(user);
+      return user;
+    }
 
-    const user = createMockUser('google-user@example.com', 'google-user-demo', asAdmin);
-    setCurrentUser(user);
-    saveMockUser(user);
-
-    return user;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+    // OAuth はリダイレクトなので、ここには到達しない
+    return { uid: '', email: null, displayName: null, isAdmin: false };
   };
 
-  // Login with Facebook (MOCK)
-  const loginWithFacebook = async (): Promise<MockUser> => {
-    // Simulate OAuth flow delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  // ===== Facebook ログイン =====
+  const loginWithFacebook = async (): Promise<AppUser> => {
+    if (!isSupabaseConfigured) {
+      const user = createMockUser('facebook-user@example.com', 'facebook-user-demo');
+      setCurrentUser(user);
+      saveMockUser(user);
+      return user;
+    }
 
-    const user = createMockUser('facebook-user@example.com', 'facebook-user-demo');
-    setCurrentUser(user);
-    saveMockUser(user);
-
-    return user;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+    return { uid: '', email: null, displayName: null, isAdmin: false };
   };
 
   const value: AuthContextType = {
@@ -186,9 +276,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     loginWithFacebook,
   };
 
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100dvh',
+        background: '#f9fafb',
+      }} />
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
+
+export type { MockUser };

@@ -1,4 +1,13 @@
-import { useReducer, useCallback, createContext, useContext, useMemo, useEffect, type ReactNode } from 'react';
+import {
+  useReducer,
+  useCallback,
+  createContext,
+  useContext,
+  useMemo,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from 'react';
 import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
 import type { Space, SpaceId, CardType, SpaceBackground } from '../types/space';
 import type { AppMode } from '../types/mode';
@@ -12,7 +21,6 @@ import {
   saveActiveSpaceId,
   loadHossiis,
   saveHossiis,
-  getHossiisStorageKey,
 } from '../utils/storage';
 import { loadMode, saveMode } from '../utils/modeStorage';
 import {
@@ -38,6 +46,26 @@ import {
 import { migrateHossiiOrigin, needsMigration, markMigrationComplete } from '../utils/migrateOldLogs';
 import { loadDisplayScale, saveDisplayScale, type DisplayScale } from '../utils/displayScaleStorage';
 
+// Supabase APIs
+import { supabase, isSupabaseConfigured } from '../supabase';
+import {
+  fetchSpaces,
+  insertSpace,
+  updateSpaceInDb,
+  deleteSpaceFromDb,
+} from '../utils/spacesApi';
+import {
+  fetchHossiis,
+  insertHossii,
+  deleteAllHossiisInSpace,
+  rowToHossii,
+  type HossiiRow,
+} from '../utils/hossiisApi';
+import {
+  upsertProfile,
+  upsertSpaceNickname,
+} from '../utils/profilesApi';
+
 // createdAt を Date に正規化（Supabase から string で来ても対応）
 const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
   const raw = h as Record<string, unknown>;
@@ -55,7 +83,7 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
     speechLevel: raw.speechLevel as Hossii['speechLevel'],
     origin: raw.origin as Hossii['origin'],
     autoType: raw.autoType as Hossii['autoType'],
-    language: raw.language as Hossii['language'], // undefined for old logs
+    language: raw.language as Hossii['language'],
   };
 };
 
@@ -80,26 +108,18 @@ const isValidBackground = (value: unknown): value is SpaceBackground => {
 const normalizeSpace = (f: unknown): Space => {
   const raw = (f ?? {}) as Record<string, unknown>;
 
-  // id: 必須（無ければ生成）
   const id = typeof raw.id === 'string' && raw.id ? raw.id : generateId();
-
-  // name: 無ければフォールバック
   const name = typeof raw.name === 'string' && raw.name ? raw.name : 'My Space';
-
-  // cardType: 不正なら 'constellation'
   const cardType = isValidCardType(raw.cardType) ? raw.cardType : 'constellation';
 
-  // quickEmotions: 無い or 8個超ならデフォルト
   let quickEmotions = DEFAULT_QUICK_EMOTIONS;
   if (Array.isArray(raw.quickEmotions) && raw.quickEmotions.length > 0 && raw.quickEmotions.length <= 8) {
     quickEmotions = raw.quickEmotions as Space['quickEmotions'];
   }
-  // 旧形式 allowedEmotions からの移行対応
   if (Array.isArray(raw.allowedEmotions) && raw.allowedEmotions.length > 0 && raw.allowedEmotions.length <= 8) {
     quickEmotions = raw.allowedEmotions as Space['quickEmotions'];
   }
 
-  // createdAt: 無効なら現在時刻
   let createdAt: Date;
   if (raw.createdAt instanceof Date) {
     createdAt = raw.createdAt;
@@ -110,12 +130,10 @@ const normalizeSpace = (f: unknown): Space => {
     createdAt = new Date();
   }
 
-  // background: 無い or 不正ならデフォルト背景
   const background = isValidBackground(raw.background)
     ? (raw.background as SpaceBackground)
     : DEFAULT_BACKGROUND;
 
-  // spaceURL: 存在すれば保持、なければ undefined のまま（設定画面で後から設定可能）
   const spaceURL = typeof raw.spaceURL === 'string' && raw.spaceURL ? raw.spaceURL : undefined;
 
   return { id, spaceURL, name, cardType, quickEmotions, createdAt, background };
@@ -129,11 +147,9 @@ function initializeSpaces(): { spaces: Space[]; activeSpaceId: SpaceId } {
     const loaded = loadSpaces();
     spaces = loaded.map(normalizeSpace);
   } catch {
-    // localStorage が壊れていても落ちない
     spaces = [];
   }
 
-  // スペースがなければデフォルトスペースを作成
   if (spaces.length === 0) {
     spaces = [DEFAULT_SPACE];
     saveSpaces(spaces);
@@ -146,7 +162,6 @@ function initializeSpaces(): { spaces: Space[]; activeSpaceId: SpaceId } {
     activeSpaceId = null;
   }
 
-  // アクティブスペースがなければ最初のスペースを選択
   if (!activeSpaceId || !spaces.find((f) => f.id === activeSpaceId)) {
     activeSpaceId = spaces[0].id;
     saveActiveSpaceId(activeSpaceId);
@@ -162,10 +177,8 @@ function initializeHossiis(defaultSpaceId: SpaceId, initialHossiis: Hossii[]): H
     if (loaded.length > 0) {
       const normalized = loaded.map((h) => normalizeHossii(h, defaultSpaceId));
 
-      // マイグレーションが必要かチェック（バージョン管理で一度だけ実行）
       if (needsMigration()) {
         const migrated = normalized.map(migrateHossiiOrigin);
-        // 変更があれば保存
         const hasChanges = migrated.some((h, i) =>
           h.origin !== normalized[i].origin ||
           h.autoType !== normalized[i].autoType ||
@@ -174,7 +187,6 @@ function initializeHossiis(defaultSpaceId: SpaceId, initialHossiis: Hossii[]): H
         if (hasChanges) {
           saveHossiis(migrated);
         }
-        // マイグレーション完了を記録
         markMigrationComplete();
         return migrated;
       }
@@ -184,7 +196,6 @@ function initializeHossiis(defaultSpaceId: SpaceId, initialHossiis: Hossii[]): H
   } catch {
     // ignore
   }
-  // localStorage になければ initialHossiis を使用
   return initialHossiis.map((h) => normalizeHossii(h, defaultSpaceId));
 }
 
@@ -207,12 +218,16 @@ type ExtendedHossiiState = HossiiState & {
 // 拡張Action型
 type ExtendedHossiiAction =
   | HossiiAction
+  | { type: 'ADD_HOSSII_FULL'; payload: Hossii }
+  | { type: 'REMOVE_HOSSII'; payload: string }
   | { type: 'SET_ACTIVE_SPACE'; payload: SpaceId }
+  | { type: 'SET_SPACES'; payload: Space[] }
   | { type: 'ADD_SPACE'; payload: Space }
   | { type: 'UPDATE_SPACE'; payload: { id: SpaceId; patch: Partial<Space> } }
   | { type: 'REMOVE_SPACE'; payload: SpaceId }
   | { type: 'SYNC_HOSSIIS'; payload: Hossii[] }
   | { type: 'SET_MODE'; payload: AppMode }
+  | { type: 'SET_PROFILE'; payload: UserProfile }
   | { type: 'SET_DEFAULT_NICKNAME'; payload: string }
   | { type: 'SET_SPACE_NICKNAME'; payload: { spaceId: string; nickname: string } }
   | { type: 'SET_SHOW_HOSSII'; payload: boolean }
@@ -239,15 +254,13 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
   return (state: ExtendedHossiiState, action: ExtendedHossiiAction): ExtendedHossiiState => {
     switch (action.type) {
       case 'ADD_HOSSII': {
-        // 空投稿防止：emotion も message も無い場合は追加しない
-        // ただし laughter は空メッセージを許可
+        // ADD_HOSSII_FULL を経由しない場合のフォールバック（後方互換）
         const msg = (action.payload.message ?? '').trim();
         const isLaughter = action.payload.autoType === 'laughter';
         if (!action.payload.emotion && !msg && !isLaughter) {
           return state;
         }
 
-        // プロフィールが無ければ作成（authorId用）
         let currentProfile = state.profile;
         if (!currentProfile) {
           currentProfile = {
@@ -258,14 +271,13 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
           saveProfile(currentProfile);
         }
 
-        // authorNameOverride があればそれを使用、なければアクティブなニックネーム
         const authorName = action.payload.authorNameOverride ?? (getActiveNicknameFromState(state) || undefined);
         const newHossii: Hossii = {
           id: generateId(),
           message: msg,
           emotion: action.payload.emotion,
           spaceId: activeSpaceIdRef.current,
-          authorId: action.payload.authorNameOverride ? undefined : currentProfile.id, // Hossii投稿はauthorIdなし
+          authorId: action.payload.authorNameOverride ? undefined : currentProfile.id,
           authorName,
           createdAt: new Date(),
           logType: action.payload.logType,
@@ -275,11 +287,33 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
           language: action.payload.language,
         };
         const newHossiis = [...state.hossiis, newHossii];
-        // localStorage に保存
         saveHossiis(newHossiis);
         return {
           ...state,
           profile: currentProfile,
+          hossiis: newHossiis,
+        };
+      }
+
+      case 'ADD_HOSSII_FULL': {
+        // 完全な Hossii オブジェクトを直接追加（Supabase 経由・Realtime 経由共通）
+        const hossii = action.payload;
+        if (state.hossiis.some((h) => h.id === hossii.id)) {
+          return state; // 重複回避
+        }
+        const newHossiis = [...state.hossiis, hossii];
+        saveHossiis(newHossiis);
+        return {
+          ...state,
+          hossiis: newHossiis,
+        };
+      }
+
+      case 'REMOVE_HOSSII': {
+        const newHossiis = state.hossiis.filter((h) => h.id !== action.payload);
+        saveHossiis(newHossiis);
+        return {
+          ...state,
           hossiis: newHossiis,
         };
       }
@@ -291,7 +325,6 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         };
 
       case 'CLEAR_ALL': {
-        // localStorage もクリア
         saveHossiis([]);
         return {
           ...state,
@@ -306,6 +339,14 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return {
           ...state,
           activeSpaceId: action.payload,
+        };
+      }
+
+      case 'SET_SPACES': {
+        saveSpaces(action.payload);
+        return {
+          ...state,
+          spaces: action.payload,
         };
       }
 
@@ -334,7 +375,6 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         const spaceIdToRemove = action.payload;
         const remainingSpaces = state.spaces.filter((f) => f.id !== spaceIdToRemove);
 
-        // スペースが1つも無くなった場合、デフォルトスペースを作成
         let newSpaces: Space[];
         if (remainingSpaces.length === 0) {
           newSpaces = [DEFAULT_SPACE];
@@ -342,7 +382,6 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
           newSpaces = remainingSpaces;
         }
 
-        // 削除対象が現在アクティブなスペースだった場合、先頭のスペースに切り替え
         let newActiveSpaceId = state.activeSpaceId;
         if (state.activeSpaceId === spaceIdToRemove) {
           newActiveSpaceId = newSpaces[0].id;
@@ -359,7 +398,6 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       }
 
       case 'SYNC_HOSSIIS': {
-        // 他タブからの同期
         return {
           ...state,
           hossiis: action.payload,
@@ -374,11 +412,18 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         };
       }
 
+      case 'SET_PROFILE': {
+        saveProfile(action.payload);
+        return {
+          ...state,
+          profile: action.payload,
+        };
+      }
+
       case 'SET_DEFAULT_NICKNAME': {
         const nickname = action.payload.trim();
         let profile = state.profile;
         if (!profile) {
-          // プロフィールが無ければ作成
           profile = {
             id: generateId(),
             defaultNickname: nickname,
@@ -502,40 +547,22 @@ type HossiiProviderProps = {
 };
 
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
-  // スペースの初期化
   const { spaces, activeSpaceId } = useMemo(() => initializeSpaces(), []);
-
-  // モードの初期化
   const initialMode = useMemo(() => loadMode(), []);
-
-  // プロフィールの初期化
   const initialProfile = useMemo(() => loadProfile(), []);
-
-  // スペースごとのニックネームの初期化
   const initialSpaceNicknames = useMemo(() => loadSpaceNicknames(), []);
-
-  // showHossii の初期化
   const initialShowHossii = useMemo(() => loadShowHossii(), []);
-
-  // listenMode の初期化
   const initialListenMode = useMemo(() => loadListenMode(), []);
   const initialListenConsent = useMemo(() => loadListenConsent(), []);
-
-  // 音声ログ設定の初期化
   const initialEmotionLogEnabled = useMemo(() => loadEmotionLogEnabled(), []);
   const initialSpeechLogEnabled = useMemo(() => loadSpeechLogEnabled(), []);
   const initialSpeechLevels = useMemo(() => loadSpeechLevels(), []);
-
-  // ディスプレイスケール設定の初期化
   const initialDisplayScale = useMemo(() => loadDisplayScale(), []);
 
-  // activeSpaceId を ref で保持（reducer 内で参照するため）
   const activeSpaceIdRef = useMemo(() => ({ current: activeSpaceId }), [activeSpaceId]);
 
-  // reducer を作成
   const reducer = useMemo(() => createReducer(activeSpaceIdRef), [activeSpaceIdRef]);
 
-  // hossiis を localStorage から読み込み
   const initialHossiisFromStorage = useMemo(
     () => initializeHossiis(activeSpaceId, initialHossiis),
     [activeSpaceId, initialHossiis]
@@ -558,10 +585,87 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     displayScale: initialDisplayScale,
   });
 
-  // 他タブからの storage イベントを監視
+  // 自分が Supabase に INSERT した ID を追跡（Realtime 重複回避）
+  const insertedHossiiIdsRef = useRef<Set<string>>(new Set());
+
+  // 最新の state を ref で保持（コールバック内でのクロージャ問題を回避）
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // ===== Supabase: スペースをマウント時に同期 =====
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    fetchSpaces().then((supabaseSpaces) => {
+      if (supabaseSpaces.length > 0) {
+        dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
+      }
+    });
+  }, []);
+
+  // ===== Supabase: アクティブスペースの hossiis を同期 =====
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    fetchHossiis(state.activeSpaceId).then((supabaseHossiis) => {
+      if (supabaseHossiis.length > 0) {
+        dispatch({ type: 'SYNC_HOSSIIS', payload: supabaseHossiis });
+      }
+    });
+  }, [state.activeSpaceId]);
+
+  // ===== Supabase Realtime: hossiis の INSERT/DELETE を購読 =====
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const activeSpaceId = state.activeSpaceId;
+
+    const channel = supabase
+      .channel(`hossiis:${activeSpaceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'hossiis',
+          filter: `space_id=eq.${activeSpaceId}`,
+        },
+        (payload) => {
+          const row = payload.new as HossiiRow;
+          // 自分が INSERT した場合はスキップ（楽観的更新で既に追加済み）
+          if (insertedHossiiIdsRef.current.has(row.id)) {
+            insertedHossiiIdsRef.current.delete(row.id);
+            return;
+          }
+          dispatch({ type: 'ADD_HOSSII_FULL', payload: rowToHossii(row) });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'hossiis',
+          filter: `space_id=eq.${activeSpaceId}`,
+        },
+        (payload) => {
+          const id = (payload.old as { id: string }).id;
+          dispatch({ type: 'REMOVE_HOSSII', payload: id });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [state.activeSpaceId]);
+
+  // ===== localStorage の storage イベント（同一ブラウザ別タブ向け、Supabase 未設定時のフォールバック）=====
+  useEffect(() => {
+    if (isSupabaseConfigured) return; // Supabase が有効なら Realtime を使う
+
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === getHossiisStorageKey() && e.newValue) {
+      if (e.key === 'hossii.hossiis' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed)) {
@@ -578,9 +682,54 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [activeSpaceIdRef]);
 
+  // ===== addHossii: 楽観的更新 → Supabase INSERT =====
   const addHossii = useCallback((input: AddHossiiInput) => {
-    dispatch({ type: 'ADD_HOSSII', payload: input });
-  }, []);
+    const msg = (input.message ?? '').trim();
+    const isLaughter = input.autoType === 'laughter';
+    if (!input.emotion && !msg && !isLaughter) return;
+
+    const currentState = stateRef.current;
+
+    // プロフィールが無ければ作成
+    let profile = currentState.profile;
+    if (!profile) {
+      profile = {
+        id: generateId(),
+        defaultNickname: '',
+        createdAt: new Date(),
+      };
+      dispatch({ type: 'SET_PROFILE', payload: profile });
+      saveProfile(profile);
+    }
+
+    const authorName =
+      input.authorNameOverride ??
+      (getActiveNicknameFromState(currentState) || undefined);
+
+    const newHossii: Hossii = {
+      id: generateId(),
+      message: msg,
+      emotion: input.emotion,
+      spaceId: activeSpaceIdRef.current,
+      authorId: input.authorNameOverride ? undefined : profile.id,
+      authorName,
+      createdAt: new Date(),
+      logType: input.logType,
+      speechLevel: input.speechLevel,
+      origin: input.origin,
+      autoType: input.autoType,
+      language: input.language,
+    };
+
+    // 楽観的更新（即時 UI 反映）
+    dispatch({ type: 'ADD_HOSSII_FULL', payload: newHossii });
+
+    // Supabase に非同期 INSERT
+    if (isSupabaseConfigured) {
+      insertedHossiiIdsRef.current.add(newHossii.id);
+      insertHossii(newHossii);
+    }
+  }, [activeSpaceIdRef]);
 
   const selectHossii = useCallback((id: string | null) => {
     dispatch({ type: 'SELECT_HOSSII', payload: id });
@@ -588,7 +737,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
   const clearAll = useCallback(() => {
     dispatch({ type: 'CLEAR_ALL' });
-  }, []);
+    if (isSupabaseConfigured) {
+      deleteAllHossiisInSpace(activeSpaceIdRef.current);
+    }
+  }, [activeSpaceIdRef]);
 
   const setActiveSpace = useCallback((id: SpaceId) => {
     dispatch({ type: 'SET_ACTIVE_SPACE', payload: id });
@@ -598,82 +750,89 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     return state.spaces.find((f) => f.id === state.activeSpaceId);
   }, [state.spaces, state.activeSpaceId]);
 
-  // アクティブなスペースのログのみを取得
   const getActiveSpaceHossiis = useCallback(() => {
     return state.hossiis.filter((h) => h.spaceId === state.activeSpaceId);
   }, [state.hossiis, state.activeSpaceId]);
 
-  // スペースを追加
   const addSpace = useCallback((space: Space) => {
     dispatch({ type: 'ADD_SPACE', payload: space });
+    if (isSupabaseConfigured) {
+      insertSpace(space);
+    }
   }, []);
 
-  // スペースを更新
   const updateSpace = useCallback((id: SpaceId, patch: Partial<Space>) => {
     dispatch({ type: 'UPDATE_SPACE', payload: { id, patch } });
+    if (isSupabaseConfigured) {
+      updateSpaceInDb(id, patch);
+    }
   }, []);
 
-  // スペースを削除
   const removeSpace = useCallback((id: SpaceId) => {
     dispatch({ type: 'REMOVE_SPACE', payload: id });
+    if (isSupabaseConfigured) {
+      deleteSpaceFromDb(id);
+    }
   }, []);
 
-  // モードを変更
   const setMode = useCallback((mode: AppMode) => {
     dispatch({ type: 'SET_MODE', payload: mode });
   }, []);
 
-  // デフォルトニックネームを設定
   const setDefaultNickname = useCallback((nickname: string) => {
     dispatch({ type: 'SET_DEFAULT_NICKNAME', payload: nickname });
+    // ログイン済みの場合のみ Supabase に同期（認証実装後に条件追加）
+    if (isSupabaseConfigured) {
+      const profile = stateRef.current.profile;
+      if (profile) {
+        upsertProfile({ ...profile, defaultNickname: nickname.trim() });
+      }
+    }
   }, []);
 
-  // スペースごとのニックネームを設定
   const setSpaceNickname = useCallback((spaceId: string, nickname: string) => {
     dispatch({ type: 'SET_SPACE_NICKNAME', payload: { spaceId, nickname } });
+    // ログイン済みの場合のみ Supabase に同期（認証実装後に条件追加）
+    if (isSupabaseConfigured) {
+      const profile = stateRef.current.profile;
+      if (profile) {
+        upsertSpaceNickname(profile.id, spaceId, nickname.trim());
+      }
+    }
   }, []);
 
-  // アクティブなニックネームを取得
   const getActiveNickname = useCallback(() => {
     return getActiveNicknameFromState(state);
   }, [state]);
 
-  // スペースに対してニックネームが設定されているか
   const hasNicknameForSpace = useCallback((spaceId: string) => {
     return !!state.spaceNicknames[spaceId];
   }, [state.spaceNicknames]);
 
-  // Hossii 表示切替
   const setShowHossii = useCallback((show: boolean) => {
     dispatch({ type: 'SET_SHOW_HOSSII', payload: show });
   }, []);
 
-  // Listen モード切替
   const setListenMode = useCallback((enabled: boolean) => {
     dispatch({ type: 'SET_LISTEN_MODE', payload: enabled });
   }, []);
 
-  // Listen 同意設定
   const setListenConsent = useCallback((consented: boolean) => {
     dispatch({ type: 'SET_LISTEN_CONSENT', payload: consented });
   }, []);
 
-  // 感情ログ有効/無効
   const setEmotionLogEnabled = useCallback((enabled: boolean) => {
     dispatch({ type: 'SET_EMOTION_LOG_ENABLED', payload: enabled });
   }, []);
 
-  // 音声ログ有効/無効
   const setSpeechLogEnabled = useCallback((enabled: boolean) => {
     dispatch({ type: 'SET_SPEECH_LOG_ENABLED', payload: enabled });
   }, []);
 
-  // 音声ログ粒度設定
   const setSpeechLevels = useCallback((levels: SpeechLevelSettings) => {
     dispatch({ type: 'SET_SPEECH_LEVELS', payload: levels });
   }, []);
 
-  // ディスプレイスケール設定
   const setDisplayScale = useCallback((scale: DisplayScale) => {
     dispatch({ type: 'SET_DISPLAY_SCALE', payload: scale });
   }, []);
