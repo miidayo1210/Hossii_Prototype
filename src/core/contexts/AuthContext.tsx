@@ -6,6 +6,7 @@ export type MockUser = {
   uid: string;
   email: string | null;
   displayName: string | null;
+  isAdmin: boolean;
 };
 
 type AuthContextType = {
@@ -13,8 +14,9 @@ type AuthContextType = {
   loading: boolean;
   signUp: (email: string, password: string) => Promise<MockUser>;
   login: (email: string, password: string) => Promise<MockUser>;
+  adminLogin: (email: string, password: string) => Promise<MockUser>;
   logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<MockUser>;
+  loginWithGoogle: (asAdmin?: boolean) => Promise<MockUser>;
   loginWithFacebook: () => Promise<MockUser>;
 };
 
@@ -36,12 +38,19 @@ type AuthProviderProps = {
 const MOCK_AUTH_KEY = 'mock_auth_user';
 
 // Helper to create a mock user
-const createMockUser = (email: string, uid?: string): MockUser => {
+const createMockUser = (email: string, uid?: string, isAdmin = false): MockUser => {
   return {
     uid: uid || `user-${Date.now()}`,
     email,
     displayName: email.split('@')[0] || 'Demo User',
+    isAdmin,
   };
+};
+
+// Mock admin check: email containing "admin" is treated as admin
+// Future: replace with app_metadata.role === "admin" from Supabase
+const checkIsAdmin = (email: string): boolean => {
+  return email.toLowerCase().includes('admin');
 };
 
 // Helper to save user to localStorage
@@ -80,10 +89,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Sign up with email and password (MOCK)
   const signUp = async (email: string, _password: string): Promise<MockUser> => {
-    // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Create mock user
     const user = createMockUser(email);
     setCurrentUser(user);
     saveMockUser(user);
@@ -91,13 +98,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return user;
   };
 
-  // Login with email and password (MOCK - always succeeds)
+  // Login with email and password (MOCK - participant login, isAdmin always false)
   const login = async (email: string, _password: string): Promise<MockUser> => {
-    // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Accept any email/password
     const user = createMockUser(email);
+    setCurrentUser(user);
+    saveMockUser(user);
+
+    return user;
+  };
+
+  // Admin login with email and password (MOCK - checks admin role)
+  // Future: use supabase.auth.signInWithPassword() then check app_metadata.role
+  const adminLogin = async (email: string, _password: string): Promise<MockUser> => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const isAdmin = checkIsAdmin(email);
+    const user = createMockUser(email, undefined, isAdmin);
     setCurrentUser(user);
     saveMockUser(user);
 
@@ -114,11 +132,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   // Login with Google (MOCK)
-  const loginWithGoogle = async (): Promise<MockUser> => {
-    // Simulate OAuth flow delay
+  // asAdmin: true when called from AdminLoginScreen
+  const loginWithGoogle = async (asAdmin = false): Promise<MockUser> => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    const user = createMockUser('google-user@example.com', 'google-user-demo');
+    const user = createMockUser('google-user@example.com', 'google-user-demo', asAdmin);
     setCurrentUser(user);
     saveMockUser(user);
 
@@ -142,6 +160,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     loading,
     signUp,
     login,
+    adminLogin,
     logout,
     loginWithGoogle,
     loginWithFacebook,

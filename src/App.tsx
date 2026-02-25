@@ -12,6 +12,7 @@ import { AccountScreen } from './components/AccountScreen/AccountScreen';
 import { SpaceSettingsScreen } from './components/SpaceSettingsScreen/SpaceSettingsScreen';
 import { StampCardScreen } from './components/StampCardScreen/StampCardScreen';
 import { StartScreen } from './components/StartScreen/StartScreen';
+import { AdminLoginScreen } from './components/Auth/AdminLoginScreen';
 import { OnboardingModal } from './components/Auth/OnboardingModal';
 import { TutorialOverlay } from './components/Tutorial/TutorialOverlay';
 import { NicknameModal } from './components/NicknameModal/NicknameModal';
@@ -22,7 +23,7 @@ import styles from './App.module.css';
 
 const AppContent = () => {
   const { currentUser } = useAuth();
-  const { screen } = useRouter();
+  const { screen, navigate } = useRouter();
   const { state, setActiveSpace, addSpace, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
@@ -30,6 +31,11 @@ const AppContent = () => {
   const [userProfile, setUserProfile] = useState<{ userId: string; nickname: string } | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
+
+  // /admin/login パスを検出（pathname ベース）
+  const [appRoute] = useState<'admin-login' | 'default'>(() =>
+    window.location.pathname === '/admin/login' ? 'admin-login' : 'default'
+  );
 
   // 処理済みの spaceId を追跡（二重処理防止）
   const processedSpaceIdRef = useRef<string | null>(null);
@@ -175,6 +181,24 @@ const AppContent = () => {
         </button>
       </div>
     );
+  }
+
+  // /admin/login パスの場合: 認証状態に関わらず管理者ログイン画面を表示
+  if (appRoute === 'admin-login') {
+    // すでに管理者としてログイン済みなら管理画面へ
+    if (currentUser?.isAdmin) {
+      window.history.replaceState({}, '', '/');
+      navigate('spaces');
+    } else {
+      return (
+        <AdminLoginScreen
+          onLoginSuccess={() => {
+            window.history.replaceState({}, '', '/');
+            navigate('spaces');
+          }}
+        />
+      );
+    }
   }
 
   // Show start screen if not authenticated

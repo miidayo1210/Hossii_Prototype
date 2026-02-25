@@ -5,7 +5,7 @@ import { useSpeechRecognition, type SpeechEvent } from '../../core/hooks/useSpee
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
-import type { EmotionKey, Hossii } from '../../core/types';
+import type { EmotionKey } from '../../core/types';
 import type { SpaceSettings } from '../../core/types/settings';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
