@@ -7,28 +7,18 @@ import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { FilterBar } from '../FilterBar/FilterBar';
 import styles from './CommentsScreen.module.css';
 
-/** フィルタ適用関数 */
 function applyFilters(hossiis: Hossii[], filters: HossiiFilters): Hossii[] {
   return hossiis.filter((h) => {
-    const isManual = !h.origin || h.origin === 'manual';
-    const isAuto = h.origin === 'auto';
+    const isComment = (!h.origin || h.origin === 'manual') && !!h.message.trim();
+    const isEmotion = !!h.emotion;
 
-    if (isManual) return filters.manual;
+    // どちらにも該当しない投稿（空メッセージかつ emotion なし）は常に表示
+    if (!isComment && !isEmotion) return true;
 
-    if (isAuto) {
-      switch (h.autoType) {
-        case 'emotion':
-          return filters.autoEmotion;
-        case 'speech':
-          return filters.autoSpeech;
-        case 'laughter':
-          return filters.autoLaughter;
-        default:
-          return filters.autoEmotion;
-      }
-    }
-
-    return true;
+    // 該当するカテゴリのうち、いずれかの filter が ON なら表示
+    if (isComment && filters.comment) return true;
+    if (isEmotion && filters.emotion) return true;
+    return false;
   });
 }
 
@@ -36,16 +26,13 @@ export const CommentsScreen = () => {
   const { state, getActiveSpaceHossiis } = useHossiiStore();
   const { activeSpaceId } = state;
 
-  // フィルタ状態
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(activeSpaceId));
 
-  // フィルタ変更時に保存
   const handleFilterChange = useCallback((newFilters: HossiiFilters) => {
     setFilters(newFilters);
     saveFilters(activeSpaceId, newFilters);
   }, [activeSpaceId]);
 
-  // スペースが変わったらフィルタをリロード
   useEffect(() => {
     setFilters(loadFilters(activeSpaceId));
   }, [activeSpaceId]);
@@ -53,7 +40,7 @@ export const CommentsScreen = () => {
   // アクティブなスペースのログのみ取得
   const hossiis = getActiveSpaceHossiis();
 
-  // ソートとフィルタ適用
+  // 新しい順にソートしてフィルタ適用
   const sortedHossiis = useMemo(() => {
     const sorted = [...hossiis].sort(
       (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
@@ -75,7 +62,6 @@ export const CommentsScreen = () => {
         <div className={styles.count}>
           {sortedHossiis.length} 件の投稿
         </div>
-        {/* フィルタバー */}
         <div className={styles.filterContainer}>
           <FilterBar filters={filters} onFilterChange={handleFilterChange} />
         </div>

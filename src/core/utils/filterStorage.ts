@@ -1,22 +1,23 @@
 /**
  * 表示フィルタの設定を localStorage に保存/読み込み
  * スペースごとに保存される
+ *
+ * 投稿種別の判定ルール:
+ *   comment  … origin が manual（または未設定）かつ message が空でない
+ *   emotion  … emotion フィールドが設定されている（manual/auto 問わず）
+ * 両方に該当する投稿は、どちらかの filter が ON なら表示される
  */
 
 // フィルタの型
 export type HossiiFilters = {
-  manual: boolean; // 手動投稿
-  autoEmotion: boolean; // 自動:感情
-  autoSpeech: boolean; // 自動:言葉
-  autoLaughter: boolean; // 自動:笑い
+  comment: boolean;  // コメント（テキスト投稿）
+  emotion: boolean;  // 気持ち（emotion が設定された投稿）
 };
 
 // デフォルト設定（全てON）
 export const DEFAULT_FILTERS: HossiiFilters = {
-  manual: true,
-  autoEmotion: true,
-  autoSpeech: true,
-  autoLaughter: true,
+  comment: true,
+  emotion: true,
 };
 
 const STORAGE_KEY_PREFIX = 'hossii.filters.';
@@ -30,10 +31,8 @@ export function loadFilters(spaceId: string): HossiiFilters {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        manual: parsed.manual ?? true,
-        autoEmotion: parsed.autoEmotion ?? true,
-        autoSpeech: parsed.autoSpeech ?? true,
-        autoLaughter: parsed.autoLaughter ?? true,
+        comment: parsed.comment ?? true,
+        emotion: parsed.emotion ?? true,
       };
     }
     return DEFAULT_FILTERS;

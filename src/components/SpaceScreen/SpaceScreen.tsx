@@ -8,7 +8,6 @@ import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import type { EmotionKey, Hossii } from '../../core/types';
 import type { SpaceSettings } from '../../core/types/settings';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
-import { loadFilters, saveFilters, type HossiiFilters } from '../../core/utils/filterStorage';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
@@ -20,38 +19,8 @@ import { QRCodePanel } from '../Navigation/QRCodePanel';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { HossiiToggle } from '../HossiiToggle/HossiiToggle';
 import { StarLayer } from '../StarLayer/StarLayer';
-import { FilterBar } from '../FilterBar/FilterBar';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
-
-/** フィルタ適用関数 */
-function applyFilters(hossiis: Hossii[], filters: HossiiFilters): Hossii[] {
-  return hossiis.filter((h) => {
-    // origin が未設定または 'manual' なら手動投稿扱い
-    const isManual = !h.origin || h.origin === 'manual';
-    const isAuto = h.origin === 'auto';
-
-    if (isManual) {
-      return filters.manual;
-    }
-
-    if (isAuto) {
-      switch (h.autoType) {
-        case 'emotion':
-          return filters.autoEmotion;
-        case 'speech':
-          return filters.autoSpeech;
-        case 'laughter':
-          return filters.autoLaughter;
-        default:
-          // autoType未設定のautoは感情扱い
-          return filters.autoEmotion;
-      }
-    }
-
-    return true;
-  });
-}
 
 /** カケラ粒子の型 */
 type Particle = {
@@ -98,8 +67,6 @@ export const SpaceScreen = () => {
   const [broadcastedReaction, setBroadcastedReaction] = useState<ReactionTrigger | null>(null);
   // 前回の latestHossii.id を追跡（新規投稿検出用）
   const prevLatestIdRef = useRef<string | null>(null);
-  // フィルタ状態
-  const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(activeSpaceId));
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -165,17 +132,6 @@ export const SpaceScreen = () => {
     const nextIndex = (currentIndex + 1) % scales.length;
     setDisplayScale(scales[nextIndex]);
   }, [displayScale, setDisplayScale]);
-
-  // フィルタ変更時に保存
-  const handleFilterChange = useCallback((newFilters: HossiiFilters) => {
-    setFilters(newFilters);
-    saveFilters(activeSpaceId, newFilters);
-  }, [activeSpaceId]);
-
-  // スペースが変わったらフィルタをリロード
-  useEffect(() => {
-    setFilters(loadFilters(activeSpaceId));
-  }, [activeSpaceId]);
 
   // 他タブからリアクションを受信
   const handleBroadcastReaction = useCallback((event: ReactionEvent) => {
@@ -269,12 +225,11 @@ export const SpaceScreen = () => {
     setTimeout(() => setParticles([]), 1200);
   }, []);
 
-  // 新しい順にソートしてフィルタ適用、上限まで表示
+  // 新しい順にソートして上限まで表示
   const displayHossiis = useMemo(() => {
     const sorted = [...hossiis].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    const filtered = applyFilters(sorted, filters);
-    return filtered.slice(0, MAX_DISPLAY_COUNT);
-  }, [hossiis, filters]);
+    return sorted.slice(0, MAX_DISPLAY_COUNT);
+  }, [hossiis]);
 
   // 各バブルの位置を事前計算（メモ化）
   const bubblePositions = useMemo(() => {
@@ -395,12 +350,8 @@ export const SpaceScreen = () => {
         <HossiiToggle />
       </div>
 
-      {/* ヘッダー（フィルター、スペース名、メニュー） */}
+      {/* ヘッダー（スペース名、メニュー） */}
       <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <FilterBar filters={filters} onFilterChange={handleFilterChange} />
-        </div>
-
         <div className={styles.headerCenter}>
           <h1 className={styles.spaceName}>
             <span className={styles.sparkle}>✨</span>

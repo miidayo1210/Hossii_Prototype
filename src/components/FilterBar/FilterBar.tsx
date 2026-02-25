@@ -19,8 +19,8 @@ export const FilterBar = ({ filters, onFilterChange }: FilterBarProps) => {
       <label className={styles.filterItem}>
         <input
           type="checkbox"
-          checked={filters.manual}
-          onChange={() => handleToggle('manual')}
+          checked={filters.comment}
+          onChange={() => handleToggle('comment')}
           className={styles.checkbox}
         />
         <span className={styles.label}>
@@ -31,37 +31,13 @@ export const FilterBar = ({ filters, onFilterChange }: FilterBarProps) => {
       <label className={styles.filterItem}>
         <input
           type="checkbox"
-          checked={filters.autoEmotion}
-          onChange={() => handleToggle('autoEmotion')}
+          checked={filters.emotion}
+          onChange={() => handleToggle('emotion')}
           className={styles.checkbox}
         />
         <span className={styles.label}>
-          <span className={styles.labelFull}>音声：感情</span>
-          <span className={styles.labelShort}>感情</span>
-        </span>
-      </label>
-      <label className={styles.filterItem}>
-        <input
-          type="checkbox"
-          checked={filters.autoSpeech}
-          onChange={() => handleToggle('autoSpeech')}
-          className={styles.checkbox}
-        />
-        <span className={styles.label}>
-          <span className={styles.labelFull}>音声：ことば</span>
-          <span className={styles.labelShort}>ことば</span>
-        </span>
-      </label>
-      <label className={styles.filterItem}>
-        <input
-          type="checkbox"
-          checked={filters.autoLaughter}
-          onChange={() => handleToggle('autoLaughter')}
-          className={styles.checkbox}
-        />
-        <span className={styles.label}>
-          <span className={styles.labelFull}>音声：笑い</span>
-          <span className={styles.labelShort}>笑い</span>
+          <span className={styles.labelFull}>気持ち</span>
+          <span className={styles.labelShort}>気持ち</span>
         </span>
       </label>
     </div>

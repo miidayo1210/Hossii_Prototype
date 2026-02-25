@@ -7,7 +7,6 @@ import { addStamp } from '../../core/utils/stampStorage';
 import type { SpaceSettings } from '../../core/types/settings';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { HossiiMini } from '../Hossii/HossiiMini';
-import { HossiiToggle } from '../HossiiToggle/HossiiToggle';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { EmotionKey, ToastState } from '../../core/types';
@@ -197,9 +196,6 @@ export const PostScreen = () => {
 
   return (
     <div className={styles.container}>
-      {/* 左上トグル */}
-      <HossiiToggle />
-
       {/* 右上メニュー */}
       <TopRightMenu />
 
