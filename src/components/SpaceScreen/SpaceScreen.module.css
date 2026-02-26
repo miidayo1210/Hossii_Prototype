@@ -65,32 +65,21 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* ヘッダー（フィルター、スペース名、メニュー） */
+/* ヘッダー（スペース名） */
 .header {
   position: fixed;
   top: 1rem;
   left: 0;
   right: 0;
   z-index: 90;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  justify-content: center;
   align-items: center;
   padding: 0 1rem;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-}
-
-.headerLeft {
-  justify-self: start;
-}
-
-.headerCenter {
-  justify-self: center;
-}
-
-.headerRight {
-  justify-self: end;
+  pointer-events: none;
 }
 
 /* 🎀 可愛く優しいスペース名のスタイル */

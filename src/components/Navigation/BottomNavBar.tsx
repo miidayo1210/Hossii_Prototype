@@ -10,10 +10,10 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home', screen: 'screen', icon: House },
-  { label: 'Post', screen: 'post', icon: PlusCircle },
-  { label: 'Logs', screen: 'comments', icon: ScrollText },
-  { label: 'Account', screen: 'account', icon: User },
+  { label: 'ホーム', screen: 'screen', icon: House },
+  { label: '投稿', screen: 'post', icon: PlusCircle },
+  { label: 'ログ', screen: 'comments', icon: ScrollText },
+  { label: 'アカウント', screen: 'account', icon: User },
 ];
 
 export const BottomNavBar = () => {
@@ -30,7 +30,7 @@ export const BottomNavBar = () => {
             key={item.screen}
             className={`${styles.navButton} ${isActive ? styles.active : ''}`}
             onClick={() => navigate(item.screen)}
-            aria-label={`Navigate to ${item.label}`}
+            aria-label={item.label}
           >
             <Icon size={24} />
             <span className={styles.label}>{item.label}</span>

@@ -8,6 +8,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+  { label: 'スペース', screen: 'screen' },
   { label: '投稿する', screen: 'post' },
   { label: 'ログ一覧', screen: 'comments' },
   { label: 'アカウント', screen: 'account' },

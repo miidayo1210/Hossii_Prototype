@@ -350,19 +350,13 @@ export const SpaceScreen = () => {
         <HossiiToggle />
       </div>
 
-      {/* ヘッダー（スペース名、メニュー） */}
+      {/* ヘッダー（スペース名） */}
       <header className={styles.header}>
-        <div className={styles.headerCenter}>
-          <h1 className={styles.spaceName}>
-            <span className={styles.sparkle}>✨</span>
-            {activeSpace?.name ?? 'My Space'}
-            <span className={styles.sparkle}>✨</span>
-          </h1>
-        </div>
-
-        <div className={styles.headerRight}>
-          <TopRightMenu />
-        </div>
+        <h1 className={styles.spaceName}>
+          <span className={styles.sparkle}>✨</span>
+          {activeSpace?.name ?? 'My Space'}
+          <span className={styles.sparkle}>✨</span>
+        </h1>
       </header>
 
       {/* バブルエリア */}
@@ -448,8 +442,9 @@ export const SpaceScreen = () => {
         />
       )}
 
-      {/* PC版のみ表示: トップバー、左コントロールバー、QRコードパネル */}
+      {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QRコードパネル */}
       <TopBar />
+      <TopRightMenu />
       <LeftControlBar
         controls={controlState}
         onToggle={handleControlToggle}
