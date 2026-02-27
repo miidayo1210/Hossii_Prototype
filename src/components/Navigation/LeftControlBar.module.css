@@ -1,27 +1,30 @@
 .controlBar {
   position: fixed;
-  left: 1.5rem;
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
   z-index: 85;
-  display: none; /* Hidden on mobile */
+  display: none;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.75);
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem;
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(16px);
-  border-radius: 9999px; /* Pill shape */
+  border-radius: 1.25rem;
   border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  min-width: 3rem;
 }
 
+/* --- 既存の丸ボタン --- */
 .controlButton {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -30,14 +33,15 @@
   transition: all 0.2s;
   gap: 0.125rem;
   position: relative;
+  flex-shrink: 0;
 }
 
 .scaleLabel {
-  font-size: 0.625rem;
+  font-size: 0.55rem;
   font-weight: 600;
   line-height: 1;
   position: absolute;
-  bottom: 0.25rem;
+  bottom: 0.2rem;
 }
 
 .controlButton:hover {
@@ -56,7 +60,65 @@
   transform: scale(0.95);
 }
 
-/* Desktop only: Show control bar */
+/* --- 区切り線 --- */
+.divider {
+  width: 80%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 0.125rem 0;
+  flex-shrink: 0;
+}
+
+/* --- グループラベル --- */
+.groupLabel {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* --- ミニボタングループ（2×2 グリッド） --- */
+.buttonGroup {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  width: 100%;
+}
+
+.miniButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 1.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-weight: 600;
+  transition: all 0.15s;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.miniButton:hover {
+  background: rgba(124, 58, 237, 0.08);
+  color: #7c3aed;
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+.miniButton.miniActive {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.35);
+}
+
+/* Desktop only */
 @media (min-width: 769px) {
   .controlBar {
     display: flex;

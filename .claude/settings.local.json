@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(find \"/Users/miiuchino/Github/Hossii_Prototype/株式会社Social & Cultural\" | sort | sed \"s|/Users/miiuchino/Github/Hossii_Prototype/||\")"
     ]
   }
 }

@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { addStamp } from '../../core/utils/stampStorage';
+import { uploadHossiiImage } from '../../core/utils/imageStorageApi';
+import { generateId } from '../../core/utils';
 import type { SpaceSettings } from '../../core/types/settings';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { HossiiMini } from '../Hossii/HossiiMini';
@@ -12,11 +14,17 @@ import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { EmotionKey, ToastState } from '../../core/types';
 import styles from './PostScreen.module.css';
 
-// TODO: 将来的に実装
-// - OnboardingHossii: 初回オンボーディング
-// - HossiiSendButton: カスタム送信ボタン
-// - 画像アップロード機能
-// - Hossii表情アセット切り替え
+// F01: 吹き出し色プリセット
+const BUBBLE_COLOR_PRESETS = [
+  '#FF6B6B',
+  '#4ECDC4',
+  '#45B7D1',
+  '#96CEB4',
+  '#FFEAA7',
+  '#DDA0DD',
+  '#98D8C8',
+  '#F7DC6F',
+];
 
 // 感情のラベルマッピング（全種類）
 const EMOTION_LABELS: Record<EmotionKey, string> = {
@@ -41,6 +49,12 @@ const GREETING_POOL = [
   '君の一声が、誰かを救うんだよ〜！📣',
 ];
 
+// F09: テキストから #タグ を抽出
+function parseHashtags(text: string): string[] {
+  const matches = text.match(/#[\p{L}\p{N}_]+/gu) ?? [];
+  return [...new Set(matches.map((t) => t.slice(1)))];
+}
+
 export const PostScreen = () => {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
@@ -48,8 +62,17 @@ export const PostScreen = () => {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [greeting, setGreeting] = useState('');
 
-  // TODO: 画像プレビュー（UIのみ、アップロード機能は未実装）
+  // F01: 吹き出し色
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+
+  // F09: ハッシュタグ
+  const [hashtagInput, setHashtagInput] = useState('');
+  const [hashtags, setHashtags] = useState<string[]>([]);
+
+  // F10: 画像投稿
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
   const { showHossii } = state;
@@ -115,11 +138,10 @@ export const PostScreen = () => {
   };
 
   const handleEmotionClick = (key: EmotionKey) => {
-    // トグル動作：同じものを押したら解除
     setSelectedEmotion(selectedEmotion === key ? null : key);
   };
 
-  // TODO: 画像選択（UIのみ）
+  // F10: 画像選択
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -130,6 +152,8 @@ export const PostScreen = () => {
       return;
     }
 
+    setImageFile(file);
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result as string);
@@ -139,60 +163,105 @@ export const PostScreen = () => {
 
   const handleImageRemove = () => {
     setImagePreview(null);
+    setImageFile(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
   };
 
-  const handleSubmit = () => {
+  // F09: ハッシュタグ追加
+  const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === '　') {
+      e.preventDefault();
+      addHashtagFromInput();
+    }
+  };
+
+  const addHashtagFromInput = () => {
+    const raw = hashtagInput.trim().replace(/^#/, '');
+    if (!raw) return;
+    if (!hashtags.includes(raw)) {
+      setHashtags((prev) => [...prev, raw]);
+    }
+    setHashtagInput('');
+  };
+
+  const removeHashtag = (tag: string) => {
+    setHashtags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  const handleSubmit = async () => {
     if (sending) return;
 
-    // 送信可否チェック：emotion または message があればOK
-    if (!selectedEmotion && !message.trim()) {
-      setToast({ message: '気持ちかメッセージを入力してね！', type: 'error' });
+    const hasImage = !!imageFile;
+    if (!selectedEmotion && !message.trim() && !hasImage) {
+      setToast({ message: '気持ち・メッセージ・写真のいずれかを入力してね！', type: 'error' });
       return;
     }
 
     setSending(true);
 
-    // ストアに追加（message と emotion を分離して渡す）
-    addHossii({
-      message: message.trim(),
-      emotion: selectedEmotion ?? undefined,
-    });
+    try {
+      // F09: メッセージ本文からもハッシュタグを抽出してマージ
+      const parsedFromMessage = parseHashtags(message);
+      const allHashtags = [...new Set([...hashtags, ...parsedFromMessage])];
 
-    // スタンプを獲得
-    if (currentUser) {
-      const newStampCount = addStamp(currentUser.uid);
-      const isNewCard = newStampCount % 20 === 0;
-
-      if (isNewCard) {
-        setToast({ message: '🎉 スタンプカードが完成したよ！', type: 'success' });
-      } else {
-        // 成功フィードバック
-        let toastMsg = '置いたよ〜！⭐ スタンプ+1';
-        if (selectedEmotion) {
-          const emoji = EMOJI_BY_EMOTION[selectedEmotion];
-          const label = EMOTION_LABELS[selectedEmotion];
-          toastMsg = `${emoji} ${label} を置いたよ！⭐ スタンプ+1`;
+      // F10: 画像アップロード
+      let imageUrl: string | undefined;
+      if (imageFile) {
+        const activeSpace = getActiveSpace();
+        const spaceId = activeSpace?.id ?? 'default';
+        const hossiiId = generateId();
+        const uploaded = await uploadHossiiImage(spaceId, hossiiId, imageFile);
+        if (uploaded) {
+          imageUrl = uploaded;
         }
-        setToast({ message: toastMsg, type: 'success' });
       }
+
+      addHossii({
+        message: message.trim(),
+        emotion: selectedEmotion ?? undefined,
+        bubbleColor: selectedColor ?? undefined,
+        hashtags: allHashtags.length > 0 ? allHashtags : undefined,
+        imageUrl,
+      });
+
+      // スタンプを獲得
+      if (currentUser) {
+        const newStampCount = addStamp(currentUser.uid);
+        const isNewCard = newStampCount % 20 === 0;
+
+        if (isNewCard) {
+          setToast({ message: '🎉 スタンプカードが完成したよ！', type: 'success' });
+        } else {
+          let toastMsg = '置いたよ〜！⭐ スタンプ+1';
+          if (selectedEmotion) {
+            const emoji = EMOJI_BY_EMOTION[selectedEmotion];
+            const label = EMOTION_LABELS[selectedEmotion];
+            toastMsg = `${emoji} ${label} を置いたよ！⭐ スタンプ+1`;
+          }
+          setToast({ message: toastMsg, type: 'success' });
+        }
+      }
+
+      // クリア
+      setSelectedEmotion(null);
+      setMessage('');
+      setSelectedColor(null);
+      setHashtags([]);
+      setHashtagInput('');
+      handleImageRemove();
+      shuffleGreeting();
+
+      setTimeout(() => {
+        navigate('screen');
+      }, 800);
+    } finally {
+      setSending(false);
     }
-
-    // クリア
-    setSelectedEmotion(null);
-    setMessage('');
-    setImagePreview(null);
-    shuffleGreeting();
-
-    setSending(false);
-
-    // 少し待ってからスペースへ遷移
-    setTimeout(() => {
-      navigate('screen');
-    }, 800);
   };
 
-  // emotion または message があれば送信可能
-  const canSubmit = selectedEmotion || message.trim();
+  const canSubmit = selectedEmotion || message.trim() || imagePreview;
 
   return (
     <div className={styles.container}>
@@ -224,7 +293,7 @@ export const PostScreen = () => {
           </div>
         )}
 
-        {/* メッセージ入力（本線） - commentPost が有効の場合のみ */}
+        {/* メッセージ入力 - commentPost が有効の場合のみ */}
         {spaceSettings?.features.commentPost !== false && (
           <div className={styles.section}>
             <div className={styles.label}>メッセージ</div>
@@ -238,7 +307,7 @@ export const PostScreen = () => {
           </div>
         )}
 
-        {/* クイック感情バー（近道） - emotionPost が有効の場合のみ */}
+        {/* クイック感情バー - emotionPost が有効の場合のみ */}
         {spaceSettings?.features.emotionPost !== false && (
           <div className={styles.section}>
             <div className={styles.label}>気持ちをつける（任意）</div>
@@ -265,7 +334,68 @@ export const PostScreen = () => {
           </div>
         )}
 
-        {/* 写真添付（UIのみ） - photoPost が有効の場合のみ */}
+        {/* F01: 吹き出し色選択 */}
+        <div className={styles.section}>
+          <div className={styles.label}>吹き出しの色（任意）</div>
+          <div className={styles.colorPalette}>
+            <button
+              type="button"
+              className={`${styles.colorSwatch} ${selectedColor === null ? styles.colorSwatchSelected : ''}`}
+              style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}
+              onClick={() => setSelectedColor(null)}
+              title="デフォルト"
+              aria-label="デフォルト色"
+            />
+            {BUBBLE_COLOR_PRESETS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`${styles.colorSwatch} ${selectedColor === color ? styles.colorSwatchSelected : ''}`}
+                style={{ backgroundColor: color }}
+                onClick={() => setSelectedColor(selectedColor === color ? null : color)}
+                title={color}
+                aria-label={`色 ${color}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* F09: ハッシュタグ */}
+        <div className={styles.section}>
+          <div className={styles.label}>ハッシュタグ（任意）</div>
+          <div className={styles.hashtagInputRow}>
+            <span className={styles.hashtagPrefix}>#</span>
+            <input
+              type="text"
+              value={hashtagInput}
+              onChange={(e) => setHashtagInput(e.target.value)}
+              onKeyDown={handleHashtagKeyDown}
+              onBlur={addHashtagFromInput}
+              placeholder="タグを入力してEnter"
+              className={styles.hashtagInput}
+              maxLength={30}
+            />
+          </div>
+          {hashtags.length > 0 && (
+            <div className={styles.hashtagChips}>
+              {hashtags.map((tag) => (
+                <span key={tag} className={styles.hashtagChip}>
+                  #{tag}
+                  <button
+                    type="button"
+                    onClick={() => removeHashtag(tag)}
+                    className={styles.hashtagRemove}
+                    aria-label={`${tag} を削除`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* F10: 写真添付 - photoPost が有効の場合のみ */}
         {spaceSettings?.features.photoPost !== false && (
           <div className={styles.section}>
             <div className={styles.label}>写真（任意）</div>
@@ -289,6 +419,7 @@ export const PostScreen = () => {
                 <span className={styles.imageUploadIcon}>📸</span>
                 <span className={styles.imageUploadText}>写真を添付</span>
                 <input
+                  ref={imageInputRef}
                   type="file"
                   accept="image/*"
                   onChange={handleImageSelect}

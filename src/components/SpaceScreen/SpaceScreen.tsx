@@ -5,10 +5,12 @@ import { useSpeechRecognition, type SpeechEvent } from '../../core/hooks/useSpee
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
+import { useAuth } from '../../core/contexts/AuthContext';
 import type { EmotionKey } from '../../core/types';
 import type { SpaceSettings } from '../../core/types/settings';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
+import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
 import { PostDetailModal } from '../PostDetailModal/PostDetailModal';
@@ -17,7 +19,7 @@ import { TopBar } from '../Navigation/TopBar';
 import { LeftControlBar, type ControlState } from '../Navigation/LeftControlBar';
 import { QRCodePanel } from '../Navigation/QRCodePanel';
 import { HossiiLive } from '../Hossii/HossiiLive';
-import { HossiiToggle } from '../HossiiToggle/HossiiToggle';
+import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { StarLayer } from '../StarLayer/StarLayer';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
@@ -30,8 +32,6 @@ type Particle = {
   y: number;
 };
 
-// パフォーマンス対策：表示件数制限
-const MAX_DISPLAY_COUNT = 40;
 
 // バブル位置生成（中央寄りに散らばる、画面端は避ける）
 function createBubblePosition(index: number): { x: number; y: number } {
@@ -58,9 +58,30 @@ type ReactionTrigger = {
 };
 
 export const SpaceScreen = () => {
-  const { state, getActiveSpaceHossiis, getActiveSpace, addHossii, setDisplayScale } = useHossiiStore();
-  const { showHossii, listenMode, emotionLogEnabled, speechLogEnabled, speechLevels, activeSpaceId, displayScale } = state;
+  const {
+    state,
+    getActiveSpaceHossiis,
+    getActiveSpace,
+    addHossii,
+    setDisplayScale,
+    setDisplayPeriod,
+    setDisplayLimit,
+    setViewMode,
+    setShowHossii,
+    setListenMode,
+    setListenConsent,
+    updateHossiiColorAction,
+    updateHossiiPositionAction,
+    updateHossiiScaleAction,
+    hideHossii,
+  } = useHossiiStore();
+  const {
+    showHossii, listenMode, hasConsentedToListen, emotionLogEnabled, speechLogEnabled,
+    speechLevels, activeSpaceId, displayScale, displayPeriod, displayLimit, viewMode,
+  } = state;
   const activeSpace = getActiveSpace();
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.isAdmin ?? false;
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   // 他タブからのリアクションを受け取るための状態
@@ -70,6 +91,9 @@ export const SpaceScreen = () => {
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+
+  // F14: 選択中バブル
+  const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
 
   // スペース設定の読み込み
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
@@ -104,14 +128,35 @@ export const SpaceScreen = () => {
     voiceEnabled: true,
   });
 
-  // showHossii が変わったら controlState を同期
+  // ストアの showHossii / listenMode が変わったら controlState に同期
   useEffect(() => {
     setControlState((prev) => ({ ...prev, hossiiVisible: showHossii }));
   }, [showHossii]);
 
+  useEffect(() => {
+    setControlState((prev) => ({ ...prev, micEnabled: listenMode }));
+  }, [listenMode]);
+
+  // 同意モーダル表示フラグ
+  const [showListenConsent, setShowListenConsent] = useState(false);
+
   const handleControlToggle = useCallback((key: keyof ControlState) => {
-    setControlState((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+    if (key === 'hossiiVisible') {
+      // ストアを直接更新（controlState は useEffect で同期される）
+      setShowHossii(!showHossii);
+    } else if (key === 'micEnabled') {
+      if (listenMode) {
+        setListenMode(false);
+      } else if (hasConsentedToListen) {
+        setListenMode(true);
+      } else {
+        setShowListenConsent(true);
+      }
+    } else {
+      // voiceEnabled / isFullscreen はローカル state のみ管理
+      setControlState((prev) => ({ ...prev, [key]: !prev[key] }));
+    }
+  }, [showHossii, listenMode, hasConsentedToListen, setShowHossii, setListenMode]);
 
   const handleFullscreenToggle = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -132,6 +177,46 @@ export const SpaceScreen = () => {
     const nextIndex = (currentIndex + 1) % scales.length;
     setDisplayScale(scales[nextIndex]);
   }, [displayScale, setDisplayScale]);
+
+  // ===== F14: 選択ハンドラ =====
+  const handleBubbleSelect = useCallback((id: string) => {
+    setSelectedBubbleId(id);
+  }, []);
+
+  const handleBubbleDeselect = useCallback(() => {
+    setSelectedBubbleId(null);
+  }, []);
+
+  // F06: 非表示（管理者のみ）
+  const handleHideBubble = useCallback(() => {
+    if (!selectedBubbleId) return;
+    hideHossii(selectedBubbleId);
+    setSelectedBubbleId(null);
+  }, [selectedBubbleId, hideHossii]);
+
+  // F04: PointerUp で即座に位置保存
+  const handlePositionSave = useCallback((id: string, x: number, y: number) => {
+    updateHossiiPositionAction(id, x, y);
+  }, [updateHossiiPositionAction]);
+
+  // F05: PointerUp で即座にスケール保存
+  const handleScaleSave = useCallback((id: string, scale: number) => {
+    updateHossiiScaleAction(id, scale);
+  }, [updateHossiiScaleAction]);
+
+  // F01: カラー選択で即座に保存
+  const handleColorSave = useCallback((id: string, color: string | null) => {
+    updateHossiiColorAction(id, color);
+  }, [updateHossiiColorAction]);
+
+  // Escape キーでデセレクト
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedBubbleId(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // 他タブからリアクションを受信
   const handleBroadcastReaction = useCallback((event: ReactionEvent) => {
@@ -225,11 +310,19 @@ export const SpaceScreen = () => {
     setTimeout(() => setParticles([]), 1200);
   }, []);
 
-  // 新しい順にソートして上限まで表示
+  // 新しい順にソートして上限まで表示（非表示・期間フィルタ・表示モードを適用）
   const displayHossiis = useMemo(() => {
-    const sorted = [...hossiis].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    return sorted.slice(0, MAX_DISPLAY_COUNT);
-  }, [hossiis]);
+    const cutoff = getPeriodCutoff(displayPeriod);
+    const limit = displayLimit === 'unlimited' ? Infinity : displayLimit;
+    const visible = hossiis.filter((h) => {
+      if (h.isHidden) return false;
+      if (cutoff && h.createdAt < cutoff) return false;
+      if (viewMode === 'image' && !h.imageUrl) return false;
+      return true;
+    });
+    const sorted = [...visible].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return sorted.slice(0, limit);
+  }, [hossiis, displayPeriod, displayLimit, viewMode]);
 
   // 各バブルの位置を事前計算（メモ化）
   const bubblePositions = useMemo(() => {
@@ -345,9 +438,6 @@ export const SpaceScreen = () => {
         >
           🔗 共有
         </button>
-
-        {/* Hossii & Listen トグル */}
-        <HossiiToggle />
       </div>
 
       {/* ヘッダー（スペース名） */}
@@ -359,8 +449,17 @@ export const SpaceScreen = () => {
         </h1>
       </header>
 
-      {/* バブルエリア */}
-      <div className={styles.bubbleArea}>
+      {/* バブルエリア（背景クリックでデセレクト） */}
+      <div
+        className={styles.bubbleArea}
+        data-bubble-area
+        onPointerDown={(e) => {
+          const target = e.target as HTMLElement;
+          if (!target.closest('[data-hossii-bubble]')) {
+            setSelectedBubbleId(null);
+          }
+        }}
+      >
         {displayHossiis.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon}>🌸</span>
@@ -368,7 +467,12 @@ export const SpaceScreen = () => {
           </div>
         ) : (
           displayHossiis.map((hossii, index) => {
-            const pos = bubblePositions[index];
+            // F02: 固定座標があればそれを優先、なければ index シード計算にフォールバック
+            const pos = hossii.isPositionFixed && hossii.positionX != null && hossii.positionY != null
+              ? { x: hossii.positionX, y: hossii.positionY }
+              : bubblePositions[index];
+
+            const isThisSelected = selectedBubbleId === hossii.id;
 
             // モバイル: スターを表示
             if (isMobile) {
@@ -396,6 +500,12 @@ export const SpaceScreen = () => {
                     activeBubbleId === hossii.id ? null : hossii.id
                   )
                 }
+                isSelected={isThisSelected}
+                onSelect={handleBubbleSelect}
+                onPositionSave={handlePositionSave}
+                onScaleSave={handleScaleSave}
+                onColorSave={handleColorSave}
+                viewMode={viewMode}
               />
             );
           })
@@ -423,6 +533,8 @@ export const SpaceScreen = () => {
           isListening={isListening}
           hossiiColor={spaceSettings?.hossiiColor}
           brainMessage={brainMessage?.text ?? null}
+          hossiis={displayHossiis}
+          readingEnabled={controlState.voiceEnabled}
         />
       )}
 
@@ -442,6 +554,43 @@ export const SpaceScreen = () => {
         />
       )}
 
+      {/* Listen 同意モーダル（左バーのマイクボタン用） */}
+      {showListenConsent && (
+        <ListenConsentModal
+          onConsent={() => {
+            setListenConsent(true);
+            setListenMode(true);
+            setShowListenConsent(false);
+          }}
+          onCancel={() => setShowListenConsent(false)}
+        />
+      )}
+
+      {/* F14: 選択時ツールバー（中央ドラッグで移動・コーナーハンドルでリサイズ） */}
+      {selectedBubbleId && (
+        <div className={styles.editToolbar}>
+          <span className={styles.editToolbarHint}>
+            ドラッグで移動 · 角ハンドルでリサイズ
+          </span>
+          {isAdmin && (
+            <button
+              type="button"
+              className={`${styles.editToolbarBtn} ${styles.editToolbarBtnHide}`}
+              onClick={handleHideBubble}
+            >
+              🚫 非表示
+            </button>
+          )}
+          <button
+            type="button"
+            className={`${styles.editToolbarBtn} ${styles.editToolbarBtnCancel}`}
+            onClick={handleBubbleDeselect}
+          >
+            ✕ 選択解除
+          </button>
+        </div>
+      )}
+
       {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QRコードパネル */}
       <TopBar />
       <TopRightMenu />
@@ -451,6 +600,12 @@ export const SpaceScreen = () => {
         onFullscreenToggle={handleFullscreenToggle}
         displayScale={displayScale}
         onDisplayScaleCycle={handleDisplayScaleCycle}
+        displayPeriod={displayPeriod}
+        onDisplayPeriodChange={setDisplayPeriod}
+        displayLimit={displayLimit}
+        onDisplayLimitChange={setDisplayLimit}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
       />
       <QRCodePanel />
     </div>

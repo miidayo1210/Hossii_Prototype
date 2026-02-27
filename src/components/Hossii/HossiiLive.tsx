@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { EmotionKey } from '../../core/types';
+import type { EmotionKey, Hossii } from '../../core/types';
 import type { HossiiColor } from '../../core/types/settings';
 import { getRandomBubble8, EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getHossiiFace } from '../../core/assets/hossiiFaces';
@@ -21,7 +21,11 @@ type Props = {
   onParticle?: (emotion: EmotionKey) => void;
   isListening?: boolean;
   hossiiColor?: HossiiColor;
-  brainMessage?: string | null; // AI brain からのメッセージ
+  brainMessage?: string | null;
+  /** F07: 読み上げ候補の投稿リスト */
+  hossiis?: Hossii[];
+  /** F07: 読み上げ ON/OFF（voiceEnabled と連動） */
+  readingEnabled?: boolean;
 };
 
 /** Hossii のサイズ (CSS の width/height と一致させる) */
@@ -153,7 +157,16 @@ function getRandomRestTime() {
   return 1000 + Math.random() * 1500;
 }
 
-export function HossiiLive({ lastTriggerId, emotion, onParticle, isListening = false, hossiiColor, brainMessage }: Props) {
+export function HossiiLive({
+  lastTriggerId,
+  emotion,
+  onParticle,
+  isListening = false,
+  hossiiColor,
+  brainMessage,
+  hossiis = [],
+  readingEnabled = false,
+}: Props) {
   // === State ===
   const [position, setPosition] = useState(getInitialPosition);
   const [transitionDuration, setTransitionDuration] = useState(6000); // ms
@@ -189,6 +202,16 @@ export function HossiiLive({ lastTriggerId, emotion, onParticle, isListening = f
   // emotion を ref で保持（effect の依存配列から外すため）
   const emotionRef = useRef<EmotionKey | null | undefined>(emotion);
   emotionRef.current = emotion;
+
+  // F07: hossiis / readingEnabled を ref で保持
+  const hossiisRef = useRef<Hossii[]>(hossiis);
+  hossiisRef.current = hossiis;
+  const readingEnabledRef = useRef(readingEnabled);
+  readingEnabledRef.current = readingEnabled;
+  // 直前に読み上げた投稿 ID（重複防止）
+  const lastReadIdRef = useRef<string | null>(null);
+  // SpeechSynthesis utterance ref（キャンセル用）
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // ============================================
   // Layer A: BaseMotion - viewport全体を泳ぐ
@@ -316,6 +339,20 @@ export function HossiiLive({ lastTriggerId, emotion, onParticle, isListening = f
   // 自発セリフ（アイドル時）
   // ============================================
   useEffect(() => {
+    function speakText(text: string) {
+      if (typeof window === 'undefined' || !window.speechSynthesis) return;
+      // 前の読み上げを停止
+      if (utteranceRef.current) {
+        window.speechSynthesis.cancel();
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ja-JP';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.1;
+      utteranceRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    }
+
     function scheduleIdleSpeech() {
       // 30-60秒のランダムな間隔
       const delay = 30000 + Math.random() * 30000;
@@ -323,13 +360,26 @@ export function HossiiLive({ lastTriggerId, emotion, onParticle, isListening = f
       idleBubbleTimerRef.current = setTimeout(() => {
         // 40%の確率で発動
         if (Math.random() < 0.4) {
-          const randomLine = HOSSII_IDLE_LINES[Math.floor(Math.random() * HOSSII_IDLE_LINES.length)];
-          setIdleBubble(randomLine);
+          // F07: readingEnabled かつ投稿がある場合、50% の確率で投稿を読み上げ
+          const candidatePosts = hossiisRef.current.filter(
+            (h) => h.message && h.message.trim().length > 0 && h.id !== lastReadIdRef.current
+          );
 
-          // 3秒後にフェードアウト
+          if (readingEnabledRef.current && candidatePosts.length > 0 && Math.random() < 0.5) {
+            const post = candidatePosts[Math.floor(Math.random() * candidatePosts.length)];
+            lastReadIdRef.current = post.id;
+            const displayText = post.message.length > 40 ? post.message.slice(0, 40) + '…' : post.message;
+            setIdleBubble(`「${displayText}」`);
+            speakText(post.message);
+          } else {
+            const randomLine = HOSSII_IDLE_LINES[Math.floor(Math.random() * HOSSII_IDLE_LINES.length)];
+            setIdleBubble(randomLine);
+          }
+
+          // 4秒後にフェードアウト
           setTimeout(() => {
             setIdleBubble(null);
-          }, 3000);
+          }, 4000);
         }
 
         // 次の自発セリフをスケジュール
@@ -344,6 +394,10 @@ export function HossiiLive({ lastTriggerId, emotion, onParticle, isListening = f
       if (idleBubbleTimerRef.current) {
         clearTimeout(idleBubbleTimerRef.current);
       }
+      // コンポーネントアンマウント時に読み上げを停止
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
 
@@ -354,6 +408,13 @@ export function HossiiLive({ lastTriggerId, emotion, onParticle, isListening = f
       lastInteractionTimeRef.current = Date.now();
     }
   }, [lastTriggerId, bubble, longBubble]);
+
+  // F07: readingEnabled が false になったら読み上げを停止
+  useEffect(() => {
+    if (!readingEnabled && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, [readingEnabled]);
 
   // ============================================
   // Layer C: TapMotion - タップ時の反応

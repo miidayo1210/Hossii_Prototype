@@ -46,6 +46,17 @@ import {
 } from '../utils/listenStorage';
 import { migrateHossiiOrigin, needsMigration, markMigrationComplete } from '../utils/migrateOldLogs';
 import { loadDisplayScale, saveDisplayScale, type DisplayScale } from '../utils/displayScaleStorage';
+import {
+  loadDisplayPeriod,
+  saveDisplayPeriod,
+  loadDisplayLimit,
+  saveDisplayLimit,
+  loadViewMode,
+  saveViewMode,
+  type DisplayPeriod,
+  type DisplayLimit,
+  type ViewMode,
+} from '../utils/displayPrefsStorage';
 
 // Supabase APIs
 import { supabase, isSupabaseConfigured } from '../supabase';
@@ -58,6 +69,10 @@ import {
 import {
   fetchHossiis,
   insertHossii,
+  updateHossiiColor,
+  updateHossiiPosition,
+  updateHossiiScale,
+  hideHossiiInDb,
   deleteAllHossiisInSpace,
   rowToHossii,
   type HossiiRow,
@@ -85,6 +100,14 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
     origin: raw.origin as Hossii['origin'],
     autoType: raw.autoType as Hossii['autoType'],
     language: raw.language as Hossii['language'],
+    bubbleColor: typeof raw.bubbleColor === 'string' ? raw.bubbleColor : undefined,
+    hashtags: Array.isArray(raw.hashtags) ? raw.hashtags as string[] : undefined,
+    imageUrl: typeof raw.imageUrl === 'string' ? raw.imageUrl : undefined,
+    positionX: typeof raw.positionX === 'number' ? raw.positionX : undefined,
+    positionY: typeof raw.positionY === 'number' ? raw.positionY : undefined,
+    isPositionFixed: typeof raw.isPositionFixed === 'boolean' ? raw.isPositionFixed : false,
+    scale: typeof raw.scale === 'number' ? raw.scale : 1.0,
+    isHidden: typeof raw.isHidden === 'boolean' ? raw.isHidden : false,
   };
 };
 
@@ -214,6 +237,9 @@ type ExtendedHossiiState = HossiiState & {
   speechLogEnabled: boolean;
   speechLevels: SpeechLevelSettings;
   displayScale: DisplayScale;
+  displayPeriod: DisplayPeriod;
+  displayLimit: DisplayLimit;
+  viewMode: ViewMode;
 };
 
 // 拡張Action型
@@ -237,7 +263,14 @@ type ExtendedHossiiAction =
   | { type: 'SET_EMOTION_LOG_ENABLED'; payload: boolean }
   | { type: 'SET_SPEECH_LOG_ENABLED'; payload: boolean }
   | { type: 'SET_SPEECH_LEVELS'; payload: SpeechLevelSettings }
-  | { type: 'SET_DISPLAY_SCALE'; payload: DisplayScale };
+  | { type: 'SET_DISPLAY_SCALE'; payload: DisplayScale }
+  | { type: 'SET_DISPLAY_PERIOD'; payload: DisplayPeriod }
+  | { type: 'SET_DISPLAY_LIMIT'; payload: DisplayLimit }
+  | { type: 'SET_VIEW_MODE'; payload: ViewMode }
+  | { type: 'UPDATE_HOSSII_POSITION'; payload: { id: string; positionX: number; positionY: number } }
+  | { type: 'UPDATE_HOSSII_SCALE'; payload: { id: string; scale: number } }
+  | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
+  | { type: 'HIDE_HOSSII'; payload: string };
 
 // アクティブなニックネームを取得するヘルパー
 const getActiveNicknameFromState = (state: ExtendedHossiiState): string => {
@@ -286,6 +319,9 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
           origin: action.payload.origin,
           autoType: action.payload.autoType,
           language: action.payload.language,
+          bubbleColor: action.payload.bubbleColor,
+          hashtags: action.payload.hashtags,
+          imageUrl: action.payload.imageUrl,
         };
         const newHossiis = [...state.hossiis, newHossii];
         saveHossiis(newHossiis);
@@ -503,10 +539,57 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
 
       case 'SET_DISPLAY_SCALE': {
         saveDisplayScale(action.payload);
-        return {
-          ...state,
-          displayScale: action.payload,
-        };
+        return { ...state, displayScale: action.payload };
+      }
+
+      case 'SET_DISPLAY_PERIOD': {
+        saveDisplayPeriod(action.payload);
+        return { ...state, displayPeriod: action.payload };
+      }
+
+      case 'SET_DISPLAY_LIMIT': {
+        saveDisplayLimit(action.payload);
+        return { ...state, displayLimit: action.payload };
+      }
+
+      case 'SET_VIEW_MODE': {
+        saveViewMode(action.payload);
+        return { ...state, viewMode: action.payload };
+      }
+
+      case 'UPDATE_HOSSII_POSITION': {
+        const { id, positionX, positionY } = action.payload;
+        const newHossiis = state.hossiis.map((h) =>
+          h.id === id ? { ...h, positionX, positionY, isPositionFixed: true } : h
+        );
+        saveHossiis(newHossiis);
+        return { ...state, hossiis: newHossiis };
+      }
+
+      case 'UPDATE_HOSSII_SCALE': {
+        const { id, scale } = action.payload;
+        const newHossiis = state.hossiis.map((h) =>
+          h.id === id ? { ...h, scale } : h
+        );
+        saveHossiis(newHossiis);
+        return { ...state, hossiis: newHossiis };
+      }
+
+      case 'UPDATE_HOSSII_COLOR': {
+        const { id, color } = action.payload;
+        const newHossiis = state.hossiis.map((h) =>
+          h.id === id ? { ...h, bubbleColor: color ?? undefined } : h
+        );
+        saveHossiis(newHossiis);
+        return { ...state, hossiis: newHossiis };
+      }
+
+      case 'HIDE_HOSSII': {
+        const newHossiis = state.hossiis.map((h) =>
+          h.id === action.payload ? { ...h, isHidden: true } : h
+        );
+        saveHossiis(newHossiis);
+        return { ...state, hossiis: newHossiis };
       }
 
       default:
@@ -539,6 +622,13 @@ type HossiiContextValue = {
   setSpeechLogEnabled: (enabled: boolean) => void;
   setSpeechLevels: (levels: SpeechLevelSettings) => void;
   setDisplayScale: (scale: DisplayScale) => void;
+  setDisplayPeriod: (period: DisplayPeriod) => void;
+  setDisplayLimit: (limit: DisplayLimit) => void;
+  setViewMode: (mode: ViewMode) => void;
+  updateHossiiColorAction: (id: string, color: string | null) => void;
+  updateHossiiPositionAction: (id: string, positionX: number, positionY: number) => void;
+  updateHossiiScaleAction: (id: string, scale: number) => void;
+  hideHossii: (id: string) => void;
 };
 
 const HossiiContext = createContext<HossiiContextValue | null>(null);
@@ -560,6 +650,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const initialSpeechLogEnabled = useMemo(() => loadSpeechLogEnabled(), []);
   const initialSpeechLevels = useMemo(() => loadSpeechLevels(), []);
   const initialDisplayScale = useMemo(() => loadDisplayScale(), []);
+  const initialDisplayPeriod = useMemo(() => loadDisplayPeriod(), []);
+  const initialDisplayLimit = useMemo(() => loadDisplayLimit(), []);
+  const initialViewMode = useMemo(() => loadViewMode(), []);
 
   const activeSpaceIdRef = useMemo(() => ({ current: activeSpaceId }), [activeSpaceId]);
 
@@ -585,6 +678,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     speechLogEnabled: initialSpeechLogEnabled,
     speechLevels: initialSpeechLevels,
     displayScale: initialDisplayScale,
+    displayPeriod: initialDisplayPeriod,
+    displayLimit: initialDisplayLimit,
+    viewMode: initialViewMode,
   });
 
   // 自分が Supabase に INSERT した ID を追跡（Realtime 重複回避）
@@ -693,7 +789,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const addHossii = useCallback((input: AddHossiiInput) => {
     const msg = (input.message ?? '').trim();
     const isLaughter = input.autoType === 'laughter';
-    if (!input.emotion && !msg && !isLaughter) return;
+    const hasImage = !!input.imageUrl;
+    if (!input.emotion && !msg && !isLaughter && !hasImage) return;
 
     const currentState = stateRef.current;
 
@@ -726,6 +823,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       origin: input.origin,
       autoType: input.autoType,
       language: input.language,
+      bubbleColor: input.bubbleColor,
+      hashtags: input.hashtags,
+      imageUrl: input.imageUrl,
     };
 
     // 楽観的更新（即時 UI 反映）
@@ -844,6 +944,46 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     dispatch({ type: 'SET_DISPLAY_SCALE', payload: scale });
   }, []);
 
+  const setDisplayPeriod = useCallback((period: DisplayPeriod) => {
+    dispatch({ type: 'SET_DISPLAY_PERIOD', payload: period });
+  }, []);
+
+  const setDisplayLimit = useCallback((limit: DisplayLimit) => {
+    dispatch({ type: 'SET_DISPLAY_LIMIT', payload: limit });
+  }, []);
+
+  const setViewMode = useCallback((mode: ViewMode) => {
+    dispatch({ type: 'SET_VIEW_MODE', payload: mode });
+  }, []);
+
+  const updateHossiiColorAction = useCallback((id: string, color: string | null) => {
+    dispatch({ type: 'UPDATE_HOSSII_COLOR', payload: { id, color } });
+    if (isSupabaseConfigured) {
+      updateHossiiColor(id, color);
+    }
+  }, []);
+
+  const updateHossiiPositionAction = useCallback((id: string, positionX: number, positionY: number) => {
+    dispatch({ type: 'UPDATE_HOSSII_POSITION', payload: { id, positionX, positionY } });
+    if (isSupabaseConfigured) {
+      updateHossiiPosition(id, positionX, positionY);
+    }
+  }, []);
+
+  const updateHossiiScaleAction = useCallback((id: string, scale: number) => {
+    dispatch({ type: 'UPDATE_HOSSII_SCALE', payload: { id, scale } });
+    if (isSupabaseConfigured) {
+      updateHossiiScale(id, scale);
+    }
+  }, []);
+
+  const hideHossii = useCallback((id: string) => {
+    dispatch({ type: 'HIDE_HOSSII', payload: id });
+    if (isSupabaseConfigured) {
+      hideHossiiInDb(id);
+    }
+  }, []);
+
   return (
     <HossiiContext.Provider
       value={{
@@ -870,6 +1010,13 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         setSpeechLogEnabled,
         setSpeechLevels,
         setDisplayScale,
+        setDisplayPeriod,
+        setDisplayLimit,
+        setViewMode,
+        updateHossiiColorAction,
+        updateHossiiPositionAction,
+        updateHossiiScaleAction,
+        hideHossii,
       }}
     >
       {children}

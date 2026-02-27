@@ -303,6 +303,100 @@
   line-height: 1.5;
 }
 
+/* F01: カラーパレット */
+.colorPalette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.colorSwatch {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  outline: none;
+  padding: 0;
+}
+
+.colorSwatch:hover {
+  transform: scale(1.15);
+}
+
+.colorSwatchSelected {
+  border-color: #1e1e1e;
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #7c3aed;
+}
+
+/* F09: ハッシュタグ */
+.hashtagInputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: white;
+  border: 1.5px solid #e9d5ff;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.hashtagPrefix {
+  font-size: 1rem;
+  color: #7c3aed;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.hashtagInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.9rem;
+  color: #374151;
+  background: transparent;
+}
+
+.hashtagInput::placeholder {
+  color: #c4b5fd;
+}
+
+.hashtagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.hashtagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+}
+
+.hashtagRemove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #7c3aed;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+  margin-left: 0.1rem;
+}
+
+.hashtagRemove:hover {
+  color: #ef4444;
+}
+
 /* Mobile: Bottom nav padding */
 @media (max-width: 768px) {
   .container {

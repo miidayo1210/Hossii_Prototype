@@ -38,6 +38,20 @@ export type Hossii = {
   origin?: HossiiOrigin; // 発生元（manual / auto）未設定は manual 扱い
   autoType?: AutoType; // 自動投稿の種類（emotion / speech / laughter）
   language?: LanguageCode; // 言語コード（自動生成されたログのみ）
+  // F01: 吹き出し色
+  bubbleColor?: string;
+  // F09: ハッシュタグ
+  hashtags?: string[];
+  // F10: 画像投稿
+  imageUrl?: string;
+  // F02/F04: 吹き出し座標固定
+  positionX?: number;
+  positionY?: number;
+  isPositionFixed?: boolean;
+  // F05: 吹き出しスケール
+  scale?: number;
+  // F06: 非表示（管理者）
+  isHidden?: boolean;
 };
 
 // addHossii の入力型（message は空もあり得るが、最終的に空投稿は弾く）
@@ -50,6 +64,9 @@ export type AddHossiiInput = {
   origin?: HossiiOrigin; // 発生元
   autoType?: AutoType; // 自動投稿の種類
   language?: LanguageCode; // 言語コード
+  bubbleColor?: string; // F01
+  hashtags?: string[]; // F09
+  imageUrl?: string; // F10
 };
 
 export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card';
