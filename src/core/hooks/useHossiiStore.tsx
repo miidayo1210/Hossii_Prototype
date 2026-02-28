@@ -78,6 +78,7 @@ import {
   rowToHossii,
   type HossiiRow,
 } from '../utils/hossiisApi';
+import { insertModerationLog } from '../utils/moderationLogsApi';
 import {
   upsertProfile,
   upsertSpaceNickname,
@@ -645,7 +646,7 @@ type HossiiContextValue = {
   updateHossiiPositionAction: (id: string, positionX: number, positionY: number) => void;
   updateHossiiScaleAction: (id: string, scale: number) => void;
   hideHossii: (id: string, adminId?: string) => void;
-  restoreHossii: (id: string) => void;
+  restoreHossii: (id: string, adminId?: string) => void;
 };
 
 const HossiiContext = createContext<HossiiContextValue | null>(null);
@@ -807,7 +808,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const msg = (input.message ?? '').trim();
     const isLaughter = input.autoType === 'laughter';
     const hasImage = !!input.imageUrl;
-    if (!input.emotion && !msg && !isLaughter && !hasImage) return;
+    const hasNumber = input.numberValue != null;
+    if (!input.emotion && !msg && !isLaughter && !hasImage && !hasNumber) return;
 
     const currentState = stateRef.current;
 
@@ -843,6 +845,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       bubbleColor: input.bubbleColor,
       hashtags: input.hashtags,
       imageUrl: input.imageUrl,
+      numberValue: input.numberValue,
     };
 
     // 楽観的更新（即時 UI 反映）
@@ -995,18 +998,26 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, []);
 
   const hideHossii = useCallback((id: string, adminId?: string) => {
+    const hossii = state.hossiis.find((h) => h.id === id);
     dispatch({ type: 'HIDE_HOSSII', payload: { hossiiId: id, adminId } });
     if (isSupabaseConfigured) {
       hideHossiiInDb(id, adminId);
+      if (hossii && adminId) {
+        insertModerationLog({ spaceId: hossii.spaceId, hossiiId: id, action: 'hide', adminId });
+      }
     }
-  }, []);
+  }, [state.hossiis]);
 
-  const restoreHossii = useCallback((id: string) => {
+  const restoreHossii = useCallback((id: string, adminId?: string) => {
+    const hossii = state.hossiis.find((h) => h.id === id);
     dispatch({ type: 'RESTORE_HOSSII', payload: id });
     if (isSupabaseConfigured) {
       restoreHossiiInDb(id);
+      if (hossii && adminId) {
+        insertModerationLog({ spaceId: hossii.spaceId, hossiiId: id, action: 'restore', adminId });
+      }
     }
-  }, []);
+  }, [state.hossiis]);
 
   return (
     <HossiiContext.Provider

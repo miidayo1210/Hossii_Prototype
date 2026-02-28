@@ -55,6 +55,8 @@ type BubbleProps = {
   onColorSave?: (id: string, color: string | null) => void;
   /** F03: 表示モード */
   viewMode?: ViewMode;
+  /** F02/F04: 編集権限（false の場合ドラッグ・リサイズ・色変更不可） */
+  canEdit?: boolean;
 };
 
 export const Bubble = ({
@@ -69,6 +71,7 @@ export const Bubble = ({
   onScaleSave,
   onColorSave,
   viewMode = 'full',
+  canEdit = true,
 }: BubbleProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +94,8 @@ export const Bubble = ({
   onScaleSaveRef.current = onScaleSave;
   const onColorSaveRef = useRef(onColorSave);
   onColorSaveRef.current = onColorSave;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
   const hossiiRef = useRef(hossii);
   hossiiRef.current = hossii;
 
@@ -119,6 +124,9 @@ export const Bubble = ({
         onSelectRef.current?.(hossiiRef.current.id);
         return;
       }
+
+      // 編集権限がない場合はドラッグ開始しない
+      if (!canEditRef.current) return;
 
       // コーナーハンドルかどうかで mode 判定
       const target = e.target as HTMLElement;
@@ -297,6 +305,9 @@ export const Bubble = ({
                   className={styles.bubbleImage}
                 />
               )}
+              {viewMode === 'full' && hossii.numberValue != null && (
+                <p className={styles.bubbleNumber}>📊 {hossii.numberValue}</p>
+              )}
               {viewMode === 'full' && hossii.hashtags && hossii.hashtags.length > 0 && (
                 <div className={styles.bubbleHashtags}>
                   {hossii.hashtags.map((tag) => (
@@ -311,8 +322,8 @@ export const Bubble = ({
         )}
       </div>
 
-      {/* 選択時: 4コーナーのリサイズハンドル + カラーパレット */}
-      {isSelected && (
+      {/* 選択時: 4コーナーのリサイズハンドル + カラーパレット（編集権限がある場合のみ） */}
+      {isSelected && canEdit && (
         <>
           <div className={`${styles.resizeHandle} ${styles.resizeHandleTL}`} data-resize-handle />
           <div className={`${styles.resizeHandle} ${styles.resizeHandleTR}`} data-resize-handle />

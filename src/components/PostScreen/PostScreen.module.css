@@ -154,6 +154,14 @@
   color: #9ca3af;
 }
 
+/* 写真 / お絵描きボタン並び */
+.mediaButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  width: 100%;
+}
+
 /* 写真添付エリア */
 .imageUploadArea {
   display: flex;
@@ -162,12 +170,32 @@
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   border: 2px dashed #c4b5fd; /* purple-300 */
   border-radius: 0.75rem;
   background: rgba(250, 245, 255, 0.5);
   cursor: pointer;
   transition: background 0.2s;
+}
+
+/* お絵描きボタン */
+.drawingButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 2px dashed #fbcfe8; /* pink-200 */
+  border-radius: 0.75rem;
+  background: rgba(255, 244, 250, 0.5);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.drawingButton:hover {
+  background: rgba(252, 231, 243, 0.5);
 }
 
 .imageUploadArea:hover {
@@ -357,6 +385,22 @@
   font-size: 0.9rem;
   color: #374151;
   background: transparent;
+}
+
+.numberInput {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e9d5ff;
+  border-radius: 0.5rem;
+  font-size: 1.1rem;
+  color: #374151;
+  background: rgba(250, 245, 255, 0.5);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.numberInput:focus {
+  border-color: #a855f7;
 }
 
 .hashtagInput::placeholder {

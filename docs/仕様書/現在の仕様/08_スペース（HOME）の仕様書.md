@@ -91,7 +91,7 @@ type DisplayLimit = 50 | 100 | 150 | 'unlimited';
 |---|---|---|
 | `full` | フル表示 | コメント + 投稿者名 + 気持ちアイコン + 画像 + ハッシュタグ（デフォルト） |
 | `bubble` | バブル表示 | 気持ちアイコン + 投稿者名・時間のみ（テキスト・画像・ハッシュタグ非表示） |
-| `image` | 画像のみ | `imageUrl` がある投稿のみ表示、画像だけレンダリング |
+| `image` | 画像のみ | `imageUrl` がある投稿のみ表示、バブル内に画像だけレンダリング（テキスト・絵文字・ハッシュタグ非表示）。バブルの座標・アニメーションはそのまま維持 |
 
 **データ仕様**:
 - `image` モード選択時は `displayHossiis` 内で `imageUrl` のない投稿を事前フィルタ
@@ -110,23 +110,6 @@ type ViewMode = 'full' | 'bubble' | 'image';
 - 気持ち絵文字は吹き出し上部の `.bubbleEmoji` スパンにのみ表示（大アイコン）
 - コメントテキスト（`.bubbleText`）には絵文字を含まない `message` の文字列のみを表示（重複なし）
 - `renderHossiiText()` は絵文字+メッセージを結合するが、Bubble コンポーネントでは `hossii.message` を直接使用
-
----
-
-### F13 画像のみ表示モードの詳細（カード/サムネイル/拡大）
-
-**概要**: 表示モード `image` 選択時の詳細レイアウト。（F10画像投稿の実装後に有効化）
-
-**対象**: 表示モード `image`（F03と連動）
-
-**UIコンポーネント**:
-- グリッドレイアウト: サムネイル 3〜4列
-- タップ/クリックで拡大モーダル表示
-- 閉じるボタン or 外側タップで閉じる
-
-**パフォーマンス**:
-- `loading="lazy"` による遅延ロード
-- サムネイル URL（Supabase Storage の transform API）を優先表示
 
 ---
 
@@ -188,7 +171,7 @@ ALTER TABLE hossiis ADD COLUMN position_y float DEFAULT NULL;
 ALTER TABLE hossiis ADD COLUMN is_position_fixed boolean DEFAULT false;
 ```
 
-**権限**: 投稿者本人のみ or 管理者のみ（要決定）
+**権限**: スペース設定の `bubbleEditPermission` に従う（下記参照）
 
 ---
 
@@ -203,7 +186,7 @@ ALTER TABLE hossiis ADD COLUMN is_position_fixed boolean DEFAULT false;
 - PointerUp 時に即座に `hossiis.position_x / position_y / is_position_fixed` を UPDATE（「確定」ボタン不要）
 - ドラッグ中はアニメーション停止（`animationPlayState: paused`）
 
-**権限**: 投稿者本人のみ or 管理者のみ（要決定）
+**権限**: スペース設定の `bubbleEditPermission` に従う（下記参照）
 
 **DB操作**:
 ```ts
@@ -243,6 +226,29 @@ bubbleStyle.scale = String(displayScale);
 ```sql
 ALTER TABLE hossiis ADD COLUMN scale float DEFAULT 1.0;
 ```
+
+---
+
+### バブル編集権限（F02/F04/F05 共通）
+
+> **✅ 実装済み**
+
+**概要**: F02（座標固定）/ F04（移動）/ F05（リサイズ）/ F01（色変更）の編集権限を、スペース設定で制御できる。
+
+**設定場所**: `SpaceSettingsScreen` > 基本設定 > 「バブル編集権限」
+
+| 設定値 | 内容 |
+|---|---|
+| `all`（デフォルト） | 全参加者が移動・リサイズ・色変更可能 |
+| `owner_and_admin` | 投稿者本人と管理者のみ編集可能 |
+
+**状態管理**:
+```ts
+// SpaceSettings に追加
+bubbleEditPermission: 'all' | 'owner_and_admin'; // デフォルト: 'all'
+```
+
+**実装ファイル**: `src/core/types/settings.ts`・`SpaceSettingsScreen/GeneralTab.tsx`・`SpaceScreen.tsx`・`Tree.tsx`
 
 ---
 
@@ -363,8 +369,6 @@ ALTER TABLE hossiis ADD COLUMN image_url text DEFAULT NULL;
 **最適化**:
 - アップロード前にクライアント側で圧縮（最大 1MB / 1280px）
 - Supabase Storage の Transform API でサムネイル生成
-
-**F13との連携**: 表示モード `image` での表示に使用
 
 ---
 

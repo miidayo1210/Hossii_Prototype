@@ -53,17 +53,16 @@ type Hossii = {
 | メッセージ（textarea） | 任意 | 200文字 | `spaceSettings.features.commentPost` |
 | 感情選択（クイック感情バー） | 任意 | 1つ（トグル） | `spaceSettings.features.emotionPost` |
 | 写真添付 | 任意 | — | `spaceSettings.features.photoPost` |
-
-> **写真添付はUIのみ実装。アップロード・保存機能は未実装。**
+| 数値入力 | 任意 | — | `spaceSettings.features.numberPost` |
 
 ### 送信可否条件
 
 ```
-emotion が選択されている OR message.trim() が1文字以上
+emotion が選択されている OR message.trim() が1文字以上 OR 画像が添付されている OR 数値が入力されている
 → 送信ボタン有効
 ```
 
-いずれも満たさない場合: `「気持ちかメッセージを入力してね！」` エラートーストを表示。
+いずれも満たさない場合: `「気持ち・メッセージ・写真・数値のいずれかを入力してね！」` エラートーストを表示。
 
 ### 送信処理フロー
 
@@ -119,7 +118,7 @@ undefined（名前なしで投稿）
 | `commentPost` | `true` | メッセージ入力欄 |
 | `emotionPost` | `true` | クイック感情バー |
 | `photoPost` | `true` | 写真添付エリア |
-| `numberPost` | `false` | 数値入力（未実装） |
+| `numberPost` | `false` | 数値入力（数値投稿） |
 
 全てのフラグが `false` の場合、「このスペースでは投稿機能が無効になっています」と警告表示。
 
@@ -180,7 +179,8 @@ PostScreen
 
 ---
 
-## 未実装
+## 実装済み追記
 
-- 写真アップロード・保存（UI のみ）
-- `numberPost`（数値投稿）
+- 写真添付: Supabase Storage へのアップロード・保存 → ✅ 実装済み（`imageStorageApi.ts`）
+- `numberPost`: 数値投稿（数値入力 UI + Hossii.numberValue フィールド）→ ✅ 実装済み
+- F08 お絵描き投稿: DrawingModal（canvas + ツールバー + undo）→ ✅ 実装済み

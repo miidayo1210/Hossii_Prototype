@@ -54,7 +54,7 @@ export const ModerationTab = ({ spaceId }: Props) => {
   };
 
   const handleRestore = (id: string) => {
-    restoreHossii(id);
+    restoreHossii(id, currentUser?.uid ?? undefined);
   };
 
   const formatDate = (date: Date) => {

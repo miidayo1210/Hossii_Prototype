@@ -83,6 +83,8 @@ export const SpaceScreen = () => {
   const activeSpace = getActiveSpace();
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin ?? false;
+  // 現在のユーザーID（匿名含む）
+  const myAuthorId = currentUser?.uid ?? state.profile?.id;
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   // 他タブからのリアクションを受け取るための状態
@@ -181,6 +183,15 @@ export const SpaceScreen = () => {
     const nextIndex = (currentIndex + 1) % scales.length;
     setDisplayScale(scales[nextIndex]);
   }, [displayScale, setDisplayScale]);
+
+  // F02/F04: バブル編集権限チェック
+  const canEditBubble = useCallback((hossii: { authorId?: string }) => {
+    if (isAdmin) return true;
+    const permission = spaceSettings?.bubbleEditPermission ?? 'all';
+    if (permission === 'all') return true;
+    // owner_and_admin: 投稿者本人のみ（authorId が一致する場合）
+    return !!myAuthorId && hossii.authorId === myAuthorId;
+  }, [isAdmin, spaceSettings, myAuthorId]);
 
   // ===== F14: 選択ハンドラ =====
   const handleBubbleSelect = useCallback((id: string) => {
@@ -510,6 +521,7 @@ export const SpaceScreen = () => {
                 onScaleSave={handleScaleSave}
                 onColorSave={handleColorSave}
                 viewMode={viewMode}
+                canEdit={canEditBubble(hossii)}
               />
             );
           })

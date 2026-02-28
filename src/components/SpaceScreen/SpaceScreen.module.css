@@ -337,6 +337,13 @@
 }
 
 /* F09: ハッシュタグ表示 */
+.bubbleNumber {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6d28d9;
+  margin: 0.25rem 0 0 0;
+}
+
 .bubbleHashtags {
   display: flex;
   flex-wrap: wrap;

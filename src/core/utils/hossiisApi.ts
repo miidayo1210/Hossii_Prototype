@@ -31,6 +31,8 @@ export type HossiiRow = {
   is_hidden: boolean | null;
   hidden_at: string | null;
   hidden_by: string | null;
+  // numberPost
+  number_value: number | null;
 };
 
 // HossiiRow → Hossii（camelCase）
@@ -58,6 +60,7 @@ export function rowToHossii(row: HossiiRow): Hossii {
     isHidden: row.is_hidden ?? false,
     hiddenAt: row.hidden_at ? new Date(row.hidden_at) : undefined,
     hiddenBy: row.hidden_by ?? undefined,
+    numberValue: row.number_value ?? undefined,
   };
 }
 
@@ -86,6 +89,7 @@ function hossiiToRow(hossii: Hossii): Omit<HossiiRow, 'created_at'> & { created_
     is_hidden: hossii.isHidden ?? false,
     hidden_at: hossii.hiddenAt?.toISOString() ?? null,
     hidden_by: hossii.hiddenBy ?? null,
+    number_value: hossii.numberValue ?? null,
   };
 }
 

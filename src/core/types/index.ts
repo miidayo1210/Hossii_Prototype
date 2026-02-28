@@ -54,6 +54,8 @@ export type Hossii = {
   isHidden?: boolean;
   hiddenAt?: Date;
   hiddenBy?: string; // 管理者の userId
+  // numberPost: 数値投稿
+  numberValue?: number;
 };
 
 // addHossii の入力型（message は空もあり得るが、最終的に空投稿は弾く）
@@ -69,6 +71,7 @@ export type AddHossiiInput = {
   bubbleColor?: string; // F01
   hashtags?: string[]; // F09
   imageUrl?: string; // F10
+  numberValue?: number; // numberPost
 };
 
 export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card';

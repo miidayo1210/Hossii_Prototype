@@ -1,4 +1,4 @@
-import type { SpaceSettings, CardType } from '../../core/types/settings';
+import type { SpaceSettings, CardType, BubbleEditPermission } from '../../core/types/settings';
 import styles from './GeneralTab.module.css';
 
 type Props = {
@@ -23,6 +23,10 @@ export const GeneralTab = ({ settings, onUpdate }: Props) => {
 
   const handleCardTypeChange = (cardType: CardType) => {
     onUpdate({ ...settings, cardType });
+  };
+
+  const handleBubbleEditPermissionChange = (bubbleEditPermission: BubbleEditPermission) => {
+    onUpdate({ ...settings, bubbleEditPermission });
   };
 
   return (
@@ -83,6 +87,31 @@ export const GeneralTab = ({ settings, onUpdate }: Props) => {
               onChange={() => handleFeatureToggle('numberPost')}
             />
             <span className={styles.toggleSlider}></span>
+          </label>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>バブル編集権限</h2>
+        <p className={styles.description}>スペース上で吹き出しを移動・リサイズ・色変更できるユーザーを設定します。</p>
+        <div className={styles.radioList}>
+          <label className={styles.radioItem}>
+            <input
+              type="radio"
+              name="bubbleEditPermission"
+              checked={settings.bubbleEditPermission === 'all'}
+              onChange={() => handleBubbleEditPermissionChange('all')}
+            />
+            <span className={styles.radioLabel}>全員が編集可能</span>
+          </label>
+          <label className={styles.radioItem}>
+            <input
+              type="radio"
+              name="bubbleEditPermission"
+              checked={settings.bubbleEditPermission === 'owner_and_admin'}
+              onChange={() => handleBubbleEditPermissionChange('owner_and_admin')}
+            />
+            <span className={styles.radioLabel}>投稿者本人と管理者のみ</span>
           </label>
         </div>
       </section>

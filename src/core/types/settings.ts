@@ -13,6 +13,9 @@ export type SpaceFeatures = {
   numberPost: boolean;
 };
 
+// バブル編集権限: 'all' = 全員可, 'owner_and_admin' = 投稿者本人と管理者のみ
+export type BubbleEditPermission = 'all' | 'owner_and_admin';
+
 export type SpaceSettings = {
   spaceId: string;
   spaceName: string;
@@ -20,6 +23,7 @@ export type SpaceSettings = {
   cardType: CardType;
   hossiiColor: HossiiColor;
   backgroundPattern: BackgroundPattern;
+  bubbleEditPermission: BubbleEditPermission;
 };
 
 export const DEFAULT_SPACE_FEATURES: SpaceFeatures = {
@@ -34,4 +38,5 @@ export const DEFAULT_SPACE_SETTINGS: Omit<SpaceSettings, 'spaceId' | 'spaceName'
   cardType: 'constellation',
   hossiiColor: 'pink',
   backgroundPattern: 'standard',
+  bubbleEditPermission: 'all',
 };

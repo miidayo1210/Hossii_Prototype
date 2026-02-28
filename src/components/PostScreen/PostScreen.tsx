@@ -9,6 +9,7 @@ import { generateId } from '../../core/utils';
 import type { SpaceSettings } from '../../core/types/settings';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { HossiiMini } from '../Hossii/HossiiMini';
+import { DrawingModal } from '../DrawingModal/DrawingModal';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { EmotionKey, ToastState } from '../../core/types';
@@ -73,6 +74,12 @@ export const PostScreen = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // F08: お絵描きモーダル
+  const [showDrawingModal, setShowDrawingModal] = useState(false);
+
+  // numberPost: 数値投稿
+  const [numberInput, setNumberInput] = useState('');
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
   const { showHossii } = state;
@@ -141,6 +148,17 @@ export const PostScreen = () => {
     setSelectedEmotion(selectedEmotion === key ? null : key);
   };
 
+  // F08: お絵描き完了
+  const handleDrawingComplete = (file: File) => {
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    setShowDrawingModal(false);
+  };
+
   // F10: 画像選択
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -194,8 +212,10 @@ export const PostScreen = () => {
     if (sending) return;
 
     const hasImage = !!imageFile;
-    if (!selectedEmotion && !message.trim() && !hasImage) {
-      setToast({ message: '気持ち・メッセージ・写真のいずれかを入力してね！', type: 'error' });
+    const parsedNumber = numberInput.trim() !== '' ? parseFloat(numberInput) : null;
+    const hasNumber = parsedNumber != null && !isNaN(parsedNumber);
+    if (!selectedEmotion && !message.trim() && !hasImage && !hasNumber) {
+      setToast({ message: '気持ち・メッセージ・写真・数値のいずれかを入力してね！', type: 'error' });
       return;
     }
 
@@ -231,6 +251,7 @@ export const PostScreen = () => {
         bubbleColor: selectedColor ?? undefined,
         hashtags: allHashtags.length > 0 ? allHashtags : undefined,
         imageUrl,
+        numberValue: hasNumber ? parsedNumber! : undefined,
       });
 
       // スタンプを獲得
@@ -257,6 +278,7 @@ export const PostScreen = () => {
       setSelectedColor(null);
       setHashtags([]);
       setHashtagInput('');
+      setNumberInput('');
       handleImageRemove();
       shuffleGreeting();
 
@@ -268,7 +290,7 @@ export const PostScreen = () => {
     }
   };
 
-  const canSubmit = selectedEmotion || message.trim() || imagePreview;
+  const canSubmit = selectedEmotion || message.trim() || imagePreview || numberInput.trim() !== '';
 
   return (
     <div className={styles.container}>
@@ -402,10 +424,25 @@ export const PostScreen = () => {
           )}
         </div>
 
-        {/* F10: 写真添付 - photoPost が有効の場合のみ */}
+        {/* numberPost: 数値入力 - numberPost が有効の場合のみ */}
+        {spaceSettings?.features.numberPost && (
+          <div className={styles.section}>
+            <div className={styles.label}>数値（任意）</div>
+            <input
+              type="number"
+              value={numberInput}
+              onChange={(e) => setNumberInput(e.target.value)}
+              placeholder="例: 36.5"
+              className={styles.numberInput}
+              step="any"
+            />
+          </div>
+        )}
+
+        {/* F10: 写真添付 / F08: お絵描き - photoPost が有効の場合のみ */}
         {spaceSettings?.features.photoPost !== false && (
           <div className={styles.section}>
-            <div className={styles.label}>写真（任意）</div>
+            <div className={styles.label}>写真 / お絵描き（任意）</div>
             {imagePreview ? (
               <div className={styles.imagePreviewContainer}>
                 <img
@@ -422,17 +459,27 @@ export const PostScreen = () => {
                 </button>
               </div>
             ) : (
-              <label className={styles.imageUploadArea}>
-                <span className={styles.imageUploadIcon}>📸</span>
-                <span className={styles.imageUploadText}>写真を添付</span>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className={styles.imageInput}
-                />
-              </label>
+              <div className={styles.mediaButtons}>
+                <label className={styles.imageUploadArea}>
+                  <span className={styles.imageUploadIcon}>📸</span>
+                  <span className={styles.imageUploadText}>写真を添付</span>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className={styles.imageInput}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={styles.drawingButton}
+                  onClick={() => setShowDrawingModal(true)}
+                >
+                  <span className={styles.imageUploadIcon}>✏️</span>
+                  <span className={styles.imageUploadText}>お絵描き</span>
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -453,6 +500,14 @@ export const PostScreen = () => {
         <div className={`${styles.toast} ${toast.type === 'success' ? styles.toastSuccess : styles.toastError}`}>
           {toast.message}
         </div>
+      )}
+
+      {/* F08: お絵描きモーダル */}
+      {showDrawingModal && (
+        <DrawingModal
+          onComplete={handleDrawingComplete}
+          onClose={() => setShowDrawingModal(false)}
+        />
       )}
     </div>
   );

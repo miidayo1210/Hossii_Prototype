@@ -26,7 +26,8 @@
 | 吹き出し色選択（F01） | F01 | ✅ 実装済み |
 | ハッシュタグ付与（F09） | F09 | ✅ 実装済み |
 | 画像投稿（F10） | F10 | ✅ 実装済み |
-| お絵描き投稿（F08） | F08 | **未実装** |
+| お絵描き投稿（F08） | F08 | ✅ 実装済み |
+| 数値投稿（numberPost） | - | ✅ 実装済み |
 
 ---
 
@@ -127,15 +128,31 @@
 
 ---
 
-## F08 お絵描き投稿（未実装）
+## F08 お絵描き投稿
+
+> **✅ 実装済み**
 
 **概要**: キャンバスに指/ペンで描いた絵を PNG として投稿する。
 
-**実装方針**:
-- `<canvas>` 要素（モーダル内）
-- ツールバー: ペン色・太さ・消しゴム・undo・クリア・送信
-- `canvas.toBlob('image/png')` → F10 の画像投稿フローで Storage へアップロード
-- スマホ: `touchstart / touchmove / touchend` を優先。`touch-action: none` でスクロール抑制
+**実装内容**:
+- `DrawingModal` コンポーネント（`src/components/DrawingModal/DrawingModal.tsx`）
+- ツールバー: ペン色（6色）・太さ（細/中/太）・消しゴム・undo（最大20ステップ）・クリア
+- Pointer Events（mouse + touch 対応）、`touch-action: none` でスクロール抑制
+- 「この絵を投稿する」ボタン: `canvas.toBlob('image/png')` → F10 の画像投稿フローで Storage へアップロード
+- PostScreen の写真添付エリアに「✏️ お絵描き」ボタンを追加
+
+---
+
+## numberPost 数値投稿
+
+> **✅ 実装済み**
+
+**概要**: 体温・歩数などの数値を投稿できる。
+
+**実装内容**:
+- `spaceSettings.features.numberPost = true` のとき PostScreen に数値入力欄を表示
+- `Hossii.numberValue?: number` フィールドに保存（DB: `hossiis.number_value float`）
+- スペース画面の Bubble（full モード）で `📊 {numberValue}` として表示
 
 ---
 
