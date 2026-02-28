@@ -23,6 +23,30 @@ export type SpaceBackground =
   | { kind: 'pattern'; value: PatternKey }                              // e.g. "mist", "dots"
   | { kind: 'image'; value: string; source: ImageSource };              // preset: "/bg/space.jpg", temp: objectURL, cloud: supabase URL
 
+// カスタム表情の型
+export type CustomEmotion = {
+  id: string;
+  label?: string;       // 管理者向けラベル（例: 「驚き」「喜び」）
+  imageUrl: string;     // Storage URL またはプリセット識別子
+  width: number;        // px（40〜200）
+  height: number;       // px（40〜200）
+};
+
+// スペース装飾の型
+export type SpaceDecoration = {
+  id: string;
+  type: 'bulletin_board';
+  position: { x: number; y: number }; // % 単位（0〜100）
+  content: {
+    title?: string;
+    body: string;
+  };
+  style?: {
+    width?: number;
+    backgroundColor?: string;
+  };
+};
+
 // スペースの型
 // quickEmotions は「制限」ではなく「初期表示用クイックボタン」
 // 投稿自体は quickEmotions に含まれない emotion も許可
@@ -34,6 +58,9 @@ export type Space = {
   quickEmotions: EmotionKey[]; // 最大8（UI用、制限ではない）
   createdAt: Date;
   background?: SpaceBackground; // 背景設定（オプショナル）
+  characterImageUrl?: string;   // A01: キャラクター画像（透過PNG推奨）
+  customEmotions?: CustomEmotion[]; // A03: カスタム表情パターン（最大20件）
+  decorations?: SpaceDecoration[];  // A02: スペース装飾（掲示板など）
 };
 
 // デフォルトのクイックボタン感情（8種）

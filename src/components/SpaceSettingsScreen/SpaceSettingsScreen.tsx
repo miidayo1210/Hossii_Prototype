@@ -2,19 +2,25 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useAuth } from '../../core/contexts/AuthContext';
 import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsStorage';
 import type { SpaceSettings } from '../../core/types/settings';
+import type { Space } from '../../core/types/space';
 import { GeneralTab } from './GeneralTab';
 import { HossiiCustomTab } from './HossiiCustomTab';
 import { BackgroundTab } from './BackgroundTab';
 import { ShareTab } from './ShareTab';
+import { ModerationTab } from './ModerationTab';
+import { DecorationTab } from './DecorationTab';
 import styles from './SpaceSettingsScreen.module.css';
 
-type Tab = 'general' | 'hossii' | 'background' | 'share';
+type Tab = 'general' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration';
 
 export const SpaceSettingsScreen = () => {
   const { navigate } = useRouter();
-  const { state } = useHossiiStore();
+  const { state, updateSpace } = useHossiiStore();
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.isAdmin ?? false;
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const [settings, setSettings] = useState<SpaceSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,7 +48,7 @@ export const SpaceSettingsScreen = () => {
   };
 
   const handleBack = () => {
-    navigate('screen');
+    navigate(isAdmin ? 'spaces' : 'screen');
   };
 
   if (!settings || !activeSpace) {
@@ -100,6 +106,20 @@ export const SpaceSettingsScreen = () => {
             >
               シェア / QR
             </button>
+            <button
+              className={`${styles.tab} ${activeTab === 'decoration' ? styles.activeTab : ''}`}
+              onClick={() => setActiveTab('decoration')}
+            >
+              スペース装飾
+            </button>
+            {isAdmin && (
+              <button
+                className={`${styles.tab} ${activeTab === 'moderation' ? styles.activeTab : ''}`}
+                onClick={() => setActiveTab('moderation')}
+              >
+                モデレーション
+              </button>
+            )}
           </nav>
         </aside>
 
@@ -108,13 +128,24 @@ export const SpaceSettingsScreen = () => {
             <GeneralTab settings={settings} onUpdate={setSettings} />
           )}
           {activeTab === 'hossii' && (
-            <HossiiCustomTab settings={settings} onUpdate={setSettings} />
+            <HossiiCustomTab
+              settings={settings}
+              onUpdate={setSettings}
+              space={activeSpace}
+              onUpdateSpace={(patch: Partial<Space>) => updateSpace(activeSpace.id, patch)}
+            />
           )}
           {activeTab === 'background' && (
             <BackgroundTab settings={settings} onUpdate={setSettings} />
           )}
           {activeTab === 'share' && (
             <ShareTab />
+          )}
+          {activeTab === 'decoration' && activeSpace && (
+            <DecorationTab space={activeSpace} />
+          )}
+          {activeTab === 'moderation' && activeSpace && (
+            <ModerationTab spaceId={activeSpace.id} />
           )}
         </main>
       </div>

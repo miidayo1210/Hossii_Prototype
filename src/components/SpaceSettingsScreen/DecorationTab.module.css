@@ -1,0 +1,257 @@
+.container {
+  padding: 2rem;
+  color: #fff;
+  max-width: 680px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.description {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 1.75rem 0;
+}
+
+/* ---- 装飾一覧 ---- */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  transition: background 0.15s;
+}
+
+.item:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.itemIcon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.itemContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0 0 0.25rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemBody {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 0.25rem 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.itemPos {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0;
+}
+
+.itemActions {
+  display: flex;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.editButton,
+.deleteButton {
+  padding: 0.35rem;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.editButton {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.editButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.deleteButton {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+
+.deleteButton:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+/* ---- 追加ボタン ---- */
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border: 1px dashed rgba(168, 85, 247, 0.4);
+  border-radius: 0.625rem;
+  background: transparent;
+  color: rgba(168, 85, 247, 0.9);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.addButton:hover {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.7);
+}
+
+.empty {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 0.5rem;
+}
+
+/* ---- エディター ---- */
+.editor {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.875rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.editorTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.input,
+.inputSmall,
+.textarea {
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.5rem;
+  color: #fff;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.input:focus,
+.inputSmall:focus,
+.textarea:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.inputSmall {
+  width: 90px;
+}
+
+.textarea {
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.posRow {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.editorActions {
+  display: flex;
+  gap: 0.625rem;
+  justify-content: flex-end;
+}
+
+.cancelButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cancelButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.saveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 1.125rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.saveButton:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.saveButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

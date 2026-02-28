@@ -52,6 +52,8 @@ export type Hossii = {
   scale?: number;
   // F06: 非表示（管理者）
   isHidden?: boolean;
+  hiddenAt?: Date;
+  hiddenBy?: string; // 管理者の userId
 };
 
 // addHossii の入力型（message は空もあり得るが、最終的に空投稿は弾く）

@@ -503,3 +503,93 @@
     padding-bottom: 5rem; /* Space for bottom nav */
   }
 }
+
+/* ---- A02: スペース装飾ウィジェット ---- */
+.decorationWidget {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 25;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 2rem;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  user-select: none;
+  transition: background 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.decorationWidget:hover {
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.decorationIcon {
+  font-size: 1rem;
+}
+
+.decorationTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.decorationPopup {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: 280px;
+  background: rgba(20, 20, 40, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  z-index: 30;
+}
+
+.decorationPopupTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.decorationPopupBody {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.decorationPopupClose {
+  align-self: flex-end;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 2rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.decorationPopupClose:hover {
+  background: rgba(255, 255, 255, 0.12);
+}

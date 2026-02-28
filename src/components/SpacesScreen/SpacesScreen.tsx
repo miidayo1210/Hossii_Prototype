@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Pencil, Check, X } from 'lucide-react';
+import { Pencil, Check, X, Settings } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { BackgroundSelector } from '../BackgroundSelector/BackgroundSelector';
 import { generateId } from '../../core/utils';
@@ -26,7 +27,8 @@ const getBgStyle = (background: SpaceBackground | undefined): React.CSSPropertie
 };
 
 export const SpacesScreen = () => {
-  const { state, addSpace, updateSpace, removeSpace } = useHossiiStore();
+  const { state, addSpace, updateSpace, removeSpace, setActiveSpace } = useHossiiStore();
+  const { navigate } = useRouter();
   const { currentUser, logout } = useAuth();
   const { spaces } = state;
 
@@ -187,6 +189,12 @@ export const SpacesScreen = () => {
   const handleImageURLRevoke = (url: string) => {
     URL.revokeObjectURL(url);
     objectURLsRef.current.delete(url);
+  };
+
+  // ---- スペース設定へ遷移 ----
+  const handleOpenSettings = (space: Space) => {
+    setActiveSpace(space.id);
+    navigate('settings');
   };
 
   // ---- 削除 ----
@@ -414,6 +422,14 @@ export const SpacesScreen = () => {
                   title={`/s/${space.spaceURL ?? space.id}`}
                 >
                   {copiedSpaceId === space.id ? '✓ コピー完了' : '🔗 招待URLをコピー'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.settingsButton}
+                  onClick={() => handleOpenSettings(space)}
+                  title="スペースを設定"
+                >
+                  <Settings size={14} />
                 </button>
                 <button
                   type="button"

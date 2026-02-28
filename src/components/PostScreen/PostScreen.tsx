@@ -215,6 +215,13 @@ export const PostScreen = () => {
         const uploaded = await uploadHossiiImage(spaceId, hossiiId, imageFile);
         if (uploaded) {
           imageUrl = uploaded;
+        } else {
+          // アップロード失敗: 画像のみ投稿なら中断、テキストがある場合は続行
+          if (!selectedEmotion && !message.trim()) {
+            setToast({ message: '画像のアップロードに失敗しました。もう一度試してね', type: 'error' });
+            return;
+          }
+          setToast({ message: '画像のアップロードに失敗しました。テキストのみ投稿します', type: 'error' });
         }
       }
 

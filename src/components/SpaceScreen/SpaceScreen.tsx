@@ -8,6 +8,7 @@ import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/AuthContext';
 import type { EmotionKey } from '../../core/types';
 import type { SpaceSettings } from '../../core/types/settings';
+import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
@@ -94,6 +95,9 @@ export const SpaceScreen = () => {
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
+
+  // A02: 選択中の装飾（ポップアップ表示用）
+  const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
 
   // スペース設定の読み込み
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
@@ -590,6 +594,42 @@ export const SpaceScreen = () => {
           </button>
         </div>
       )}
+
+      {/* A02: スペース装飾オーバーレイ */}
+      {(activeSpace?.decorations ?? []).map((decoration: SpaceDecoration) => {
+        const isOpen = selectedDecorationId === decoration.id;
+        return (
+          <div
+            key={decoration.id}
+            className={styles.decorationWidget}
+            style={{ left: `${decoration.position.x}%`, top: `${decoration.position.y}%` }}
+            onClick={() => setSelectedDecorationId(isOpen ? null : decoration.id)}
+          >
+            <span className={styles.decorationIcon}>📋</span>
+            {decoration.content.title && (
+              <span className={styles.decorationTitle}>{decoration.content.title}</span>
+            )}
+            {isOpen && (
+              <div
+                className={styles.decorationPopup}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {decoration.content.title && (
+                  <p className={styles.decorationPopupTitle}>{decoration.content.title}</p>
+                )}
+                <p className={styles.decorationPopupBody}>{decoration.content.body}</p>
+                <button
+                  type="button"
+                  className={styles.decorationPopupClose}
+                  onClick={() => setSelectedDecorationId(null)}
+                >
+                  閉じる
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QRコードパネル */}
       <TopBar />

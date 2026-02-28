@@ -1,0 +1,257 @@
+.container {
+  padding: 2rem;
+  color: #fff;
+  max-width: 900px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.description {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 1.75rem 0;
+}
+
+/* ---- フィルターバー ---- */
+.filterBar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.segmentGroup {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.segmentButton {
+  padding: 0.4rem 0.875rem;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.segmentButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.segmentActive {
+  background: rgba(168, 85, 247, 0.5);
+  border-color: rgba(168, 85, 247, 0.8);
+  color: #fff;
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+.searchInputWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.5rem;
+  color: #fff;
+  font-size: 0.8125rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.searchInput::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.searchInput:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.dateInput {
+  padding: 0.5rem 0.625rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.5rem;
+  color: #fff;
+  font-size: 0.8125rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.dateInput:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.dateSep {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8125rem;
+}
+
+/* ---- テーブル ---- */
+.tableWrapper {
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+.tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.1s;
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hiddenRow {
+  opacity: 0.55;
+}
+
+.td {
+  padding: 0.75rem 1rem;
+  color: rgba(255, 255, 255, 0.85);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.tdMessage {
+  padding: 0.75rem 1rem;
+  color: rgba(255, 255, 255, 0.85);
+  vertical-align: middle;
+  max-width: 280px;
+}
+
+.authorName {
+  font-weight: 500;
+}
+
+.messageText {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noMessage {
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+}
+
+.badgeVisible {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badgeHidden {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.hideButton,
+.restoreButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.375rem;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.hideButton {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.hideButton:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.restoreButton {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.restoreButton:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.875rem;
+}
+
+.count {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}

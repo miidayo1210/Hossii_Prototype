@@ -29,6 +29,8 @@ export type HossiiRow = {
   scale: number | null;
   // F06
   is_hidden: boolean | null;
+  hidden_at: string | null;
+  hidden_by: string | null;
 };
 
 // HossiiRow → Hossii（camelCase）
@@ -54,6 +56,8 @@ export function rowToHossii(row: HossiiRow): Hossii {
     isPositionFixed: row.is_position_fixed ?? false,
     scale: row.scale ?? 1.0,
     isHidden: row.is_hidden ?? false,
+    hiddenAt: row.hidden_at ? new Date(row.hidden_at) : undefined,
+    hiddenBy: row.hidden_by ?? undefined,
   };
 }
 
@@ -80,6 +84,8 @@ function hossiiToRow(hossii: Hossii): Omit<HossiiRow, 'created_at'> & { created_
     is_position_fixed: hossii.isPositionFixed ?? false,
     scale: hossii.scale ?? 1.0,
     is_hidden: hossii.isHidden ?? false,
+    hidden_at: hossii.hiddenAt?.toISOString() ?? null,
+    hidden_by: hossii.hiddenBy ?? null,
   };
 }
 
@@ -149,15 +155,27 @@ export async function updateHossiiScale(id: string, scale: number): Promise<void
   }
 }
 
-export async function hideHossiiInDb(id: string): Promise<void> {
+export async function hideHossiiInDb(id: string, adminId?: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
   const { error } = await supabase
     .from('hossiis')
-    .update({ is_hidden: true })
+    .update({ is_hidden: true, hidden_at: new Date().toISOString(), hidden_by: adminId ?? null })
     .eq('id', id);
   if (error) {
     console.error('[hossiisApi] hideHossiiInDb error:', error.message);
+  }
+}
+
+export async function restoreHossiiInDb(id: string): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  const { error } = await supabase
+    .from('hossiis')
+    .update({ is_hidden: false, hidden_at: null, hidden_by: null })
+    .eq('id', id);
+  if (error) {
+    console.error('[hossiisApi] restoreHossiiInDb error:', error.message);
   }
 }
 

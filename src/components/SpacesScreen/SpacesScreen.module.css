@@ -430,6 +430,28 @@
   color: #16a34a;
 }
 
+.settingsButton {
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.settingsButton:hover {
+  background: #f5f3ff;
+  border-color: #a78bfa;
+  color: #7c3aed;
+}
+
 .deleteButton {
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;

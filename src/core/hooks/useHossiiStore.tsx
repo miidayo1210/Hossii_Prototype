@@ -73,6 +73,7 @@ import {
   updateHossiiPosition,
   updateHossiiScale,
   hideHossiiInDb,
+  restoreHossiiInDb,
   deleteAllHossiisInSpace,
   rowToHossii,
   type HossiiRow,
@@ -270,7 +271,8 @@ type ExtendedHossiiAction =
   | { type: 'UPDATE_HOSSII_POSITION'; payload: { id: string; positionX: number; positionY: number } }
   | { type: 'UPDATE_HOSSII_SCALE'; payload: { id: string; scale: number } }
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
-  | { type: 'HIDE_HOSSII'; payload: string };
+  | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
+  | { type: 'RESTORE_HOSSII'; payload: string };
 
 // アクティブなニックネームを取得するヘルパー
 const getActiveNicknameFromState = (state: ExtendedHossiiState): string => {
@@ -585,8 +587,22 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       }
 
       case 'HIDE_HOSSII': {
+        const { hossiiId, adminId } = action.payload;
+        const now = new Date();
         const newHossiis = state.hossiis.map((h) =>
-          h.id === action.payload ? { ...h, isHidden: true } : h
+          h.id === hossiiId
+            ? { ...h, isHidden: true, hiddenAt: now, hiddenBy: adminId }
+            : h
+        );
+        saveHossiis(newHossiis);
+        return { ...state, hossiis: newHossiis };
+      }
+
+      case 'RESTORE_HOSSII': {
+        const newHossiis = state.hossiis.map((h) =>
+          h.id === action.payload
+            ? { ...h, isHidden: false, hiddenAt: undefined, hiddenBy: undefined }
+            : h
         );
         saveHossiis(newHossiis);
         return { ...state, hossiis: newHossiis };
@@ -628,7 +644,8 @@ type HossiiContextValue = {
   updateHossiiColorAction: (id: string, color: string | null) => void;
   updateHossiiPositionAction: (id: string, positionX: number, positionY: number) => void;
   updateHossiiScaleAction: (id: string, scale: number) => void;
-  hideHossii: (id: string) => void;
+  hideHossii: (id: string, adminId?: string) => void;
+  restoreHossii: (id: string) => void;
 };
 
 const HossiiContext = createContext<HossiiContextValue | null>(null);
@@ -977,10 +994,17 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
   }, []);
 
-  const hideHossii = useCallback((id: string) => {
-    dispatch({ type: 'HIDE_HOSSII', payload: id });
+  const hideHossii = useCallback((id: string, adminId?: string) => {
+    dispatch({ type: 'HIDE_HOSSII', payload: { hossiiId: id, adminId } });
     if (isSupabaseConfigured) {
-      hideHossiiInDb(id);
+      hideHossiiInDb(id, adminId);
+    }
+  }, []);
+
+  const restoreHossii = useCallback((id: string) => {
+    dispatch({ type: 'RESTORE_HOSSII', payload: id });
+    if (isSupabaseConfigured) {
+      restoreHossiiInDb(id);
     }
   }, []);
 
@@ -1017,6 +1041,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         updateHossiiPositionAction,
         updateHossiiScaleAction,
         hideHossii,
+        restoreHossii,
       }}
     >
       {children}
