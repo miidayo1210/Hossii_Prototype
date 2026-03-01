@@ -99,7 +99,8 @@ const AppContent = () => {
           setPendingSpaceId(targetSpace.id);
           setShowNicknameModal(true);
         }
-        window.history.replaceState({}, '', '/#screen');
+        window.history.replaceState({}, '', `/s/${slug}#screen`);
+        navigate('screen');
       } else {
         // 未ログイン: ゲスト入室画面を表示（isGuestMode でなければ）
         if (!isGuestMode) {
@@ -301,7 +302,9 @@ const AppContent = () => {
         onEnterAsGuest={() => {
           setActiveSpace(guestSpaceId);
           setIsGuestMode(true);
-          window.history.replaceState({}, '', '/#screen');
+          const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
+          const slugForGuest = guestSpace?.spaceURL;
+          window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}#screen` : '/#screen');
           navigate('screen');
         }}
         onLoginRequested={() => {

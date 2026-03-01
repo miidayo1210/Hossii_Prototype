@@ -10,6 +10,7 @@ export type AppUser = {
   email: string | null;
   displayName: string | null;
   isAdmin: boolean;
+  communityId?: string;
   communityName?: string;
   communityStatus?: CommunityStatus;
 };
@@ -71,6 +72,7 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     email: user.email ?? null,
     displayName: displayName ?? community.name ?? null,
     isAdmin: community.status === 'approved',
+    communityId: community.id,
     communityName: community.name,
     communityStatus: community.status,
   };

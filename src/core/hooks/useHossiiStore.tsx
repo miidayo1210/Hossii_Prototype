@@ -83,6 +83,7 @@ import {
   upsertProfile,
   upsertSpaceNickname,
 } from '../utils/profilesApi';
+import { useAuth } from '../contexts/AuthContext';
 
 // createdAt を Date に正規化（Supabase から string で来ても対応）
 const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
@@ -657,6 +658,9 @@ type HossiiProviderProps = {
 };
 
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
+  const { currentUser } = useAuth();
+  const communityId = currentUser?.communityId;
+
   const { spaces, activeSpaceId } = useMemo(() => initializeSpaces(), []);
   const initialMode = useMemo(() => loadMode(), []);
   const initialProfile = useMemo(() => loadProfile(), []);
@@ -716,13 +720,13 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
-    fetchSpaces().then((supabaseSpaces) => {
+    fetchSpaces(communityId).then((supabaseSpaces) => {
       if (supabaseSpaces.length > 0) {
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
       }
       setSpacesLoadedFromSupabase(true);
     });
-  }, []);
+  }, [communityId]);
 
   // ===== Supabase: アクティブスペースの hossiis を同期 =====
   useEffect(() => {
@@ -884,9 +888,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const addSpace = useCallback((space: Space) => {
     dispatch({ type: 'ADD_SPACE', payload: space });
     if (isSupabaseConfigured) {
-      insertSpace(space);
+      insertSpace(space, communityId);
     }
-  }, []);
+  }, [communityId]);
 
   const updateSpace = useCallback((id: SpaceId, patch: Partial<Space>) => {
     dispatch({ type: 'UPDATE_SPACE', payload: { id, patch } });

@@ -5,6 +5,7 @@ import type { EmotionKey } from '../types';
 // Supabase の行型（snake_case）
 type SpaceRow = {
   id: string;
+  community_id?: string | null;
   space_url: string | null;
   name: string;
   card_type: string;
@@ -39,13 +40,19 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
   };
 }
 
-export async function fetchSpaces(): Promise<Space[]> {
+export async function fetchSpaces(communityId?: string): Promise<Space[]> {
   if (!isSupabaseConfigured) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('spaces')
     .select('*')
     .order('created_at', { ascending: true });
+
+  if (communityId) {
+    query = query.eq('community_id', communityId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('[spacesApi] fetchSpaces error:', error.message);
@@ -55,10 +62,15 @@ export async function fetchSpaces(): Promise<Space[]> {
   return (data as SpaceRow[]).map(rowToSpace);
 }
 
-export async function insertSpace(space: Space): Promise<void> {
+export async function insertSpace(space: Space, communityId?: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  const { error } = await supabase.from('spaces').insert(spaceToRow(space));
+  const row = {
+    ...spaceToRow(space),
+    ...(communityId ? { community_id: communityId } : {}),
+  };
+
+  const { error } = await supabase.from('spaces').insert(row);
   if (error) {
     console.error('[spacesApi] insertSpace error:', error.message);
   }
