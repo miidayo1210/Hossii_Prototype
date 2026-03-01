@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
@@ -28,6 +28,18 @@ export const MyLogsScreen = () => {
   const { hossiis, spaces, profile, activeSpaceId } = state;
 
   const [filter, setFilter] = useState<FilterType>('all');
+  // 拡大表示する画像URL（null のときライトボックス非表示）
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // Escape キーでライトボックスを閉じる
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxUrl(null);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [lightboxUrl]);
 
   // スペース名を解決
   const getSpaceName = (spaceId: string): string => {
@@ -117,8 +129,28 @@ export const MyLogsScreen = () => {
                     <span className={styles.time}>{relativeTime}</span>
                   </div>
 
-                  {/* 2行目: 本文 */}
-                  <p className={styles.message}>{renderHossiiText(hossii)}</p>
+                  {/* 2行目: 本文（画像のみ投稿はスキップ） */}
+                  {renderHossiiText(hossii) && (
+                    <p className={styles.message}>{renderHossiiText(hossii)}</p>
+                  )}
+
+                  {/* 画像サムネイル（タップで拡大） */}
+                  {hossii.imageUrl && (
+                    <button
+                      type="button"
+                      className={styles.imageThumb}
+                      onClick={() => setLightboxUrl(hossii.imageUrl!)}
+                      aria-label="画像を拡大表示"
+                    >
+                      <img
+                        src={hossii.imageUrl}
+                        alt="投稿画像"
+                        className={styles.thumbImg}
+                        loading="lazy"
+                      />
+                      <span className={styles.thumbHint}>タップして拡大</span>
+                    </button>
+                  )}
 
                   {/* 3行目: authorName + emotion（任意） */}
                   {(hossii.authorName || emoji) && (
@@ -135,6 +167,32 @@ export const MyLogsScreen = () => {
           )}
         </div>
       </main>
+
+      {/* ライトボックス（画像拡大表示） */}
+      {lightboxUrl && (
+        <div
+          className={styles.lightbox}
+          onClick={() => setLightboxUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="画像拡大表示"
+        >
+          <button
+            type="button"
+            className={styles.lightboxClose}
+            onClick={() => setLightboxUrl(null)}
+            aria-label="閉じる"
+          >
+            ✕
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="拡大画像"
+            className={styles.lightboxImg}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

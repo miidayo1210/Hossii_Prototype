@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from './core/hooks/useRouter';
 import { HossiiProvider, useHossiiStore } from './core/hooks/useHossiiStore';
 import { AuthProvider, useAuth } from './core/contexts/AuthContext';
@@ -32,6 +32,12 @@ const AppContent = () => {
   const [userProfile, setUserProfile] = useState<{ userId: string; nickname: string } | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
+
+  // /s/[slug] パスかどうかを初回レンダー時に同期的に検出（フラッシュ防止）
+  const isOnSlugPath = useMemo(
+    () => /^\/s\/[a-z0-9]/.test(window.location.pathname),
+    []
+  );
 
   // /s/[slug] ゲスト入室フロー用 state
   // guestSpaceId: 未ログインで /s/[slug] にアクセスしたときのスペースID
@@ -320,6 +326,17 @@ const AppContent = () => {
           setGuestSpaceId(null);
         }}
       />
+    );
+  }
+
+  // /s/[slug] アクセス中にスペースがまだ解決されていない間は空白を表示
+  // GuestEntryScreen と同じ背景色にすることでフラッシュを防ぐ
+  if (!currentUser && !isGuestMode && isOnSlugPath && !guestSpaceId && !spaceURLNotFound) {
+    return (
+      <div style={{
+        minHeight: '100dvh',
+        background: 'linear-gradient(150deg, #ede9fe 0%, #f5f3ff 40%, #fce7f3 100%)',
+      }} />
     );
   }
 

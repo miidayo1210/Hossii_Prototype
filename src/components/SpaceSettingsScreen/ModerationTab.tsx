@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Eye, EyeOff, Search } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { fetchAllHossiisForModeration } from '../../core/utils/hossiisApi';
+import type { Hossii } from '../../core/types';
 import styles from './ModerationTab.module.css';
 
 type FilterMode = 'visible' | 'hidden' | 'all';
@@ -18,10 +20,20 @@ export const ModerationTab = ({ spaceId }: Props) => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const spaceHossiis = useMemo(
-    () => state.hossiis.filter((h) => h.spaceId === spaceId),
-    [state.hossiis, spaceId]
-  );
+  // ページリロード後も非表示投稿を確認・復元できるよう、DB から全件取得する
+  const [dbHossiis, setDbHossiis] = useState<Hossii[]>([]);
+  useEffect(() => {
+    fetchAllHossiisForModeration(spaceId).then(setDbHossiis);
+  }, [spaceId]);
+
+  // store の hossiis（当セッションで追加・変更済み）と DB 全件をマージ
+  // store 側が最新（楽観的更新）なので、store に存在するものは store を優先する
+  const spaceHossiis = useMemo(() => {
+    const fromStore = state.hossiis.filter((h) => h.spaceId === spaceId);
+    const storeIds = new Set(fromStore.map((h) => h.id));
+    const fromDbOnly = dbHossiis.filter((h) => !storeIds.has(h.id));
+    return [...fromStore, ...fromDbOnly];
+  }, [state.hossiis, spaceId, dbHossiis]);
 
   const filtered = useMemo(() => {
     return spaceHossiis
@@ -51,10 +63,14 @@ export const ModerationTab = ({ spaceId }: Props) => {
   const handleHide = (id: string) => {
     if (!window.confirm('この投稿を非表示にしますか？')) return;
     hideHossii(id, currentUser?.uid ?? undefined);
+    // dbHossiis 内のエントリも非表示状態に更新
+    setDbHossiis((prev) => prev.map((h) => h.id === id ? { ...h, isHidden: true } : h));
   };
 
   const handleRestore = (id: string) => {
     restoreHossii(id, currentUser?.uid ?? undefined);
+    // dbHossiis 内のエントリも復元状態に更新
+    setDbHossiis((prev) => prev.map((h) => h.id === id ? { ...h, isHidden: false } : h));
   };
 
   const formatDate = (date: Date) => {

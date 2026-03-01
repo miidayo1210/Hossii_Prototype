@@ -96,14 +96,34 @@ function hossiiToRow(hossii: Hossii): Omit<HossiiRow, 'created_at'> & { created_
 export async function fetchHossiis(spaceId: string): Promise<Hossii[]> {
   if (!isSupabaseConfigured) return [];
 
+  // is_hidden = false または NULL の投稿のみ取得（非表示投稿をクライアントに送らない）
   const { data, error } = await supabase
     .from('hossiis')
     .select('*')
     .eq('space_id', spaceId)
+    .or('is_hidden.eq.false,is_hidden.is.null')
     .order('created_at', { ascending: true });
 
   if (error) {
     console.error('[hossiisApi] fetchHossiis error:', error.message);
+    return [];
+  }
+
+  return (data as HossiiRow[]).map(rowToHossii);
+}
+
+/** 非表示を含む全投稿を取得（モデレーション画面専用） */
+export async function fetchAllHossiisForModeration(spaceId: string): Promise<Hossii[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const { data, error } = await supabase
+    .from('hossiis')
+    .select('*')
+    .eq('space_id', spaceId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[hossiisApi] fetchAllHossiisForModeration error:', error.message);
     return [];
   }
 

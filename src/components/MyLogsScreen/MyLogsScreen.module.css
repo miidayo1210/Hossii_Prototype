@@ -203,6 +203,106 @@
   flex-shrink: 0;
 }
 
+/* ===== 画像サムネイル ===== */
+.imageThumb {
+  display: block;
+  width: 100%;
+  margin-top: 0.625rem;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.thumbImg {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 10px;
+  transition: opacity 0.15s;
+}
+
+.imageThumb:hover .thumbImg,
+.imageThumb:active .thumbImg {
+  opacity: 0.88;
+}
+
+.thumbHint {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 0.625rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* ===== ライトボックス ===== */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: lbFadeIn 0.18s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes lbFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.lightboxImg {
+  max-width: 100%;
+  max-height: 90dvh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  animation: lbScale 0.18s ease-out;
+}
+
+@keyframes lbScale {
+  from { transform: scale(0.94); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s;
+  /* iOS のタップハイライトを消す */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lightboxClose:hover,
+.lightboxClose:active {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 /* Mobile: Bottom nav padding */
 @media (max-width: 768px) {
   .container {
