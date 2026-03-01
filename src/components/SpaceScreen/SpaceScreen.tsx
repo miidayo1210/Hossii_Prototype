@@ -61,6 +61,7 @@ type ReactionTrigger = {
 export const SpaceScreen = () => {
   const {
     state,
+    hossiiLoadedFromSupabase,
     getActiveSpaceHossiis,
     getActiveSpace,
     addHossii,
@@ -431,6 +432,30 @@ export const SpaceScreen = () => {
 
   return (
     <div className={`${styles.container} ${backgroundClass}`} style={backgroundStyle}>
+      {/* Supabase から hossiis をロード中のオーバーレイ */}
+      {!hossiiLoadedFromSupabase && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.18)',
+          backdropFilter: 'blur(2px)',
+        }}>
+          <div style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: '4px solid rgba(255,255,255,0.3)',
+            borderTopColor: '#fff',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
       {/* 星レイヤー（Hossii OFF時のみ表示） */}
       <StarLayer />
 

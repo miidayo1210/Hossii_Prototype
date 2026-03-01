@@ -50,19 +50,22 @@ async function resolveAppUser(user: User): Promise<AppUser> {
   const roleFromMetadata = user.app_metadata?.role as string | undefined;
   const displayName = user.user_metadata?.display_name as string | null ?? null;
 
-  // app_metadata.role = "admin" は承認済みとして扱う
+  // communities テーブルで communityId を取得（app_metadata.role = 'admin' でも必ず試みる）
+  const community = await getAdminCommunity(user.id);
+
+  // app_metadata.role = "admin" は承認済みとして扱う（communityId は取得できた場合のみ付与）
   if (roleFromMetadata === 'admin') {
     return {
       uid: user.id,
       email: user.email ?? null,
-      displayName,
+      displayName: displayName ?? community?.name ?? null,
       isAdmin: true,
+      communityId: community?.id,
+      communityName: community?.name,
       communityStatus: 'approved',
     };
   }
 
-  // communities テーブルで管理者チェック・ステータス確認
-  const community = await getAdminCommunity(user.id);
   if (!community) {
     return { uid: user.id, email: user.email ?? null, displayName, isAdmin: false };
   }

@@ -274,7 +274,8 @@ type ExtendedHossiiAction =
   | { type: 'UPDATE_HOSSII_SCALE'; payload: { id: string; scale: number } }
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
-  | { type: 'RESTORE_HOSSII'; payload: string };
+  | { type: 'RESTORE_HOSSII'; payload: string }
+  | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii };
 
 // アクティブなニックネームを取得するヘルパー
 const getActiveNicknameFromState = (state: ExtendedHossiiState): string => {
@@ -610,6 +611,15 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return { ...state, hossiis: newHossiis };
       }
 
+      case 'UPDATE_HOSSII_FROM_REALTIME': {
+        // Realtime の UPDATE イベント由来。localStorage は更新しない（Supabase が正）
+        const updated = action.payload;
+        const newHossiis = state.hossiis.map((h) =>
+          h.id === updated.id ? updated : h
+        );
+        return { ...state, hossiis: newHossiis };
+      }
+
       default:
         return state;
     }
@@ -619,6 +629,7 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
 type HossiiContextValue = {
   state: ExtendedHossiiState;
   spacesLoadedFromSupabase: boolean;
+  hossiiLoadedFromSupabase: boolean;
   addHossii: (input: AddHossiiInput) => void;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -680,8 +691,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
   const reducer = useMemo(() => createReducer(activeSpaceIdRef), [activeSpaceIdRef]);
 
+  // Supabase が設定済みの場合は localStorage の古いデータを初期表示しない（フラッシュ防止）
   const initialHossiisFromStorage = useMemo(
-    () => initializeHossiis(activeSpaceId, initialHossiis),
+    () => isSupabaseConfigured ? [] : initializeHossiis(activeSpaceId, initialHossiis),
     [activeSpaceId, initialHossiis]
   );
 
@@ -716,6 +728,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // Supabase 未設定の場合は localStorage のみを使うため即 true
   const [spacesLoadedFromSupabase, setSpacesLoadedFromSupabase] = useState(!isSupabaseConfigured);
 
+  // Supabase からの hossiis 読み込みが完了したかどうか
+  const [hossiiLoadedFromSupabase, setHossiiLoadedFromSupabase] = useState(!isSupabaseConfigured);
+
   // ===== Supabase: スペースをマウント時に同期 =====
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -732,31 +747,32 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
+    // ローディング開始と同時に古いデータを即クリア（フラッシュ防止）
+    setHossiiLoadedFromSupabase(false);
+    dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
+
     fetchHossiis(state.activeSpaceId).then((supabaseHossiis) => {
-      if (supabaseHossiis.length > 0) {
-        dispatch({ type: 'SYNC_HOSSIIS', payload: supabaseHossiis });
-      }
+      dispatch({ type: 'SYNC_HOSSIIS', payload: supabaseHossiis });
+      setHossiiLoadedFromSupabase(true);
     });
   }, [state.activeSpaceId]);
 
-  // ===== Supabase Realtime: hossiis の INSERT/DELETE を購読 =====
+  // ===== Supabase Realtime: hossiis の INSERT/UPDATE/DELETE を購読 =====
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
     const activeSpaceId = state.activeSpaceId;
 
+    // サーバーサイドフィルタは REPLICA IDENTITY FULL が必要なため
+    // フィルタなしで購読し、クライアントサイドでスペースIDをチェックする
     const channel = supabase
-      .channel(`hossiis:${activeSpaceId}`)
+      .channel(`hossiis_realtime:${activeSpaceId}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'hossiis',
-          filter: `space_id=eq.${activeSpaceId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'hossiis' },
         (payload) => {
           const row = payload.new as HossiiRow;
+          if (row.space_id !== activeSpaceId) return;
           // 自分が INSERT した場合はスキップ（楽観的更新で既に追加済み）
           if (insertedHossiiIdsRef.current.has(row.id)) {
             insertedHossiiIdsRef.current.delete(row.id);
@@ -767,18 +783,28 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       )
       .on(
         'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'hossiis',
-          filter: `space_id=eq.${activeSpaceId}`,
-        },
+        { event: 'UPDATE', schema: 'public', table: 'hossiis' },
+        (payload) => {
+          const row = payload.new as HossiiRow;
+          if (row.space_id !== activeSpaceId) return;
+          dispatch({ type: 'UPDATE_HOSSII_FROM_REALTIME', payload: rowToHossii(row) });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'hossiis' },
         (payload) => {
           const id = (payload.old as { id: string }).id;
           dispatch({ type: 'REMOVE_HOSSII', payload: id });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] hossiis subscribed for space:', activeSpaceId);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] hossiis channel error:', status, activeSpaceId);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -1028,6 +1054,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       value={{
         state,
         spacesLoadedFromSupabase,
+        hossiiLoadedFromSupabase,
         addHossii,
         selectHossii,
         clearAll,

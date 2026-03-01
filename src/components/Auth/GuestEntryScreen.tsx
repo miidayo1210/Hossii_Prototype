@@ -13,7 +13,9 @@ type Props = {
 export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
   const [step, setStep] = useState<Step>('select');
-  const [nickname, setNickname] = useState(state.profile?.defaultNickname ?? '');
+  // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
+  const savedNickname = state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '';
+  const [nickname, setNickname] = useState(savedNickname);
 
   const spaceName = state.spaces.find((s) => s.id === spaceId)?.name ?? 'スペース';
 
@@ -26,9 +28,9 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
 
   return (
     <div className={styles.container}>
-      <div className={styles.stars} />
-      <div className={styles.stars2} />
-      <div className={styles.stars3} />
+      <div className={`${styles.blob} ${styles.blob1}`} />
+      <div className={`${styles.blob} ${styles.blob2}`} />
+      <div className={`${styles.blob} ${styles.blob3}`} />
 
       <div className={styles.card}>
         <div className={styles.header}>

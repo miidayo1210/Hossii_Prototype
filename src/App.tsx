@@ -102,9 +102,17 @@ const AppContent = () => {
         window.history.replaceState({}, '', `/s/${slug}#screen`);
         navigate('screen');
       } else {
-        // 未ログイン: ゲスト入室画面を表示（isGuestMode でなければ）
+        // 未ログイン: ニックネームが保存済みなら直接入室、なければゲスト入室画面を表示
         if (!isGuestMode) {
-          setGuestSpaceId(targetSpace.id);
+          if (hasNicknameForSpace(targetSpace.id)) {
+            // 過去に入室済み（ニックネームが localStorage に保存されている）→ そのまま入室
+            setActiveSpace(targetSpace.id);
+            setIsGuestMode(true);
+            window.history.replaceState({}, '', `/s/${slug}#screen`);
+            navigate('screen');
+          } else {
+            setGuestSpaceId(targetSpace.id);
+          }
         }
       }
     } else if (spacesLoadedFromSupabase) {
