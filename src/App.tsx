@@ -23,7 +23,7 @@ import { mockHossiis } from './demo/mockData';
 import styles from './App.module.css';
 
 const AppContent = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { screen, navigate } = useRouter();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
@@ -222,6 +222,74 @@ const AppContent = () => {
           navigate('spaces');
         }}
       />
+    );
+  }
+
+  // 審査待ちユーザーが /admin/login 以外のルートにいる場合（セッション復元時等）
+  if (currentUser && currentUser.communityStatus === 'pending') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', height: '100dvh', gap: '12px',
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+        color: '#fff', fontFamily: 'sans-serif', textAlign: 'center', padding: '24px',
+      }}>
+        <div style={{ fontSize: '3rem' }}>⏳</div>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>審査中です</h2>
+        {currentUser.communityName && (
+          <p style={{ fontSize: '0.95rem', color: '#a5b4fc', margin: 0 }}>
+            「{currentUser.communityName}」
+          </p>
+        )}
+        <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.7, margin: 0 }}>
+          Hossii 運営チームが審査しています。<br />
+          承認後にスペース管理画面が利用できます。
+        </p>
+        <button
+          onClick={async () => {
+            try { await logout(); } catch { /* ignore */ }
+            window.location.href = '/admin/login';
+          }}
+          style={{
+            marginTop: '8px', padding: '10px 24px', borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.3)', background: 'transparent',
+            color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', cursor: 'pointer',
+          }}
+        >
+          ログアウト
+        </button>
+      </div>
+    );
+  }
+
+  // 却下されたユーザー
+  if (currentUser && currentUser.communityStatus === 'rejected') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', height: '100dvh', gap: '12px',
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+        color: '#fff', fontFamily: 'sans-serif', textAlign: 'center', padding: '24px',
+      }}>
+        <div style={{ fontSize: '3rem' }}>❌</div>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>申請が承認されませんでした</h2>
+        <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.7, margin: 0 }}>
+          ご不明な点はお問い合わせください。
+        </p>
+        <button
+          onClick={async () => {
+            try { await logout(); } catch { /* ignore */ }
+            window.location.href = '/admin/login';
+          }}
+          style={{
+            marginTop: '8px', padding: '10px 24px', borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.3)', background: 'transparent',
+            color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', cursor: 'pointer',
+          }}
+        >
+          ログアウト
+        </button>
+      </div>
     );
   }
 

@@ -208,7 +208,11 @@ export const SpacesScreen = () => {
   // ---- ログアウト ----
   const handleLogout = async () => {
     setShowAccountMenu(false);
-    await logout();
+    try {
+      await logout();
+    } catch (e) {
+      console.error('[SpacesScreen] logout error:', e);
+    }
     window.location.href = '/admin/login';
   };
 

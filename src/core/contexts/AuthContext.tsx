@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { getAdminCommunity, createCommunity } from '../utils/communitiesApi';
+import type { CommunityStatus } from '../utils/communitiesApi';
 
 export type AppUser = {
   uid: string;
@@ -10,6 +11,7 @@ export type AppUser = {
   displayName: string | null;
   isAdmin: boolean;
   communityName?: string;
+  communityStatus?: CommunityStatus;
 };
 
 type AuthContextType = {
@@ -40,25 +42,37 @@ type AuthProviderProps = {
 
 /**
  * Supabase User → AppUser（非同期: communities テーブルで管理者チェック）
- * app_metadata.role = "admin" でも判定（Supabase Dashboard で手動設定した場合）
+ * app_metadata.role = "admin" は承認済みとして扱う（Supabase Dashboard で手動設定した場合）
+ * communities.status が 'approved' のときのみ isAdmin: true
  */
 async function resolveAppUser(user: User): Promise<AppUser> {
-  // app_metadata に role が設定されていれば優先
   const roleFromMetadata = user.app_metadata?.role as string | undefined;
   const displayName = user.user_metadata?.display_name as string | null ?? null;
 
+  // app_metadata.role = "admin" は承認済みとして扱う
   if (roleFromMetadata === 'admin') {
-    return { uid: user.id, email: user.email ?? null, displayName, isAdmin: true };
+    return {
+      uid: user.id,
+      email: user.email ?? null,
+      displayName,
+      isAdmin: true,
+      communityStatus: 'approved',
+    };
   }
 
-  // communities テーブルで管理者チェック
+  // communities テーブルで管理者チェック・ステータス確認
   const community = await getAdminCommunity(user.id);
+  if (!community) {
+    return { uid: user.id, email: user.email ?? null, displayName, isAdmin: false };
+  }
+
   return {
     uid: user.id,
     email: user.email ?? null,
-    displayName: displayName ?? community?.name ?? null,
-    isAdmin: community !== null,
-    communityName: community?.name,
+    displayName: displayName ?? community.name ?? null,
+    isAdmin: community.status === 'approved',
+    communityName: community.name,
+    communityStatus: community.status,
   };
 }
 
@@ -173,23 +187,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (error || !data.user) throw error ?? new Error('Admin login failed');
 
     const appUser = await resolveAppUser(data.user);
-    if (!appUser.isAdmin) throw new Error('管理者権限がありません。コミュニティ登録が必要です。');
+
+    // コミュニティ未登録（申請すらしていない）の場合のみ throw
+    // pending / rejected はそのまま返し、UI 側でハンドリング
+    if (!appUser.isAdmin && !appUser.communityStatus) {
+      throw new Error('管理者権限がありません。コミュニティ登録が必要です。');
+    }
     return appUser;
   };
 
-  // ===== 管理者サインアップ（コミュニティ登録）=====
+  // ===== 管理者サインアップ（コミュニティ登録申請）=====
   const adminSignUp = async (
     email: string,
     password: string,
     communityName: string
   ): Promise<AppUser> => {
     if (!isSupabaseConfigured) {
+      // モック環境では即時承認（テスト用）
       const user: AppUser = {
         uid: `admin-${Date.now()}`,
         email,
         displayName: communityName,
         isAdmin: true,
         communityName,
+        communityStatus: 'approved',
       };
       setCurrentUser(user);
       saveMockUser(user);
@@ -204,16 +225,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
     if (error || !data.user) throw error ?? new Error('Sign up failed');
 
-    // 2. communities テーブルに登録
+    // 2. communities テーブルに登録（status は DB デフォルトの 'pending'）
     const community = await createCommunity(data.user.id, communityName);
-    if (!community) throw new Error('コミュニティの作成に失敗しました。');
+    if (!community) throw new Error('コミュニティの申請に失敗しました。');
 
+    // 登録申請完了：isAdmin は false、status は 'pending'
     return {
       uid: data.user.id,
       email,
       displayName: communityName,
-      isAdmin: true,
+      isAdmin: false,
       communityName,
+      communityStatus: 'pending',
     };
   };
 
@@ -225,7 +248,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return;
     }
 
-    const { error } = await supabase.auth.signOut();
+    // scope: 'local' でローカルセッションのみ削除（他タブへの影響を最小化し確実にログアウト）
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) throw error;
   };
 

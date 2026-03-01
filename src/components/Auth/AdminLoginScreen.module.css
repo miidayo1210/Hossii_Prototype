@@ -4,3 +4,63 @@
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.4);
 }
+
+/* 登録申請タブの注意書き */
+.registerNote {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* 審査中・却下カード */
+.pendingCard {
+  text-align: center;
+}
+
+.pendingIcon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.pendingTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0.5rem 0;
+}
+
+.pendingCommunity {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #a5b4fc;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.pendingMessage {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.7;
+  margin: 0.75rem 0 1.5rem;
+}
+
+.pendingBackButton {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.6rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pendingBackButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
