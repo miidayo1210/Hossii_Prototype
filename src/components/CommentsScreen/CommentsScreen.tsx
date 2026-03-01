@@ -9,7 +9,7 @@ import styles from './CommentsScreen.module.css';
 
 function applyFilters(hossiis: Hossii[], filters: HossiiFilters): Hossii[] {
   return hossiis.filter((h) => {
-    const isComment = (!h.origin || h.origin === 'manual') && !!h.message.trim();
+    const isComment = (!h.origin || h.origin === 'manual') && (!!h.message.trim() || !!h.imageUrl);
     const isEmotion = !!h.emotion;
 
     // どちらにも該当しない投稿（空メッセージかつ emotion なし）は常に表示
@@ -27,6 +27,16 @@ export const CommentsScreen = () => {
   const { activeSpaceId } = state;
 
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(activeSpaceId));
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxUrl(null);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [lightboxUrl]);
 
   const handleFilterChange = useCallback((newFilters: HossiiFilters) => {
     setFilters(newFilters);
@@ -96,10 +106,28 @@ export const CommentsScreen = () => {
                       {hossii.authorName && (
                         <div className={styles.authorName}>{hossii.authorName}</div>
                       )}
-                      <div className={styles.message}>
-                        {icon && <span className={styles.logIcon}>{icon}</span>}
-                        {isLaughter ? '' : renderHossiiText(hossii)}
-                      </div>
+                      {(!isLaughter && renderHossiiText(hossii)) && (
+                        <div className={styles.message}>
+                          {icon && <span className={styles.logIcon}>{icon}</span>}
+                          {renderHossiiText(hossii)}
+                        </div>
+                      )}
+                      {hossii.imageUrl && (
+                        <button
+                          type="button"
+                          className={styles.imageThumb}
+                          onClick={() => setLightboxUrl(hossii.imageUrl!)}
+                          aria-label="画像を拡大表示"
+                        >
+                          <img
+                            src={hossii.imageUrl}
+                            alt="投稿画像"
+                            className={styles.thumbImg}
+                            loading="lazy"
+                          />
+                          <span className={styles.thumbHint}>タップして拡大</span>
+                        </button>
+                      )}
                       <div className={styles.meta}>
                         <span className={styles.time}>{timestamp}</span>
                       </div>
@@ -111,6 +139,31 @@ export const CommentsScreen = () => {
           )}
         </div>
       </main>
+
+      {lightboxUrl && (
+        <div
+          className={styles.lightbox}
+          onClick={() => setLightboxUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="画像拡大表示"
+        >
+          <button
+            type="button"
+            className={styles.lightboxClose}
+            onClick={() => setLightboxUrl(null)}
+            aria-label="閉じる"
+          >
+            ✕
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="拡大画像"
+            className={styles.lightboxImg}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };
