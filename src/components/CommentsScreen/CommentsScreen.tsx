@@ -5,6 +5,7 @@ import { loadFilters, saveFilters, type HossiiFilters } from '../../core/utils/f
 import type { Hossii } from '../../core/types';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { FilterBar } from '../FilterBar/FilterBar';
+import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
 import styles from './CommentsScreen.module.css';
 
 function applyFilters(hossiis: Hossii[], filters: HossiiFilters): Hossii[] {
@@ -25,6 +26,8 @@ function applyFilters(hossiis: Hossii[], filters: HossiiFilters): Hossii[] {
 export const CommentsScreen = () => {
   const { state, getActiveSpaceHossiis } = useHossiiStore();
   const { activeSpaceId } = state;
+
+  const { flags } = useFeatureFlags(activeSpaceId ?? undefined);
 
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(activeSpaceId));
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -112,7 +115,7 @@ export const CommentsScreen = () => {
                           {renderHossiiText(hossii)}
                         </div>
                       )}
-                      {hossii.imageUrl && (
+                      {hossii.imageUrl && flags.comments_thumbnail && (
                         <button
                           type="button"
                           className={styles.imageThumb}
@@ -127,6 +130,16 @@ export const CommentsScreen = () => {
                           />
                           <span className={styles.thumbHint}>タップして拡大</span>
                         </button>
+                      )}
+                      {hossii.imageUrl && !flags.comments_thumbnail && (
+                        <a
+                          href={hossii.imageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.imageLinkFallback}
+                        >
+                          📎 画像を開く
+                        </a>
                       )}
                       <div className={styles.meta}>
                         <span className={styles.time}>{timestamp}</span>
