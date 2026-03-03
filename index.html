@@ -8,5 +8,55 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function () {
+        function simulateActivity() {
+          ['mousemove', 'mousedown', 'keydown', 'touchstart'].forEach(function (type) {
+            document.dispatchEvent(new Event(type, { bubbles: true }));
+          });
+        }
+
+        async function requestWakeLock() {
+          if ('wakeLock' in navigator) {
+            try {
+              await navigator.wakeLock.request('screen');
+            } catch (e) {}
+          }
+        }
+
+        function startCanvasLoop() {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1;
+          canvas.height = 1;
+          canvas.style.cssText =
+            'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+          document.body.appendChild(canvas);
+
+          const ctx = canvas.getContext('2d');
+          let tick = 0;
+
+          function draw() {
+            ctx.fillStyle = tick % 2 === 0 ? '#000' : '#001';
+            ctx.fillRect(0, 0, 1, 1);
+            tick++;
+            requestAnimationFrame(draw);
+          }
+
+          draw();
+        }
+
+        requestWakeLock();
+        simulateActivity();
+        startCanvasLoop();
+
+        setInterval(simulateActivity, 30 * 1000);
+
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') {
+            requestWakeLock();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

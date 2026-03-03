@@ -4,6 +4,8 @@
 
 Hossii の Feature Flag システムは、**スペース単位**で機能を ON/OFF できる仕組みです。
 
+スペースの商品思想・レイヤー設計については [space-product-vision.md](./space-product-vision.md) を参照。
+
 - A段階（現在）: スペース単位で override できる
 - B段階（将来）: ユーザー・テナント単位の override に拡張可能な設計
 
