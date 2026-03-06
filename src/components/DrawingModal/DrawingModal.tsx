@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { saveImageLocally } from '../../core/utils/saveImageLocally';
 import styles from './DrawingModal.module.css';
 
 type Tool = 'pen' | 'eraser';
@@ -144,9 +145,11 @@ export const DrawingModal = ({ onComplete, onClose }: Props) => {
   const handleSend = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.toBlob((blob) => {
+    canvas.toBlob(async (blob) => {
       if (!blob) return;
-      const file = new File([blob], `drawing-${Date.now()}.png`, { type: 'image/png' });
+      const filename = `drawing-${Date.now()}.png`;
+      const file = new File([blob], filename, { type: 'image/png' });
+      await saveImageLocally(file, filename);
       onComplete(file);
     }, 'image/png');
   };

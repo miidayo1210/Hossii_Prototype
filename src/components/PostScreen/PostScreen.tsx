@@ -6,6 +6,7 @@ import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { addStamp } from '../../core/utils/stampStorage';
 import { upsertStampCount } from '../../core/utils/stampsApi';
 import { uploadHossiiImage } from '../../core/utils/imageStorageApi';
+import { saveImageLocally } from '../../core/utils/saveImageLocally';
 import { generateId } from '../../core/utils';
 import type { SpaceSettings } from '../../core/types/settings';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
@@ -160,8 +161,9 @@ export const PostScreen = () => {
     setShowDrawingModal(false);
   };
 
-  // F10: 画像選択
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // F10: 画像選択（カメラ撮影 / ギャラリー共通）
+  // lastModified が1分以内 → カメラで撮りたてとみなしてローカル保存も実行
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -172,20 +174,22 @@ export const PostScreen = () => {
     }
 
     setImageFile(file);
-
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+
+    const isJustTaken = Date.now() - file.lastModified < 60_000;
+    if (isJustTaken) {
+      await saveImageLocally(file, `hossii-photo-${Date.now()}.jpg`);
+    }
   };
 
   const handleImageRemove = () => {
     setImagePreview(null);
     setImageFile(null);
-    if (imageInputRef.current) {
-      imageInputRef.current.value = '';
-    }
+    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
   // F09: ハッシュタグ追加
