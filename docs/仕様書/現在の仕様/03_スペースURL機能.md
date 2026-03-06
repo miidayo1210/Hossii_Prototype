@@ -3,7 +3,7 @@
 > **分類:** `[Core]` URL設計・スペースアクセスフロー
 > **関連:** [core-concepts.md](../../core/core-concepts.md) §2（Space）
 
-> 最終更新: 2026-03-01
+> 最終更新: 2026-03-06（フェーズ 2・3 実装完了）
 
 ---
 
@@ -46,7 +46,7 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 
 ---
 
-### フェーズ 2 — コミュニティ別スペース分離（優先度：高）
+### フェーズ 2 — コミュニティ別スペース分離 ✅ 完了
 
 **問題:** 現状は全管理者が同じスペース一覧を見てしまう。
 
@@ -61,18 +61,25 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 
 ---
 
-### フェーズ 3 — URL 構造移行（フェーズ2完了後）
+### フェーズ 3 — URL 構造移行 ✅ 完了（2026-03-06）
 
 **目標:** `/s/[space-id]` → `/c/[community-id]/s/[space-id]/` へ移行する。
 
-| 変更内容 | 対象 |
-|---------|------|
-| App.tsx のパスマッチ正規表現を更新 | `src/App.tsx` |
-| 招待 URL コピーを新フォーマットに更新 | `src/components/SpacesScreen/SpacesScreen.tsx` |
-| ShareTab の URL プレフィックスを更新 | `src/components/SpaceSettingsScreen/ShareTab.tsx` |
-| QRCodePanel の URL 生成を更新 | `src/components/Navigation/QRCodePanel.tsx` |
+| 変更内容 | 対象 | 状態 |
+|---------|------|------|
+| コミュニティ登録時に `slug` を自動生成（8文字ランダム英数字） | `src/core/utils/communitiesApi.ts` | ✅ |
+| `AppUser` に `communitySlug` を追加 | `src/core/contexts/AuthContext.tsx` | ✅ |
+| `AdminNavigationContext` に `overrideCommunitySlug` を追加 | `src/core/contexts/AdminNavigationContext.tsx` | ✅ |
+| `useHossiiStore` から `communitySlug` を expose | `src/core/hooks/useHossiiStore.tsx` | ✅ |
+| App.tsx のパスマッチ正規表現を更新（`/c/*/s/*` 対応） | `src/App.tsx` | ✅ |
+| 招待 URL コピーを新フォーマットに更新 | `src/components/SpacesScreen/SpacesScreen.tsx` | ✅ |
+| ShareTab の URL プレフィックスを更新 | `src/components/SpaceSettingsScreen/ShareTab.tsx` | ✅ |
+| QRCodePanel の URL 生成を更新 | `src/components/Navigation/QRCodePanel.tsx` | ✅ |
 
-**後方互換:** `/s/[space-id]` への旧 URL アクセス時は `/c/[community-id]/s/[space-id]/` へリダイレクトする（将来対応）。
+**備考:**
+- 新規コミュニティ登録時に `communities.slug` が自動生成される。
+- slug 未設定の既存コミュニティは `/s/[space-id]` 形式にフォールバック（後方互換）。
+- `/s/[space-id]` への旧 URL アクセスは引き続き動作する（リダイレクトはフェーズ 4 で対応）。
 
 ---
 
@@ -85,13 +92,14 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 
 ---
 
-## 現在の URL 設計（フェーズ1完了後）
+## 現在の URL 設計（フェーズ 3 完了後）
 
 | ルート | 対象 | 内容 |
 |-------|------|------|
 | `/` | 管理者 | トップ画面 |
 | `/admin/login` | 管理者のみ | 管理者ログイン・コミュニティ登録申請画面 |
-| `/s/[space-id]` | 参加者 | スペース直接アクセス（ゲスト/ログイン選択） |
+| `/c/[community-id]/s/[space-id]` | 参加者 | スペース直接アクセス（推奨） |
+| `/s/[space-id]` | 参加者 | スペース直接アクセス（後方互換、旧形式） |
 
 ---
 
@@ -133,8 +141,8 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 | `/s/[slug]` でのスペースアクセス | ✅ 実装済み |
 | 招待 URL コピーボタン（管理画面） | ✅ 実装済み |
 | QR コード生成・表示 | ✅ 実装済み |
-| 入室後も URL バーに `/s/[slug]` を保持 | ✅ フェーズ1 完了（`App.tsx` の `replaceState` から `#screen` 除去） |
-| コミュニティ別スペース分離 | **フェーズ2（未実装）** |
-| `/c/[community-id]/s/[space-id]/` URL への移行 | **フェーズ3（未実装）** |
-| `community-id` のインライン編集 | **フェーズ4（未実装）** |
-| 旧 URL のリダイレクト | **フェーズ4（未実装）** |
+| 入室後も URL バーに `/s/[slug]` を保持 | ✅ フェーズ 1 完了 |
+| コミュニティ別スペース分離 | ✅ フェーズ 2 完了 |
+| `/c/[community-id]/s/[space-id]/` URL への移行 | ✅ フェーズ 3 完了（2026-03-06） |
+| `community-id` のインライン編集 | ⬜ フェーズ 4（未実装） |
+| 旧 URL `/s/[slug]` のリダイレクト | ⬜ フェーズ 4（未実装） |

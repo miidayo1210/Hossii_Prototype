@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, Building2 } from 'lucide-react';
+import { Mail, Lock, Building2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import type { AppUser } from '../../core/contexts/AuthContext';
 import styles from './LoginScreen.module.css';
@@ -20,6 +20,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
   const [pendingCommunityName, setPendingCommunityName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [communityName, setCommunityName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +248,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
             <div className={styles.inputGroup}>
               <Lock size={18} className={styles.inputIcon} />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 className={styles.input}
                 placeholder="パスワード"
                 value={password}
@@ -255,6 +256,15 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
                 required
                 disabled={loading}
               />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
 
             <button
@@ -304,7 +314,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
               <div className={styles.inputGroup}>
                 <Lock size={18} className={styles.inputIcon} />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   className={styles.input}
                   placeholder="パスワード（8文字以上）"
                   value={password}
@@ -313,6 +323,15 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
                   disabled={loading}
                   minLength={8}
                 />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
 
               <button

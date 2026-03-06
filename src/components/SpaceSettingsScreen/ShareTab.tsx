@@ -10,7 +10,7 @@ import {
 import styles from './ShareTab.module.css';
 
 export const ShareTab = () => {
-  const { state, updateSpace, getActiveSpace } = useHossiiStore();
+  const { state, updateSpace, getActiveSpace, communitySlug } = useHossiiStore();
   const activeSpace = getActiveSpace();
 
   const [inputValue, setInputValue] = useState(activeSpace?.spaceURL ?? '');
@@ -22,7 +22,9 @@ export const ShareTab = () => {
 
   const spaceURL = activeSpace.spaceURL;
   const shareURL = spaceURL
-    ? `${window.location.origin}/s/${spaceURL}`
+    ? communitySlug
+      ? `${window.location.origin}/c/${communitySlug}/s/${spaceURL}`
+      : `${window.location.origin}/s/${spaceURL}`
     : null;
 
   const validation = inputValue ? validateSpaceURL(inputValue) : null;
@@ -100,7 +102,11 @@ export const ShareTab = () => {
         </p>
 
         <div className={styles.inputRow}>
-          <span className={styles.prefix}>{window.location.origin}/s/</span>
+          <span className={styles.prefix}>
+            {communitySlug
+              ? `${window.location.origin}/c/${communitySlug}/s/`
+              : `${window.location.origin}/s/`}
+          </span>
           <input
             type="text"
             className={`${styles.urlInput} ${hasError ? styles.inputError : ''} ${isDuplicate ? styles.inputError : ''}`}

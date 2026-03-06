@@ -2,10 +2,12 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from './core/hooks/useRouter';
 import { HossiiProvider, useHossiiStore } from './core/hooks/useHossiiStore';
 import { AuthProvider, useAuth } from './core/contexts/AuthContext';
+import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
 import { PostScreen } from './components/PostScreen/PostScreen';
 import { SpaceScreen } from './components/SpaceScreen/SpaceScreen';
 import { CommentsScreen } from './components/CommentsScreen/CommentsScreen';
 import { SpacesScreen } from './components/SpacesScreen/SpacesScreen';
+import { CommunitiesScreen } from './components/CommunitiesScreen/CommunitiesScreen';
 import { ProfileScreen } from './components/ProfileScreen/ProfileScreen';
 import { MyLogsScreen } from './components/MyLogsScreen/MyLogsScreen';
 import { AccountScreen } from './components/AccountScreen/AccountScreen';
@@ -56,7 +58,7 @@ const AppContent = () => {
   useEffect(() => {
     if (appRoute === 'admin-login' && currentUser?.isAdmin) {
       window.history.replaceState({}, '', '/');
-      navigate('spaces');
+      navigate(currentUser.isSuperAdmin ? 'communities' : 'spaces');
       setAppRoute('default');
     }
   }, [appRoute, currentUser, navigate]);
@@ -83,7 +85,13 @@ const AppContent = () => {
   // ログイン完了後にpendingLoginSlugへリダイレクト（ゲスト→ログイン引き継ぎ）
   useEffect(() => {
     if (currentUser && pendingLoginSlug) {
-      window.location.href = `/s/${pendingLoginSlug}`;
+      // 現在のパスが /c/*/s/* 形式ならそのまま維持、そうでなければ /s/[slug] にリダイレクト
+      const isCommunityPath = window.location.pathname.match(
+        /^\/c\/([a-z0-9][a-z0-9-]*)\/s\/([a-z0-9][a-z0-9-]*)$/
+      );
+      window.location.href = isCommunityPath
+        ? window.location.pathname
+        : `/s/${pendingLoginSlug}`;
     }
   }, [currentUser, pendingLoginSlug]);
 
@@ -97,12 +105,21 @@ const AppContent = () => {
     }
   }, [currentUser, userProfile, showOnboarding]);
 
-  // /s/[slug] パスでスペースに直接アクセス
+  // /c/[community-slug]/s/[space-slug] または /s/[slug] パスでスペースに直接アクセス
   useEffect(() => {
-    const match = window.location.pathname.match(/^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/);
-    if (!match) return;
+    const communitySpaceMatch = window.location.pathname.match(
+      /^\/c\/([a-z0-9][a-z0-9-]*)\/s\/([a-z0-9][a-z0-9-]*)$/
+    );
+    const legacyMatch = window.location.pathname.match(
+      /^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/
+    );
 
-    const slug = match[1];
+    const slug = communitySpaceMatch ? communitySpaceMatch[2] : legacyMatch?.[1];
+    if (!slug) return;
+
+    // アクセス時のパスをそのまま保持する（/c/*/s/* 形式も維持）
+    const originalPath = window.location.pathname;
+
     const targetSpace = state.spaces.find((s) => s.spaceURL === slug);
 
     if (targetSpace) {
@@ -116,7 +133,7 @@ const AppContent = () => {
           setPendingSpaceId(targetSpace.id);
           setShowNicknameModal(true);
         }
-        window.history.replaceState({}, '', `/s/${slug}`);
+        window.history.replaceState({}, '', originalPath);
         navigate('screen');
       } else {
         // 未ログイン: ニックネームが保存済みなら直接入室、なければゲスト入室画面を表示
@@ -125,7 +142,7 @@ const AppContent = () => {
             // 過去に入室済み（ニックネームが localStorage に保存されている）→ そのまま入室
             setActiveSpace(targetSpace.id);
             setIsGuestMode(true);
-            window.history.replaceState({}, '', `/s/${slug}`);
+            window.history.replaceState({}, '', originalPath);
             navigate('screen');
           } else {
             setGuestSpaceId(targetSpace.id);
@@ -245,7 +262,6 @@ const AppContent = () => {
         onLoginSuccess={() => {
           window.history.replaceState({}, '', '/');
           setAppRoute('default');
-          navigate('spaces');
         }}
       />
     );
@@ -379,6 +395,8 @@ const AppContent = () => {
         return <CommentsScreen />;
       case 'spaces':
         return <SpacesScreen />;
+      case 'communities':
+        return <CommunitiesScreen />;
       case 'profile':
         return <ProfileScreen />;
       case 'mylogs':
@@ -417,9 +435,11 @@ const AppContent = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <HossiiProvider initialHossiis={mockHossiis}>
-        <AppContent />
-      </HossiiProvider>
+      <AdminNavigationProvider>
+        <HossiiProvider initialHossiis={mockHossiis}>
+          <AppContent />
+        </HossiiProvider>
+      </AdminNavigationProvider>
     </AuthProvider>
   );
 };

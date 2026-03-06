@@ -10,8 +10,10 @@ export type AppUser = {
   email: string | null;
   displayName: string | null;
   isAdmin: boolean;
+  isSuperAdmin?: boolean;
   communityId?: string;
   communityName?: string;
+  communitySlug?: string;
   communityStatus?: CommunityStatus;
 };
 
@@ -26,6 +28,7 @@ type AuthContextType = {
   logout: () => Promise<void>;
   loginWithGoogle: (asAdmin?: boolean) => Promise<AppUser>;
   loginWithFacebook: () => Promise<AppUser>;
+  refreshCommunitySlug: (newSlug: string) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,6 +54,17 @@ async function resolveAppUser(user: User): Promise<AppUser> {
   const roleFromMetadata = user.app_metadata?.role as string | undefined;
   const displayName = user.user_metadata?.display_name as string | null ?? null;
 
+  // スーパー管理者（Hossii 運営）の判定
+  if (roleFromMetadata === 'super_admin') {
+    return {
+      uid: user.id,
+      email: user.email ?? null,
+      displayName: displayName ?? 'Hossii 運営',
+      isAdmin: true,
+      isSuperAdmin: true,
+    };
+  }
+
   // communities テーブルで communityId を取得（app_metadata.role = 'admin' でも必ず試みる）
   const community = await getAdminCommunity(user.id);
 
@@ -63,6 +77,7 @@ async function resolveAppUser(user: User): Promise<AppUser> {
       isAdmin: true,
       communityId: community?.id,
       communityName: community?.name,
+      communitySlug: community?.slug ?? undefined,
       communityStatus: 'approved',
     };
   }
@@ -78,6 +93,7 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     isAdmin: community.status === 'approved',
     communityId: community.id,
     communityName: community.name,
+    communitySlug: community.slug ?? undefined,
     communityStatus: community.status,
   };
 }
@@ -297,6 +313,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return { uid: '', email: null, displayName: null, isAdmin: false };
   };
 
+  const refreshCommunitySlug = (newSlug: string) => {
+    setCurrentUser((prev) => prev ? { ...prev, communitySlug: newSlug } : null);
+  };
+
   const value: AuthContextType = {
     currentUser,
     loading,
@@ -308,6 +328,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     logout,
     loginWithGoogle,
     loginWithFacebook,
+    refreshCommunitySlug,
   };
 
   if (loading) {

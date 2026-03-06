@@ -84,6 +84,7 @@ import {
   upsertSpaceNickname,
 } from '../utils/profilesApi';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdminNavigation } from '../contexts/AdminNavigationContext';
 
 // createdAt を Date に正規化（Supabase から string で来ても対応）
 const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
@@ -630,6 +631,7 @@ type HossiiContextValue = {
   state: ExtendedHossiiState;
   spacesLoadedFromSupabase: boolean;
   hossiiLoadedFromSupabase: boolean;
+  communitySlug: string | null | undefined;
   addHossii: (input: AddHossiiInput) => void;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -670,7 +672,9 @@ type HossiiProviderProps = {
 
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
   const { currentUser } = useAuth();
-  const communityId = currentUser?.communityId;
+  const { overrideCommunityId, overrideCommunitySlug } = useAdminNavigation();
+  const communityId = overrideCommunityId ?? currentUser?.communityId;
+  const communitySlug = overrideCommunitySlug ?? currentUser?.communitySlug;
 
   const { spaces, activeSpaceId } = useMemo(() => initializeSpaces(), []);
   const initialMode = useMemo(() => loadMode(), []);
@@ -736,9 +740,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     if (!isSupabaseConfigured) return;
 
     fetchSpaces(communityId).then((supabaseSpaces) => {
-      if (supabaseSpaces.length > 0) {
-        dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
-      }
+      dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
       setSpacesLoadedFromSupabase(true);
     });
   }, [communityId]);
@@ -1055,6 +1057,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         state,
         spacesLoadedFromSupabase,
         hossiiLoadedFromSupabase,
+        communitySlug,
         addHossii,
         selectHossii,
         clearAll,

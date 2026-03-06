@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Pencil, Check, X, Settings } from 'lucide-react';
+import { Pencil, Check, X, Settings, ChevronLeft } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { useAdminNavigation } from '../../core/contexts/AdminNavigationContext';
 import { BackgroundSelector } from '../BackgroundSelector/BackgroundSelector';
 import { generateId } from '../../core/utils';
 import { generateSpaceURL, validateSpaceURL, isSpaceURLUnique } from '../../core/utils/spaceUrlUtils';
+import { updateCommunitySlug } from '../../core/utils/communitiesApi';
 import type { Space, CardType, SpaceBackground } from '../../core/types/space';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import styles from './SpacesScreen.module.css';
@@ -27,14 +29,34 @@ const getBgStyle = (background: SpaceBackground | undefined): React.CSSPropertie
 };
 
 export const SpacesScreen = () => {
-  const { state, addSpace, updateSpace, removeSpace, setActiveSpace } = useHossiiStore();
+  const { state, addSpace, updateSpace, removeSpace, setActiveSpace, communitySlug } = useHossiiStore();
   const { navigate } = useRouter();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, refreshCommunitySlug } = useAuth();
+  const { overrideCommunityId, overrideCommunityName, clearOverrideCommunity } = useAdminNavigation();
   const { spaces } = state;
+
+  const pageTitle = overrideCommunityName
+    ? `${overrideCommunityName} のスペース管理`
+    : currentUser?.communityName
+      ? `${currentUser.communityName} のスペース管理`
+      : 'スペース管理';
+
+  const showBackButton = !!(currentUser?.isSuperAdmin && overrideCommunityId);
+
+  const handleBack = () => {
+    clearOverrideCommunity();
+    navigate('communities');
+  };
 
   // アカウントドロップダウン
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  // コミュニティ ID インライン編集
+  const [editingCommunityId, setEditingCommunityId] = useState(false);
+  const [communityIdValue, setCommunityIdValue] = useState('');
+  const [communityIdError, setCommunityIdError] = useState<string | null>(null);
+  const [communityIdSaving, setCommunityIdSaving] = useState(false);
 
   // スペース作成モーダル
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -78,6 +100,57 @@ export const SpacesScreen = () => {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAccountMenu]);
+
+  // ---- コミュニティ ID 編集 ----
+  const startEditCommunityId = () => {
+    setCommunityIdValue(communitySlug ?? '');
+    setCommunityIdError(null);
+    setEditingCommunityId(true);
+  };
+
+  const cancelEditCommunityId = () => {
+    setEditingCommunityId(false);
+    setCommunityIdError(null);
+  };
+
+  const handleCommunityIdChange = (value: string) => {
+    const lower = value.toLowerCase();
+    setCommunityIdValue(lower);
+    const result = validateSpaceURL(lower);
+    setCommunityIdError(result.valid ? null : result.error);
+  };
+
+  const handleSaveCommunityId = async () => {
+    const result = validateSpaceURL(communityIdValue);
+    if (!result.valid) return;
+    if (communityIdValue === communitySlug) {
+      setEditingCommunityId(false);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'コミュニティ ID を変更すると、配布済みの URL・QR コードがすべて無効になります。変更しますか？'
+    );
+    if (!confirmed) return;
+
+    setCommunityIdSaving(true);
+    const communityId = currentUser?.communityId;
+    if (!communityId) {
+      setCommunityIdError('コミュニティ情報が取得できませんでした。');
+      setCommunityIdSaving(false);
+      return;
+    }
+
+    const ok = await updateCommunitySlug(communityId, communityIdValue);
+    setCommunityIdSaving(false);
+
+    if (ok) {
+      refreshCommunitySlug(communityIdValue);
+      setEditingCommunityId(false);
+    } else {
+      setCommunityIdError('保存に失敗しました。このIDはすでに使用されている可能性があります。');
+    }
+  };
 
   // ---- モーダル ----
   const openCreateModal = () => {
@@ -171,7 +244,9 @@ export const SpacesScreen = () => {
   // ---- 招待URLコピー ----
   const handleCopyLink = (space: Space) => {
     const slug = space.spaceURL ?? space.id;
-    const url = `${window.location.origin}/s/${slug}`;
+    const url = communitySlug
+      ? `${window.location.origin}/c/${communitySlug}/s/${slug}`
+      : `${window.location.origin}/s/${slug}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedSpaceId(space.id);
       setTimeout(() => setCopiedSpaceId(null), 2000);
@@ -221,8 +296,19 @@ export const SpacesScreen = () => {
       {/* 管理者ヘッダー */}
       <header className={styles.adminHeader}>
         <div className={styles.adminHeaderLeft}>
+          {showBackButton && (
+            <button
+              type="button"
+              className={styles.backButton}
+              onClick={handleBack}
+              title="コミュニティ一覧へ戻る"
+            >
+              <ChevronLeft size={16} />
+              戻る
+            </button>
+          )}
           <span className={styles.adminLogo}>✨ Hossii</span>
-          <span className={styles.adminPageTitle}>スペース管理</span>
+          <span className={styles.adminPageTitle}>{pageTitle}</span>
         </div>
 
         <div className={styles.adminHeaderRight}>
@@ -254,6 +340,71 @@ export const SpacesScreen = () => {
                   <p className={styles.accountMenuEmail}>
                     {currentUser?.email ?? ''}
                   </p>
+
+                  {/* コミュニティ ID（スーパー管理者は表示しない） */}
+                  {!currentUser?.isSuperAdmin && (
+                    <div className={styles.communityIdSection}>
+                      <span className={styles.communityIdLabel}>コミュニティ ID</span>
+
+                      {editingCommunityId ? (
+                        <div className={styles.communityIdEditArea}>
+                          <div className={styles.communityIdInputRow}>
+                            <input
+                              className={`${styles.communityIdInput} ${communityIdError ? styles.communityIdInputError : ''}`}
+                              value={communityIdValue}
+                              onChange={(e) => handleCommunityIdChange(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveCommunityId();
+                                if (e.key === 'Escape') cancelEditCommunityId();
+                              }}
+                              placeholder="例: my-community"
+                              maxLength={40}
+                              disabled={communityIdSaving}
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              className={styles.communityIdActionBtn}
+                              onClick={handleSaveCommunityId}
+                              disabled={!!communityIdError || !communityIdValue || communityIdSaving}
+                              title="保存"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.communityIdActionBtn}
+                              onClick={cancelEditCommunityId}
+                              disabled={communityIdSaving}
+                              title="キャンセル"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                          {communityIdError && (
+                            <p className={styles.communityIdErrorText}>{communityIdError}</p>
+                          )}
+                          <p className={styles.communityIdWarning}>
+                            ⚠️ 変更すると全スペースの招待 URL・QR コードが無効になります
+                          </p>
+                        </div>
+                      ) : (
+                        <div className={styles.communityIdDisplay}>
+                          <span className={styles.communityIdValue}>
+                            {communitySlug ?? '未設定'}
+                          </span>
+                          <button
+                            type="button"
+                            className={styles.communityIdEditBtn}
+                            onClick={startEditCommunityId}
+                            title="コミュニティ ID を編集"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -425,7 +576,9 @@ export const SpacesScreen = () => {
                     copiedSpaceId === space.id ? styles.copyButtonCopied : ''
                   }`}
                   onClick={() => handleCopyLink(space)}
-                  title={`/s/${space.spaceURL ?? space.id}`}
+                  title={communitySlug
+                    ? `/c/${communitySlug}/s/${space.spaceURL ?? space.id}`
+                    : `/s/${space.spaceURL ?? space.id}`}
                 >
                   {copiedSpaceId === space.id ? '✓ コピー完了' : '🔗 招待URLをコピー'}
                 </button>
