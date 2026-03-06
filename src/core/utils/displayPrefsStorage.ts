@@ -72,12 +72,12 @@ export function saveDisplayLimit(limit: DisplayLimit): void {
 
 // ---- ViewMode ----
 
-export type ViewMode = 'full' | 'bubble' | 'image';
+export type ViewMode = 'full' | 'bubble' | 'image' | 'slideshow';
 
 const VIEW_MODE_KEY = 'hossii.viewMode';
 const DEFAULT_VIEW_MODE: ViewMode = 'full';
 
-const VALID_VIEW_MODES: ViewMode[] = ['full', 'bubble', 'image'];
+const VALID_VIEW_MODES: ViewMode[] = ['full', 'bubble', 'image', 'slideshow'];
 
 export function loadViewMode(): ViewMode {
   try {

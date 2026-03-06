@@ -24,6 +24,7 @@ import { QRCodePanel } from '../Navigation/QRCodePanel';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { StarLayer } from '../StarLayer/StarLayer';
+import { SlideshowView } from '../Slideshow/SlideshowView';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
@@ -519,6 +520,14 @@ export const SpaceScreen = () => {
         </h1>
       </header>
 
+      {/* スライドショーモード */}
+      {viewMode === 'slideshow' && (
+        <SlideshowView
+          hossiis={displayHossiis}
+          onExit={() => setViewMode('full')}
+        />
+      )}
+
       {/* バブルエリア（背景クリックでデセレクト） */}
       <div
         className={styles.bubbleArea}
@@ -704,23 +713,27 @@ export const SpaceScreen = () => {
         );
       })}
 
-      {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QRコードパネル */}
-      <TopBar />
-      <TopRightMenu />
-      <LeftControlBar
-        controls={controlState}
-        onToggle={handleControlToggle}
-        onFullscreenToggle={handleFullscreenToggle}
-        displayScale={displayScale}
-        onDisplayScaleCycle={handleDisplayScaleCycle}
-        displayPeriod={displayPeriod}
-        onDisplayPeriodChange={setDisplayPeriod}
-        displayLimit={displayLimit}
-        onDisplayLimitChange={setDisplayLimit}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-      />
-      <QRCodePanel />
+      {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QRコードパネル（スライドショー中は非表示） */}
+      {viewMode !== 'slideshow' && (
+        <>
+          <TopBar />
+          <TopRightMenu />
+          <LeftControlBar
+            controls={controlState}
+            onToggle={handleControlToggle}
+            onFullscreenToggle={handleFullscreenToggle}
+            displayScale={displayScale}
+            onDisplayScaleCycle={handleDisplayScaleCycle}
+            displayPeriod={displayPeriod}
+            onDisplayPeriodChange={setDisplayPeriod}
+            displayLimit={displayLimit}
+            onDisplayLimitChange={setDisplayLimit}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
+          <QRCodePanel />
+        </>
+      )}
     </div>
   );
 };

@@ -42,6 +42,7 @@ const VIEW_MODE_OPTIONS: { value: ViewMode; label: string; title: string }[] = [
   { value: 'full', label: '📝', title: 'フル表示' },
   { value: 'bubble', label: '💬', title: 'バブル表示' },
   { value: 'image', label: '🖼', title: '画像のみ' },
+  { value: 'slideshow', label: '🎞', title: 'スライドショー' },
 ];
 
 export const LeftControlBar = ({
