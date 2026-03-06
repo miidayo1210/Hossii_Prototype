@@ -1,5 +1,8 @@
 # スペース URL 機能 仕様
 
+> **分類:** `[Core]` URL設計・スペースアクセスフロー
+> **関連:** [core-concepts.md](../../core/core-concepts.md) §2（Space）
+
 > 最終更新: 2026-03-01
 
 ---
@@ -28,18 +31,18 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 
 ## 段階的実装計画（フェーズ）
 
-### フェーズ 1 — URL バーの修正（優先度：高）
+### フェーズ 1 — URL バーの修正 ✅ 完了
 
 **問題:** 入室後に URL が `/#screen` に書き換えられるため、ブラウザのアドレスバーからコピーしたリンクが使えない。
 
 **目標:** 入室後も `/s/[space-id]` を URL バーに保持する。
 
 ```
-変更前: window.history.replaceState({}, '', '/#screen')
-変更後: window.history.replaceState({}, '', `/s/${spaceURL}`)
+変更前: window.history.replaceState({}, '', `/s/${slug}#screen`)
+変更後: window.history.replaceState({}, '', `/s/${slug}`)
 ```
 
-**対象ファイル:** `src/App.tsx`（2箇所の `replaceState`）
+**対象ファイル:** `src/App.tsx`（ログイン済み入室・ゲスト入室・再入室の3箇所を修正済み）
 
 ---
 
@@ -130,7 +133,7 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 | `/s/[slug]` でのスペースアクセス | ✅ 実装済み |
 | 招待 URL コピーボタン（管理画面） | ✅ 実装済み |
 | QR コード生成・表示 | ✅ 実装済み |
-| 入室後も URL バーに `/s/[slug]` を保持 | **フェーズ1（未実装）** |
+| 入室後も URL バーに `/s/[slug]` を保持 | ✅ フェーズ1 完了（`App.tsx` の `replaceState` から `#screen` 除去） |
 | コミュニティ別スペース分離 | **フェーズ2（未実装）** |
 | `/c/[community-id]/s/[space-id]/` URL への移行 | **フェーズ3（未実装）** |
 | `community-id` のインライン編集 | **フェーズ4（未実装）** |

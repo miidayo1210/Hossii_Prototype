@@ -23,7 +23,7 @@ import { mockHossiis } from './demo/mockData';
 import styles from './App.module.css';
 
 const AppContent = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, isResolvingAuth, logout } = useAuth();
   const { screen, navigate } = useRouter();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
@@ -42,8 +42,10 @@ const AppContent = () => {
   // /s/[slug] ゲスト入室フロー用 state
   // guestSpaceId: 未ログインで /s/[slug] にアクセスしたときのスペースID
   // isGuestMode: ゲストとして入室済み（ニックネーム入力完了後）
+  // pendingLoginSlug: ゲストがログインを選択した後、ログイン完了後にリダイレクトするslug
   const [guestSpaceId, setGuestSpaceId] = useState<string | null>(null);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  const [pendingLoginSlug, setPendingLoginSlug] = useState<string | null>(null);
 
   // /admin/login パスを検出（pathname ベース）
   const [appRoute, setAppRoute] = useState<'admin-login' | 'default'>(() =>
@@ -64,8 +66,10 @@ const AppContent = () => {
 
   // Check if user needs onboarding (new user without profile)
   // 管理者はオンボーディング不要（コミュニティ名が表示名を兼ねる）
+  // isResolvingAuth 中は onAuthStateChange の非同期解決が完了していないためスキップ
   useEffect(() => {
-    if (currentUser && !currentUser.isAdmin && !userProfile) {
+    if (isResolvingAuth) return;
+    if (currentUser && !currentUser.isAdmin && !userProfile && currentUser.communityStatus === undefined) {
       const hasProfile = localStorage.getItem(`profile_${currentUser.uid}`);
       if (!hasProfile) {
         setShowOnboarding(true);
@@ -74,7 +78,14 @@ const AppContent = () => {
         setUserProfile(savedProfile);
       }
     }
-  }, [currentUser, userProfile]);
+  }, [currentUser, userProfile, isResolvingAuth]);
+
+  // ログイン完了後にpendingLoginSlugへリダイレクト（ゲスト→ログイン引き継ぎ）
+  useEffect(() => {
+    if (currentUser && pendingLoginSlug) {
+      window.location.href = `/s/${pendingLoginSlug}`;
+    }
+  }, [currentUser, pendingLoginSlug]);
 
   // Check if user needs tutorial (first time user)
   useEffect(() => {
@@ -105,7 +116,7 @@ const AppContent = () => {
           setPendingSpaceId(targetSpace.id);
           setShowNicknameModal(true);
         }
-        window.history.replaceState({}, '', `/s/${slug}#screen`);
+        window.history.replaceState({}, '', `/s/${slug}`);
         navigate('screen');
       } else {
         // 未ログイン: ニックネームが保存済みなら直接入室、なければゲスト入室画面を表示
@@ -114,7 +125,7 @@ const AppContent = () => {
             // 過去に入室済み（ニックネームが localStorage に保存されている）→ そのまま入室
             setActiveSpace(targetSpace.id);
             setIsGuestMode(true);
-            window.history.replaceState({}, '', `/s/${slug}#screen`);
+            window.history.replaceState({}, '', `/s/${slug}`);
             navigate('screen');
           } else {
             setGuestSpaceId(targetSpace.id);
@@ -318,11 +329,15 @@ const AppContent = () => {
           setIsGuestMode(true);
           const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
           const slugForGuest = guestSpace?.spaceURL;
-          window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}#screen` : '/#screen');
+          window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}` : '/');
           navigate('screen');
         }}
         onLoginRequested={() => {
-          // ログイン選択 → guestSpaceId をクリアして StartScreen（ログイン画面）へ
+          // ログイン選択 → slug を保存してから StartScreen へ
+          const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
+          if (guestSpace?.spaceURL) {
+            setPendingLoginSlug(guestSpace.spaceURL);
+          }
           setGuestSpaceId(null);
         }}
       />

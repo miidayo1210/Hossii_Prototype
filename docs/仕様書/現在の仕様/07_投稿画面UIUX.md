@@ -1,5 +1,8 @@
 # 投稿画面 UI/UX 仕様書
 
+> **分類:** `[Implementation]` 投稿画面のコンポーネント・UX詳細
+> **関連:** [01_投稿（Hossii投稿).md](./01_投稿（Hossii投稿).md)
+
 > 最終更新: 2026-02-27
 > 関連ファイル:
 > `src/components/PostScreen/PostScreen.tsx`

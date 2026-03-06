@@ -57,6 +57,10 @@ type BubbleProps = {
   viewMode?: ViewMode;
   /** F02/F04: 編集権限（false の場合ドラッグ・リサイズ・色変更不可） */
   canEdit?: boolean;
+  /** likes_enabled Feature Flag が ON の場合のみ true */
+  likesEnabled?: boolean;
+  /** いいねトグル時のコールバック（楽観的更新は Bubble 内で行い、Supabase 処理は親で行う） */
+  onLike?: (id: string) => void;
 };
 
 export const Bubble = ({
@@ -72,12 +76,24 @@ export const Bubble = ({
   onColorSave,
   viewMode = 'full',
   canEdit = true,
+  likesEnabled = false,
+  onLike,
 }: BubbleProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ドラッグ中のローカル状態（親 state を汚染しない）
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [dragScale, setDragScale] = useState<number | null>(null);
+
+  // いいねのローカル楽観的状態
+  const [localLikedByMe, setLocalLikedByMe] = useState(hossii.likedByMe ?? false);
+  const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
+
+  // hossii.likedByMe が外部から変わった場合（初回フェッチ完了後など）に同期
+  useEffect(() => {
+    setLocalLikedByMe(hossii.likedByMe ?? false);
+    setLocalLikeCount(hossii.likeCount ?? 0);
+  }, [hossii.likedByMe, hossii.likeCount]);
 
   // stale closure 回避用 ref
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -285,7 +301,7 @@ export const Bubble = ({
         {/* --- viewMode: image → 画像のみ --- */}
         {viewMode === 'image' ? (
           hossii.imageUrl ? (
-            <img src={hossii.imageUrl} alt="投稿画像" className={styles.bubbleImage} />
+            <img src={hossii.imageUrl} alt="投稿画像" className={styles.bubbleImage} loading="lazy" />
           ) : null
         ) : (
           <>
@@ -303,6 +319,7 @@ export const Bubble = ({
                   src={hossii.imageUrl}
                   alt="投稿画像"
                   className={styles.bubbleImage}
+                  loading="lazy"
                 />
               )}
               {viewMode === 'full' && hossii.numberValue != null && (
@@ -316,6 +333,22 @@ export const Bubble = ({
                     </span>
                   ))}
                 </div>
+              )}
+              {viewMode === 'full' && likesEnabled && (
+                <button
+                  className={`${styles.likeButton} ${localLikedByMe ? styles.likeButtonActive : ''}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newLiked = !localLikedByMe;
+                    setLocalLikedByMe(newLiked);
+                    setLocalLikeCount((c) => newLiked ? c + 1 : Math.max(0, c - 1));
+                    onLike?.(hossii.id);
+                  }}
+                  aria-label={localLikedByMe ? 'いいねを取り消す' : 'いいね'}
+                >
+                  {localLikedByMe ? '❤️' : '🤍'} {localLikeCount > 0 && <span>{localLikeCount}</span>}
+                </button>
               )}
             </div>
           </>

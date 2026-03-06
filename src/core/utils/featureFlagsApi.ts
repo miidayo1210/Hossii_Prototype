@@ -4,7 +4,7 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 // Feature Flag キーの定義
 // 新しいフラグを追加する時はここに追加する
 // ============================================================
-export type FeatureFlagKey = 'comments_thumbnail';
+export type FeatureFlagKey = 'comments_thumbnail' | 'likes_enabled';
 
 export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 
@@ -107,17 +107,20 @@ export async function setSpaceFeatureFlag(
 function buildDefaults(): FeatureFlags {
   return {
     comments_thumbnail: true,
+    likes_enabled: false,
   };
 }
 
 function buildAllFalse(): FeatureFlags {
   return {
     comments_thumbnail: false,
+    likes_enabled: false,
   };
 }
 
 function castToFeatureFlags(raw: Record<string, boolean>): FeatureFlags {
   return {
     comments_thumbnail: raw['comments_thumbnail'] ?? true,
+    likes_enabled: raw['likes_enabled'] ?? false,
   };
 }

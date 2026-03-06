@@ -6,7 +6,40 @@ import type { Hossii } from '../../core/types';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { FilterBar } from '../FilterBar/FilterBar';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
+import { useAuth } from '../../core/contexts/AuthContext';
+import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import styles from './CommentsScreen.module.css';
+
+type LikeButtonProps = {
+  hossii: Hossii;
+  likedByMe: boolean;
+  onLike: (id: string) => void;
+};
+
+const LikeButton = ({ hossii, likedByMe, onLike }: LikeButtonProps) => {
+  const [localLiked, setLocalLiked] = useState(likedByMe);
+  const [localCount, setLocalCount] = useState(hossii.likeCount ?? 0);
+
+  useEffect(() => {
+    setLocalLiked(likedByMe);
+    setLocalCount(hossii.likeCount ?? 0);
+  }, [likedByMe, hossii.likeCount]);
+
+  return (
+    <button
+      className={`${styles.likeButton} ${localLiked ? styles.likeButtonActive : ''}`}
+      onClick={() => {
+        const newLiked = !localLiked;
+        setLocalLiked(newLiked);
+        setLocalCount((c) => newLiked ? c + 1 : Math.max(0, c - 1));
+        onLike(hossii.id);
+      }}
+      aria-label={localLiked ? 'いいねを取り消す' : 'いいね'}
+    >
+      {localLiked ? '❤️' : '🤍'}{localCount > 0 && ` ${localCount}`}
+    </button>
+  );
+};
 
 function applyFilters(hossiis: Hossii[], filters: HossiiFilters): Hossii[] {
   return hossiis.filter((h) => {
@@ -26,11 +59,13 @@ function applyFilters(hossiis: Hossii[], filters: HossiiFilters): Hossii[] {
 export const CommentsScreen = () => {
   const { state, getActiveSpaceHossiis } = useHossiiStore();
   const { activeSpaceId } = state;
+  const { currentUser } = useAuth();
 
   const { flags } = useFeatureFlags(activeSpaceId ?? undefined);
 
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(activeSpaceId));
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!lightboxUrl) return;
@@ -52,6 +87,29 @@ export const CommentsScreen = () => {
 
   // アクティブなスペースのログのみ取得
   const hossiis = getActiveSpaceHossiis();
+
+  // likes_enabled フラグが ON のときにいいね済みIDを取得
+  useEffect(() => {
+    if (!currentUser || !flags.likes_enabled || hossiis.length === 0) return;
+    const ids = hossiis.map((h) => h.id);
+    fetchLikedIds(currentUser.uid, ids).then(setLikedIds);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, flags.likes_enabled, activeSpaceId]);
+
+  const handleLike = useCallback(async (hossiiId: string) => {
+    if (!currentUser) return;
+    try {
+      const nowLiked = await toggleLike(hossiiId, currentUser.uid);
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (nowLiked) next.add(hossiiId);
+        else next.delete(hossiiId);
+        return next;
+      });
+    } catch (err) {
+      console.error('[CommentsScreen] toggleLike error:', err);
+    }
+  }, [currentUser]);
 
   // 新しい順にソートしてフィルタ適用
   const sortedHossiis = useMemo(() => {
@@ -143,6 +201,13 @@ export const CommentsScreen = () => {
                       )}
                       <div className={styles.meta}>
                         <span className={styles.time}>{timestamp}</span>
+                        {flags.likes_enabled && (
+                          <LikeButton
+                            hossii={hossii}
+                            likedByMe={likedIds.has(hossii.id)}
+                            onLike={handleLike}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>

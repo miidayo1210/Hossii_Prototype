@@ -4,6 +4,7 @@ import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { addStamp } from '../../core/utils/stampStorage';
+import { upsertStampCount } from '../../core/utils/stampsApi';
 import { uploadHossiiImage } from '../../core/utils/imageStorageApi';
 import { generateId } from '../../core/utils';
 import type { SpaceSettings } from '../../core/types/settings';
@@ -257,6 +258,8 @@ export const PostScreen = () => {
       // スタンプを獲得
       if (currentUser) {
         const newStampCount = addStamp(currentUser.uid);
+        // ログイン済みユーザーのみ Supabase にも保存（非同期・fire-and-forget）
+        upsertStampCount(currentUser.uid, newStampCount);
         const isNewCard = newStampCount % 20 === 0;
 
         if (isNewCard) {

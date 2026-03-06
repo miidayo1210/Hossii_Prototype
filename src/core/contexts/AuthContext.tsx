@@ -18,6 +18,7 @@ export type AppUser = {
 type AuthContextType = {
   currentUser: AppUser | null;
   loading: boolean;
+  isResolvingAuth: boolean;
   signUp: (email: string, password: string) => Promise<AppUser>;
   login: (email: string, password: string) => Promise<AppUser>;
   adminLogin: (email: string, password: string) => Promise<AppUser>;
@@ -112,6 +113,7 @@ const clearMockUser = () => localStorage.removeItem(MOCK_AUTH_KEY);
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isResolvingAuth, setIsResolvingAuth] = useState(false);
 
   // ===== セッション初期化 =====
   useEffect(() => {
@@ -138,12 +140,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // 認証状態の変化を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event: string, session: Session | null) => {
+        setIsResolvingAuth(true);
         if (session) {
           const appUser = await resolveAppUser(session.user);
           setCurrentUser(appUser);
         } else {
           setCurrentUser(null);
         }
+        setIsResolvingAuth(false);
       }
     );
 
@@ -296,6 +300,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const value: AuthContextType = {
     currentUser,
     loading,
+    isResolvingAuth,
     signUp,
     login,
     adminLogin,

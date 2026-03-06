@@ -3,7 +3,8 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/AuthContext';
-import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsStorage';
+import { saveSpaceSettings } from '../../core/utils/settingsStorage';
+import { fetchSpaceSettings, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import type { SpaceSettings } from '../../core/types/settings';
 import type { Space } from '../../core/types/space';
 import { GeneralTab } from './GeneralTab';
@@ -28,21 +29,25 @@ export const SpaceSettingsScreen = () => {
 
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
 
-  // 設定を読み込む
+  // 設定を読み込む（Supabase 優先、フォールバックは localStorage）
   useEffect(() => {
-    if (activeSpace) {
-      const loadedSettings = loadSpaceSettings(activeSpace.id, activeSpace.name);
-      setSettings(loadedSettings);
-    }
-  }, [activeSpace]);
+    if (!activeSpace) return;
+    fetchSpaceSettings(activeSpace.id, activeSpace.name).then((loaded) => {
+      setSettings(loaded);
+      // localStorage にも同期してオフライン表示を保証
+      saveSpaceSettings(loaded);
+    });
+  }, [activeSpace?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!settings) return;
 
     setIsSaving(true);
+    // localStorage に即時保存（楽観的更新）
     saveSpaceSettings(settings);
+    // Supabase に非同期で保存
+    await upsertSpaceSettings(settings);
 
-    // 保存完了のアニメーション
     setTimeout(() => {
       setIsSaving(false);
     }, 500);

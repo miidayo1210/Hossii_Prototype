@@ -359,6 +359,32 @@
   border-radius: 9999px;
 }
 
+/* いいねボタン */
+.likeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  color: #6b7280;
+  transition: background 0.15s, color 0.15s;
+}
+
+.likeButton:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.likeButtonActive {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.06);
+}
+
 /* F05: リサイズハンドル（4コーナー共通） */
 .resizeHandle {
   position: absolute;

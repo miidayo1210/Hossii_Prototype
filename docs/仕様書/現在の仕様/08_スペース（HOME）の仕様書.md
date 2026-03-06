@@ -1,5 +1,7 @@
 # スペース（HOME）詳細仕様書
 
+> **分類:** `[Implementation]` スペースビュー（#screen）のUI・表示ロジック詳細
+
 ## 現在の実装状況（ベースライン）
 
 - 表示上限: `state.displayLimit`（デフォルト50件、LeftControlBar から変更可）

@@ -5,12 +5,14 @@ import { useSpeechRecognition, type SpeechEvent } from '../../core/hooks/useSpee
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
+import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
 import { useAuth } from '../../core/contexts/AuthContext';
 import type { EmotionKey } from '../../core/types';
 import type { SpaceSettings } from '../../core/types/settings';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
+import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
@@ -86,6 +88,7 @@ export const SpaceScreen = () => {
   const isAdmin = currentUser?.isAdmin ?? false;
   // 現在のユーザーID（匿名含む）
   const myAuthorId = currentUser?.uid ?? state.profile?.id;
+  const { flags } = useFeatureFlags(activeSpace?.id);
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   // 他タブからのリアクションを受け取るための状態
@@ -98,6 +101,9 @@ export const SpaceScreen = () => {
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
+
+  // いいね済み hossii_id セット（likes_enabled フラグが ON の場合のみ使用）
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
   // A02: 選択中の装飾（ポップアップ表示用）
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
@@ -126,6 +132,30 @@ export const SpaceScreen = () => {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [loadSettings]);
+
+  // likes_enabled フラグが ON のときにいいね済みIDを取得
+  const hossiisForLikes = getActiveSpaceHossiis();
+  useEffect(() => {
+    if (!currentUser || !flags.likes_enabled || hossiisForLikes.length === 0) return;
+    const ids = hossiisForLikes.map((h) => h.id);
+    fetchLikedIds(currentUser.uid, ids).then(setLikedIds);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, flags.likes_enabled, activeSpaceId]);
+
+  const handleLike = useCallback(async (hossiiId: string) => {
+    if (!currentUser) return;
+    try {
+      const nowLiked = await toggleLike(hossiiId, currentUser.uid);
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (nowLiked) next.add(hossiiId);
+        else next.delete(hossiiId);
+        return next;
+      });
+    } catch (err) {
+      console.error('[SpaceScreen] toggleLike error:', err);
+    }
+  }, [currentUser]);
 
   // PC版コントロールバーの状態管理
   const [controlState, setControlState] = useState<ControlState>({
@@ -528,10 +558,14 @@ export const SpaceScreen = () => {
             }
 
             // デスクトップ: バブルを表示
+            const hossiiWithLikes = flags.likes_enabled
+              ? { ...hossii, likedByMe: likedIds.has(hossii.id) }
+              : hossii;
+
             return (
               <Bubble
                 key={hossii.id}
-                hossii={hossii}
+                hossii={hossiiWithLikes}
                 index={index}
                 position={pos}
                 isActive={activeBubbleId === hossii.id}
@@ -547,6 +581,8 @@ export const SpaceScreen = () => {
                 onColorSave={handleColorSave}
                 viewMode={viewMode}
                 canEdit={canEditBubble(hossii)}
+                likesEnabled={flags.likes_enabled}
+                onLike={handleLike}
               />
             );
           })

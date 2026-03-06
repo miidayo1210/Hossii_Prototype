@@ -226,13 +226,15 @@ export const SpacesScreen = () => {
         </div>
 
         <div className={styles.adminHeaderRight}>
-          <button
-            type="button"
-            className={styles.createSpaceButton}
-            onClick={openCreateModal}
-          >
-            + 新しいスペースを作成
-          </button>
+          {currentUser?.isAdmin && (
+            <button
+              type="button"
+              className={styles.createSpaceButton}
+              onClick={openCreateModal}
+            >
+              + 新しいスペースを作成
+            </button>
+          )}
 
           <div className={styles.accountDropdown} ref={accountMenuRef}>
             <button

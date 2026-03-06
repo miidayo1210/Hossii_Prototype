@@ -1,5 +1,8 @@
 # 投稿（Hossii 投稿）仕様
 
+> **分類:** `[Core]` 全スペース共通の投稿データ型・送信フロー
+> **関連:** [core-concepts.md](../../core/core-concepts.md) §2（Hossii型）
+
 > 最終更新: 2026-02-23
 > 関連ファイル: `src/components/PostScreen/PostScreen.tsx`, `src/core/hooks/useHossiiStore.tsx`, `src/core/types/index.ts`
 
