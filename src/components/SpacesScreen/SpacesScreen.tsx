@@ -607,6 +607,9 @@ export const SpacesScreen = () => {
                     currentBackground={space.background}
                     onSelect={(bg) => handleBackgroundSelect(space.id, bg)}
                     onImageURLRevoke={handleImageURLRevoke}
+                    spaceId={space.id}
+                    savedBackgroundImages={space.savedBackgroundImages}
+                    onUpdateSavedImages={(urls) => updateSpace(space.id, { savedBackgroundImages: urls })}
                   />
                 </div>
               )}

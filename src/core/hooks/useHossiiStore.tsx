@@ -164,7 +164,13 @@ const normalizeSpace = (f: unknown): Space => {
 
   const spaceURL = typeof raw.spaceURL === 'string' && raw.spaceURL ? raw.spaceURL : undefined;
 
-  return { id, spaceURL, name, cardType, quickEmotions, createdAt, background };
+  const savedBackgroundImages =
+    Array.isArray(raw.savedBackgroundImages) &&
+    raw.savedBackgroundImages.every((u) => typeof u === 'string')
+      ? (raw.savedBackgroundImages as string[])
+      : undefined;
+
+  return { id, spaceURL, name, cardType, quickEmotions, createdAt, background, savedBackgroundImages };
 };
 
 // 初期化: localStorage からスペースを読み込み、なければデフォルトスペースを作成
@@ -386,6 +392,10 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       }
 
       case 'SET_SPACES': {
+        // Supabase がエラー時に空配列を返した場合、localStorage の既存データを消さない
+        if (action.payload.length === 0 && state.spaces.length > 0) {
+          return state;
+        }
         saveSpaces(action.payload);
         return {
           ...state,

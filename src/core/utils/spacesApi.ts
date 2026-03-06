@@ -11,6 +11,7 @@ type SpaceRow = {
   card_type: string;
   quick_emotions: string[];
   background: unknown;
+  saved_background_images: string[] | null;
   created_at: string;
 };
 
@@ -23,6 +24,7 @@ function rowToSpace(row: SpaceRow): Space {
     cardType: row.card_type as Space['cardType'],
     quickEmotions: row.quick_emotions as EmotionKey[],
     background: row.background as Space['background'],
+    savedBackgroundImages: row.saved_background_images ?? undefined,
     createdAt: new Date(row.created_at),
   };
 }
@@ -36,6 +38,7 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
     card_type: space.cardType,
     quick_emotions: space.quickEmotions,
     background: space.background ?? { kind: 'pattern', value: 'mist' },
+    saved_background_images: space.savedBackgroundImages ?? null,
     created_at: space.createdAt.toISOString(),
   };
 }
@@ -85,6 +88,7 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   if (patch.cardType !== undefined) updateObj.card_type = patch.cardType;
   if (patch.quickEmotions !== undefined) updateObj.quick_emotions = patch.quickEmotions;
   if (patch.background !== undefined) updateObj.background = patch.background;
+  if (patch.savedBackgroundImages !== undefined) updateObj.saved_background_images = patch.savedBackgroundImages ?? null;
 
   if (Object.keys(updateObj).length === 0) return;
 

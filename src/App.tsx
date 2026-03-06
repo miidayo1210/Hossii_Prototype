@@ -34,6 +34,8 @@ const AppContent = () => {
   const [userProfile, setUserProfile] = useState<{ userId: string; nickname: string } | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
+  // 初回 URL スラッグ解決済みフラグ（スペース設定変更後に再トリガーされるのを防ぐ）
+  const initialSlugHandledRef = useRef(false);
 
   // /s/[slug] パスかどうかを初回レンダー時に同期的に検出（フラッシュ防止）
   const isOnSlugPath = useMemo(
@@ -117,12 +119,17 @@ const AppContent = () => {
     const slug = communitySpaceMatch ? communitySpaceMatch[2] : legacyMatch?.[1];
     if (!slug) return;
 
+    // 既に初回ナビゲーション処理済みの場合は再実行しない
+    // （スペースのslug変更時に state.spaces が更新されても "not found" にならないよう防止）
+    if (initialSlugHandledRef.current) return;
+
     // アクセス時のパスをそのまま保持する（/c/*/s/* 形式も維持）
     const originalPath = window.location.pathname;
 
     const targetSpace = state.spaces.find((s) => s.spaceURL === slug);
 
     if (targetSpace) {
+      initialSlugHandledRef.current = true;
       // スペースが見つかった場合は "not found" をリセット
       setSpaceURLNotFound(false);
 

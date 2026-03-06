@@ -26,6 +26,13 @@ export const PATTERN_PRESETS: Array<{ key: PatternKey; label: string }> = [
   { key: 'stars', label: '星空' },
 ];
 
+// Theme Presets (space/cosmic visual themes using CSS gradients)
+export const THEME_PRESETS: Array<{ key: PatternKey; label: string; description: string }> = [
+  { key: 'nebula', label: 'ネビュラ', description: '星雲のような幻想的な背景' },
+  { key: 'galaxy', label: 'ギャラクシー', description: '銀河のような渦巻き背景' },
+  { key: 'starfield', label: 'スターフィールド', description: '無数の星が輝く背景' },
+];
+
 // Image Presets (for future use - currently no images in public/bg/)
 // Uncomment when images are available
 export const IMAGE_PRESETS: Array<{ key: string; label: string; value: string }> = [

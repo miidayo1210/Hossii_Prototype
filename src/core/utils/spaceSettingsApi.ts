@@ -11,7 +11,6 @@ type SupabaseSpaceSettings = {
   feature_number_post: boolean;
   card_type: string;
   hossii_color: string;
-  background_pattern: string;
   bubble_edit_permission: string;
 };
 
@@ -27,7 +26,6 @@ function toSpaceSettings(row: SupabaseSpaceSettings): SpaceSettings {
     },
     cardType: row.card_type as SpaceSettings['cardType'],
     hossiiColor: row.hossii_color as SpaceSettings['hossiiColor'],
-    backgroundPattern: row.background_pattern as SpaceSettings['backgroundPattern'],
     bubbleEditPermission: (row.bubble_edit_permission ?? 'all') as SpaceSettings['bubbleEditPermission'],
   };
 }
@@ -42,7 +40,6 @@ function toRow(settings: SpaceSettings): SupabaseSpaceSettings {
     feature_number_post: settings.features.numberPost,
     card_type: settings.cardType,
     hossii_color: settings.hossiiColor,
-    background_pattern: settings.backgroundPattern,
     bubble_edit_permission: settings.bubbleEditPermission ?? 'all',
   };
 }

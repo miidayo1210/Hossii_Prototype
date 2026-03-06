@@ -149,8 +149,11 @@ export const SpaceSettingsScreen = () => {
               onUpdateSpace={(patch: Partial<Space>) => updateSpace(activeSpace.id, patch)}
             />
           )}
-          {activeTab === 'background' && (
-            <BackgroundTab settings={settings} onUpdate={setSettings} />
+          {activeTab === 'background' && activeSpace && (
+            <BackgroundTab
+              space={activeSpace}
+              onUpdateSpace={(patch) => updateSpace(activeSpace.id, patch)}
+            />
           )}
           {activeTab === 'share' && (
             <ShareTab />

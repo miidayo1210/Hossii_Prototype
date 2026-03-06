@@ -61,6 +61,57 @@ export async function compressImage(file: File): Promise<Blob> {
   });
 }
 
+/** Supabase Storage にスペース背景画像をアップロードして公開 URL を返す */
+export async function uploadBackgroundImage(
+  spaceId: string,
+  file: File
+): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+
+  let blob: Blob;
+  try {
+    blob = await compressImage(file);
+  } catch {
+    blob = file;
+  }
+
+  // タイムスタンプで一意なファイル名を生成（同スペースに複数枚保存可能）
+  const timestamp = Date.now();
+  const path = `backgrounds/${spaceId}/${timestamp}.jpg`;
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+
+  if (error) {
+    console.error('[imageStorageApi] uploadBackgroundImage error:', error.message);
+    return null;
+  }
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+/** Supabase Storage から背景画像を削除する */
+export async function deleteBackgroundImage(publicUrl: string): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  // 公開 URL からストレージパスを抽出
+  // 例: https://xxx.supabase.co/storage/v1/object/public/hossii-images/backgrounds/spaceId/ts.jpg
+  const marker = `/object/public/${BUCKET}/`;
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) {
+    console.warn('[imageStorageApi] deleteBackgroundImage: cannot parse path from URL', publicUrl);
+    return;
+  }
+  const path = publicUrl.slice(idx + marker.length);
+
+  const { error } = await supabase.storage.from(BUCKET).remove([path]);
+  if (error) {
+    console.error('[imageStorageApi] deleteBackgroundImage error:', error.message);
+  }
+}
+
 /** Supabase Storage に画像をアップロードして公開 URL を返す */
 export async function uploadHossiiImage(
   spaceId: string,

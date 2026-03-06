@@ -12,7 +12,10 @@ export type PatternKey =
   | 'dots'
   | 'grid'
   | 'waves'
-  | 'stars';
+  | 'stars'
+  | 'nebula'
+  | 'galaxy'
+  | 'starfield';
 
 // 画像ソースの種類
 export type ImageSource = 'preset' | 'temp' | 'cloud';
@@ -58,10 +61,14 @@ export type Space = {
   quickEmotions: EmotionKey[]; // 最大8（UI用、制限ではない）
   createdAt: Date;
   background?: SpaceBackground; // 背景設定（オプショナル）
+  savedBackgroundImages?: string[]; // 保存済み背景画像URLリスト（最大 MAX_BACKGROUND_IMAGES 枚）
   characterImageUrl?: string;   // A01: キャラクター画像（透過PNG推奨）
   customEmotions?: CustomEmotion[]; // A03: カスタム表情パターン（最大20件）
   decorations?: SpaceDecoration[];  // A02: スペース装飾（掲示板など）
 };
+
+// 背景画像の保存上限
+export const MAX_BACKGROUND_IMAGES = 3;
 
 // デフォルトのクイックボタン感情（8種）
 export const DEFAULT_QUICK_EMOTIONS: EmotionKey[] = [

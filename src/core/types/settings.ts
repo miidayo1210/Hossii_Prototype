@@ -4,8 +4,6 @@ export type CardType = 'stamp' | 'constellation' | 'graph';
 
 export type HossiiColor = 'pink' | 'blue' | 'yellow' | 'green' | 'purple';
 
-export type BackgroundPattern = 'standard' | 'nebula' | 'galaxy' | 'stars';
-
 export type SpaceFeatures = {
   commentPost: boolean;
   emotionPost: boolean;
@@ -22,7 +20,6 @@ export type SpaceSettings = {
   features: SpaceFeatures;
   cardType: CardType;
   hossiiColor: HossiiColor;
-  backgroundPattern: BackgroundPattern;
   bubbleEditPermission: BubbleEditPermission;
 };
 
@@ -37,6 +34,5 @@ export const DEFAULT_SPACE_SETTINGS: Omit<SpaceSettings, 'spaceId' | 'spaceName'
   features: DEFAULT_SPACE_FEATURES,
   cardType: 'constellation',
   hossiiColor: 'pink',
-  backgroundPattern: 'standard',
   bubbleEditPermission: 'all',
 };
