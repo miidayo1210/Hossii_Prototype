@@ -45,7 +45,12 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
   };
 }
 
-export async function fetchSpaces(communityId?: string): Promise<Space[]> {
+/**
+ * コミュニティのスペース一覧を取得する。
+ * - 成功時: Space[] を返す（0件の場合は空配列）
+ * - エラー時: null を返す（呼び出し側で既存データを保持するかどうかを判断する）
+ */
+export async function fetchSpaces(communityId?: string): Promise<Space[] | null> {
   if (!isSupabaseConfigured) return [];
 
   let query = supabase
@@ -61,7 +66,7 @@ export async function fetchSpaces(communityId?: string): Promise<Space[]> {
 
   if (error) {
     console.error('[spacesApi] fetchSpaces error:', error.message);
-    return [];
+    return null;
   }
 
   return (data as SpaceRow[]).map(rowToSpace);

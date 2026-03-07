@@ -272,9 +272,10 @@ const AppContent = () => {
     }
     return (
       <AdminLoginScreen
-        onLoginSuccess={() => {
+        onLoginSuccess={(user) => {
           window.history.replaceState({}, '', '/');
           setAppRoute('default');
+          navigate(user.isSuperAdmin ? 'communities' : 'spaces');
         }}
       />
     );

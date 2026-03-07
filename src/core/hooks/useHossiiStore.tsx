@@ -392,10 +392,6 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       }
 
       case 'SET_SPACES': {
-        // Supabase がエラー時に空配列を返した場合、localStorage の既存データを消さない
-        if (action.payload.length === 0 && state.spaces.length > 0) {
-          return state;
-        }
         saveSpaces(action.payload);
         return {
           ...state,
@@ -750,7 +746,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     if (!isSupabaseConfigured) return;
 
     fetchSpaces(communityId).then((supabaseSpaces) => {
-      dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
+      if (supabaseSpaces !== null) {
+        // null はエラーを意味するため、その場合は既存データを保持する
+        dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
+      }
       setSpacesLoadedFromSupabase(true);
     });
   }, [communityId]);

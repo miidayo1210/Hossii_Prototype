@@ -9,7 +9,7 @@ type Tab = 'login' | 'register';
 type ViewState = 'form' | 'pending' | 'rejected';
 
 type Props = {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user: AppUser) => void;
 };
 
 export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
@@ -39,7 +39,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
 
   const handleUserCheck = async (user: AppUser) => {
     if (user.isAdmin) {
-      onLoginSuccess();
+      onLoginSuccess(user);
     } else if (user.communityStatus === 'pending') {
       setPendingCommunityName(user.communityName ?? '');
       setViewState('pending');
