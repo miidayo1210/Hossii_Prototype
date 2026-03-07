@@ -1,12 +1,16 @@
 import type { SpaceSettings, CardType, BubbleEditPermission } from '../../core/types/settings';
+import type { Space } from '../../core/types/space';
+import { BUBBLE_SHAPE_PRESETS } from '../../core/assets/bubbleShapes';
 import styles from './GeneralTab.module.css';
 
 type Props = {
   settings: SpaceSettings;
   onUpdate: (settings: SpaceSettings) => void;
+  space?: Space;
+  onUpdateSpace?: (patch: Partial<Space>) => void;
 };
 
-export const GeneralTab = ({ settings, onUpdate }: Props) => {
+export const GeneralTab = ({ settings, onUpdate, space, onUpdateSpace }: Props) => {
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({ ...settings, spaceName: e.target.value });
   };
@@ -27,6 +31,14 @@ export const GeneralTab = ({ settings, onUpdate }: Props) => {
 
   const handleBubbleEditPermissionChange = (bubbleEditPermission: BubbleEditPermission) => {
     onUpdate({ ...settings, bubbleEditPermission });
+  };
+
+  const handleIsPrivateToggle = () => {
+    onUpdateSpace?.({ isPrivate: !(space?.isPrivate ?? false) });
+  };
+
+  const handleBubbleShapeChange = (shapePath: string | undefined) => {
+    onUpdateSpace?.({ bubbleShapePng: shapePath });
   };
 
   return (
@@ -88,6 +100,17 @@ export const GeneralTab = ({ settings, onUpdate }: Props) => {
             />
             <span className={styles.toggleSlider}></span>
           </label>
+
+          <label className={styles.toggleItem}>
+            <span className={styles.toggleLabel}>いいね機能</span>
+            <input
+              type="checkbox"
+              className={styles.toggle}
+              checked={settings.features.likesEnabled}
+              onChange={() => handleFeatureToggle('likesEnabled')}
+            />
+            <span className={styles.toggleSlider}></span>
+          </label>
         </div>
       </section>
 
@@ -115,6 +138,62 @@ export const GeneralTab = ({ settings, onUpdate }: Props) => {
           </label>
         </div>
       </section>
+
+      {onUpdateSpace && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>プライバシー設定</h2>
+          <p className={styles.description}>ONにするとこのスペースは本人のみアクセスできます（内省スペース向け）。</p>
+          <div className={styles.toggleList}>
+            <label className={styles.toggleItem}>
+              <span className={styles.toggleLabel}>非公開スペース</span>
+              <input
+                type="checkbox"
+                className={styles.toggle}
+                checked={space?.isPrivate ?? false}
+                onChange={handleIsPrivateToggle}
+              />
+              <span className={styles.toggleSlider}></span>
+            </label>
+          </div>
+        </section>
+      )}
+
+      {onUpdateSpace && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>吹き出しの形</h2>
+          <p className={styles.description}>
+            スペース内のすべての吹き出しに適用される形状を選択します。
+            {BUBBLE_SHAPE_PRESETS.length === 0 && (
+              <> カスタム形状を追加するには PNG ファイルを <code>public/assets/bubble-shapes/</code> に格納してください。</>
+            )}
+          </p>
+          <div className={styles.shapeList}>
+            <button
+              type="button"
+              className={`${styles.shapeOption} ${!space?.bubbleShapePng ? styles.shapeOptionActive : ''}`}
+              onClick={() => handleBubbleShapeChange(undefined)}
+            >
+              <span className={styles.shapePreviewDefault} />
+              <span className={styles.shapeLabel}>デフォルト（角丸）</span>
+            </button>
+            {BUBBLE_SHAPE_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                className={`${styles.shapeOption} ${space?.bubbleShapePng === preset.path ? styles.shapeOptionActive : ''}`}
+                onClick={() => handleBubbleShapeChange(preset.path)}
+              >
+                <img
+                  src={preset.path}
+                  alt={preset.label}
+                  className={styles.shapePreviewImg}
+                />
+                <span className={styles.shapeLabel}>{preset.label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>カードタイプ</h2>

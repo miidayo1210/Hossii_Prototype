@@ -9,6 +9,7 @@ export type SpaceFeatures = {
   emotionPost: boolean;
   photoPost: boolean;
   numberPost: boolean;
+  likesEnabled: boolean;
 };
 
 // バブル編集権限: 'all' = 全員可, 'owner_and_admin' = 投稿者本人と管理者のみ
@@ -28,6 +29,7 @@ export const DEFAULT_SPACE_FEATURES: SpaceFeatures = {
   emotionPost: true,
   photoPost: true,
   numberPost: false,
+  likesEnabled: true,
 };
 
 export const DEFAULT_SPACE_SETTINGS: Omit<SpaceSettings, 'spaceId' | 'spaceName'> = {

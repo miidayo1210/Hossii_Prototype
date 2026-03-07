@@ -139,7 +139,12 @@ export const SpaceSettingsScreen = () => {
 
         <main className={styles.main}>
           {activeTab === 'general' && (
-            <GeneralTab settings={settings} onUpdate={setSettings} />
+            <GeneralTab
+              settings={settings}
+              onUpdate={setSettings}
+              space={activeSpace}
+              onUpdateSpace={(patch: Partial<Space>) => updateSpace(activeSpace.id, patch)}
+            />
           )}
           {activeTab === 'hossii' && (
             <HossiiCustomTab

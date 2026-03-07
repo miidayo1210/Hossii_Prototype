@@ -9,6 +9,7 @@ type SupabaseSpaceSettings = {
   feature_emotion_post: boolean;
   feature_photo_post: boolean;
   feature_number_post: boolean;
+  feature_likes_enabled: boolean;
   card_type: string;
   hossii_color: string;
   bubble_edit_permission: string;
@@ -23,6 +24,7 @@ function toSpaceSettings(row: SupabaseSpaceSettings): SpaceSettings {
       emotionPost: row.feature_emotion_post,
       photoPost: row.feature_photo_post,
       numberPost: row.feature_number_post,
+      likesEnabled: row.feature_likes_enabled ?? true,
     },
     cardType: row.card_type as SpaceSettings['cardType'],
     hossiiColor: row.hossii_color as SpaceSettings['hossiiColor'],
@@ -38,6 +40,7 @@ function toRow(settings: SpaceSettings): SupabaseSpaceSettings {
     feature_emotion_post: settings.features.emotionPost,
     feature_photo_post: settings.features.photoPost,
     feature_number_post: settings.features.numberPost,
+    feature_likes_enabled: settings.features.likesEnabled,
     card_type: settings.cardType,
     hossii_color: settings.hossiiColor,
     bubble_edit_permission: settings.bubbleEditPermission ?? 'all',

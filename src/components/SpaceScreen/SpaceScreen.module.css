@@ -318,6 +318,26 @@
   overflow: visible !important;
 }
 
+/* カスタム形状PNG使用時（mask-imageによりborderが非表示になるためdrop-shadowで代替） */
+.bubbleCustomShape {
+  border-radius: 0 !important;
+  border: none !important;
+  backdrop-filter: none !important;
+}
+
+.bubbleCustomShape.bubbleActive {
+  filter: drop-shadow(0 0 6px rgba(217, 119, 6, 0.5));
+}
+
+/* カスタム形状選択中（drop-shadowで選択枠を表現） */
+.bubbleSelectedShape {
+  filter: drop-shadow(0 0 4px #7c3aed) drop-shadow(0 0 8px rgba(124, 58, 237, 0.4)) !important;
+  z-index: 30;
+  animation: none !important;
+  cursor: grab;
+  overflow: visible !important;
+}
+
 /* F04: ドラッグ中バブル */
 .bubbleDragging {
   cursor: grabbing !important;
@@ -359,12 +379,14 @@
   border-radius: 9999px;
 }
 
-/* いいねボタン */
+/* いいねボタン（吹き出し右下に配置） */
 .likeButton {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.2rem;
   margin-top: 0.35rem;
+  margin-left: auto;
+  width: fit-content;
   padding: 0.15rem 0.5rem;
   background: transparent;
   border: 1px solid rgba(0, 0, 0, 0.12);

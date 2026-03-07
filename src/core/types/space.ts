@@ -65,6 +65,8 @@ export type Space = {
   characterImageUrl?: string;   // A01: キャラクター画像（透過PNG推奨）
   customEmotions?: CustomEmotion[]; // A03: カスタム表情パターン（最大20件）
   decorations?: SpaceDecoration[];  // A02: スペース装飾（掲示板など）
+  isPrivate?: boolean;              // 非公開スペース（内省スペースなど個人利用向け）
+  bubbleShapePng?: string;          // 吹き出しのカスタム形状PNGパス（例: "/assets/bubble-shapes/speech.png"）
 };
 
 // 背景画像の保存上限

@@ -1,7 +1,7 @@
 # 内省スペース 仕様書
 
-> **ステータス:** Draft
-> **最終更新:** 2026-03-06
+> **ステータス:** In Review（基盤実装済み・段階的拡張中）
+> **最終更新:** 2026-03-07
 > **優先度:** Priority 3
 > **参照:** [space-product-vision.md](../space-product-vision.md) §7（セレンディピティ設計）/ [20_feat_内省スペース.md](../仕様書/現在の仕様/20_feat_内省スペース.md)
 
@@ -110,7 +110,7 @@
 | スペースビュー | `#screen` | 自分の庭を眺める | ✅ |
 | コメント一覧 | `#comments` | 時系列ログ | ✅ |
 | マイログ | `#mylogs` | 自分の投稿を振り返る | ✅ |
-| 内省ビュー | `#reflection` | カレンダー・感情グラフ（新規作成） | ✅（要実装） |
+| 内省ビュー | `#reflection` | タイムライン・感情フィルター・ランダム想起カード | ✅（実装済み）※カレンダーグリッドは別タスク |
 | スライドショー | `#slideshow` | 過去投稿をランダムに流す | ✅（要実装） |
 | スペース管理 | `#spaces` | 設定 | ✅ |
 | スタンプカード | `#card` | 投稿継続のモチベーション | ✅（任意） |
@@ -123,11 +123,26 @@
 
 | フィールド | 型 | 説明 | 必須 |
 |-----------|-----|------|------|
-| `tags` | string[] | ユーザー自由タグ（「アイデア」「仕事」「家族」など） | 任意 |
-| `mood` | number (1-5) | 気分スコア（数値投稿の特殊版） | 任意 |
-| `isPrivate` | boolean | 公開/非公開フラグ | デフォルトtrue |
+| `hashtags` | string[] | 自由タグ（「アイデア」「仕事」「家族」など）。UI上は「タグ」と表示（`hashtags`フィールドを流用） | 任意 |
+| `numberValue` | number (1-5) | 気分スコア。内省スペースでは 1〜5 の気分スケールとして運用（`numberValue`フィールドを流用） | 任意 |
 
-### スペース設定
+> **補足:** `tags` や `mood` は専用フィールドを追加せず既存フィールドを流用する方針。
+> 将来「特定投稿だけシェア」のユースケースが生じた場合は `Hossii.isPrivate` の追加を検討。
+
+### 不要なフィールド
+
+- `autoType` / `origin` / `language` — 自動生成機能は不要
+- `isHidden` / `hiddenBy` — 個人スペースなので管理者モデレーションは不要
+
+### スペース設定（Space型への追加）
+
+| フィールド | 型 | 説明 | デフォルト |
+|-----------|-----|------|-----------|
+| `isPrivate` | boolean | スペース全体を非公開にする | `true` |
+
+> **設計方針:** プライバシー制御はスペース単位で持つ（投稿単位の `isPrivate` は当面不要）。
+
+### スペース設定（SpaceSettings）
 
 | 設定キー | 推奨値 | 説明 |
 |---------|--------|------|
@@ -138,15 +153,31 @@
 
 ## 9. Feature Flag 構成
 
-| Flag Key | ON/OFF | 説明 |
-|----------|--------|------|
+### 9-A. SpaceFeatures プリセット（入力種別トグル）
+
+`SpaceFeatures`（`settings.ts`）で管理する。スペース設定UIから変更可能。
+
+| Feature Key | 推奨値 | 説明 |
+|-------------|--------|------|
 | `commentPost` | **ON** | テキスト投稿 |
 | `emotionPost` | **ON** | 気持ちタグ |
 | `photoPost` | **ON** | インスピレーション画像 |
-| `numberPost` | **ON** | 気分スコア（体調・テンション） |
-| `zine_export_enabled` | OFF | 不要（月次サマリーで代替） |
-| `random_recall_enabled` | **ON**（要実装） | セレンディピティの核心機能 |
-| `public_board_mode` | OFF | デフォルトプライベート |
+| `numberPost` | **ON** | 気分スコア（1〜5） |
+
+### 9-B. FeatureFlags プリセット（実験的・複雑機能の制御）
+
+`FeatureFlagKey`（`featureFlagsApi.ts`）で管理する。管理者画面の Feature Flags タブから ON/OFF 可能。
+
+| Flag Key | ON/OFF | 説明 | 実装状況 |
+|----------|--------|------|---------|
+| `random_recall_enabled` | **ON** | ランダム想起 — セレンディピティの核心。過去投稿を不意に浮かび上がらせる | ✅ フラグ追加済み・`useRandomRecall` フック実装済み |
+| `public_board_mode` | **OFF** | 公開ボードモード — デフォルトOFF（内省スペースはプライベート運用） | ✅ フラグ追加済み・アクセス制御実装は別タスク |
+| `zine_export_enabled` | **OFF** | ZINE出力 — 月次サマリーで代替するため不要 | ✅ フラグ追加済み・機能実装は別タスク |
+
+> **実装メモ:**
+> - 3フラグとも `FeatureFlagKey` 追加・`buildDefaults`/`castToFeatureFlags` 更新・FeatureFlagsTab UI 追加まで完了
+> - `random_recall_enabled` が ON の場合、`ReflectionScreen` 上部にランダム想起カードが表示される（7日以上前の投稿からランダム選出）
+> - `public_board_mode` の実際のアクセス制御（ルートガード等）は別タスク
 
 ---
 
@@ -175,15 +206,25 @@
 
 ## 12. Coreとの差分
 
-### 新しく必要な機能
+### 新しく必要な機能・フィールド
 
-- **ランダム想起エンジン**: 過去投稿をランダム・文脈的にサジェストするロジック
-- **内省ビュー** (`#reflection`): カレンダー×感情グラフの専用画面
-- **プライベートスペース**: URLを知っていても他者から見えないスペース
-- **自由タグ**: 感情タグとは別にユーザーが任意のタグを付けられる
+| 項目 | 内容 | 実装状況 |
+|------|------|---------|
+| `Space.isPrivate: boolean` | スペース全体の公開/非公開フラグ（`Space`型・`spacesApi.ts`） | ✅ 実装済み |
+| `FeatureFlagKey` の拡張 | `random_recall_enabled` / `public_board_mode` / `zine_export_enabled` | ✅ 実装済み |
+| `Screen` 型への `'reflection'` 追加 | ルーティング・`App.tsx` への組み込み | ✅ 実装済み |
+| `useRandomRecall` フック | 7日以上前の投稿からランダム選出するロジック | ✅ 実装済み |
+| `ReflectionScreen` | タイムライン・感情フィルター・ランダム想起カード | ✅ 実装済み |
+| GeneralTab：isPrivate トグル | スペース設定UIから非公開切り替え | ✅ 実装済み |
+| カレンダーグリッド表示 | 月ごとの感情変化をカレンダー形式で表示 | 未実装（ライブラリ選定が必要） |
+| 月次サマリー・PDF出力 | `zine_export_enabled` 機能本体 | 未実装（別タスク） |
+| Supabase `is_private` カラム追加 | DBマイグレーション | 未実装（別作業） |
+| `public_board_mode` アクセス制御 | ルートガード・スペースへのアクセス制限 | 未実装（別タスク） |
 
 ### 不要なCore機能
 
+- `autoType` / `origin` / `language`（自動生成機能）
+- `isHidden` / `hiddenBy`（モデレーション機能）
 - ゲスト入室フロー（個人スペースなので不要）
 - 公開スクリーン投影
 

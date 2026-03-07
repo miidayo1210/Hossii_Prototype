@@ -77,7 +77,7 @@ export type AddHossiiInput = {
   numberValue?: number; // numberPost
 };
 
-export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities';
+export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities' | 'reflection';
 
 export type HossiiState = {
   hossiis: Hossii[];

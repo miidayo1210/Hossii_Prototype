@@ -61,6 +61,8 @@ type BubbleProps = {
   likesEnabled?: boolean;
   /** いいねトグル時のコールバック（楽観的更新は Bubble 内で行い、Supabase 処理は親で行う） */
   onLike?: (id: string) => void;
+  /** カスタム吹き出し形状PNGのパス（指定するとmask-imageでPNG形状に切り抜かれる） */
+  bubbleShapePng?: string;
 };
 
 export const Bubble = ({
@@ -78,6 +80,7 @@ export const Bubble = ({
   canEdit = true,
   likesEnabled = false,
   onLike,
+  bubbleShapePng,
 }: BubbleProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -85,15 +88,13 @@ export const Bubble = ({
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [dragScale, setDragScale] = useState<number | null>(null);
 
-  // いいねのローカル楽観的状態
-  const [localLikedByMe, setLocalLikedByMe] = useState(hossii.likedByMe ?? false);
+  // いいねのローカル楽観的状態（インクリメント専用）
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
 
-  // hossii.likedByMe が外部から変わった場合（初回フェッチ完了後など）に同期
+  // hossii.likeCount が外部から変わった場合（初回フェッチ完了後など）に同期
   useEffect(() => {
-    setLocalLikedByMe(hossii.likedByMe ?? false);
     setLocalLikeCount(hossii.likeCount ?? 0);
-  }, [hossii.likedByMe, hossii.likeCount]);
+  }, [hossii.likeCount]);
 
   // stale closure 回避用 ref
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -268,14 +269,27 @@ export const Bubble = ({
     bubbleStyle.backgroundColor = hossii.bubbleColor;
     bubbleStyle.borderColor = hossii.bubbleColor;
   }
+  if (bubbleShapePng) {
+    // PNGのアルファチャンネルを型紙として使用。borderRadius/borderは非表示になるためリセット
+    bubbleStyle.maskImage = `url(${bubbleShapePng})`;
+    bubbleStyle.WebkitMaskImage = `url(${bubbleShapePng})`;
+    bubbleStyle.maskSize = '100% 100%';
+    bubbleStyle.WebkitMaskSize = '100% 100%';
+    bubbleStyle.maskRepeat = 'no-repeat';
+    bubbleStyle.WebkitMaskRepeat = 'no-repeat';
+    bubbleStyle.borderRadius = '0';
+    bubbleStyle.border = 'none';
+    bubbleStyle.backdropFilter = 'none';
+  }
   if (displayScale !== 1.0) {
     bubbleStyle.scale = String(displayScale);
   }
 
   const classNames = [
     styles.bubble,
+    bubbleShapePng ? styles.bubbleCustomShape : '',
     isActive && !isSelected ? styles.bubbleActive : '',
-    isSelected ? styles.bubbleSelected : '',
+    isSelected ? (bubbleShapePng ? styles.bubbleSelectedShape : styles.bubbleSelected) : '',
     dragPos ? styles.bubbleDragging : '',
   ]
     .filter(Boolean)
@@ -336,18 +350,16 @@ export const Bubble = ({
               )}
               {viewMode === 'full' && likesEnabled && (
                 <button
-                  className={`${styles.likeButton} ${localLikedByMe ? styles.likeButtonActive : ''}`}
+                  className={styles.likeButton}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
-                    const newLiked = !localLikedByMe;
-                    setLocalLikedByMe(newLiked);
-                    setLocalLikeCount((c) => newLiked ? c + 1 : Math.max(0, c - 1));
+                    setLocalLikeCount((c) => c + 1);
                     onLike?.(hossii.id);
                   }}
-                  aria-label={localLikedByMe ? 'いいねを取り消す' : 'いいね'}
+                  aria-label="いいね"
                 >
-                  {localLikedByMe ? '❤️' : '🤍'} {localLikeCount > 0 && <span>{localLikeCount}</span>}
+                  ❤️ {localLikeCount > 0 && <span>{localLikeCount}</span>}
                 </button>
               )}
             </div>

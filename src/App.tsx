@@ -13,9 +13,11 @@ import { MyLogsScreen } from './components/MyLogsScreen/MyLogsScreen';
 import { AccountScreen } from './components/AccountScreen/AccountScreen';
 import { SpaceSettingsScreen } from './components/SpaceSettingsScreen/SpaceSettingsScreen';
 import { StampCardScreen } from './components/StampCardScreen/StampCardScreen';
+import { ReflectionScreen } from './components/ReflectionScreen/ReflectionScreen';
 import { StartScreen } from './components/StartScreen/StartScreen';
 import { AdminLoginScreen } from './components/Auth/AdminLoginScreen';
 import { GuestEntryScreen } from './components/Auth/GuestEntryScreen';
+import { PrivateSpaceScreen } from './components/Auth/PrivateSpaceScreen';
 import { OnboardingModal } from './components/Auth/OnboardingModal';
 import { TutorialOverlay } from './components/Tutorial/TutorialOverlay';
 import { NicknameModal } from './components/NicknameModal/NicknameModal';
@@ -50,6 +52,8 @@ const AppContent = () => {
   const [guestSpaceId, setGuestSpaceId] = useState<string | null>(null);
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [pendingLoginSlug, setPendingLoginSlug] = useState<string | null>(null);
+  // isPrivate なスペースへの未ログインアクセス時に true になる
+  const [guestSpaceIsPrivate, setGuestSpaceIsPrivate] = useState(false);
 
   // /admin/login パスを検出（pathname ベース）
   const [appRoute, setAppRoute] = useState<'admin-login' | 'default'>(() =>
@@ -143,9 +147,11 @@ const AppContent = () => {
         window.history.replaceState({}, '', originalPath);
         navigate('screen');
       } else {
-        // 未ログイン: ニックネームが保存済みなら直接入室、なければゲスト入室画面を表示
+        // 未ログイン: isPrivate なスペースはアクセス拒否
         if (!isGuestMode) {
-          if (hasNicknameForSpace(targetSpace.id)) {
+          if (targetSpace.isPrivate) {
+            setGuestSpaceIsPrivate(true);
+          } else if (hasNicknameForSpace(targetSpace.id)) {
             // 過去に入室済み（ニックネームが localStorage に保存されている）→ そのまま入室
             setActiveSpace(targetSpace.id);
             setIsGuestMode(true);
@@ -342,6 +348,17 @@ const AppContent = () => {
     );
   }
 
+  // /s/[slug] アクセス: 未ログインかつ isPrivate なスペース → アクセス拒否画面
+  if (!currentUser && guestSpaceIsPrivate) {
+    return (
+      <PrivateSpaceScreen
+        onLoginRequested={() => {
+          setGuestSpaceIsPrivate(false);
+        }}
+      />
+    );
+  }
+
   // /s/[slug] アクセス: 未ログインかつゲスト入室前 → ゲスト入室画面
   if (!currentUser && guestSpaceId && !isGuestMode) {
     return (
@@ -369,7 +386,7 @@ const AppContent = () => {
 
   // /s/[slug] アクセス中にスペースがまだ解決されていない間は空白を表示
   // GuestEntryScreen と同じ背景色にすることでフラッシュを防ぐ
-  if (!currentUser && !isGuestMode && isOnSlugPath && !guestSpaceId && !spaceURLNotFound) {
+  if (!currentUser && !isGuestMode && isOnSlugPath && !guestSpaceId && !guestSpaceIsPrivate && !spaceURLNotFound) {
     return (
       <div style={{
         minHeight: '100dvh',
@@ -414,6 +431,8 @@ const AppContent = () => {
         return <SpaceSettingsScreen />;
       case 'card':
         return <StampCardScreen />;
+      case 'reflection':
+        return <ReflectionScreen />;
       default:
         return <SpaceScreen />;
     }

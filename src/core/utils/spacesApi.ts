@@ -13,6 +13,7 @@ type SpaceRow = {
   background: unknown;
   saved_background_images: string[] | null;
   created_at: string;
+  is_private?: boolean | null;
 };
 
 // SpaceRow → Space（camelCase）
@@ -26,6 +27,7 @@ function rowToSpace(row: SpaceRow): Space {
     background: row.background as Space['background'],
     savedBackgroundImages: row.saved_background_images ?? undefined,
     createdAt: new Date(row.created_at),
+    isPrivate: row.is_private ?? undefined,
   };
 }
 
@@ -89,6 +91,7 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   if (patch.quickEmotions !== undefined) updateObj.quick_emotions = patch.quickEmotions;
   if (patch.background !== undefined) updateObj.background = patch.background;
   if (patch.savedBackgroundImages !== undefined) updateObj.saved_background_images = patch.savedBackgroundImages ?? null;
+  if (patch.isPrivate !== undefined) updateObj.is_private = patch.isPrivate ?? null;
 
   if (Object.keys(updateObj).length === 0) return;
 

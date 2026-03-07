@@ -146,3 +146,56 @@
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
 }
+
+/* 吹き出し形状セレクター */
+.shapeList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.shapeOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: rgba(255, 255, 255, 0.9);
+  min-width: 90px;
+}
+
+.shapeOption:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.shapeOptionActive {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.15);
+}
+
+.shapePreviewDefault {
+  display: block;
+  width: 56px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.shapePreviewImg {
+  width: 56px;
+  height: 36px;
+  object-fit: contain;
+  filter: brightness(0) invert(1) opacity(0.7);
+}
+
+.shapeLabel {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}

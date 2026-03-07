@@ -20,6 +20,21 @@ const FLAG_LIST: FlagMeta[] = [
     label: '画像サムネイル表示',
     description: 'コメント一覧で画像投稿をサムネイルとして表示します。OFFにするとリンク表示になります。',
   },
+  {
+    key: 'random_recall_enabled',
+    label: 'ランダム想起',
+    description: '内省スペースで7日以上前の投稿をランダムに表示します。セレンディピティ体験の核心機能。',
+  },
+  {
+    key: 'public_board_mode',
+    label: '公開ボードモード',
+    description: 'ONにするとスペースを公開ボードとして運用できます。内省スペースでは通常OFF。',
+  },
+  {
+    key: 'zine_export_enabled',
+    label: 'ZINE出力',
+    description: '月次の振り返りレポートをPDFで出力します（実装予定）。',
+  },
 ];
 
 export const FeatureFlagsTab = ({ spaceId }: Props) => {

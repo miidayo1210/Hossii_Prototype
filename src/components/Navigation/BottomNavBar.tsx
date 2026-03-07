@@ -1,6 +1,5 @@
-import { House, PlusCircle, ScrollText, User, LayoutGrid } from 'lucide-react';
+import { House, PlusCircle, ScrollText, User } from 'lucide-react';
 import { useRouter } from '../../core/hooks/useRouter';
-import { useAuth } from '../../core/contexts/AuthContext';
 import type { Screen } from '../../core/types';
 import styles from './BottomNavBar.module.css';
 
@@ -11,22 +10,16 @@ type NavItem = {
 };
 
 const USER_NAV: NavItem[] = [
-  { label: 'ホーム', screen: 'screen', icon: House },
+  { label: 'スペース', screen: 'screen', icon: House },
   { label: '投稿', screen: 'post', icon: PlusCircle },
   { label: 'ログ', screen: 'comments', icon: ScrollText },
   { label: 'アカウント', screen: 'account', icon: User },
 ];
 
-const ADMIN_NAV: NavItem[] = [
-  { label: 'スペース管理', screen: 'spaces', icon: LayoutGrid },
-  { label: 'アカウント', screen: 'account', icon: User },
-];
-
 export const BottomNavBar = () => {
   const { screen: currentScreen, navigate } = useRouter();
-  const { currentUser } = useAuth();
 
-  const navItems = currentUser?.isAdmin ? ADMIN_NAV : USER_NAV;
+  const navItems = USER_NAV;
 
   return (
     <nav className={styles.nav}>

@@ -1,7 +1,28 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 
 /**
- * いいねをトグルする
+ * いいね数を1インクリメントする（匿名・何回でも可）
+ * @returns 更新後の like_count
+ */
+export async function incrementLike(hossiiId: string): Promise<number> {
+  if (!isSupabaseConfigured) {
+    console.warn('[likesApi] Supabase not configured');
+    return 0;
+  }
+
+  const { data, error } = await supabase
+    .rpc('increment_hossii_like', { p_hossii_id: hossiiId });
+
+  if (error) {
+    console.error('[likesApi] incrementLike error:', error);
+    return 0;
+  }
+
+  return (data as number) ?? 0;
+}
+
+/**
+ * いいねをトグルする（旧 API・廃止予定）
  * すでにいいねしていれば削除（unlike）、していなければ追加（like）
  * @returns 操作後のいいね状態（true = いいね済み）
  */

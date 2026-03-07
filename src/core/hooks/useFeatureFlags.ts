@@ -9,7 +9,13 @@ export type UseFeatureFlagsResult = {
 const cache = new Map<string, { flags: FeatureFlags; fetchedAt: number }>();
 const CACHE_TTL_MS = 60_000; // 1分
 
-const DEFAULT_FLAGS: FeatureFlags = { comments_thumbnail: true, likes_enabled: false };
+const DEFAULT_FLAGS: FeatureFlags = {
+  comments_thumbnail: true,
+  likes_enabled: false,
+  random_recall_enabled: false,
+  public_board_mode: false,
+  zine_export_enabled: false,
+};
 
 function getCached(spaceId: string): FeatureFlags | null {
   const entry = cache.get(spaceId);

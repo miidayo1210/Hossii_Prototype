@@ -3,7 +3,7 @@ import type { Screen } from '../types';
 
 const parseHash = (hash: string): Screen => {
   const cleaned = hash.replace('#', '');
-  if (cleaned === 'post' || cleaned === 'screen' || cleaned === 'comments' || cleaned === 'spaces' || cleaned === 'profile' || cleaned === 'mylogs' || cleaned === 'account' || cleaned === 'settings' || cleaned === 'card' || cleaned === 'communities') {
+  if (cleaned === 'post' || cleaned === 'screen' || cleaned === 'comments' || cleaned === 'spaces' || cleaned === 'profile' || cleaned === 'mylogs' || cleaned === 'account' || cleaned === 'settings' || cleaned === 'card' || cleaned === 'communities' || cleaned === 'reflection') {
     return cleaned;
   }
   return 'screen';
