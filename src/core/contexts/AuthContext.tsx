@@ -287,9 +287,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return user;
     }
 
+    // OAuth 後に元のパス（/admin/login など）へ戻れるようにする
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo },
     });
     if (error) throw error;
     // OAuth はリダイレクトなので、ここには到達しない

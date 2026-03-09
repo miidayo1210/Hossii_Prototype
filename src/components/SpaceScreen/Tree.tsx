@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import type { ViewMode } from '../../core/utils/displayPrefsStorage';
@@ -37,6 +38,13 @@ function truncateText(text: string): string {
 
 // BubbleEditMode は外部で参照されないが後方互換のため残す
 export type BubbleEditMode = 'none' | 'moving' | 'resizing';
+
+type ResizeCorner = 'TL' | 'TR' | 'BL' | 'BR';
+
+function getCornerFromTarget(target: HTMLElement): ResizeCorner {
+  const handle = target.closest('[data-resize-handle]') as HTMLElement | null;
+  return (handle?.dataset.resizeHandle as ResizeCorner) ?? 'BR';
+}
 
 type BubbleProps = {
   hossii: Hossii;
@@ -90,11 +98,29 @@ export const Bubble = ({
 
   // いいねのローカル楽観的状態（インクリメント専用）
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isBouncing, setIsBouncing] = useState(false);
+
+  type LikeParticle = { id: string; emoji: string; tx: number };
+  const [likeParticles, setLikeParticles] = useState<LikeParticle[]>([]);
+
+  // I: 画像ライトボックス
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   // hossii.likeCount が外部から変わった場合（初回フェッチ完了後など）に同期
   useEffect(() => {
     setLocalLikeCount(hossii.likeCount ?? 0);
   }, [hossii.likeCount]);
+
+  // I: ライトボックス表示中の Escape キーで閉じる
+  useEffect(() => {
+    if (!lightboxSrc) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxSrc(null);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [lightboxSrc]);
 
   // stale closure 回避用 ref
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -119,6 +145,7 @@ export const Bubble = ({
   // ドラッグセッション管理
   const dragStateRef = useRef<{
     mode: 'moving' | 'resizing';
+    corner: ResizeCorner;
     startPX: number;
     startPY: number;
     startBX: number;
@@ -154,6 +181,7 @@ export const Bubble = ({
 
       dragStateRef.current = {
         mode: isResizeHandle ? 'resizing' : 'moving',
+        corner: isResizeHandle ? getCornerFromTarget(target) : 'BR',
         startPX: e.clientX,
         startPY: e.clientY,
         startBX: positionRef.current.x,
@@ -190,10 +218,13 @@ export const Bubble = ({
         dragPosRef.current = newPos;
         setDragPos({ ...newPos });
       } else {
-        // リサイズ: 右下方向に大きく = 拡大
-        const dX = e.clientX - startPX;
-        const dY = startPY - e.clientY; // 上に行くほど大きく
-        const delta = (dX + dY) / 2;
+        // リサイズ: 各コーナーから「外側」へ引くと拡大
+        const { corner } = dragStateRef.current;
+        const dX = e.clientX - startPX; // 右が正
+        const dY = e.clientY - startPY; // 下が正
+        const signX = (corner === 'TL' || corner === 'BL') ? -1 : 1;
+        const signY = (corner === 'TL' || corner === 'TR') ? -1 : 1;
+        const delta = (signX * dX + signY * dY) / 2;
         const newScale = Math.max(0.5, Math.min(2.5, startScale + delta * 0.006));
         dragScaleRef.current = newScale;
         setDragScale(newScale);
@@ -256,6 +287,13 @@ export const Bubble = ({
   const animationDelay = `${(index % 8) * 0.5}s`;
   const animationDuration = `${4 + (index % 3)}s`;
 
+  // フッター帯の表示制御
+  const hashtags = hossii.hashtags ?? [];
+  const MAX_VISIBLE_TAGS = 3;
+  const visibleTags = hashtags.slice(0, MAX_VISIBLE_TAGS);
+  const extraTagCount = hashtags.length - MAX_VISIBLE_TAGS;
+  const showFooter = viewMode === 'full' && (hashtags.length > 0 || likesEnabled);
+
   const isDragging = dragStateRef.current?.moved ?? false;
 
   const bubbleStyle: React.CSSProperties = {
@@ -270,16 +308,15 @@ export const Bubble = ({
     bubbleStyle.borderColor = hossii.bubbleColor;
   }
   if (bubbleShapePng) {
-    // PNGのアルファチャンネルを型紙として使用。borderRadius/borderは非表示になるためリセット
-    bubbleStyle.maskImage = `url(${bubbleShapePng})`;
-    bubbleStyle.WebkitMaskImage = `url(${bubbleShapePng})`;
-    bubbleStyle.maskSize = '100% 100%';
-    bubbleStyle.WebkitMaskSize = '100% 100%';
-    bubbleStyle.maskRepeat = 'no-repeat';
-    bubbleStyle.WebkitMaskRepeat = 'no-repeat';
+    // PNG はオーバーレイ <img> で描画するため mask-image は使わない。
+    // 背景色をフィルとして残し、border/backdrop-filter のみリセットする。
+    if (!hossii.bubbleColor) {
+      bubbleStyle.backgroundColor = 'rgba(255, 251, 235, 0.95)';
+    }
     bubbleStyle.borderRadius = '0';
     bubbleStyle.border = 'none';
     bubbleStyle.backdropFilter = 'none';
+    bubbleStyle.boxShadow = 'none';
   }
   if (displayScale !== 1.0) {
     bubbleStyle.scale = String(displayScale);
@@ -296,6 +333,7 @@ export const Bubble = ({
     .join(' ');
 
   return (
+    <>
     <div
       ref={containerRef}
       className={classNames}
@@ -311,11 +349,28 @@ export const Bubble = ({
         if (!isSelected) onActivate();
       }}
     >
-      <div className={styles.bubbleInner}>
+      {/* B02: 形状 PNG をフレームとしてオーバーレイ表示 */}
+      {bubbleShapePng && (
+        <img
+          src={bubbleShapePng}
+          className={styles.bubbleShapeOverlay}
+          alt=""
+          draggable={false}
+        />
+      )}
+
+      <div className={`${styles.bubbleInner} ${bubbleShapePng ? styles.bubbleInnerShaped : ''}`}>
         {/* --- viewMode: image → 画像のみ --- */}
         {viewMode === 'image' ? (
           hossii.imageUrl ? (
-            <img src={hossii.imageUrl} alt="投稿画像" className={styles.bubbleImage} loading="lazy" />
+            <img
+              src={hossii.imageUrl}
+              alt="投稿画像"
+              className={styles.bubbleImage}
+              loading="lazy"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); setLightboxSrc(hossii.imageUrl!); }}
+            />
           ) : null
         ) : (
           <>
@@ -334,46 +389,81 @@ export const Bubble = ({
                   alt="投稿画像"
                   className={styles.bubbleImage}
                   loading="lazy"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); setLightboxSrc(hossii.imageUrl!); }}
                 />
               )}
               {viewMode === 'full' && hossii.numberValue != null && (
                 <p className={styles.bubbleNumber}>📊 {hossii.numberValue}</p>
-              )}
-              {viewMode === 'full' && hossii.hashtags && hossii.hashtags.length > 0 && (
-                <div className={styles.bubbleHashtags}>
-                  {hossii.hashtags.map((tag) => (
-                    <span key={tag} className={styles.bubbleHashtag}>
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {viewMode === 'full' && likesEnabled && (
-                <button
-                  className={styles.likeButton}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLocalLikeCount((c) => c + 1);
-                    onLike?.(hossii.id);
-                  }}
-                  aria-label="いいね"
-                >
-                  ❤️ {localLikeCount > 0 && <span>{localLikeCount}</span>}
-                </button>
               )}
             </div>
           </>
         )}
       </div>
 
+      {/* フッター帯: タグ・いいね（full モードかつ該当要素がある場合のみ） */}
+      {showFooter && (
+        <div className={styles.bubbleFooter}>
+          <div className={styles.bubbleHashtags}>
+            {visibleTags.map((tag) => (
+              <span key={tag} className={styles.bubbleHashtag}>#{tag}</span>
+            ))}
+            {extraTagCount > 0 && (
+              <span className={styles.bubbleHashtagMore}>+{extraTagCount}</span>
+            )}
+          </div>
+          {likesEnabled && (
+            <div style={{ position: 'relative' }}>
+              {likeParticles.map((p) => (
+                <span
+                  key={p.id}
+                  className={styles.likeParticle}
+                  style={{ '--tx': `${p.tx}px` } as React.CSSProperties}
+                >
+                  {p.emoji}
+                </span>
+              ))}
+              <button
+                className={[
+                  styles.likeButton,
+                  isLiked ? styles.likeButtonActive : '',
+                  isBouncing ? styles.likeButtonBouncing : '',
+                ].filter(Boolean).join(' ')}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isBouncing) return;
+                  setLocalLikeCount((c) => c + 1);
+                  setIsLiked(true);
+                  setIsBouncing(true);
+                  setTimeout(() => setIsBouncing(false), 450);
+                  const LIKE_EMOJIS = ['❤️', '💛', '⭐', '✨'];
+                  const count = 3 + Math.floor(Math.random() * 3);
+                  const particles: LikeParticle[] = Array.from({ length: count }, (_, i) => ({
+                    id: `${Date.now()}-${i}`,
+                    emoji: LIKE_EMOJIS[Math.floor(Math.random() * LIKE_EMOJIS.length)],
+                    tx: Math.round((Math.random() - 0.5) * 40),
+                  }));
+                  setLikeParticles(particles);
+                  setTimeout(() => setLikeParticles([]), 750);
+                  onLike?.(hossii.id);
+                }}
+                aria-label="いいね"
+              >
+                ❤️ {localLikeCount > 0 && <span>{localLikeCount}</span>}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 選択時: 4コーナーのリサイズハンドル + カラーパレット（編集権限がある場合のみ） */}
       {isSelected && canEdit && (
         <>
-          <div className={`${styles.resizeHandle} ${styles.resizeHandleTL}`} data-resize-handle />
-          <div className={`${styles.resizeHandle} ${styles.resizeHandleTR}`} data-resize-handle />
-          <div className={`${styles.resizeHandle} ${styles.resizeHandleBL}`} data-resize-handle />
-          <div className={`${styles.resizeHandle} ${styles.resizeHandleBR}`} data-resize-handle />
+          <div className={`${styles.resizeHandle} ${styles.resizeHandleTL}`} data-resize-handle="TL" />
+          <div className={`${styles.resizeHandle} ${styles.resizeHandleTR}`} data-resize-handle="TR" />
+          <div className={`${styles.resizeHandle} ${styles.resizeHandleBL}`} data-resize-handle="BL" />
+          <div className={`${styles.resizeHandle} ${styles.resizeHandleBR}`} data-resize-handle="BR" />
 
           {/* カラーパレット */}
           <div
@@ -405,6 +495,27 @@ export const Bubble = ({
         </>
       )}
     </div>
+
+    {lightboxSrc && createPortal(
+      <div
+        className={styles.lightboxOverlay}
+        onClick={() => setLightboxSrc(null)}
+      >
+        <img
+          src={lightboxSrc}
+          alt="拡大表示"
+          className={styles.lightboxImage}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <button
+          className={styles.lightboxClose}
+          onClick={() => setLightboxSrc(null)}
+          aria-label="閉じる"
+        >✕</button>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 

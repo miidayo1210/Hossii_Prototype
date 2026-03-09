@@ -360,6 +360,59 @@
   box-shadow: 0 0 0 2px white, 0 0 0 4px #7c3aed;
 }
 
+/* B02: 吹き出し形状ピッカー */
+.shapePicker {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 0.5rem;
+  padding: 0.25rem 0 0.5rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.shapePicker::-webkit-scrollbar {
+  display: none;
+}
+
+.shapeThumb {
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.5rem;
+  border: 2px solid transparent;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  transition: transform 0.15s, border-color 0.15s;
+  outline: none;
+}
+
+.shapeThumb:hover {
+  transform: scale(1.1);
+}
+
+.shapeThumbSelected {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #7c3aed;
+  transform: scale(1.1);
+}
+
+.shapeThumbDefault {
+  font-size: 0.6rem;
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.shapeThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* F09: ハッシュタグ */
 .hashtagInputRow {
   display: flex;

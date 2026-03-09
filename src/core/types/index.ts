@@ -40,6 +40,8 @@ export type Hossii = {
   language?: LanguageCode; // 言語コード（自動生成されたログのみ）
   // F01: 吹き出し色
   bubbleColor?: string;
+  // B02: 吹き出し形状（投稿ごと）
+  bubbleShapePng?: string;
   // F09: ハッシュタグ（自由入力）
   hashtags?: string[];
   // T02: 投稿タグ（プリセットから選択）
@@ -77,6 +79,7 @@ export type AddHossiiInput = {
   autoType?: AutoType; // 自動投稿の種類
   language?: LanguageCode; // 言語コード
   bubbleColor?: string; // F01
+  bubbleShapePng?: string; // B02
   hashtags?: string[]; // F09
   tags?: string[]; // T02: プリセットタグ
   imageUrl?: string; // F10

@@ -232,6 +232,36 @@
   color: #9ca3af;
 }
 
+/* ---- カード内タグ ---- */
+.cardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 0.375rem;
+}
+
+.cardTag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* プリセットタグ（tags フィールド）: 紫 */
+.cardTagPreset {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+
+/* 自由入力タグ（hashtags フィールド）: グレー */
+.cardTagFree {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
 /* TODO: 将来的に channel に応じてカード背景色を変える */
 /* .cardSupport { background: #fdf2f8; } pink-50 */
 /* .cardQa { background: #eff6ff; } blue-50 */

@@ -11,6 +11,7 @@ import type { SpaceSettings } from '../../core/types/settings';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
+import { createBubblePosition } from '../../core/utils/bubblePosition';
 import { incrementLike } from '../../core/utils/likesApi';
 import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
 import { Bubble } from './Tree';
@@ -35,24 +36,6 @@ type Particle = {
   y: number;
 };
 
-
-// バブル位置生成（中央寄りに散らばる、画面端は避ける）
-function createBubblePosition(index: number): { x: number; y: number } {
-  // シード値としてindexを使い、deterministic なランダム風配置
-  const seed = (index * 7919 + 1) % 1000;
-  const seed2 = (index * 6271 + 3) % 1000;
-
-  // 中央寄りにする（2つの乱数の平均 → 自然な中央寄せ）
-  const r1 = seed / 1000;
-  const r2 = seed2 / 1000;
-
-  // 画面の 8% 〜 92% の範囲に配置（端を避ける）
-  const x = 8 + ((r1 + r2) / 2) * 84;
-  // 縦は 12% 〜 78% の範囲（上下ナビを避ける）
-  const y = 12 + ((r2 + (1 - r1)) / 2) * 66;
-
-  return { x, y };
-}
 
 /** リアクショントリガーの型 */
 type ReactionTrigger = {
@@ -130,9 +113,12 @@ export const SpaceScreen = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, [loadSettings]);
 
+  const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
+
   const handleLike = useCallback(async (hossiiId: string) => {
     try {
       await incrementLike(hossiiId);
+      setLikeReactionTrigger({ id: `like-${hossiiId}-${Date.now()}` });
     } catch (err) {
       console.error('[SpaceScreen] incrementLike error:', err);
     }
@@ -567,7 +553,7 @@ export const SpaceScreen = () => {
                 canEdit={canEditBubble(hossii)}
                 likesEnabled={spaceSettings?.features.likesEnabled ?? false}
                 onLike={handleLike}
-                bubbleShapePng={activeSpace?.bubbleShapePng}
+                bubbleShapePng={hossii.bubbleShapePng ?? activeSpace?.bubbleShapePng}
               />
             );
           })
@@ -597,6 +583,7 @@ export const SpaceScreen = () => {
           brainMessage={brainMessage?.text ?? null}
           hossiis={displayHossiis}
           readingEnabled={controlState.voiceEnabled}
+          onLikeTrigger={likeReactionTrigger?.id}
         />
       )}
 

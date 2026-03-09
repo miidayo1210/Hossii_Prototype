@@ -9,7 +9,8 @@ export type FeatureFlagKey =
   | 'likes_enabled'
   | 'random_recall_enabled'
   | 'public_board_mode'
-  | 'zine_export_enabled';
+  | 'zine_export_enabled'
+  | 'bubble_shapes_extended';
 
 export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 
@@ -32,11 +33,44 @@ type SpaceFeatureFlagRow = {
 };
 
 // ============================================================
+// localStorage フォールバック（Supabase 未設定時用）
+// ============================================================
+
+function localStorageKey(spaceId: string): string {
+  return `feature_flags_overrides_${spaceId}`;
+}
+
+function loadLocalOverrides(spaceId: string): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(localStorageKey(spaceId));
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalOverride(spaceId: string, flagKey: string, enabled: boolean): void {
+  const overrides = loadLocalOverrides(spaceId);
+  overrides[flagKey] = enabled;
+  localStorage.setItem(localStorageKey(spaceId), JSON.stringify(overrides));
+}
+
+function removeLocalOverride(spaceId: string, flagKey: string): void {
+  const overrides = loadLocalOverrides(spaceId);
+  delete overrides[flagKey];
+  if (Object.keys(overrides).length === 0) {
+    localStorage.removeItem(localStorageKey(spaceId));
+  } else {
+    localStorage.setItem(localStorageKey(spaceId), JSON.stringify(overrides));
+  }
+}
+
+// ============================================================
 // getFeatureFlagsForSpace
 // スペース単位のフラグを取得して、default + override をマージして返す
 //
-// 優先順位（A段階）: space_feature_flags.enabled > feature_flags.default_enabled
-// B段階では: user > space > tenant > default に拡張予定（docs/feature-flags.md 参照）
+// 優先順位: localStorage override > Supabase override > default
+// （Supabase が利用できない場合や RLS で読み取れない場合も localStorage が有効）
 // ============================================================
 export async function getFeatureFlagsForSpace(spaceId: string): Promise<FeatureFlags> {
   // Kill Switch が有効なら全フラグを false
@@ -44,9 +78,11 @@ export async function getFeatureFlagsForSpace(spaceId: string): Promise<FeatureF
     return buildAllFalse();
   }
 
-  // Supabase 未設定時（ローカル開発・テスト環境）はデフォルト値を返す
+  const localOverrides = loadLocalOverrides(spaceId);
+
+  // Supabase 未設定時（ローカル開発・テスト環境）は localStorage override + デフォルト値を返す
   if (!isSupabaseConfigured) {
-    return buildDefaults();
+    return castToFeatureFlags({ ...buildDefaults(), ...localOverrides });
   }
 
   try {
@@ -58,7 +94,7 @@ export async function getFeatureFlagsForSpace(spaceId: string): Promise<FeatureF
     if (defaultsError) throw defaultsError;
 
     // space_feature_flags テーブルからスペース固有の override を取得
-    const { data: overrides, error: overridesError } = await supabase
+    const { data: remoteOverrides, error: overridesError } = await supabase
       .from('space_feature_flags')
       .select('flag_key, enabled')
       .eq('space_id', spaceId);
@@ -71,22 +107,24 @@ export async function getFeatureFlagsForSpace(spaceId: string): Promise<FeatureF
       result[row.key] = row.default_enabled;
     }
 
-    // override で上書き
-    for (const row of (overrides ?? []) as SpaceFeatureFlagRow[]) {
+    // Supabase の override で上書き
+    for (const row of (remoteOverrides ?? []) as SpaceFeatureFlagRow[]) {
       result[row.flag_key] = row.enabled;
     }
 
-    return castToFeatureFlags(result);
+    // localStorage の override を最優先で上書き（Supabase 書き込み失敗時のフォールバック値）
+    return castToFeatureFlags({ ...result, ...localOverrides });
   } catch (err) {
-    // 取得失敗時はデフォルト値（全 false）にフォールバック
+    // 取得失敗時は localStorage override + デフォルト値にフォールバック
     console.warn('[FeatureFlags] Failed to fetch flags, falling back to defaults.', err);
-    return buildDefaults();
+    return castToFeatureFlags({ ...buildDefaults(), ...localOverrides });
   }
 }
 
 // ============================================================
 // setSpaceFeatureFlag
 // スペース単位のフラグを更新する（管理者UI用）
+// Supabase 未設定時・書き込みエラー時は localStorage にフォールバック保存する
 // ============================================================
 export async function setSpaceFeatureFlag(
   spaceId: string,
@@ -94,14 +132,28 @@ export async function setSpaceFeatureFlag(
   enabled: boolean,
   updatedBy?: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('space_feature_flags')
-    .upsert(
-      { space_id: spaceId, flag_key: flagKey, enabled, updated_by: updatedBy ?? null },
-      { onConflict: 'space_id,flag_key' },
-    );
+  // Supabase 未設定時は localStorage のみに保存
+  if (!isSupabaseConfigured) {
+    saveLocalOverride(spaceId, flagKey, enabled);
+    return;
+  }
 
-  if (error) throw error;
+  try {
+    const { error } = await supabase
+      .from('space_feature_flags')
+      .upsert(
+        { space_id: spaceId, flag_key: flagKey, enabled, updated_by: updatedBy ?? null },
+        { onConflict: 'space_id,flag_key' },
+      );
+
+    if (error) throw error;
+    // Supabase 書き込み成功時は localStorage の同キーを削除（Supabase を正とする）
+    removeLocalOverride(spaceId, flagKey);
+  } catch (err) {
+    // RLS 等で Supabase 書き込みが失敗した場合は localStorage にフォールバック
+    console.warn('[FeatureFlags] Supabase write failed, falling back to localStorage.', err);
+    saveLocalOverride(spaceId, flagKey, enabled);
+  }
 }
 
 // ============================================================
@@ -116,6 +168,7 @@ function buildDefaults(): FeatureFlags {
     random_recall_enabled: false,
     public_board_mode: false,
     zine_export_enabled: false,
+    bubble_shapes_extended: false,
   };
 }
 
@@ -126,6 +179,7 @@ function buildAllFalse(): FeatureFlags {
     random_recall_enabled: false,
     public_board_mode: false,
     zine_export_enabled: false,
+    bubble_shapes_extended: false,
   };
 }
 
@@ -136,5 +190,6 @@ function castToFeatureFlags(raw: Record<string, boolean>): FeatureFlags {
     random_recall_enabled: raw['random_recall_enabled'] ?? false,
     public_board_mode: raw['public_board_mode'] ?? false,
     zine_export_enabled: raw['zine_export_enabled'] ?? false,
+    bubble_shapes_extended: raw['bubble_shapes_extended'] ?? false,
   };
 }

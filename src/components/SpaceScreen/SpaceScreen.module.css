@@ -318,11 +318,18 @@
   overflow: visible !important;
 }
 
-/* カスタム形状PNG使用時（mask-imageによりborderが非表示になるためdrop-shadowで代替） */
+/* カスタム形状バブル: PNG フレームオーバーレイ方式 */
 .bubbleCustomShape {
   border-radius: 0 !important;
   border: none !important;
   backdrop-filter: none !important;
+  box-shadow: none !important;
+  /* 正方形に固定してフレーム PNG と比率を合わせる */
+  width: 190px !important;
+  max-width: 190px !important;
+  min-height: 190px !important;
+  padding: 0 !important;
+  /* overflow: hidden は使わない（カラーパレット・リサイズハンドルがクリップされるため） */
 }
 
 .bubbleCustomShape.bubbleActive {
@@ -335,7 +342,35 @@
   z-index: 30;
   animation: none !important;
   cursor: grab;
-  overflow: visible !important;
+  overflow: visible;
+}
+
+/* B02: PNG フレームオーバーレイ */
+.bubbleShapeOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  z-index: 1;
+  display: block;
+}
+
+/* カスタム形状のコンテンツ: PNG より前面・中央寄せ */
+.bubbleInnerShaped {
+  position: relative;
+  z-index: 2;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center;
+  width: 100%;
+  min-height: 190px;
+  padding: 1.5rem 1rem;
+  box-sizing: border-box;
+  gap: 0.25rem !important;
 }
 
 /* F04: ドラッグ中バブル */
@@ -354,6 +389,14 @@
   object-fit: cover;
   border-radius: 0.75rem;
   margin-top: 0.5rem;
+  cursor: zoom-in;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.bubbleImage:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  z-index: 1;
 }
 
 /* F09: ハッシュタグ表示 */
@@ -364,29 +407,72 @@
   margin: 0.25rem 0 0 0;
 }
 
+/* フッター帯: タグ・いいね */
+.bubbleFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+  height: auto;
+  padding: 4px 4px 0;
+  margin-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  gap: 4px;
+}
+
 .bubbleHashtags {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 0.25rem;
-  margin-top: 0.375rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .bubbleHashtag {
-  font-size: 0.625rem;
+  font-size: 10px;
   color: #6d28d9;
   background: rgba(167, 139, 250, 0.15);
   padding: 0.1rem 0.4rem;
   border-radius: 9999px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* いいねボタン（吹き出し右下に配置） */
+.bubbleHashtagMore {
+  font-size: 10px;
+  color: #6d28d9;
+  opacity: 0.7;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* いいねボタン アニメーション */
+@keyframes likePulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.06); }
+}
+
+@keyframes likeBounce {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(0.82); }
+  55%  { transform: scale(1.18); }
+  80%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@keyframes likeParticle {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  80%  { opacity: 0.6; }
+  100% { transform: translate(var(--tx), -44px) scale(0.4); opacity: 0; }
+}
+
+/* いいねボタン（フッター帯内） */
 .likeButton {
   display: flex;
   align-items: center;
   gap: 0.2rem;
-  margin-top: 0.35rem;
-  margin-left: auto;
-  width: fit-content;
+  flex-shrink: 0;
   padding: 0.15rem 0.5rem;
   background: transparent;
   border: 1px solid rgba(0, 0, 0, 0.12);
@@ -394,17 +480,33 @@
   font-size: 0.7rem;
   cursor: pointer;
   color: #6b7280;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  animation: likePulse 2.4s ease-in-out infinite;
 }
 
 .likeButton:hover {
+  transform: scale(1.12);
+  animation: none;
   background: rgba(239, 68, 68, 0.08);
+}
+
+.likeButtonBouncing {
+  animation: likeBounce 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
 }
 
 .likeButtonActive {
   color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.likeParticle {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  font-size: 13px;
+  pointer-events: none;
+  animation: likeParticle 0.65s ease-out forwards;
 }
 
 /* F05: リサイズハンドル（4コーナー共通） */
@@ -647,4 +749,35 @@
 
 .decorationPopupClose:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+/* I: 画像ライトボックス */
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.lightboxImage {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 24px;
+  color: white;
+  background: none;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
 }

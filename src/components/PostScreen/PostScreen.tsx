@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { addStamp } from '../../core/utils/stampStorage';
 import { upsertStampCount } from '../../core/utils/stampsApi';
@@ -16,6 +17,25 @@ import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { EmotionKey, ToastState } from '../../core/types';
 import styles from './PostScreen.module.css';
+
+// B02: 吹き出し形状プリセット（14種）
+type BubbleShapePreset = { path: string; label: string };
+const BUBBLE_SHAPE_PRESETS: BubbleShapePreset[] = [
+  { path: '/assets/bubble-shapes/Hossiiコメ枠ハート.png', label: 'ハート' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠雲.png', label: '雲' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠風船.png', label: '風船' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠葉っぱ.png', label: '葉っぱ' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠雫.png', label: '雫' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠付箋小.png', label: '付箋' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠メモ大.png', label: 'メモ' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠ネコ.png', label: 'ネコ' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠金魚.png', label: '金魚' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠いるか.png', label: 'いるか' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠イチョウ.png', label: 'イチョウ' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠コウモリ.png', label: 'コウモリ' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠絵馬.png', label: '絵馬' },
+  { path: '/assets/bubble-shapes/Hossiiコメ枠紙ひこうき.png', label: '紙ひこうき' },
+];
 
 // F01: 吹き出し色プリセット
 const BUBBLE_COLOR_PRESETS = [
@@ -70,6 +90,9 @@ export const PostScreen = () => {
   // F01: 吹き出し色
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
+  // B02: 吹き出し形状
+  const [selectedShape, setSelectedShape] = useState<string | null>(null);
+
   // F09: ハッシュタグ
   const [hashtagInput, setHashtagInput] = useState('');
   const [hashtags, setHashtags] = useState<string[]>([]);
@@ -90,6 +113,7 @@ export const PostScreen = () => {
   const { showHossii } = state;
   const { navigate } = useRouter();
   const { currentUser } = useAuth();
+  const { flags: featureFlags } = useFeatureFlags(state.activeSpaceId ?? undefined);
 
   // スペース設定の読み込み
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
@@ -271,6 +295,7 @@ export const PostScreen = () => {
         message: message.trim(),
         emotion: selectedEmotion ?? undefined,
         bubbleColor: selectedColor ?? undefined,
+        bubbleShapePng: selectedShape ?? undefined,
         hashtags: allHashtags.length > 0 ? allHashtags : undefined,
         tags: selectedPresetTags.length > 0 ? selectedPresetTags : undefined,
         imageUrl,
@@ -301,6 +326,7 @@ export const PostScreen = () => {
       setSelectedEmotion(null);
       setMessage('');
       setSelectedColor(null);
+      setSelectedShape(null);
       setHashtags([]);
       setHashtagInput('');
       setSelectedPresetTags([]);
@@ -414,6 +440,36 @@ export const PostScreen = () => {
             ))}
           </div>
         </div>
+
+        {/* B02: 吹き出し形状選択（bubble_shapes_extended が ON の場合のみ） */}
+        {featureFlags.bubble_shapes_extended && (
+          <div className={styles.section}>
+            <div className={styles.label}>吹き出しの形（任意）</div>
+            <div className={styles.shapePicker}>
+              <button
+                type="button"
+                className={`${styles.shapeThumb} ${selectedShape === null ? styles.shapeThumbSelected : ''}`}
+                onClick={() => setSelectedShape(null)}
+                title="デフォルト"
+                aria-label="デフォルト形状"
+              >
+                <span className={styles.shapeThumbDefault}>なし</span>
+              </button>
+              {BUBBLE_SHAPE_PRESETS.map((shape) => (
+                <button
+                  key={shape.path}
+                  type="button"
+                  className={`${styles.shapeThumb} ${selectedShape === shape.path ? styles.shapeThumbSelected : ''}`}
+                  onClick={() => setSelectedShape(selectedShape === shape.path ? null : shape.path)}
+                  title={shape.label}
+                  aria-label={`形状: ${shape.label}`}
+                >
+                  <img src={shape.path} alt={shape.label} className={styles.shapeThumbImg} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* F09: ハッシュタグ */}
         <div className={styles.section}>

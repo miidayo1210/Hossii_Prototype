@@ -15,6 +15,7 @@ import type { AppMode } from '../types/mode';
 import type { UserProfile, SpaceNicknames } from '../types/profile';
 import { DEFAULT_SPACE, DEFAULT_QUICK_EMOTIONS, DEFAULT_BACKGROUND } from '../types/space';
 import { generateId } from '../utils';
+import { createBubblePosition } from '../utils/bubblePosition';
 import {
   loadSpaces,
   saveSpaces,
@@ -635,9 +636,14 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       case 'UPDATE_HOSSII_FROM_REALTIME': {
         // Realtime の UPDATE イベント由来。localStorage は更新しない（Supabase が正）
         const updated = action.payload;
-        const newHossiis = state.hossiis.map((h) =>
-          h.id === updated.id ? updated : h
-        );
+        const newHossiis = state.hossiis.map((h) => {
+          if (h.id !== updated.id) return h;
+          // Supabase にまだカラムが存在しないフィールドは既存のローカル値を保持する
+          return {
+            ...updated,
+            bubbleShapePng: updated.bubbleShapePng ?? h.bubbleShapePng,
+          };
+        });
         return { ...state, hossiis: newHossiis };
       }
 
@@ -884,6 +890,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       input.authorNameOverride ??
       (getActiveNicknameFromState(currentState) || undefined);
 
+    // 投稿時に初期座標を確定する（同一スペース内の現在の投稿数をインデックスとして使用）
+    const spaceHossiiCount = stateRef.current.hossiis.filter(
+      (h) => h.spaceId === activeSpaceIdRef.current
+    ).length;
+    const initialPos = createBubblePosition(spaceHossiiCount);
+
     const newHossii: Hossii = {
       id: generateId(),
       message: msg,
@@ -898,10 +910,14 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       autoType: input.autoType,
       language: input.language,
       bubbleColor: input.bubbleColor,
+      bubbleShapePng: input.bubbleShapePng,
       hashtags: input.hashtags,
       tags: input.tags,
       imageUrl: input.imageUrl,
       numberValue: input.numberValue,
+      positionX: initialPos.x,
+      positionY: initialPos.y,
+      isPositionFixed: true,
     };
 
     // 楽観的更新（即時 UI 反映）

@@ -15,6 +15,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   random_recall_enabled: false,
   public_board_mode: false,
   zine_export_enabled: false,
+  bubble_shapes_extended: false,
 };
 
 function getCached(spaceId: string): FeatureFlags | null {

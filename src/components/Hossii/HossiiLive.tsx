@@ -26,6 +26,8 @@ type Props = {
   hossiis?: Hossii[];
   /** F07: 読み上げ ON/OFF（voiceEnabled と連動） */
   readingEnabled?: boolean;
+  /** いいね時のリアクショントリガー（値が変化するたびに反応） */
+  onLikeTrigger?: string | null;
 };
 
 /** Hossii のサイズ (CSS の width/height と一致させる) */
@@ -166,6 +168,7 @@ export function HossiiLive({
   brainMessage,
   hossiis = [],
   readingEnabled = false,
+  onLikeTrigger,
 }: Props) {
   // === State ===
   const [position, setPosition] = useState(getInitialPosition);
@@ -181,6 +184,16 @@ export function HossiiLive({
   // 表情状態（優先順位: interaction > reaction > idle）
   const [interactionFace, setInteractionFace] = useState<string | null>(null);
   const [reactionFace, setReactionFace] = useState<string | null>(null);
+
+  // いいねトリガーへの反応（喜び系表情を一時表示）
+  useEffect(() => {
+    if (!onLikeTrigger) return;
+    const joyFaces = ['joy', 'fun', 'laugh'] as EmotionKey[];
+    const face = getHossiiFace(joyFaces[Math.floor(Math.random() * joyFaces.length)]);
+    setReactionFace(face);
+    const timer = setTimeout(() => setReactionFace(null), 1200 + Math.random() * 300);
+    return () => clearTimeout(timer);
+  }, [onLikeTrigger]);
 
   // 表示する顔を優先順位で決定
   // interaction > reaction > listening > idle

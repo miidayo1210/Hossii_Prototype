@@ -64,6 +64,16 @@ const AppContent = () => {
   // 処理済みの spaceId を追跡（二重処理防止）
   const processedSpaceIdRef = useRef<string | null>(null);
 
+  // /admin/login にいて管理者ログイン済みの場合は管理画面へ自動遷移
+  useEffect(() => {
+    if (appRoute !== 'admin-login') return;
+    if (isResolvingAuth) return;
+    if (!currentUser?.isAdmin) return;
+    window.history.replaceState({}, '', '/');
+    setAppRoute('default');
+    navigate(currentUser.isSuperAdmin ? 'communities' : 'spaces');
+  }, [appRoute, currentUser, isResolvingAuth, navigate]);
+
   // Check if user needs onboarding (new user without profile)
   // 管理者はオンボーディング不要（コミュニティ名が表示名を兼ねる）
   // isResolvingAuth 中は onAuthStateChange の非同期解決が完了していないためスキップ
@@ -258,54 +268,13 @@ const AppContent = () => {
 
   // /admin/login パスの場合: 管理者ログイン画面を表示
   if (appRoute === 'admin-login') {
-    if (currentUser?.isAdmin) {
-      // 既にログイン済みの場合はログイン済み画面を表示し、進むかログアウトかを選ばせる
+    // ログイン済み管理者は useEffect で自動遷移するまでローディング表示
+    if (currentUser?.isAdmin || isResolvingAuth) {
       return (
         <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', height: '100dvh', gap: '16px',
+          minHeight: '100dvh',
           background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-          color: '#fff', fontFamily: 'sans-serif', textAlign: 'center', padding: '24px',
-        }}>
-          <div style={{ fontSize: '2.5rem' }}>✨</div>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>
-            すでにログインしています
-          </h2>
-          {currentUser.communityName && (
-            <p style={{ fontSize: '0.95rem', color: '#a5b4fc', margin: 0 }}>
-              {currentUser.communityName}
-            </p>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px', width: '100%', maxWidth: '240px' }}>
-            <button
-              onClick={() => {
-                window.history.replaceState({}, '', '/');
-                setAppRoute('default');
-                navigate(currentUser.isSuperAdmin ? 'communities' : 'spaces');
-              }}
-              style={{
-                padding: '12px 24px', borderRadius: '8px', border: 'none',
-                background: '#6366f1', color: '#fff', fontSize: '0.95rem',
-                cursor: 'pointer', fontWeight: 600,
-              }}
-            >
-              管理画面へ進む
-            </button>
-            <button
-              onClick={async () => {
-                try { await logout(); } catch { /* ignore */ }
-                window.history.replaceState({}, '', '/admin/login');
-              }}
-              style={{
-                padding: '12px 24px', borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.3)', background: 'transparent',
-                color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem', cursor: 'pointer',
-              }}
-            >
-              別のアカウントでログイン
-            </button>
-          </div>
-        </div>
+        }} />
       );
     }
     return (

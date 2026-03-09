@@ -166,12 +166,18 @@ export async function updateHossiiPosition(
 ): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  const { error } = await supabase
-    .from('hossiis')
-    .update({ position_x: positionX, position_y: positionY, is_position_fixed: true })
-    .eq('id', id);
+  const doUpdate = () =>
+    supabase
+      .from('hossiis')
+      .update({ position_x: positionX, position_y: positionY, is_position_fixed: true })
+      .eq('id', id);
+
+  const { error } = await doUpdate();
   if (error) {
-    console.error('[hossiisApi] updateHossiiPosition error:', error.message);
+    const { error: retryError } = await doUpdate();
+    if (retryError) {
+      console.warn('[hossiisApi] updateHossiiPosition retry failed:', retryError.message);
+    }
   }
 }
 

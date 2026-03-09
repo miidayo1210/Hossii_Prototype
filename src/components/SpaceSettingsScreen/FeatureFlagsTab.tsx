@@ -35,6 +35,11 @@ const FLAG_LIST: FlagMeta[] = [
     label: 'ZINE出力',
     description: '月次の振り返りレポートをPDFで出力します（実装予定）。',
   },
+  {
+    key: 'bubble_shapes_extended',
+    label: '吹き出し形状カスタマイズ',
+    description: '投稿ごとに吹き出しの形を選択できるようにします。',
+  },
 ];
 
 export const FeatureFlagsTab = ({ spaceId }: Props) => {
