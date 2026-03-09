@@ -441,6 +441,44 @@
   color: #ef4444;
 }
 
+/* プリセットタグ選択チップ */
+.presetTagsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.presetTagChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: #f3f0ff;
+  color: #6d28d9;
+  border: 1.5px solid #ddd6fe;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.presetTagChip:hover {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+}
+
+.presetTagChipSelected {
+  background: #7c3aed;
+  color: #fff;
+  border-color: #7c3aed;
+}
+
+.presetTagChipSelected:hover {
+  background: #6d28d9;
+  border-color: #6d28d9;
+}
+
 /* Mobile: Bottom nav padding */
 @media (max-width: 768px) {
   .container {

@@ -53,8 +53,10 @@ const GREETING_POOL = [
 ];
 
 // F09: テキストから #タグ を抽出
+// 全角 ＃ を半角 # に正規化してからマッチする
 function parseHashtags(text: string): string[] {
-  const matches = text.match(/#[\p{L}\p{N}_]+/gu) ?? [];
+  const normalized = text.replace(/＃/g, '#');
+  const matches = normalized.match(/#[\p{L}\p{N}_]+/gu) ?? [];
   return [...new Set(matches.map((t) => t.slice(1)))];
 }
 
@@ -71,6 +73,7 @@ export const PostScreen = () => {
   // F09: ハッシュタグ
   const [hashtagInput, setHashtagInput] = useState('');
   const [hashtags, setHashtags] = useState<string[]>([]);
+  const [selectedPresetTags, setSelectedPresetTags] = useState<string[]>([]);
 
   // F10: 画像投稿
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -118,6 +121,9 @@ export const PostScreen = () => {
     const activeSpace = getActiveSpace();
     return activeSpace?.quickEmotions ?? DEFAULT_QUICK_EMOTIONS;
   }, [getActiveSpace]);
+
+  // activeSpace からプリセットタグを取得（state から直接読み取り）
+  const presetTags = state.spaces.find((s) => s.id === state.activeSpaceId)?.presetTags ?? [];
 
   // quickEmotions からボタンデータを生成
   const emotionButtons = useMemo(() => {
@@ -194,6 +200,8 @@ export const PostScreen = () => {
 
   // F09: ハッシュタグ追加
   const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // IME 変換中（日本語入力の途中）は無視する
+    if (e.isComposing) return;
     if (e.key === 'Enter' || e.key === ' ' || e.key === '　') {
       e.preventDefault();
       addHashtagFromInput();
@@ -201,7 +209,8 @@ export const PostScreen = () => {
   };
 
   const addHashtagFromInput = () => {
-    const raw = hashtagInput.trim().replace(/^#/, '');
+    // 全角 ＃ も半角 # と同様に先頭から除去する
+    const raw = hashtagInput.trim().replace(/^[#＃]+/, '');
     if (!raw) return;
     if (!hashtags.includes(raw)) {
       setHashtags((prev) => [...prev, raw]);
@@ -211,6 +220,14 @@ export const PostScreen = () => {
 
   const removeHashtag = (tag: string) => {
     setHashtags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  // プリセットタグのトグル（# 付き文字列を # なしで管理）
+  const togglePresetTag = (tagWithHash: string) => {
+    const raw = tagWithHash.replace(/^#/, '');
+    setSelectedPresetTags((prev) =>
+      prev.includes(raw) ? prev.filter((t) => t !== raw) : [...prev, raw]
+    );
   };
 
   const handleSubmit = async () => {
@@ -227,7 +244,7 @@ export const PostScreen = () => {
     setSending(true);
 
     try {
-      // F09: メッセージ本文からもハッシュタグを抽出してマージ
+      // F09: メッセージ本文からもハッシュタグを抽出してマージ（自由入力のみ）
       const parsedFromMessage = parseHashtags(message);
       const allHashtags = [...new Set([...hashtags, ...parsedFromMessage])];
 
@@ -255,6 +272,7 @@ export const PostScreen = () => {
         emotion: selectedEmotion ?? undefined,
         bubbleColor: selectedColor ?? undefined,
         hashtags: allHashtags.length > 0 ? allHashtags : undefined,
+        tags: selectedPresetTags.length > 0 ? selectedPresetTags : undefined,
         imageUrl,
         numberValue: hasNumber ? parsedNumber! : undefined,
       });
@@ -285,6 +303,7 @@ export const PostScreen = () => {
       setSelectedColor(null);
       setHashtags([]);
       setHashtagInput('');
+      setSelectedPresetTags([]);
       setNumberInput('');
       handleImageRemove();
       shuffleGreeting();
@@ -399,6 +418,27 @@ export const PostScreen = () => {
         {/* F09: ハッシュタグ */}
         <div className={styles.section}>
           <div className={styles.label}>ハッシュタグ（任意）</div>
+
+          {/* プリセットタグ（スペースに登録されている場合のみ表示） */}
+          {presetTags.length > 0 && (
+            <div className={styles.presetTagsRow}>
+              {presetTags.map((tag) => {
+                const raw = tag.replace(/^#/, '');
+                const isSelected = selectedPresetTags.includes(raw);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => togglePresetTag(tag)}
+                    className={`${styles.presetTagChip} ${isSelected ? styles.presetTagChipSelected : ''}`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className={styles.hashtagInputRow}>
             <span className={styles.hashtagPrefix}>#</span>
             <input

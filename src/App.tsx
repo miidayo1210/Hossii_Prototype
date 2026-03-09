@@ -60,14 +60,6 @@ const AppContent = () => {
     window.location.pathname === '/admin/login' ? 'admin-login' : 'default'
   );
 
-  // 管理者ログイン済みで /admin/login にアクセスした場合は useEffect でリダイレクト
-  useEffect(() => {
-    if (appRoute === 'admin-login' && currentUser?.isAdmin) {
-      window.history.replaceState({}, '', '/');
-      navigate(currentUser.isSuperAdmin ? 'communities' : 'spaces');
-      setAppRoute('default');
-    }
-  }, [appRoute, currentUser, navigate]);
 
   // 処理済みの spaceId を追跡（二重処理防止）
   const processedSpaceIdRef = useRef<string | null>(null);
@@ -267,8 +259,54 @@ const AppContent = () => {
   // /admin/login パスの場合: 管理者ログイン画面を表示
   if (appRoute === 'admin-login') {
     if (currentUser?.isAdmin) {
-      // useEffect でリダイレクト中 → 一時的に何も表示しない（すぐに遷移する）
-      return null;
+      // 既にログイン済みの場合はログイン済み画面を表示し、進むかログアウトかを選ばせる
+      return (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', height: '100dvh', gap: '16px',
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+          color: '#fff', fontFamily: 'sans-serif', textAlign: 'center', padding: '24px',
+        }}>
+          <div style={{ fontSize: '2.5rem' }}>✨</div>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>
+            すでにログインしています
+          </h2>
+          {currentUser.communityName && (
+            <p style={{ fontSize: '0.95rem', color: '#a5b4fc', margin: 0 }}>
+              {currentUser.communityName}
+            </p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px', width: '100%', maxWidth: '240px' }}>
+            <button
+              onClick={() => {
+                window.history.replaceState({}, '', '/');
+                setAppRoute('default');
+                navigate(currentUser.isSuperAdmin ? 'communities' : 'spaces');
+              }}
+              style={{
+                padding: '12px 24px', borderRadius: '8px', border: 'none',
+                background: '#6366f1', color: '#fff', fontSize: '0.95rem',
+                cursor: 'pointer', fontWeight: 600,
+              }}
+            >
+              管理画面へ進む
+            </button>
+            <button
+              onClick={async () => {
+                try { await logout(); } catch { /* ignore */ }
+                window.history.replaceState({}, '', '/admin/login');
+              }}
+              style={{
+                padding: '12px 24px', borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.3)', background: 'transparent',
+                color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem', cursor: 'pointer',
+              }}
+            >
+              別のアカウントでログイン
+            </button>
+          </div>
+        </div>
+      );
     }
     return (
       <AdminLoginScreen

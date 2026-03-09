@@ -67,6 +67,10 @@ export type Space = {
   decorations?: SpaceDecoration[];  // A02: スペース装飾（掲示板など）
   isPrivate?: boolean;              // 非公開スペース（内省スペースなど個人利用向け）
   bubbleShapePng?: string;          // 吹き出しのカスタム形状PNGパス（例: "/assets/bubble-shapes/speech.png"）
+  // T01: スペースで使えるタグ候補（管理者が登録）
+  //   投稿UIのワンタップ選択候補・ログ一覧フィルタの元データとして使用。
+  //   各投稿に実際についたタグは hossiis.tags（フェーズ2で追加予定）に分離して管理する。
+  presetTags?: string[];
 };
 
 // 背景画像の保存上限

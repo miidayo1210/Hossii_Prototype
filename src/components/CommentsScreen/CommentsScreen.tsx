@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { Tag, X } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { renderHossiiText } from '../../core/utils/render';
 import { loadFilters, saveFilters, type HossiiFilters } from '../../core/utils/filterStorage';
@@ -67,6 +68,10 @@ export const CommentsScreen = () => {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
+  // タグフィルター
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+
   useEffect(() => {
     if (!lightboxUrl) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -87,6 +92,17 @@ export const CommentsScreen = () => {
 
   // アクティブなスペースのログのみ取得
   const hossiis = getActiveSpaceHossiis();
+
+  // タグフィルター候補: presetTags ＋ 投稿に実際についているタグ
+  const activeSpace = state.spaces.find((s) => s.id === activeSpaceId);
+  const allTagCandidates = useMemo(() => {
+    const set = new Set<string>(activeSpace?.presetTags ?? []);
+    hossiis.forEach((h) => {
+      h.tags?.forEach((t) => set.add(`#${t}`));
+      h.hashtags?.forEach((t) => set.add(`#${t}`));
+    });
+    return Array.from(set).sort();
+  }, [activeSpace?.presetTags, hossiis]);
 
   // likes_enabled フラグが ON のときにいいね済みIDを取得
   useEffect(() => {
@@ -116,8 +132,16 @@ export const CommentsScreen = () => {
     const sorted = [...hossiis].sort(
       (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
     );
-    return applyFilters(sorted, filters);
-  }, [hossiis, filters]);
+    let result = applyFilters(sorted, filters);
+    if (selectedTags.length > 0) {
+      const raw = selectedTags.map((t) => t.replace(/^#/, ''));
+      result = result.filter((h) => {
+        const searchIn = h.tags ?? h.hashtags;
+        return raw.some((t) => searchIn?.includes(t));
+      });
+    }
+    return result;
+  }, [hossiis, filters, selectedTags]);
 
   return (
     <div className={styles.container}>
@@ -135,6 +159,57 @@ export const CommentsScreen = () => {
         </div>
         <div className={styles.filterContainer}>
           <FilterBar filters={filters} onFilterChange={handleFilterChange} />
+          {/* タグフィルター（タグが1件以上ある場合のみ表示） */}
+          {allTagCandidates.length > 0 && (
+            <div className={styles.tagFilterRow}>
+              {selectedTags.map((tag) => (
+                <span key={tag} className={styles.tagActiveChip}>
+                  <Tag size={10} />
+                  {tag}
+                  <button
+                    type="button"
+                    className={styles.tagActiveRemove}
+                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                    aria-label={`${tag} のフィルターを解除`}
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              ))}
+              <div className={styles.tagDropdownWrapper}>
+                <button
+                  type="button"
+                  className={styles.tagSelectButton}
+                  onClick={() => setTagDropdownOpen((v) => !v)}
+                >
+                  <Tag size={12} />
+                  タグで絞り込む
+                </button>
+                {tagDropdownOpen && (
+                  <div className={styles.tagDropdown}>
+                    {allTagCandidates
+                      .filter((tag) => !selectedTags.includes(tag))
+                      .map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={styles.tagDropdownItem}
+                          onClick={() => {
+                            setSelectedTags((prev) => [...prev, tag]);
+                            setTagDropdownOpen(false);
+                          }}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    {allTagCandidates.every((tag) => selectedTags.includes(tag)) && (
+                      <span className={styles.tagDropdownEmpty}>すべて選択済み</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -198,6 +273,20 @@ export const CommentsScreen = () => {
                         >
                           📎 画像を開く
                         </a>
+                      )}
+                      {((hossii.tags?.length ?? 0) > 0 || (hossii.hashtags?.length ?? 0) > 0) && (
+                        <div className={styles.cardTags}>
+                          {hossii.tags?.map((tag) => (
+                            <span key={`t-${tag}`} className={`${styles.cardTag} ${styles.cardTagPreset}`}>
+                              #{tag}
+                            </span>
+                          ))}
+                          {hossii.hashtags?.map((tag) => (
+                            <span key={`h-${tag}`} className={`${styles.cardTag} ${styles.cardTagFree}`}>
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
                       )}
                       <div className={styles.meta}>
                         <span className={styles.time}>{timestamp}</span>

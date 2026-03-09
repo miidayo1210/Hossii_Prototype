@@ -14,6 +14,7 @@ type SpaceRow = {
   saved_background_images: string[] | null;
   created_at: string;
   is_private?: boolean | null;
+  preset_tags?: string[] | null;
 };
 
 // SpaceRow → Space（camelCase）
@@ -28,6 +29,7 @@ function rowToSpace(row: SpaceRow): Space {
     savedBackgroundImages: row.saved_background_images ?? undefined,
     createdAt: new Date(row.created_at),
     isPrivate: row.is_private ?? undefined,
+    presetTags: row.preset_tags ?? undefined,
   };
 }
 
@@ -42,6 +44,7 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
     background: space.background ?? { kind: 'pattern', value: 'mist' },
     saved_background_images: space.savedBackgroundImages ?? null,
     created_at: space.createdAt.toISOString(),
+    preset_tags: space.presetTags ?? null,
   };
 }
 
@@ -97,12 +100,26 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   if (patch.background !== undefined) updateObj.background = patch.background;
   if (patch.savedBackgroundImages !== undefined) updateObj.saved_background_images = patch.savedBackgroundImages ?? null;
   if (patch.isPrivate !== undefined) updateObj.is_private = patch.isPrivate ?? null;
+  if (patch.presetTags !== undefined) updateObj.preset_tags = patch.presetTags ?? null;
 
   if (Object.keys(updateObj).length === 0) return;
 
-  const { error } = await supabase.from('spaces').update(updateObj).eq('id', id);
+  // 開発用デバッグ: 認証状態を確認（RLS による silent fail の切り分け用）
+  const { data: authData } = await supabase.auth.getUser();
+  console.log('[auth] updateSpaceInDb 実行時のユーザー:', authData?.user?.id ?? 'NULL (未認証 → RLS で UPDATE がブロックされる可能性あり)');
+
+  const { data, error } = await supabase
+    .from('spaces')
+    .update(updateObj)
+    .eq('id', id)
+    .select();
+
   if (error) {
-    console.error('[spacesApi] updateSpaceInDb error:', error.message);
+    console.error('[spacesApi] updateSpaceInDb error:', error.message, error);
+    throw new Error(error.message);
+  }
+  if (!data || data.length === 0) {
+    console.warn('[spacesApi] updateSpaceInDb: 0 rows updated (RLS ブロックまたは ID 不一致の可能性)', { id, patch });
   }
 }
 

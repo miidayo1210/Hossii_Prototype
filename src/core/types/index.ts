@@ -40,8 +40,13 @@ export type Hossii = {
   language?: LanguageCode; // 言語コード（自動生成されたログのみ）
   // F01: 吹き出し色
   bubbleColor?: string;
-  // F09: ハッシュタグ
+  // F09: ハッシュタグ（自由入力）
   hashtags?: string[];
+  // T02: 投稿タグ（プリセットから選択）
+  //   スペースの preset_tags から選択して付与するタグ。
+  //   保存先は hossiis テーブルの tags カラム（jsonb）。
+  //   ログ一覧フィルタリングの実際の対象になる。
+  tags?: string[];
   // F10: 画像投稿
   imageUrl?: string;
   // F02/F04: 吹き出し座標固定
@@ -73,6 +78,7 @@ export type AddHossiiInput = {
   language?: LanguageCode; // 言語コード
   bubbleColor?: string; // F01
   hashtags?: string[]; // F09
+  tags?: string[]; // T02: プリセットタグ
   imageUrl?: string; // F10
   numberValue?: number; // numberPost
 };

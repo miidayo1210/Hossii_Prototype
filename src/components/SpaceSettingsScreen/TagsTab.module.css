@@ -1,0 +1,171 @@
+.container {
+  padding: 24px;
+  max-width: 600px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px;
+}
+
+.description {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 24px;
+  line-height: 1.6;
+}
+
+.inputSection {
+  margin-bottom: 24px;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hashPrefix {
+  font-size: 18px;
+  font-weight: 600;
+  color: #7c3aed;
+  line-height: 1;
+}
+
+.input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1a1a2e;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: #7c3aed;
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 0 16px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.addButton:hover {
+  background: #6d28d9;
+}
+
+.addButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.error {
+  font-size: 12px;
+  color: #ef4444;
+  margin: 6px 0 0;
+}
+
+.hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 6px 0 0;
+}
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 5px 8px;
+  background: #f3f0ff;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tagIcon {
+  opacity: 0.6;
+}
+
+.removeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 2px;
+  background: none;
+  border: none;
+  color: #6d28d9;
+  cursor: pointer;
+  border-radius: 50%;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.removeButton:hover {
+  opacity: 1;
+  background: #ddd6fe;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0 0 24px;
+}
+
+.footer {
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.saveButton {
+  height: 40px;
+  padding: 0 24px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.saveButton:hover {
+  background: #6d28d9;
+}
+
+.saveButtonSaved {
+  background: #10b981;
+}
+
+.saveButtonSaved:hover {
+  background: #059669;
+}

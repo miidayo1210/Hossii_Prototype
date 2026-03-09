@@ -1,24 +1,40 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Eye, EyeOff, Search } from 'lucide-react';
+import { Eye, EyeOff, Search, Tag, X } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { fetchAllHossiisForModeration } from '../../core/utils/hossiisApi';
 import type { Hossii } from '../../core/types';
+import type { Space } from '../../core/types/space';
 import styles from './ModerationTab.module.css';
 
 type FilterMode = 'visible' | 'hidden' | 'all';
 
 type Props = {
   spaceId: string;
+  space?: Space;
 };
 
-export const ModerationTab = ({ spaceId }: Props) => {
+export const ModerationTab = ({ spaceId, space }: Props) => {
   const { state, hideHossii, restoreHossii } = useHossiiStore();
   const { currentUser } = useAuth();
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [keyword, setKeyword] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+
+  const presetTags = space?.presetTags ?? [];
+
+  // フィルタ候補: presetTags ＋ 投稿に実際についているタグ（tags / hashtags）を収集
+  const allTagCandidates = useMemo(() => {
+    const set = new Set<string>(presetTags); // "#感想" 形式
+    spaceHossiis.forEach((h) => {
+      h.tags?.forEach((t) => set.add(`#${t}`));
+      h.hashtags?.forEach((t) => set.add(`#${t}`));
+    });
+    return Array.from(set).sort();
+  }, [presetTags, spaceHossiis]);
 
   // ページリロード後も非表示投稿を確認・復元できるよう、DB から全件取得する
   const [dbHossiis, setDbHossiis] = useState<Hossii[]>([]);
@@ -55,10 +71,18 @@ export const ModerationTab = ({ spaceId }: Props) => {
           to.setHours(23, 59, 59, 999);
           if (h.createdAt > to) return false;
         }
+        if (selectedTags.length > 0) {
+          // OR 条件: 選択タグのいずれかを含む投稿のみ
+          // tags（プリセット選択）を優先し、未設定の場合は hashtags にフォールバック（移行期対応）
+          const raw = selectedTags.map((t) => t.replace(/^#/, ''));
+          const searchIn = h.tags ?? h.hashtags;
+          const hasTag = raw.some((t) => searchIn?.includes(t));
+          if (!hasTag) return false;
+        }
         return true;
       })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [spaceHossiis, filterMode, keyword, dateFrom, dateTo]);
+  }, [spaceHossiis, filterMode, keyword, dateFrom, dateTo, selectedTags]);
 
   const handleHide = (id: string) => {
     if (!window.confirm('この投稿を非表示にしますか？')) return;
@@ -132,6 +156,60 @@ export const ModerationTab = ({ spaceId }: Props) => {
             title="終了日"
           />
         </div>
+
+        {/* タグフィルター（タグが1件以上ある場合のみ表示） */}
+        {allTagCandidates.length > 0 && (
+          <div className={styles.tagFilterRow}>
+            <div className={styles.tagFilterChips}>
+              {selectedTags.map((tag) => (
+                <span key={tag} className={styles.tagFilterChip}>
+                  <Tag size={11} />
+                  {tag}
+                  <button
+                    type="button"
+                    className={styles.tagFilterRemove}
+                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                    aria-label={`${tag} のフィルターを解除`}
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+              <div className={styles.tagDropdownWrapper}>
+                <button
+                  type="button"
+                  className={styles.tagAddButton}
+                  onClick={() => setTagDropdownOpen((v) => !v)}
+                >
+                  <Tag size={13} />
+                  タグで絞り込む
+                </button>
+                {tagDropdownOpen && (
+                  <div className={styles.tagDropdown}>
+                    {allTagCandidates
+                      .filter((tag) => !selectedTags.includes(tag))
+                      .map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={styles.tagDropdownItem}
+                          onClick={() => {
+                            setSelectedTags((prev) => [...prev, tag]);
+                            setTagDropdownOpen(false);
+                          }}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    {allTagCandidates.every((tag) => selectedTags.includes(tag)) && (
+                      <span className={styles.tagDropdownEmpty}>すべて選択済み</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 投稿一覧 */}
@@ -171,6 +249,20 @@ export const ModerationTab = ({ spaceId }: Props) => {
                         : <span className={styles.noMessage}>(メッセージなし)</span>
                       }
                     </span>
+                    {((hossii.tags?.length ?? 0) > 0 || (hossii.hashtags?.length ?? 0) > 0) && (
+                      <div className={styles.rowTagChips}>
+                        {hossii.tags?.map((tag) => (
+                          <span key={`t-${tag}`} className={`${styles.rowTagChip} ${styles.rowTagChipPreset}`}>
+                            #{tag}
+                          </span>
+                        ))}
+                        {hossii.hashtags?.map((tag) => (
+                          <span key={`h-${tag}`} className={`${styles.rowTagChip} ${styles.rowTagChipFree}`}>
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className={styles.td}>
                     {hossii.isHidden ? (

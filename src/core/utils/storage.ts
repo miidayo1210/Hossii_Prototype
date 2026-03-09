@@ -37,6 +37,7 @@ export function saveSpaces(spaces: Space[]): void {
         cardType: f.cardType,
         quickEmotions: f.quickEmotions,
         createdAt: f.createdAt.toISOString(),
+        presetTags: f.presetTags,
         // background は保存しない（一時画像のため）
       };
       }
@@ -49,6 +50,7 @@ export function saveSpaces(spaces: Space[]): void {
         quickEmotions: f.quickEmotions,
         createdAt: f.createdAt.toISOString(),
         background: f.background, // 背景設定を保存
+        presetTags: f.presetTags, // T01: プリセットタグ
       };
     });
     localStorage.setItem(SPACES_KEY, JSON.stringify(toSave));

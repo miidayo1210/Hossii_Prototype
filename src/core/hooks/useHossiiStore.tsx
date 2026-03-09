@@ -170,7 +170,12 @@ const normalizeSpace = (f: unknown): Space => {
       ? (raw.savedBackgroundImages as string[])
       : undefined;
 
-  return { id, spaceURL, name, cardType, quickEmotions, createdAt, background, savedBackgroundImages };
+  const presetTags =
+    Array.isArray(raw.presetTags) && raw.presetTags.every((t) => typeof t === 'string')
+      ? (raw.presetTags as string[])
+      : undefined;
+
+  return { id, spaceURL, name, cardType, quickEmotions, createdAt, background, savedBackgroundImages, presetTags };
 };
 
 // 初期化: localStorage からスペースを読み込み、なければデフォルトスペースを作成
@@ -392,10 +397,19 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       }
 
       case 'SET_SPACES': {
-        saveSpaces(action.payload);
+        // Supabase が presetTags を返さない場合（未マイグレーション等）は
+        // ローカル state の値を引き継いで上書きを防ぐ
+        const mergedSpaces = action.payload.map((space) => {
+          const existing = state.spaces.find((s) => s.id === space.id);
+          return {
+            ...space,
+            presetTags: space.presetTags ?? existing?.presetTags,
+          };
+        });
+        saveSpaces(mergedSpaces);
         return {
           ...state,
-          spaces: action.payload,
+          spaces: mergedSpaces,
         };
       }
 
@@ -885,6 +899,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       language: input.language,
       bubbleColor: input.bubbleColor,
       hashtags: input.hashtags,
+      tags: input.tags,
       imageUrl: input.imageUrl,
       numberValue: input.numberValue,
     };
@@ -932,7 +947,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const updateSpace = useCallback((id: SpaceId, patch: Partial<Space>) => {
     dispatch({ type: 'UPDATE_SPACE', payload: { id, patch } });
     if (isSupabaseConfigured) {
-      updateSpaceInDb(id, patch);
+      updateSpaceInDb(id, patch).catch((err: unknown) => {
+        console.error('[updateSpace] Supabase 保存失敗:', err);
+      });
     }
   }, []);
 

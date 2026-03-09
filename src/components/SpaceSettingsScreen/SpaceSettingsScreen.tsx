@@ -14,9 +14,10 @@ import { ShareTab } from './ShareTab';
 import { ModerationTab } from './ModerationTab';
 import { DecorationTab } from './DecorationTab';
 import { FeatureFlagsTab } from './FeatureFlagsTab';
+import { TagsTab } from './TagsTab';
 import styles from './SpaceSettingsScreen.module.css';
 
-type Tab = 'general' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration' | 'featureFlags';
+type Tab = 'general' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration' | 'featureFlags' | 'tags';
 
 export const SpaceSettingsScreen = () => {
   const { navigate } = useRouter();
@@ -120,6 +121,14 @@ export const SpaceSettingsScreen = () => {
             </button>
             {isAdmin && (
               <button
+                className={`${styles.tab} ${activeTab === 'tags' ? styles.activeTab : ''}`}
+                onClick={() => setActiveTab('tags')}
+              >
+                タグ設定
+              </button>
+            )}
+            {isAdmin && (
+              <button
                 className={`${styles.tab} ${activeTab === 'moderation' ? styles.activeTab : ''}`}
                 onClick={() => setActiveTab('moderation')}
               >
@@ -166,8 +175,14 @@ export const SpaceSettingsScreen = () => {
           {activeTab === 'decoration' && activeSpace && (
             <DecorationTab space={activeSpace} />
           )}
+          {activeTab === 'tags' && activeSpace && (
+            <TagsTab
+              space={activeSpace}
+              onUpdateSpace={(patch) => updateSpace(activeSpace.id, patch)}
+            />
+          )}
           {activeTab === 'moderation' && activeSpace && (
-            <ModerationTab spaceId={activeSpace.id} />
+            <ModerationTab spaceId={activeSpace.id} space={activeSpace} />
           )}
           {activeTab === 'featureFlags' && activeSpace && (
             <FeatureFlagsTab spaceId={activeSpace.id} />

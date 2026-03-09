@@ -19,6 +19,8 @@ export type HossiiRow = {
   bubble_color: string | null;
   // F09
   hashtags: string[] | null;
+  // T02: プリセットタグ
+  tags: string[] | null;
   // F10
   image_url: string | null;
   // F02/F04
@@ -54,6 +56,7 @@ export function rowToHossii(row: HossiiRow): Hossii {
     createdAt: new Date(row.created_at),
     bubbleColor: row.bubble_color ?? undefined,
     hashtags: row.hashtags ?? undefined,
+    tags: row.tags ?? undefined,
     imageUrl: row.image_url ?? undefined,
     positionX: row.position_x ?? undefined,
     positionY: row.position_y ?? undefined,
@@ -84,6 +87,7 @@ function hossiiToRow(hossii: Hossii): Omit<HossiiRow, 'created_at'> & { created_
     created_at: hossii.createdAt.toISOString(),
     bubble_color: hossii.bubbleColor ?? null,
     hashtags: hossii.hashtags ?? null,
+    tags: hossii.tags ?? null,
     image_url: hossii.imageUrl ?? null,
     position_x: hossii.positionX ?? null,
     position_y: hossii.positionY ?? null,
