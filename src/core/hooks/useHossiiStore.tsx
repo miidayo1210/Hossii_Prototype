@@ -970,11 +970,18 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, []);
 
   const removeSpace = useCallback((id: SpaceId) => {
+    const spaceToDelete = stateRef.current.spaces.find((s) => s.id === id);
     dispatch({ type: 'REMOVE_SPACE', payload: id });
-    if (isSupabaseConfigured) {
-      deleteSpaceFromDb(id);
+    if (isSupabaseConfigured && spaceToDelete) {
+      deleteSpaceFromDb(id).then((success) => {
+        if (!success) {
+          console.error('[removeSpace] Supabase DELETE 失敗 → ローカル状態を復元します');
+          dispatch({ type: 'ADD_SPACE', payload: spaceToDelete });
+          alert('スペースの削除に失敗しました。権限がないか、通信エラーが発生しました。');
+        }
+      });
     }
-  }, []);
+  }, [stateRef]);
 
   const setMode = useCallback((mode: AppMode) => {
     dispatch({ type: 'SET_MODE', payload: mode });

@@ -123,13 +123,18 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   }
 }
 
-export async function deleteSpaceFromDb(id: SpaceId): Promise<void> {
-  if (!isSupabaseConfigured) return;
+export async function deleteSpaceFromDb(id: SpaceId): Promise<boolean> {
+  if (!isSupabaseConfigured) return true;
+
+  const { data: authData } = await supabase.auth.getUser();
+  console.log('[auth] deleteSpaceFromDb 実行時のユーザー:', authData?.user?.id ?? 'NULL (未認証 → RLS で DELETE がブロックされる可能性あり)');
 
   const { error } = await supabase.from('spaces').delete().eq('id', id);
   if (error) {
-    console.error('[spacesApi] deleteSpaceFromDb error:', error.message);
+    console.error('[spacesApi] deleteSpaceFromDb error:', error.message, error);
+    return false;
   }
+  return true;
 }
 
 export async function fetchSpaceByUrl(spaceUrl: string): Promise<Space | null> {
