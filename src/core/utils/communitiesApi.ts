@@ -83,6 +83,27 @@ export async function fetchAllCommunities(): Promise<Community[]> {
 }
 
 /**
+ * slug でコミュニティを1件取得する（スーパー管理者専用）
+ * URL パラメータからコミュニティ情報を復元する用途で使用
+ */
+export async function fetchCommunityBySlug(slug: string): Promise<Community | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const { data, error } = await supabase
+    .from('communities')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[communitiesApi] fetchCommunityBySlug error:', error.message);
+    return null;
+  }
+
+  return data ? rowToCommunity(data as CommunityRow) : null;
+}
+
+/**
  * コミュニティの slug を更新する（管理者本人のみ可 / RLS で保護）
  * 成功時は true、失敗時は false を返す
  */

@@ -7,7 +7,7 @@ import { useAdminNavigation } from '../../core/contexts/AdminNavigationContext';
 import { BackgroundSelector } from '../BackgroundSelector/BackgroundSelector';
 import { generateId } from '../../core/utils';
 import { generateSpaceURL, validateSpaceURL, isSpaceURLUnique } from '../../core/utils/spaceUrlUtils';
-import { updateCommunitySlug } from '../../core/utils/communitiesApi';
+import { updateCommunitySlug, fetchCommunityBySlug } from '../../core/utils/communitiesApi';
 import type { Space, CardType, SpaceBackground } from '../../core/types/space';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import styles from './SpacesScreen.module.css';
@@ -30,9 +30,9 @@ const getBgStyle = (background: SpaceBackground | undefined): React.CSSPropertie
 
 export const SpacesScreen = () => {
   const { state, addSpace, updateSpace, removeSpace, setActiveSpace, communitySlug } = useHossiiStore();
-  const { navigate } = useRouter();
+  const { navigate, screenParam } = useRouter();
   const { currentUser, logout, refreshCommunitySlug } = useAuth();
-  const { overrideCommunityId, overrideCommunityName, clearOverrideCommunity } = useAdminNavigation();
+  const { overrideCommunityId, overrideCommunityName, clearOverrideCommunity, setOverrideCommunity } = useAdminNavigation();
   const { spaces } = state;
 
   const pageTitle = overrideCommunityName
@@ -42,6 +42,28 @@ export const SpacesScreen = () => {
       : 'スペース管理';
 
   const showBackButton = !!(currentUser?.isSuperAdmin && overrideCommunityId);
+
+  // スーパー管理者の override 復元: sessionStorage → URL param → #communities リダイレクト
+  useEffect(() => {
+    if (!currentUser?.isSuperAdmin) return;
+    if (overrideCommunityId) return; // sessionStorage から復元済み
+
+    if (screenParam) {
+      // URL に community slug がある場合は API から復元を試みる
+      fetchCommunityBySlug(screenParam).then((community) => {
+        if (community) {
+          setOverrideCommunity(community.id, community.name, community.slug);
+        } else {
+          navigate('communities');
+        }
+      });
+    } else {
+      // URL にも slug がない → communities へリダイレクト
+      navigate('communities');
+    }
+  // overrideCommunityId が null → 設定済みの順に1回だけ走ればよいため
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.isSuperAdmin, screenParam]);
 
   const handleBack = () => {
     clearOverrideCommunity();

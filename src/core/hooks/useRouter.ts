@@ -1,31 +1,46 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Screen } from '../types';
 
-const parseHash = (hash: string): Screen => {
+const VALID_SCREENS: Screen[] = [
+  'post', 'screen', 'comments', 'spaces', 'profile',
+  'mylogs', 'account', 'settings', 'card', 'communities', 'reflection',
+];
+
+type RouterState = {
+  screen: Screen;
+  screenParam?: string;
+};
+
+const parseHash = (hash: string): RouterState => {
   const cleaned = hash.replace('#', '');
-  if (cleaned === 'post' || cleaned === 'screen' || cleaned === 'comments' || cleaned === 'spaces' || cleaned === 'profile' || cleaned === 'mylogs' || cleaned === 'account' || cleaned === 'settings' || cleaned === 'card' || cleaned === 'communities' || cleaned === 'reflection') {
-    return cleaned;
-  }
-  return 'screen';
+  const slashIdx = cleaned.indexOf('/');
+  const screenPart = slashIdx >= 0 ? cleaned.slice(0, slashIdx) : cleaned;
+  const param = slashIdx >= 0 ? cleaned.slice(slashIdx + 1) : undefined;
+
+  const screen = VALID_SCREENS.includes(screenPart as Screen)
+    ? (screenPart as Screen)
+    : 'screen';
+
+  return { screen, screenParam: param || undefined };
 };
 
 export const useRouter = () => {
-  const [screen, setScreen] = useState<Screen>(() =>
+  const [routerState, setRouterState] = useState<RouterState>(() =>
     parseHash(window.location.hash)
   );
 
   useEffect(() => {
     const handleHashChange = () => {
-      setScreen(parseHash(window.location.hash));
+      setRouterState(parseHash(window.location.hash));
     };
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const navigate = useCallback((newScreen: Screen) => {
-    window.location.hash = newScreen;
+  const navigate = useCallback((newScreen: Screen, param?: string) => {
+    window.location.hash = param ? `${newScreen}/${param}` : newScreen;
   }, []);
 
-  return { screen, navigate };
+  return { screen: routerState.screen, screenParam: routerState.screenParam, navigate };
 };

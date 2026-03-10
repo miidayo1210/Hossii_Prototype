@@ -44,7 +44,7 @@ export const CommunitiesScreen = () => {
 
   const handleManageSpaces = (community: Community) => {
     setOverrideCommunity(community.id, community.name, community.slug);
-    navigate('spaces');
+    navigate('spaces', community.slug ?? undefined);
   };
 
   const handleLogout = async () => {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { HOSSII_IDLE } from '../../core/assets/hossiiIdle';
 import styles from './GuestEntryScreen.module.css';
 
 type Step = 'select' | 'nickname';
@@ -17,7 +18,10 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
   const savedNickname = state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '';
   const [nickname, setNickname] = useState(savedNickname);
 
-  const spaceName = state.spaces.find((s) => s.id === spaceId)?.name ?? 'スペース';
+  const space = state.spaces.find((s) => s.id === spaceId);
+  const spaceName = space?.name ?? 'スペース';
+  const characterImageUrl = space?.characterImageUrl;
+  const welcomeMessage = space?.welcomeMessage ?? `「${spaceName}」にようこそ！ニックネームを入力してね。`;
 
   const handleGuestEnter = () => {
     const trimmed = nickname.trim();
@@ -66,7 +70,18 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
 
         {step === 'nickname' && (
           <div className={styles.nicknameForm}>
-            <p className={styles.nicknameLabel}>このスペースで使う名前</p>
+            <div className={styles.welcomeArea}>
+              <div className={styles.characterIcon}>
+                <img
+                  src={characterImageUrl ?? (nickname.trim() ? HOSSII_IDLE.smile : HOSSII_IDLE.base)}
+                  alt="Hossiiキャラ"
+                  className={styles.characterImage}
+                />
+              </div>
+              <div className={styles.speechBubble}>
+                <p className={styles.speechText}>{welcomeMessage}</p>
+              </div>
+            </div>
             <input
               type="text"
               className={styles.nicknameInput}
@@ -75,6 +90,7 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
               onChange={(e) => setNickname(e.target.value)}
               maxLength={30}
               autoFocus
+              autoComplete="off"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleGuestEnter();
               }}

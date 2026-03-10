@@ -71,6 +71,7 @@ export type Space = {
   //   投稿UIのワンタップ選択候補・ログ一覧フィルタの元データとして使用。
   //   各投稿に実際についたタグは hossiis.tags（フェーズ2で追加予定）に分離して管理する。
   presetTags?: string[];
+  welcomeMessage?: string;  // 入室時ウェルカムメッセージ（未設定時はデフォルト文言）
 };
 
 // 背景画像の保存上限

@@ -195,6 +195,22 @@ export const GeneralTab = ({ settings, onUpdate, space, onUpdateSpace }: Props) 
         </section>
       )}
 
+      {onUpdateSpace && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>ウェルカムメッセージ</h2>
+          <p className={styles.description}>入室時にHossiiキャラが話すメッセージを設定します。未設定時はデフォルト文言が表示されます。</p>
+          <textarea
+            className={styles.textarea}
+            value={space?.welcomeMessage ?? ''}
+            onChange={(e) => onUpdateSpace({ welcomeMessage: e.target.value || undefined })}
+            placeholder={`「${space?.name ?? 'スペース'}」にようこそ！ニックネームを入力してね。`}
+            maxLength={100}
+            rows={3}
+          />
+          <p className={styles.charCount}>{(space?.welcomeMessage ?? '').length} / 100</p>
+        </section>
+      )}
+
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>カードタイプ</h2>
         <div className={styles.radioList}>
