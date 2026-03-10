@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from './core/hooks/useRouter';
 import { HossiiProvider, useHossiiStore } from './core/hooks/useHossiiStore';
+import { fetchSpaceByUrl } from './core/utils/spacesApi';
+import { isSupabaseConfigured } from './core/supabase';
 import { AuthProvider, useAuth } from './core/contexts/AuthContext';
 import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
 import { PostScreen } from './components/PostScreen/PostScreen';
@@ -29,7 +31,7 @@ import styles from './App.module.css';
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
   const { screen, navigate } = useRouter();
-  const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, hasNicknameForSpace } = useHossiiStore();
+  const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -112,6 +114,34 @@ const AppContent = () => {
       }
     }
   }, [currentUser, userProfile, showOnboarding]);
+
+  // ===== URL スラッグ ファストパス =====
+  // fetchSpaces（全件取得）の完了を待たずに、スラッグで1件だけ直接取得して state に注入する。
+  // これにより管理者の二重 fetch や auth 解決待ちによる遅延を回避し、初回アクセスを高速化する。
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const communitySpaceMatch = window.location.pathname.match(
+      /^\/c\/([a-z0-9][a-z0-9-]*)\/s\/([a-z0-9][a-z0-9-]*)$/
+    );
+    const legacyMatch = window.location.pathname.match(
+      /^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/
+    );
+    const slug = communitySpaceMatch ? communitySpaceMatch[2] : legacyMatch?.[1];
+    if (!slug) return;
+
+    // すでにローカル state にキャッシュ済みなら何もしない（fetchSpaces の完了前でも）
+    const cached = state.spaces.find((s) => s.spaceURL === slug);
+    if (cached) return;
+
+    fetchSpaceByUrl(slug).then((space) => {
+      // ナビゲーション済み or 別のパスで解決済みの場合はスキップ
+      if (!space || initialSlugHandledRef.current) return;
+      addSpaceLocal(space);
+    });
+  // マウント時に1回だけ実行。state.spaces はマウント時点で localStorage から同期済み。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // /c/[community-slug]/s/[space-slug] または /s/[slug] パスでスペースに直接アクセス
   useEffect(() => {

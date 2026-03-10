@@ -3,7 +3,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/AuthContext';
-import { saveSpaceSettings } from '../../core/utils/settingsStorage';
+import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsStorage';
 import { fetchSpaceSettings, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import type { SpaceSettings } from '../../core/types/settings';
 import type { Space } from '../../core/types/space';
@@ -25,12 +25,20 @@ export const SpaceSettingsScreen = () => {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin ?? false;
   const [activeTab, setActiveTab] = useState<Tab>('general');
-  const [settings, setSettings] = useState<SpaceSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
 
-  // 設定を読み込む（Supabase 優先、フォールバックは localStorage）
+  // localStorage から同期的に初期値を取得することで「読み込み中...」フラッシュを防ぐ。
+  // Supabase からの最新値は useEffect で非同期に上書きする。
+  const [settings, setSettings] = useState<SpaceSettings | null>(() => {
+    const spaceId = state.activeSpaceId;
+    if (!spaceId) return null;
+    const space = state.spaces.find((s) => s.id === spaceId);
+    return loadSpaceSettings(spaceId, space?.name ?? '');
+  });
+
+  // Supabase から最新の設定を取得して上書き
   useEffect(() => {
     if (!activeSpace) return;
     fetchSpaceSettings(activeSpace.id, activeSpace.name).then((loaded) => {

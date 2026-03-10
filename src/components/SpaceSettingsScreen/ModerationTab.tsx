@@ -26,16 +26,6 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
 
   const presetTags = space?.presetTags ?? [];
 
-  // フィルタ候補: presetTags ＋ 投稿に実際についているタグ（tags / hashtags）を収集
-  const allTagCandidates = useMemo(() => {
-    const set = new Set<string>(presetTags); // "#感想" 形式
-    spaceHossiis.forEach((h) => {
-      h.tags?.forEach((t) => set.add(`#${t}`));
-      h.hashtags?.forEach((t) => set.add(`#${t}`));
-    });
-    return Array.from(set).sort();
-  }, [presetTags, spaceHossiis]);
-
   // ページリロード後も非表示投稿を確認・復元できるよう、DB から全件取得する
   const [dbHossiis, setDbHossiis] = useState<Hossii[]>([]);
   useEffect(() => {
@@ -50,6 +40,16 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
     const fromDbOnly = dbHossiis.filter((h) => !storeIds.has(h.id));
     return [...fromStore, ...fromDbOnly];
   }, [state.hossiis, spaceId, dbHossiis]);
+
+  // フィルタ候補: presetTags ＋ 投稿に実際についているタグ（tags / hashtags）を収集
+  const allTagCandidates = useMemo(() => {
+    const set = new Set<string>(presetTags); // "#感想" 形式
+    spaceHossiis.forEach((h) => {
+      h.tags?.forEach((t) => set.add(`#${t}`));
+      h.hashtags?.forEach((t) => set.add(`#${t}`));
+    });
+    return Array.from(set).sort();
+  }, [presetTags, spaceHossiis]);
 
   const filtered = useMemo(() => {
     return spaceHossiis

@@ -665,6 +665,7 @@ type HossiiContextValue = {
   getActiveSpace: () => Space | undefined;
   getActiveSpaceHossiis: () => Hossii[];
   addSpace: (space: Space) => void;
+  addSpaceLocal: (space: Space) => void;
   updateSpace: (id: SpaceId, patch: Partial<Space>) => void;
   removeSpace: (id: SpaceId) => void;
   setMode: (mode: AppMode) => void;
@@ -697,7 +698,7 @@ type HossiiProviderProps = {
 };
 
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isResolvingAuth } = useAuth();
   const { overrideCommunityId, overrideCommunitySlug } = useAdminNavigation();
   const communityId = overrideCommunityId ?? currentUser?.communityId;
   const communitySlug = overrideCommunitySlug ?? currentUser?.communitySlug;
@@ -762,8 +763,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const [hossiiLoadedFromSupabase, setHossiiLoadedFromSupabase] = useState(!isSupabaseConfigured);
 
   // ===== Supabase: スペースをマウント時に同期 =====
+  // isResolvingAuth が true の間は発火しない。
+  // これにより管理者ユーザーで communityId が undefined → 確定値と2回 fetchSpaces が
+  // 走る二重リクエストを排除し、1回で正しい communityId のスペースを取得できる。
   useEffect(() => {
     if (!isSupabaseConfigured) return;
+    if (isResolvingAuth) return;
 
     fetchSpaces(communityId).then((supabaseSpaces) => {
       if (supabaseSpaces !== null) {
@@ -772,7 +777,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       }
       setSpacesLoadedFromSupabase(true);
     });
-  }, [communityId]);
+  }, [communityId, isResolvingAuth]);
 
   // ===== Supabase: アクティブスペースの hossiis を同期 =====
   useEffect(() => {
@@ -960,6 +965,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
   }, [communityId]);
 
+  // Supabase から取得済みのスペースをローカル state に追加する（DB insert は行わない）
+  // URL スラッグ直アクセス時のファストパス用
+  const addSpaceLocal = useCallback((space: Space) => {
+    dispatch({ type: 'ADD_SPACE', payload: space });
+  }, []);
+
   const updateSpace = useCallback((id: SpaceId, patch: Partial<Space>) => {
     dispatch({ type: 'UPDATE_SPACE', payload: { id, patch } });
     if (isSupabaseConfigured) {
@@ -1114,6 +1125,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         getActiveSpace,
         getActiveSpaceHossiis,
         addSpace,
+        addSpaceLocal,
         updateSpace,
         removeSpace,
         setMode,

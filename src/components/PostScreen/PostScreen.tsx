@@ -225,7 +225,7 @@ export const PostScreen = () => {
   // F09: ハッシュタグ追加
   const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // IME 変換中（日本語入力の途中）は無視する
-    if (e.isComposing) return;
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter' || e.key === ' ' || e.key === '　') {
       e.preventDefault();
       addHashtagFromInput();
