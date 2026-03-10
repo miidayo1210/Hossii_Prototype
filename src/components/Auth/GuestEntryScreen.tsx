@@ -90,7 +90,7 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
               onChange={(e) => setNickname(e.target.value)}
               maxLength={30}
               autoFocus
-              autoComplete="off"
+              autoComplete="new-password"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleGuestEnter();
               }}

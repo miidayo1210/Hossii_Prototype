@@ -49,7 +49,7 @@ export const NicknameModal = ({ spaceId, onClose }: Props) => {
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
           autoFocus
-          autoComplete="off"
+          autoComplete="new-password"
         />
         <button
           type="button"
