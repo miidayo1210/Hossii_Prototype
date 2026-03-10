@@ -85,7 +85,7 @@
 .buttons {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.75rem;
 }
 
 .primaryButton {
@@ -165,6 +165,23 @@
   background: #faf5ff;
 }
 
+.signUpLink {
+  background: none;
+  border: none;
+  color: #7c3aed;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-align: center;
+  padding: 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  margin-top: 0.125rem;
+}
+
+.signUpLink:hover {
+  color: #5b21b6;
+}
+
 /* ===== ニックネームフォーム（nickname step） ===== */
 .nicknameForm {
   display: flex;
@@ -192,7 +209,7 @@
 .characterImage {
   width: 72px;
   height: 72px;
-  object-fit: contain;
+  object-fit: cover;
   border-radius: 50%;
 }
 

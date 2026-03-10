@@ -461,30 +461,19 @@ export const SpaceScreen = () => {
         🌳 {activeSpace?.name ?? 'My Space'}
       </div>
 
-      {/* 操作パネル（操作レイヤー） */}
-      <div className={styles.controlPanel}>
-        {/* 共有ボタン */}
-        <button
-          type="button"
-          className={styles.shareButton}
-          onClick={() => {
-            const url = `${window.location.origin}${window.location.pathname}?space=${activeSpaceId}`;
-            navigator.clipboard.writeText(url);
-            alert('スペースのリンクをコピーしました');
-          }}
-        >
-          🔗 共有
-        </button>
-      </div>
-
-      {/* ヘッダー（スペース名） */}
-      <header className={styles.header}>
-        <h1 className={styles.spaceName}>
-          <span className={styles.sparkle}>✨</span>
-          {activeSpace?.name ?? 'My Space'}
-          <span className={styles.sparkle}>✨</span>
-        </h1>
-      </header>
+      {/* 共有ボタン（右上） */}
+      <button
+        type="button"
+        className={styles.shareButtonSmall}
+        aria-label="リンクをコピー"
+        onClick={() => {
+          const url = `${window.location.origin}${window.location.pathname}?space=${activeSpaceId}`;
+          navigator.clipboard.writeText(url);
+          alert('スペースのリンクをコピーしました');
+        }}
+      >
+        🔗
+      </button>
 
       {/* スライドショーモード */}
       {viewMode === 'slideshow' && (

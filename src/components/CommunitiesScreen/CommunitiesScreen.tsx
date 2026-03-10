@@ -4,6 +4,8 @@ import { useRouter } from '../../core/hooks/useRouter';
 import { useAdminNavigation } from '../../core/contexts/AdminNavigationContext';
 import { fetchAllCommunities } from '../../core/utils/communitiesApi';
 import type { Community, CommunityStatus } from '../../core/utils/communitiesApi';
+import { fetchCommunityStats } from '../../core/utils/spacesApi';
+import type { CommunityStats } from '../../core/utils/spacesApi';
 import styles from './CommunitiesScreen.module.css';
 
 const statusBadge = (status: CommunityStatus) => {
@@ -23,6 +25,9 @@ export const CommunitiesScreen = () => {
   const [loading, setLoading] = useState(true);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statsCache, setStatsCache] = useState<Map<string, CommunityStats>>(new Map());
+  const [loadingStatsId, setLoadingStatsId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAllCommunities()
@@ -45,6 +50,19 @@ export const CommunitiesScreen = () => {
   const handleManageSpaces = (community: Community) => {
     setOverrideCommunity(community.id, community.name, community.slug);
     navigate('spaces', community.slug ?? undefined);
+  };
+
+  const handleToggleDetail = async (community: Community) => {
+    if (expandedId === community.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(community.id);
+    if (statsCache.has(community.id)) return;
+    setLoadingStatsId(community.id);
+    const stats = await fetchCommunityStats(community.id);
+    setStatsCache((prev) => new Map(prev).set(community.id, stats));
+    setLoadingStatsId(null);
   };
 
   const handleLogout = async () => {
@@ -135,6 +153,49 @@ export const CommunitiesScreen = () => {
                       </span>
                     )}
                   </div>
+
+                  <button
+                    type="button"
+                    className={styles.toggleDetailButton}
+                    onClick={() => handleToggleDetail(community)}
+                    aria-expanded={expandedId === community.id}
+                  >
+                    <span>{expandedId === community.id ? '詳細を隠す' : '詳細を見る'}</span>
+                    <span className={`${styles.toggleIcon} ${expandedId === community.id ? styles.toggleIconOpen : ''}`}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {expandedId === community.id && (
+                    <div className={styles.detailPanel}>
+                      {loadingStatsId === community.id ? (
+                        <p className={styles.detailLoading}>読み込み中...</p>
+                      ) : (() => {
+                        const stats = statsCache.get(community.id);
+                        if (!stats) return null;
+                        return (
+                          <div className={styles.statsGrid}>
+                            <div className={styles.statItem}>
+                              <span className={styles.statLabel}>スペース数</span>
+                              <span className={styles.statValue}>{stats.spaceCount} 件</span>
+                            </div>
+                            <div className={styles.statItem}>
+                              <span className={styles.statLabel}>最終作成日</span>
+                              <span className={styles.statValue}>
+                                {stats.lastActivityAt
+                                  ? stats.lastActivityAt.toLocaleDateString('ja-JP')
+                                  : '—'}
+                              </span>
+                            </div>
+                            <div className={styles.statItem}>
+                              <span className={styles.statLabel}>総投稿数</span>
+                              <span className={styles.statValue}>{stats.totalPostCount} 件</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   <div className={styles.cardActions}>
                     <button

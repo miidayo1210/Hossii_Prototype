@@ -141,6 +141,53 @@ export async function deleteSpaceFromDb(id: SpaceId): Promise<boolean> {
   return true;
 }
 
+export type CommunityStats = {
+  spaceCount: number;
+  lastActivityAt: Date | null;
+  totalPostCount: number;
+};
+
+export async function fetchCommunityStats(communityId: string): Promise<CommunityStats> {
+  const empty: CommunityStats = { spaceCount: 0, lastActivityAt: null, totalPostCount: 0 };
+  if (!isSupabaseConfigured) return empty;
+
+  const { data: spaceRows, error: spaceError } = await supabase
+    .from('spaces')
+    .select('id, created_at')
+    .eq('community_id', communityId);
+
+  if (spaceError) {
+    console.error('[spacesApi] fetchCommunityStats spaces error:', spaceError.message);
+    return empty;
+  }
+
+  const rows = (spaceRows ?? []) as { id: string; created_at: string }[];
+  const spaceCount = rows.length;
+
+  let lastActivityAt: Date | null = null;
+  if (rows.length > 0) {
+    const latest = rows.reduce((a, b) => (a.created_at > b.created_at ? a : b));
+    lastActivityAt = new Date(latest.created_at);
+  }
+
+  let totalPostCount = 0;
+  if (rows.length > 0) {
+    const spaceIds = rows.map((r) => r.id);
+    const { count, error: hossiiError } = await supabase
+      .from('hossiis')
+      .select('id', { count: 'exact', head: true })
+      .in('space_id', spaceIds);
+
+    if (hossiiError) {
+      console.error('[spacesApi] fetchCommunityStats hossiis error:', hossiiError.message);
+    } else {
+      totalPostCount = count ?? 0;
+    }
+  }
+
+  return { spaceCount, lastActivityAt, totalPostCount };
+}
+
 export async function fetchSpaceByUrl(spaceUrl: string): Promise<Space | null> {
   if (!isSupabaseConfigured) return null;
 

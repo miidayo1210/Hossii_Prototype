@@ -4,6 +4,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { getAdminCommunity, createCommunity } from '../utils/communitiesApi';
 import type { CommunityStatus } from '../utils/communitiesApi';
+import { upsertUserProfile, fetchUserProfile } from '../utils/userProfilesApi';
 
 export type AppUser = {
   uid: string;
@@ -11,6 +12,7 @@ export type AppUser = {
   displayName: string | null;
   isAdmin: boolean;
   isSuperAdmin?: boolean;
+  username?: string;
   communityId?: string;
   communityName?: string;
   communitySlug?: string;
@@ -21,7 +23,13 @@ type AuthContextType = {
   currentUser: AppUser | null;
   loading: boolean;
   isResolvingAuth: boolean;
-  signUp: (email: string, password: string) => Promise<AppUser>;
+  signUp: (
+    email: string,
+    password: string,
+    username: string,
+    birthdate?: string | null,
+    gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null
+  ) => Promise<AppUser>;
   login: (email: string, password: string) => Promise<AppUser>;
   adminLogin: (email: string, password: string) => Promise<AppUser>;
   adminSignUp: (email: string, password: string, communityName: string) => Promise<AppUser>;
@@ -66,7 +74,12 @@ async function resolveAppUser(user: User): Promise<AppUser> {
   }
 
   // communities テーブルで communityId を取得（app_metadata.role = 'admin' でも必ず試みる）
-  const community = await getAdminCommunity(user.id);
+  const [community, userProfile] = await Promise.all([
+    getAdminCommunity(user.id),
+    fetchUserProfile(user.id),
+  ]);
+
+  const username = userProfile?.username ?? undefined;
 
   // app_metadata.role = "admin" は承認済みとして扱う（communityId は取得できた場合のみ付与）
   if (roleFromMetadata === 'admin') {
@@ -75,6 +88,7 @@ async function resolveAppUser(user: User): Promise<AppUser> {
       email: user.email ?? null,
       displayName: displayName ?? community?.name ?? null,
       isAdmin: true,
+      username,
       communityId: community?.id,
       communityName: community?.name,
       communitySlug: community?.slug ?? undefined,
@@ -83,7 +97,7 @@ async function resolveAppUser(user: User): Promise<AppUser> {
   }
 
   if (!community) {
-    return { uid: user.id, email: user.email ?? null, displayName, isAdmin: false };
+    return { uid: user.id, email: user.email ?? null, displayName, isAdmin: false, username };
   }
 
   return {
@@ -91,6 +105,7 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     email: user.email ?? null,
     displayName: displayName ?? community.name ?? null,
     isAdmin: community.status === 'approved',
+    username,
     communityId: community.id,
     communityName: community.name,
     communitySlug: community.slug ?? undefined,
@@ -109,6 +124,7 @@ const createMockUser = (email: string, uid?: string, isAdmin = false, communityN
   email,
   displayName: communityName ?? email.split('@')[0] ?? 'Demo User',
   isAdmin,
+  username: undefined,
   communityName,
 });
 
@@ -171,9 +187,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   // ===== 参加者サインアップ =====
-  const signUp = async (email: string, password: string): Promise<AppUser> => {
+  const signUp = async (
+    email: string,
+    password: string,
+    username: string,
+    birthdate?: string | null,
+    gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null
+  ): Promise<AppUser> => {
     if (!isSupabaseConfigured) {
-      const user = createMockUser(email);
+      const user: AppUser = { ...createMockUser(email), username };
       setCurrentUser(user);
       saveMockUser(user);
       return user;
@@ -181,6 +203,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error || !data.user) throw error ?? new Error('Sign up failed');
+
+    await upsertUserProfile(data.user.id, username, birthdate, gender);
+
     return resolveAppUser(data.user);
   };
 

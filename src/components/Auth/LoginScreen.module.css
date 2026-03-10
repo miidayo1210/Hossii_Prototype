@@ -230,6 +230,20 @@
   cursor: not-allowed;
 }
 
+.inputNoIcon {
+  padding-left: 1rem;
+}
+
+.selectInput {
+  appearance: none;
+  cursor: pointer;
+}
+
+.selectInput option {
+  background: #1b2735;
+  color: #fff;
+}
+
 .submitButton {
   width: 100%;
   padding: 0.875rem;

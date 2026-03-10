@@ -15,11 +15,10 @@
 
 .starDot {
   display: block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #a78bfa;
-  box-shadow: 0 0 8px rgba(167, 139, 250, 0.5);
+  font-size: 14px;
+  line-height: 1;
+  color: #a78bfa;
+  text-shadow: 0 0 8px rgba(167, 139, 250, 0.5);
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -32,7 +31,7 @@
 
 /* Emotion-based colors with custom twinkle animations */
 .star[data-emotion="joy"] .starDot {
-  background: #fbbf24;
+  color: #fbbf24;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -44,7 +43,7 @@
 }
 
 .star[data-emotion="wow"] .starDot {
-  background: #60a5fa;
+  color: #60a5fa;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -56,7 +55,7 @@
 }
 
 .star[data-emotion="empathy"] .starDot {
-  background: #f472b6;
+  color: #f472b6;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -68,7 +67,7 @@
 }
 
 .star[data-emotion="inspire"] .starDot {
-  background: #a78bfa;
+  color: #a78bfa;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -80,7 +79,7 @@
 }
 
 .star[data-emotion="think"] .starDot {
-  background: #10b981;
+  color: #10b981;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -92,7 +91,7 @@
 }
 
 .star[data-emotion="laugh"] .starDot {
-  background: #f59e0b;
+  color: #f59e0b;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -104,7 +103,7 @@
 }
 
 .star[data-emotion="moved"] .starDot {
-  background: #ec4899;
+  color: #ec4899;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -116,7 +115,7 @@
 }
 
 .star[data-emotion="fun"] .starDot {
-  background: #8b5cf6;
+  color: #8b5cf6;
   animation:
     pulse var(--pulse-duration, 3.5s) ease-in-out infinite,
     float 6s ease-in-out infinite,
@@ -158,10 +157,10 @@
 /* Subtle twinkling effect */
 @keyframes twinkle {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(167, 139, 250, 0.5);
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(167, 139, 250, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(167, 139, 250, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }
 
@@ -176,63 +175,63 @@
 /* Emotion-specific twinkle animations */
 @keyframes twinkleJoy {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(251, 191, 36, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(251, 191, 36, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }
 
 @keyframes twinkleWow {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(96, 165, 250, 0.5);
+    text-shadow: 0 0 8px rgba(96, 165, 250, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(96, 165, 250, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(96, 165, 250, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }
 
 @keyframes twinkleEmpathy {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(244, 114, 182, 0.5);
+    text-shadow: 0 0 8px rgba(244, 114, 182, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(244, 114, 182, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(244, 114, 182, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }
 
 @keyframes twinkleThink {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    text-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(16, 185, 129, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(16, 185, 129, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }
 
 @keyframes twinkleLaugh {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+    text-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(245, 158, 11, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(245, 158, 11, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }
 
 @keyframes twinkleMoved {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(236, 72, 153, 0.5);
+    text-shadow: 0 0 8px rgba(236, 72, 153, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(236, 72, 153, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(236, 72, 153, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }
 
 @keyframes twinkleFun {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+    text-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
   }
   50% {
-    box-shadow: 0 0 16px rgba(139, 92, 246, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 16px rgba(139, 92, 246, 0.8), 0 0 4px rgba(255, 255, 255, 0.6);
   }
 }

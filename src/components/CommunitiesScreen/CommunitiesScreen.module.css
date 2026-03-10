@@ -254,6 +254,94 @@
 }
 
 /* ------------------------------------------------
+   詳細トグル・アコーディオン
+   ------------------------------------------------ */
+.toggleDetailButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.4375rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.toggleDetailButton:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.toggleIcon {
+  display: inline-block;
+  font-size: 0.625rem;
+  transition: transform 0.2s ease;
+}
+
+.toggleIconOpen {
+  transform: rotate(180deg);
+}
+
+.detailPanel {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.625rem;
+  padding: 0.875rem 1rem;
+  background: #fafafa;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.detailLoading {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin: 0;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.statLabel {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.statValue {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* ------------------------------------------------
    ローディング・空状態
    ------------------------------------------------ */
 .loadingState {

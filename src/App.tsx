@@ -18,6 +18,7 @@ import { StampCardScreen } from './components/StampCardScreen/StampCardScreen';
 import { ReflectionScreen } from './components/ReflectionScreen/ReflectionScreen';
 import { StartScreen } from './components/StartScreen/StartScreen';
 import { AdminLoginScreen } from './components/Auth/AdminLoginScreen';
+import { LoginScreen } from './components/Auth/LoginScreen';
 import { GuestEntryScreen } from './components/Auth/GuestEntryScreen';
 import { PrivateSpaceScreen } from './components/Auth/PrivateSpaceScreen';
 import { OnboardingModal } from './components/Auth/OnboardingModal';
@@ -50,10 +51,21 @@ const AppContent = () => {
   // /s/[slug] ゲスト入室フロー用 state
   // guestSpaceId: 未ログインで /s/[slug] にアクセスしたときのスペースID
   // isGuestMode: ゲストとして入室済み（ニックネーム入力完了後）
-  // pendingLoginSlug: ゲストがログインを選択した後、ログイン完了後にリダイレクトするslug
+  // pendingLoginSlug: ゲストがログイン/新規登録を選択した後、完了後にリダイレクトするslug
+  // pendingAuthMode: ログイン画面の初期モード（login / signup）
   const [guestSpaceId, setGuestSpaceId] = useState<string | null>(null);
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [pendingLoginSlug, setPendingLoginSlug] = useState<string | null>(null);
+  const [pendingAuthMode, setPendingAuthMode] = useState<'login' | 'signup'>('login');
+
+  // ゲスト入室中に AccountScreen からログイン/新規登録を要求されたとき
+  const handleGuestAuthRequested = (mode: 'login' | 'signup') => {
+    const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
+    if (activeSpace?.spaceURL) {
+      setPendingLoginSlug(activeSpace.spaceURL);
+    }
+    setPendingAuthMode(mode);
+  };
   // isPrivate なスペースへの未ログインアクセス時に true になる
   const [guestSpaceIsPrivate, setGuestSpaceIsPrivate] = useState(false);
 
@@ -92,16 +104,19 @@ const AppContent = () => {
     }
   }, [currentUser, userProfile, isResolvingAuth]);
 
-  // ログイン完了後にpendingLoginSlugへリダイレクト（ゲスト→ログイン引き継ぎ）
+  // ログイン/新規登録完了後にpendingLoginSlugへリダイレクト
   useEffect(() => {
     if (currentUser && pendingLoginSlug) {
+      const slug = pendingLoginSlug;
+      setPendingLoginSlug(null);
+      setPendingAuthMode('login');
       // 現在のパスが /c/*/s/* 形式ならそのまま維持、そうでなければ /s/[slug] にリダイレクト
       const isCommunityPath = window.location.pathname.match(
         /^\/c\/([a-z0-9][a-z0-9-]*)\/s\/([a-z0-9][a-z0-9-]*)$/
       );
       window.location.href = isCommunityPath
         ? window.location.pathname
-        : `/s/${pendingLoginSlug}`;
+        : `/s/${slug}`;
     }
   }, [currentUser, pendingLoginSlug]);
 
@@ -399,6 +414,15 @@ const AppContent = () => {
 
   // /s/[slug] アクセス: 未ログインかつゲスト入室前 → ゲスト入室画面
   if (!currentUser && guestSpaceId && !isGuestMode) {
+    const handleAuthRequested = (mode: 'login' | 'signup') => {
+      const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
+      if (guestSpace?.spaceURL) {
+        setPendingLoginSlug(guestSpace.spaceURL);
+      }
+      setPendingAuthMode(mode);
+      setGuestSpaceId(null);
+    };
+
     return (
       <GuestEntryScreen
         spaceId={guestSpaceId}
@@ -410,13 +434,20 @@ const AppContent = () => {
           window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}` : '/');
           navigate('screen');
         }}
-        onLoginRequested={() => {
-          // ログイン選択 → slug を保存してから StartScreen へ
-          const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
-          if (guestSpace?.spaceURL) {
-            setPendingLoginSlug(guestSpace.spaceURL);
-          }
-          setGuestSpaceId(null);
+        onLoginRequested={() => handleAuthRequested('login')}
+        onSignUpRequested={() => handleAuthRequested('signup')}
+      />
+    );
+  }
+
+  // ログイン/新規登録が選択された後 → LoginScreen を表示（ゲストモード中も含む）
+  if (!currentUser && pendingLoginSlug) {
+    return (
+      <LoginScreen
+        initialMode={pendingAuthMode}
+        onClose={() => {
+          setPendingLoginSlug(null);
+          setPendingAuthMode('login');
         }}
       />
     );
@@ -464,7 +495,12 @@ const AppContent = () => {
       case 'mylogs':
         return <MyLogsScreen />;
       case 'account':
-        return <AccountScreen />;
+        return (
+          <AccountScreen
+            onLoginRequested={() => handleGuestAuthRequested('login')}
+            onSignUpRequested={() => handleGuestAuthRequested('signup')}
+          />
+        );
       case 'settings':
         return <SpaceSettingsScreen />;
       case 'card':

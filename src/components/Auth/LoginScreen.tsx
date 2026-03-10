@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, LogIn, UserPlus, X, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus, X, Eye, EyeOff, User } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import styles from './LoginScreen.module.css';
 
@@ -7,13 +7,17 @@ type AuthMode = 'login' | 'signup';
 
 type Props = {
   onClose?: () => void;
+  initialMode?: AuthMode;
 };
 
-export const LoginScreen = ({ onClose }: Props) => {
+export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
   const { login, signUp, loginWithGoogle, loginWithFacebook } = useAuth();
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [birthdate, setBirthdate] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | 'prefer_not_to_say' | ''>('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,17 +25,29 @@ export const LoginScreen = ({ onClose }: Props) => {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (mode === 'signup' && !username.trim()) {
+      setError('ユーザー名を入力してください');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (mode === 'login') {
         await login(email, password);
       } else {
-        await signUp(email, password);
+        await signUp(
+          email,
+          password,
+          username.trim(),
+          birthdate || null,
+          gender || null
+        );
       }
     } catch (err: any) {
       console.error('Authentication error:', err);
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.code ?? err.message));
     } finally {
       setLoading(false);
     }
@@ -142,6 +158,22 @@ export const LoginScreen = ({ onClose }: Props) => {
 
         {/* Email/Password form */}
         <form onSubmit={handleEmailAuth} className={styles.form}>
+          {mode === 'signup' && (
+            <div className={styles.inputGroup}>
+              <User size={18} className={styles.inputIcon} />
+              <input
+                type="text"
+                className={styles.input}
+                placeholder="ユーザー名（必須）"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                maxLength={30}
+                disabled={loading}
+              />
+            </div>
+          )}
+
           <div className={styles.inputGroup}>
             <Mail size={18} className={styles.inputIcon} />
             <input
@@ -178,12 +210,42 @@ export const LoginScreen = ({ onClose }: Props) => {
             </button>
           </div>
 
+          {mode === 'signup' && (
+            <>
+              <div className={styles.inputGroup}>
+                <input
+                  type="date"
+                  className={`${styles.input} ${styles.inputNoIcon}`}
+                  placeholder="生年月日（任意）"
+                  value={birthdate}
+                  onChange={(e) => setBirthdate(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+
+              <div className={styles.inputGroup}>
+                <select
+                  className={`${styles.input} ${styles.inputNoIcon} ${styles.selectInput}`}
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as typeof gender)}
+                  disabled={loading}
+                >
+                  <option value="">性別（任意）</option>
+                  <option value="male">男性</option>
+                  <option value="female">女性</option>
+                  <option value="other">その他</option>
+                  <option value="prefer_not_to_say">回答しない</option>
+                </select>
+              </div>
+            </>
+          )}
+
           <button
             type="submit"
             className={styles.submitButton}
             disabled={loading}
           >
-            {loading ? '処理中...' : mode === 'login' ? 'ログイン' : '新規登録'}
+            {loading ? '処理中...' : mode === 'login' ? 'ログイン' : 'アカウントを作成'}
           </button>
         </form>
 

@@ -9,9 +9,10 @@ type Props = {
   spaceId: string;
   onEnterAsGuest: () => void;
   onLoginRequested: () => void;
+  onSignUpRequested: () => void;
 };
 
-export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: Props) => {
+export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested, onSignUpRequested }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
   const [step, setStep] = useState<Step>('select');
   // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
@@ -51,12 +52,6 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
             >
               ゲストとして参加
             </button>
-            <p className={styles.guestNote}>ニックネームだけで参加できます</p>
-
-            <div className={styles.divider}>
-              <span className={styles.dividerText}>または</span>
-            </div>
-
             <button
               type="button"
               className={styles.secondaryButton}
@@ -64,7 +59,13 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
             >
               アカウントでログイン
             </button>
-            <p className={styles.loginNote}>過去ログの閲覧が可能になります</p>
+            <button
+              type="button"
+              className={styles.signUpLink}
+              onClick={onSignUpRequested}
+            >
+              新規登録の方はこちら
+            </button>
           </div>
         )}
 

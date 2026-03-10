@@ -5,7 +5,12 @@ import { useAuth } from '../../core/contexts/AuthContext';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import styles from './AccountScreen.module.css';
 
-export const AccountScreen = () => {
+type Props = {
+  onLoginRequested?: () => void;
+  onSignUpRequested?: () => void;
+};
+
+export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) => {
   const { currentUser, logout } = useAuth();
   const { state, setDefaultNickname, setSpaceNickname, getActiveSpace } = useHossiiStore();
   const { profile, spaceNicknames, activeSpaceId } = state;
@@ -96,6 +101,22 @@ export const AccountScreen = () => {
               <p className={styles.guestDesc}>
                 アカウントを作成すると、複数の端末で同じ情報を使えます。
               </p>
+              <div className={styles.guestActions}>
+                <button
+                  type="button"
+                  className={styles.loginButton}
+                  onClick={onLoginRequested}
+                >
+                  アカウントでログイン
+                </button>
+                <button
+                  type="button"
+                  className={styles.signUpButton}
+                  onClick={onSignUpRequested}
+                >
+                  新規会員登録
+                </button>
+              </div>
             </div>
           )}
         </section>

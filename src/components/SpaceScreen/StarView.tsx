@@ -31,7 +31,7 @@ export const StarView = ({ hossii, x, y, onClick }: Props) => {
       aria-label={`${hossii.authorName || 'Post'} from ${hossii.createdAt.toLocaleTimeString()}`}
       data-emotion={emotion}
     >
-      <span className={styles.starDot}></span>
+      <span className={styles.starDot}>★</span>
       {isLaughter && <span className={styles.laughterBadge}>😂</span>}
     </button>
   );
