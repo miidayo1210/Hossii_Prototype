@@ -764,6 +764,11 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // SET_SPACES が走ってもこれらを失わないように保持する
   const pendingSpaceIds = useRef<Set<string>>(new Set());
 
+  // スペースの Supabase INSERT が完了するまでの Promise を保持
+  // insertHossii は hossiis.space_id の外部キー制約があるため、
+  // スペース INSERT が完了するまで待機してから実行する必要がある
+  const pendingSpacePromises = useRef<Map<string, Promise<void>>>(new Map());
+
   // 最新の state を ref で保持（コールバック内でのクロージャ問題を回避）
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -945,9 +950,16 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     dispatch({ type: 'ADD_HOSSII_FULL', payload: newHossii });
 
     // Supabase に非同期 INSERT
+    // hossiis.space_id は spaces.id の外部キーのため、スペース INSERT が
+    // 完了していない場合は待機してから実行する
     if (isSupabaseConfigured) {
       insertedHossiiIdsRef.current.add(newHossii.id);
-      insertHossii(newHossii);
+      const spacePending = pendingSpacePromises.current.get(newHossii.spaceId);
+      if (spacePending) {
+        spacePending.then(() => insertHossii(newHossii));
+      } else {
+        insertHossii(newHossii);
+      }
     }
   }, [activeSpaceIdRef]);
 
@@ -978,9 +990,11 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     pendingSpaceIds.current.add(space.id);
     dispatch({ type: 'ADD_SPACE', payload: space });
     if (isSupabaseConfigured) {
-      insertSpace(space, communityId).finally(() => {
+      const promise = insertSpace(space, communityId).finally(() => {
         pendingSpaceIds.current.delete(space.id);
+        pendingSpacePromises.current.delete(space.id);
       });
+      pendingSpacePromises.current.set(space.id, promise);
     } else {
       pendingSpaceIds.current.delete(space.id);
     }
