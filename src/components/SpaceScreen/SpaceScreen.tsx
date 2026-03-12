@@ -80,8 +80,8 @@ export const SpaceScreen = () => {
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  // モバイル: プレビュー表示するHossiiのID（8秒ごとにローテーション）
-  const [previewHossiiId, setPreviewHossiiId] = useState<string | null>(null);
+  // モバイル: プレビュー表示するHossiiのID（8秒ごとにローテーション、最大3件）
+  const [previewHossiiIds, setPreviewHossiiIds] = useState<Set<string>>(new Set());
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
@@ -344,17 +344,18 @@ export const SpaceScreen = () => {
     return displayHossiis.map((_, index) => createBubblePosition(index));
   }, [displayHossiis]);
 
-  // モバイル: コンテンツ（テキストor画像）を持つ投稿をランダムでプレビュー表示（8秒ローテーション）
+  // モバイル: コンテンツ（テキストor画像）を持つ投稿をランダムで3件プレビュー表示（8秒ローテーション）
   useEffect(() => {
     if (!isMobile) return;
     const postsWithContent = displayHossiis.filter((h) => h.message || h.imageUrl);
     if (postsWithContent.length === 0) {
-      setPreviewHossiiId(null);
+      setPreviewHossiiIds(new Set());
       return;
     }
     const pick = () => {
-      const idx = Math.floor(Math.random() * postsWithContent.length);
-      setPreviewHossiiId(postsWithContent[idx].id);
+      const shuffled = [...postsWithContent].sort(() => Math.random() - 0.5);
+      const picked = shuffled.slice(0, Math.min(3, shuffled.length)).map((h) => h.id);
+      setPreviewHossiiIds(new Set(picked));
     };
     pick();
     const interval = setInterval(pick, 8000);
@@ -537,7 +538,7 @@ export const SpaceScreen = () => {
                   x={pos.x}
                   y={pos.y}
                   onClick={() => setSelectedPostId(hossii.id)}
-                  showPreview={previewHossiiId === hossii.id}
+                  showPreview={previewHossiiIds.has(hossii.id)}
                 />
               );
             }
