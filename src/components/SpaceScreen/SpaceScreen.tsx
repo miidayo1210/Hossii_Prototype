@@ -358,7 +358,7 @@ export const SpaceScreen = () => {
       setPreviewHossiiIds(new Set(picked));
     };
     pick();
-    const interval = setInterval(pick, 8000);
+    const interval = setInterval(pick, 6000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobile, displayHossiis.length]);
