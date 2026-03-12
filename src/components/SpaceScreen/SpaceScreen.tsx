@@ -80,6 +80,8 @@ export const SpaceScreen = () => {
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  // モバイル: プレビュー表示するHossiiのID（8秒ごとにローテーション）
+  const [previewHossiiId, setPreviewHossiiId] = useState<string | null>(null);
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
@@ -342,6 +344,24 @@ export const SpaceScreen = () => {
     return displayHossiis.map((_, index) => createBubblePosition(index));
   }, [displayHossiis]);
 
+  // モバイル: コンテンツ（テキストor画像）を持つ投稿をランダムでプレビュー表示（8秒ローテーション）
+  useEffect(() => {
+    if (!isMobile) return;
+    const postsWithContent = displayHossiis.filter((h) => h.message || h.imageUrl);
+    if (postsWithContent.length === 0) {
+      setPreviewHossiiId(null);
+      return;
+    }
+    const pick = () => {
+      const idx = Math.floor(Math.random() * postsWithContent.length);
+      setPreviewHossiiId(postsWithContent[idx].id);
+    };
+    pick();
+    const interval = setInterval(pick, 8000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile, displayHossiis.length]);
+
   // 最新の投稿（HossiiLive用）
   const latestHossii = displayHossiis[0] ?? null;
 
@@ -517,6 +537,7 @@ export const SpaceScreen = () => {
                   x={pos.x}
                   y={pos.y}
                   onClick={() => setSelectedPostId(hossii.id)}
+                  showPreview={previewHossiiId === hossii.id}
                 />
               );
             }
@@ -589,6 +610,8 @@ export const SpaceScreen = () => {
         <PostDetailModal
           hossii={selectedPost}
           onClose={() => setSelectedPostId(null)}
+          likesEnabled={spaceSettings?.features.likesEnabled ?? false}
+          onLike={handleLike}
         />
       )}
 

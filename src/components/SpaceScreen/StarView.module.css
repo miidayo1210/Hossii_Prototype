@@ -172,6 +172,70 @@
   pointer-events: none;
 }
 
+/* ハイライト中の星（プレビュー表示時） */
+.starHighlight .starDot {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+  transform: scale(1.3);
+}
+
+/* プレビューバブル */
+.previewBubble {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 160px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  animation: previewFadeIn 0.4s ease both;
+  z-index: 10;
+}
+
+.previewRight {
+  left: calc(100% + 10px);
+}
+
+.previewLeft {
+  right: calc(100% + 10px);
+}
+
+@keyframes previewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+.previewImage {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+.previewText {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #374151;
+  margin: 0 0 0.25rem 0;
+  word-break: break-word;
+}
+
+.previewAuthor {
+  font-size: 0.6rem;
+  color: #7c3aed;
+  font-weight: 600;
+}
+
 /* Emotion-specific twinkle animations */
 @keyframes twinkleJoy {
   0%, 100% {
