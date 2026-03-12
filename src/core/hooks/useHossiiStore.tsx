@@ -264,7 +264,7 @@ type ExtendedHossiiAction =
   | { type: 'ADD_HOSSII_FULL'; payload: Hossii }
   | { type: 'REMOVE_HOSSII'; payload: string }
   | { type: 'SET_ACTIVE_SPACE'; payload: SpaceId }
-  | { type: 'SET_SPACES'; payload: Space[] }
+  | { type: 'SET_SPACES'; payload: Space[]; preserveIds?: Set<string> }
   | { type: 'ADD_SPACE'; payload: Space }
   | { type: 'UPDATE_SPACE'; payload: { id: SpaceId; patch: Partial<Space> } }
   | { type: 'REMOVE_SPACE'; payload: SpaceId }
@@ -407,6 +407,15 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
             presetTags: space.presetTags ?? existing?.presetTags,
           };
         });
+        // Supabase fetch 中に ADD_SPACE で追加されたスペース（insert が in-flight）を保持する。
+        // preserveIds に含まれるスペース ID のうち、Supabase 結果に含まれないものをローカルから引き継ぐ。
+        if (action.preserveIds && action.preserveIds.size > 0) {
+          const supabaseIds = new Set(action.payload.map((s) => s.id));
+          const pendingSpaces = state.spaces
+            .filter((s) => action.preserveIds!.has(s.id) && !supabaseIds.has(s.id))
+            .map((s) => ({ ...s, presetTags: s.presetTags }));
+          mergedSpaces.push(...pendingSpaces);
+        }
         saveSpaces(mergedSpaces);
         return {
           ...state,
@@ -751,6 +760,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // 自分が Supabase に INSERT した ID を追跡（Realtime 重複回避）
   const insertedHossiiIdsRef = useRef<Set<string>>(new Set());
 
+  // ADD_SPACE 後の insertSpace が完了していないスペース ID を追跡
+  // SET_SPACES が走ってもこれらを失わないように保持する
+  const pendingSpaceIds = useRef<Set<string>>(new Set());
+
   // 最新の state を ref で保持（コールバック内でのクロージャ問題を回避）
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -770,10 +783,13 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     if (!isSupabaseConfigured) return;
     if (isResolvingAuth) return;
 
+    // snapshot: fetch 開始時点の pending IDs を保存
+    const preserveIds = new Set(pendingSpaceIds.current);
+
     fetchSpaces(communityId).then((supabaseSpaces) => {
       if (supabaseSpaces !== null) {
         // null はエラーを意味するため、その場合は既存データを保持する
-        dispatch({ type: 'SET_SPACES', payload: supabaseSpaces });
+        dispatch({ type: 'SET_SPACES', payload: supabaseSpaces, preserveIds });
       }
       setSpacesLoadedFromSupabase(true);
     });
@@ -959,9 +975,14 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, [state.hossiis, state.activeSpaceId]);
 
   const addSpace = useCallback((space: Space) => {
+    pendingSpaceIds.current.add(space.id);
     dispatch({ type: 'ADD_SPACE', payload: space });
     if (isSupabaseConfigured) {
-      insertSpace(space, communityId);
+      insertSpace(space, communityId).finally(() => {
+        pendingSpaceIds.current.delete(space.id);
+      });
+    } else {
+      pendingSpaceIds.current.delete(space.id);
     }
   }, [communityId]);
 

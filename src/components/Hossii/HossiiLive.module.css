@@ -315,6 +315,38 @@
 }
 
 /* ============================================
+   R01: アイドル揺れアニメーション
+   ============================================ */
+@keyframes hossiiIdle {
+  0%, 100% { transform: rotate(-2deg) scale(1); }
+  25%       { transform: rotate(2deg) scale(1.02); }
+  50%       { transform: rotate(-1deg) scale(1); }
+  75%       { transform: rotate(1.5deg) scale(1.01); }
+}
+
+.hossiiCharacter {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: hossiiIdle var(--idle-duration, 4s) ease-in-out infinite;
+}
+
+/* R02: Z軸スピンモーション */
+@keyframes hossiiSpin {
+  0%   { transform: rotateZ(0deg) scale(1); }
+  40%  { transform: rotateZ(200deg) scale(1.12); }
+  70%  { transform: rotateZ(340deg) scale(1.05); }
+  100% { transform: rotateZ(360deg) scale(1); }
+}
+
+.hossiiSpinning {
+  animation: hossiiSpin 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards !important;
+}
+
+/* ============================================
    レスポンシブ対応（モバイル）
    ============================================ */
 @media (max-width: 768px) {

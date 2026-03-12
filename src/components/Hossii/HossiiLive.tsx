@@ -12,7 +12,7 @@ import type { EmotionKey, Hossii } from '../../core/types';
 import type { HossiiColor } from '../../core/types/settings';
 import { getRandomBubble8, EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getHossiiFace } from '../../core/assets/hossiiFaces';
-import { getDefaultIdle, getRandomInteractionFace, getListeningFace } from '../../core/assets/hossiiIdle';
+import { HOSSII_IDLE, getDefaultIdle, getRandomInteractionFace, getListeningFace } from '../../core/assets/hossiiIdle';
 import styles from './HossiiLive.module.css';
 
 type Props = {
@@ -74,17 +74,26 @@ const getHueRotation = (color?: HossiiColor): number => {
   }
 };
 
-/** 自発セリフ（アイドル時） */
-const HOSSII_IDLE_LINES: string[] = [
-  'きょうのスペース、いいかんじ',
-  'ふう…',
-  'だれか来るかな',
-  'ここ、すき',
-  'しずかだね',
-  'のんびり〜',
-  'ほわわ…',
-  'いいてんき♪',
-];
+/** 自発セリフ（投稿数連動カテゴリ） */
+const IDLE_SPEECH = {
+  greeting: ['元気〜？', 'おはよ！', 'こんにちは！', 'やあ！'],
+  prompt:   ['なにか感じてる？', '気持ちを教えてね', '今どんな気分？'],
+  reaction: ['いいね！', 'それ、わかる〜', 'ありがとう！'],
+  quiet:    ['静かだね〜', 'だれかいる？', 'ほわわ…', 'しずかだね'],
+  busy:     ['にぎやかだね！', 'みんな元気そう！', 'うれしいな〜'],
+};
+
+function getIdleSpeechLine(postCount: number): string {
+  let pool: string[];
+  if (postCount === 0) {
+    pool = [...IDLE_SPEECH.greeting, ...IDLE_SPEECH.prompt, ...IDLE_SPEECH.quiet];
+  } else if (postCount <= 5) {
+    pool = [...IDLE_SPEECH.greeting, ...IDLE_SPEECH.reaction];
+  } else {
+    pool = [...IDLE_SPEECH.reaction, ...IDLE_SPEECH.busy];
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 /** EmotionKey -> アニメーションclass名 */
 const ANIM_CLASS_BY_EMOTION: Record<EmotionKey, string> = {
@@ -175,6 +184,7 @@ export function HossiiLive({
   const [transitionDuration, setTransitionDuration] = useState(6000); // ms
   const [isSwimming, setIsSwimming] = useState(false);
   const [isReacting, setIsReacting] = useState(false);
+  const [isSpinning, setIsSpinning] = useState(false);
   const [tapTransform, setTapTransform] = useState<string | null>(null);
   const [bubble, setBubble] = useState<string | null>(null);
   const [longBubble, setLongBubble] = useState<{ emoji: string; text: string } | null>(null);
@@ -185,14 +195,19 @@ export function HossiiLive({
   const [interactionFace, setInteractionFace] = useState<string | null>(null);
   const [reactionFace, setReactionFace] = useState<string | null>(null);
 
-  // いいねトリガーへの反応（喜び系表情を一時表示）
+  // いいねトリガーへの反応（喜び系表情 + スピン）
   useEffect(() => {
     if (!onLikeTrigger) return;
     const joyFaces = ['joy', 'fun', 'laugh'] as EmotionKey[];
     const face = getHossiiFace(joyFaces[Math.floor(Math.random() * joyFaces.length)]);
     setReactionFace(face);
-    const timer = setTimeout(() => setReactionFace(null), 1200 + Math.random() * 300);
-    return () => clearTimeout(timer);
+    setIsSpinning(true);
+    const spinTimer = setTimeout(() => setIsSpinning(false), 600);
+    const faceTimer = setTimeout(() => setReactionFace(null), 1200 + Math.random() * 300);
+    return () => {
+      clearTimeout(spinTimer);
+      clearTimeout(faceTimer);
+    };
   }, [onLikeTrigger]);
 
   // 表示する顔を優先順位で決定
@@ -208,6 +223,7 @@ export function HossiiLive({
   const prevTriggerIdRef = useRef<string | undefined>(undefined);
   const longBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleFaceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const moveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -215,6 +231,13 @@ export function HossiiLive({
   // emotion を ref で保持（effect の依存配列から外すため）
   const emotionRef = useRef<EmotionKey | null | undefined>(emotion);
   emotionRef.current = emotion;
+  // stale closure 回避: 表情 state を ref でミラー
+  const reactionFaceRef = useRef<string | null>(null);
+  useEffect(() => { reactionFaceRef.current = reactionFace; }, [reactionFace]);
+  const interactionFaceRef = useRef<string | null>(null);
+  useEffect(() => { interactionFaceRef.current = interactionFace; }, [interactionFace]);
+  // energyLevel を ref でミラー（idle face タイマーの間隔制御用）
+  const energyLevelRef = useRef<number>(0);
 
   // F07: hossiis / readingEnabled を ref で保持
   const hossiisRef = useRef<Hossii[]>(hossiis);
@@ -308,9 +331,11 @@ export function HossiiLive({
       setReactionFace(getHossiiFace(currentEmotion));
     }
 
-    // 2) にこっ（scale は CSS .reacting .hossiiImage で）
+    // 2) にこっ（scale は CSS .reacting .hossiiImage で）+ スピン
     setIsReacting(true);
     timers.push(setTimeout(() => setIsReacting(false), 500));
+    setIsSpinning(true);
+    timers.push(setTimeout(() => setIsSpinning(false), 600));
 
     // 3) 吹き出し
     if (currentEmotion) {
@@ -349,6 +374,35 @@ export function HossiiLive({
   }, [lastTriggerId, onParticle]);
 
   // ============================================
+  // F02/F03: アイドル表情ランダム切り替え（8〜15s）
+  // ============================================
+  useEffect(() => {
+    function scheduleIdleFace() {
+      // Lv0/1: 8〜15s, Lv2: 6〜10s, Lv3: 4〜7s
+      const baseDelay = energyLevelRef.current >= 3 ? 4000
+        : energyLevelRef.current >= 2 ? 6000
+        : 8000;
+      const randRange = energyLevelRef.current >= 3 ? 3000
+        : energyLevelRef.current >= 2 ? 4000
+        : 7000;
+      const delay = baseDelay + Math.random() * randRange;
+      idleFaceTimerRef.current = setTimeout(() => {
+        if (!reactionFaceRef.current && !interactionFaceRef.current) {
+          const faces = [HOSSII_IDLE.smile, HOSSII_IDLE.closingEye];
+          const face = faces[Math.floor(Math.random() * faces.length)];
+          setReactionFace(face);
+          setTimeout(() => setReactionFace(null), 1500 + Math.random() * 1500);
+        }
+        scheduleIdleFace();
+      }, delay);
+    }
+    scheduleIdleFace();
+    return () => {
+      if (idleFaceTimerRef.current) clearTimeout(idleFaceTimerRef.current);
+    };
+  }, []);
+
+  // ============================================
   // 自発セリフ（アイドル時）
   // ============================================
   useEffect(() => {
@@ -367,33 +421,31 @@ export function HossiiLive({
     }
 
     function scheduleIdleSpeech() {
-      // 30-60秒のランダムな間隔
-      const delay = 30000 + Math.random() * 30000;
+      // 12-20秒のランダムな間隔
+      const delay = 12000 + Math.random() * 8000;
 
       idleBubbleTimerRef.current = setTimeout(() => {
-        // 40%の確率で発動
-        if (Math.random() < 0.4) {
-          // F07: readingEnabled かつ投稿がある場合、50% の確率で投稿を読み上げ
-          const candidatePosts = hossiisRef.current.filter(
-            (h) => h.message && h.message.trim().length > 0 && h.id !== lastReadIdRef.current
-          );
+        // F07: readingEnabled かつ投稿がある場合、50% の確率で投稿を読み上げ
+        const candidatePosts = hossiisRef.current.filter(
+          (h) => h.message && h.message.trim().length > 0 && h.id !== lastReadIdRef.current
+        );
 
-          if (readingEnabledRef.current && candidatePosts.length > 0 && Math.random() < 0.5) {
-            const post = candidatePosts[Math.floor(Math.random() * candidatePosts.length)];
-            lastReadIdRef.current = post.id;
-            const displayText = post.message.length > 40 ? post.message.slice(0, 40) + '…' : post.message;
-            setIdleBubble(`「${displayText}」`);
-            speakText(post.message);
-          } else {
-            const randomLine = HOSSII_IDLE_LINES[Math.floor(Math.random() * HOSSII_IDLE_LINES.length)];
-            setIdleBubble(randomLine);
-          }
-
-          // 4秒後にフェードアウト
-          setTimeout(() => {
-            setIdleBubble(null);
-          }, 4000);
+        if (readingEnabledRef.current && candidatePosts.length > 0 && Math.random() < 0.5) {
+          const post = candidatePosts[Math.floor(Math.random() * candidatePosts.length)];
+          lastReadIdRef.current = post.id;
+          const displayText = post.message.length > 40 ? post.message.slice(0, 40) + '…' : post.message;
+          setIdleBubble(`「${displayText}」`);
+          speakText(post.message);
+        } else {
+          // 投稿数に応じたカテゴリからセリフ選択
+          const line = getIdleSpeechLine(hossiisRef.current.length);
+          setIdleBubble(line);
         }
+
+        // 3〜5秒後にフェードアウト
+        setTimeout(() => {
+          setIdleBubble(null);
+        }, 3000 + Math.random() * 2000);
 
         // 次の自発セリフをスケジュール
         scheduleIdleSpeech();
@@ -514,6 +566,9 @@ export function HossiiLive({
       if (idleBubbleTimerRef.current) {
         clearTimeout(idleBubbleTimerRef.current);
       }
+      if (idleFaceTimerRef.current) {
+        clearTimeout(idleFaceTimerRef.current);
+      }
       if (interactionTimerRef.current) {
         clearTimeout(interactionTimerRef.current);
       }
@@ -522,6 +577,18 @@ export function HossiiLive({
       }
     };
   }, []);
+
+  // J: 投稿数連動・元気度レベル（0〜3）
+  const energyLevel = useMemo(() => {
+    const n = hossiis.length;
+    if (n === 0) return 0;
+    if (n <= 3) return 1;
+    if (n <= 9) return 2;
+    return 3;
+  }, [hossiis]);
+  // レベル別アイドルアニメーション速度（秒）: Lv0=6s, Lv1=4s, Lv2=3s, Lv3=2s
+  const idleAnimDuration = ([6, 4, 3, 2] as const)[energyLevel];
+  energyLevelRef.current = energyLevel;
 
   // コンテナのクラス名
   const containerClasses = [
@@ -555,16 +622,24 @@ export function HossiiLive({
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && handleTap(e as unknown as React.MouseEvent<HTMLDivElement>)}
       >
-        <img
-          src={displayFace}
-          alt="Hossii"
-          className={styles.hossiiImage}
-          style={{ filter: colorFilter }}
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-        <span className={styles.fallbackEmoji}>🌟</span>
+        <div
+          className={[
+            styles.hossiiCharacter,
+            isSpinning ? styles.hossiiSpinning : '',
+          ].filter(Boolean).join(' ')}
+          style={{ '--idle-duration': `${idleAnimDuration}s` } as React.CSSProperties}
+        >
+          <img
+            src={displayFace}
+            alt="Hossii"
+            className={styles.hossiiImage}
+            style={{ filter: colorFilter }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <span className={styles.fallbackEmoji}>🌟</span>
+        </div>
 
         {/* 短い吹き出し（投稿時） */}
         {bubble && !longBubble && (
