@@ -12,7 +12,7 @@ type Props = {
   onSignUpRequested: () => void;
 };
 
-export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested, onSignUpRequested }: Props) => {
+export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested: _onLoginRequested, onSignUpRequested: _onSignUpRequested }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
   const [step, setStep] = useState<Step>('select');
   // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
