@@ -64,34 +64,51 @@ export async function fetchNeighbors(spaceId: string): Promise<Space[]> {
   }));
 }
 
-// 隣人を追加（管理者のみ）
+// 隣人を追加（相互登録: A→B と B→A を両方 insert）
 export async function addNeighbor(spaceId: string, neighborSpaceId: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  const { error } = await supabase
+  const { error: e1 } = await supabase
     .from('space_neighbors')
     .insert({ space_id: spaceId, neighbor_space_id: neighborSpaceId });
 
-  if (error) {
-    console.error('[neighborsApi] addNeighbor error:', error);
-    throw error;
+  // 23505 = unique_violation（すでに登録済み）は無視
+  if (e1 && e1.code !== '23505') {
+    console.error('[neighborsApi] addNeighbor error:', e1);
+    throw e1;
+  }
+
+  const { error: e2 } = await supabase
+    .from('space_neighbors')
+    .insert({ space_id: neighborSpaceId, neighbor_space_id: spaceId });
+
+  if (e2 && e2.code !== '23505') {
+    console.error('[neighborsApi] addNeighbor reverse error:', e2);
+    // 逆方向の失敗は警告にとどめ、主方向の登録は維持する
   }
 }
 
-// 隣人を削除（管理者のみ）
+// 隣人を削除（相互削除: A→B と B→A を両方 delete）
 export async function removeNeighbor(spaceId: string, neighborSpaceId: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  const { error } = await supabase
+  const { error: e1 } = await supabase
     .from('space_neighbors')
     .delete()
     .eq('space_id', spaceId)
     .eq('neighbor_space_id', neighborSpaceId);
 
-  if (error) {
-    console.error('[neighborsApi] removeNeighbor error:', error);
-    throw error;
-  }
+  if (e1) console.error('[neighborsApi] removeNeighbor error:', e1);
+
+  const { error: e2 } = await supabase
+    .from('space_neighbors')
+    .delete()
+    .eq('space_id', neighborSpaceId)
+    .eq('neighbor_space_id', spaceId);
+
+  if (e2) console.error('[neighborsApi] removeNeighbor reverse error:', e2);
+
+  if (e1) throw e1;
 }
 
 // 隣スペースからランダムに 1 件を選ぶ
@@ -196,3 +213,4 @@ export async function fetchNextBottle(
 
   return null;
 }
+

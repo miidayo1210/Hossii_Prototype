@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
 import type { BottlePayload } from '../../core/utils/neighborsApi';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
@@ -13,18 +13,6 @@ type Props = {
 export const MessageBottle = ({ payload, onOpen, onDismiss }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
-
-  // 20 秒後に自動消滅（未開封の場合は recordBottleDelivery を呼ばない）
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!isOpen) {
-        setIsDismissed(true);
-        // アニメーション後に親に通知
-        setTimeout(onDismiss, 500);
-      }
-    }, 20000);
-    return () => clearTimeout(timer);
-  }, [isOpen, onDismiss]);
 
   const handleBottleClick = useCallback(() => {
     setIsOpen(true);
@@ -58,7 +46,7 @@ export const MessageBottle = ({ payload, onOpen, onDismiss }: Props) => {
           className={`${styles.bottleButton} ${isDismissed ? styles.dismissed : ''}`}
           onClick={handleBottleClick}
           aria-label="漂着メッセージを開封する"
-          title="隣の島からメッセージが届きました"
+          title="隣のスペースからメッセージが届きました"
         >
           🍾
         </button>
@@ -75,7 +63,7 @@ export const MessageBottle = ({ payload, onOpen, onDismiss }: Props) => {
               <X size={18} />
             </button>
 
-            <p className={styles.fromLabel}>🏝 となりの島から届きました</p>
+            <p className={styles.fromLabel}>となりのスペースから届きました</p>
             <hr className={styles.divider} />
 
             {emotionEmoji && (

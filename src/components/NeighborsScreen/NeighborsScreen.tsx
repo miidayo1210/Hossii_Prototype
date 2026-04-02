@@ -62,7 +62,7 @@ export const NeighborsScreen = () => {
           <span>戻る</span>
         </button>
         <div className={styles.headerTitle}>
-          <h1 className={styles.title}>🏝 隣の島</h1>
+          <h1 className={styles.title}>隣のスペース</h1>
           <p className={styles.subtitle}>つながっているスペース</p>
         </div>
         <TopRightMenu />
@@ -74,8 +74,8 @@ export const NeighborsScreen = () => {
         ) : cards.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon}>🏝</span>
-            <p className={styles.emptyText}>まだ隣の島はありません</p>
-            <p className={styles.emptyHint}>スペース管理画面の「隣の島」タブから追加できます。</p>
+            <p className={styles.emptyText}>まだ隣のスペースはありません</p>
+            <p className={styles.emptyHint}>スペース管理画面の「隣のスペース」タブから追加できます。</p>
           </div>
         ) : (
           <ul className={styles.cardList}>

@@ -172,6 +172,51 @@
   font-size: 0.9rem;
 }
 
+/* コミュニティ候補リスト */
+.candidateList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.candidateItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  background: rgba(168, 85, 247, 0.05);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+.addQuickButton {
+  flex-shrink: 0;
+  padding: 0.4rem 0.9rem;
+  border-radius: 2rem;
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  background: rgba(168, 85, 247, 0.15);
+  color: rgba(168, 85, 247, 0.9);
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.addQuickButton:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.3);
+  border-color: #a855f7;
+  color: #fff;
+}
+
+.addQuickButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* トースト */
 .toastSuccess,
 .toastError {

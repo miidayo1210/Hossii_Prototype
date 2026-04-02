@@ -157,7 +157,7 @@ export const SpaceSettingsScreen = () => {
                 className={`${styles.tab} ${activeTab === 'neighbors' ? styles.activeTab : ''}`}
                 onClick={() => setActiveTab('neighbors')}
               >
-                隣の島
+                隣のスペース
               </button>
             )}
           </nav>
@@ -209,6 +209,7 @@ export const SpaceSettingsScreen = () => {
               settings={settings}
               onUpdate={setSettings}
               spaceId={activeSpace.id}
+              communitySpaces={state.spaces}
             />
           )}
         </main>

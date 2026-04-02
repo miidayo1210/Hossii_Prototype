@@ -125,13 +125,13 @@ export const LeftControlBar = ({
         <span className={styles.scaleLabel}>{scalePercent}%</span>
       </button>
 
-      {/* --- 隣の島ワープボタン --- */}
+      {/* --- 隣のスペースワープボタン --- */}
       {neighbors.length > 0 && !isVisiting && (
         <button
           className={`${styles.controlButton} ${styles.mobileVisible}`}
           onClick={onWarp}
-          aria-label="隣の島にワープ"
-          title="隣の島にワープ"
+          aria-label="隣のスペースにワープ"
+          title="隣のスペースにワープ"
         >
           🏝
         </button>

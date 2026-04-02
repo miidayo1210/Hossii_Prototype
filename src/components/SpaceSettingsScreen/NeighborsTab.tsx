@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Trash2, Plus } from 'lucide-react';
 import type { SpaceSettings, BottleFrequency } from '../../core/types/settings';
 import type { Space } from '../../core/types/space';
 import { fetchNeighbors, addNeighbor, removeNeighbor } from '../../core/utils/neighborsApi';
@@ -11,6 +11,7 @@ type Props = {
   settings: SpaceSettings;
   onUpdate: (settings: SpaceSettings) => void;
   spaceId: string;
+  communitySpaces?: Space[];
 };
 
 const FREQUENCY_OPTIONS: { value: BottleFrequency; label: string }[] = [
@@ -21,8 +22,9 @@ const FREQUENCY_OPTIONS: { value: BottleFrequency; label: string }[] = [
   { value: 'off', label: '無効' },
 ];
 
-export const NeighborsTab = ({ settings, onUpdate, spaceId }: Props) => {
+export const NeighborsTab = ({ settings, onUpdate, spaceId, communitySpaces }: Props) => {
   const [neighbors, setNeighbors] = useState<Space[]>([]);
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [urlInput, setUrlInput] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -31,6 +33,14 @@ export const NeighborsTab = ({ settings, onUpdate, spaceId }: Props) => {
   useEffect(() => {
     fetchNeighbors(spaceId).then(setNeighbors);
   }, [spaceId]);
+
+  // 同じコミュニティのスペースのうち、自スペースと登録済み隣人を除いた候補
+  const candidates = useMemo(
+    () => (communitySpaces ?? []).filter(
+      (s) => s.id !== spaceId && !neighbors.some((n) => n.id === s.id),
+    ),
+    [communitySpaces, spaceId, neighbors],
+  );
 
   const showToast = (msg: string, isError = false) => {
     if (isError) {
@@ -83,6 +93,23 @@ export const NeighborsTab = ({ settings, onUpdate, spaceId }: Props) => {
     }
   };
 
+  const handleAddCandidate = async (candidate: Space) => {
+    setAddingIds((prev) => new Set(prev).add(candidate.id));
+    try {
+      await addNeighbor(spaceId, candidate.id);
+      setNeighbors((prev) => [...prev, candidate]);
+      showToast(`${candidate.name} を追加しました`);
+    } catch {
+      showToast('追加に失敗しました', true);
+    } finally {
+      setAddingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(candidate.id);
+        return next;
+      });
+    }
+  };
+
   const handleRemoveNeighbor = async (neighborId: string) => {
     try {
       await removeNeighbor(spaceId, neighborId);
@@ -100,7 +127,7 @@ export const NeighborsTab = ({ settings, onUpdate, spaceId }: Props) => {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>漂着メッセージの頻度</h2>
-        <p className={styles.description}>隣の島から投稿がボトルに入って届く間隔を設定します。</p>
+        <p className={styles.description}>隣のスペースから投稿がボトルに入って届く間隔を設定します。</p>
         <div className={styles.frequencyGroup}>
           {FREQUENCY_OPTIONS.map(({ value, label }) => (
             <button
@@ -114,9 +141,37 @@ export const NeighborsTab = ({ settings, onUpdate, spaceId }: Props) => {
         </div>
       </section>
 
+      {candidates.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>同じコミュニティのスペース</h2>
+          <p className={styles.description}>同じコミュニティに属するスペースです。ボタンを押すだけで隣のスペースとして登録できます（相互登録）。</p>
+          <ul className={styles.candidateList}>
+            {candidates.map((candidate) => (
+              <li key={candidate.id} className={styles.candidateItem}>
+                <div className={styles.neighborInfo}>
+                  <span className={styles.neighborName}>{candidate.name}</span>
+                  {candidate.spaceURL && (
+                    <span className={styles.neighborUrl}>{candidate.spaceURL}</span>
+                  )}
+                </div>
+                <button
+                  className={styles.addQuickButton}
+                  onClick={() => handleAddCandidate(candidate)}
+                  disabled={addingIds.has(candidate.id)}
+                  aria-label={`${candidate.name}を隣のスペースに追加`}
+                >
+                  <Plus size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.2rem' }} />
+                  {addingIds.has(candidate.id) ? '追加中...' : '追加'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>隣の島を追加</h2>
-        <p className={styles.description}>スペース URL を入力して隣の島として登録します。</p>
+        <h2 className={styles.sectionTitle}>隣のスペースを追加</h2>
+        <p className={styles.description}>スペース URL を入力して隣のスペースとして登録します。</p>
         <div className={styles.addRow}>
           <input
             type="text"
@@ -137,9 +192,9 @@ export const NeighborsTab = ({ settings, onUpdate, spaceId }: Props) => {
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>登録済みの隣の島</h2>
+        <h2 className={styles.sectionTitle}>登録済みの隣のスペース</h2>
         {neighbors.length === 0 ? (
-          <p className={styles.emptyText}>まだ隣の島はありません</p>
+          <p className={styles.emptyText}>まだ隣のスペースはありません</p>
         ) : (
           <ul className={styles.neighborList}>
             {neighbors.map((neighbor) => (
