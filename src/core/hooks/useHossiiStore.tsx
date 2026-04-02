@@ -949,9 +949,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       tags: input.tags,
       imageUrl: input.imageUrl,
       numberValue: input.numberValue,
-      positionX: initialPos.x,
-      positionY: initialPos.y,
-      isPositionFixed: true,
+      positionX: input.positionX ?? initialPos.x,
+      positionY: input.positionY ?? initialPos.y,
+      isPositionFixed: input.isPositionFixed ?? true,
     };
 
     // 楽観的更新（即時 UI 反映）

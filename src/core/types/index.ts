@@ -84,6 +84,9 @@ export type AddHossiiInput = {
   tags?: string[]; // T02: プリセットタグ
   imageUrl?: string; // F10
   numberValue?: number; // numberPost
+  positionX?: number; // 0〜1 の相対座標
+  positionY?: number; // 0〜1 の相対座標
+  isPositionFixed?: boolean; // true のとき上記座標で固定配置
 };
 
 export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities' | 'reflection' | 'neighbors';

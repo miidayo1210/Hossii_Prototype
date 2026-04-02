@@ -16,6 +16,7 @@ import { DrawingModal } from '../DrawingModal/DrawingModal';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { EmotionKey, ToastState } from '../../core/types';
+import { loadContinuousPost, saveContinuousPost } from '../../core/utils/displayPrefsStorage';
 import styles from './PostScreen.module.css';
 
 // B02: 吹き出し形状プリセット（14種）
@@ -72,6 +73,22 @@ const GREETING_POOL = [
   '君の一声が、誰かを救うんだよ〜！📣',
 ];
 
+// 位置選択グリッドのエリアラベル（左上から右下へ）
+const AREA_LABELS = ['上・左', '上・中', '上・右', '中・左', '中・中', '中・右', '下・左', '下・中', '下・右'];
+
+// areaIndex（0〜8）からスペース上の相対座標（0〜1）を計算する
+function areaToPosition(idx: number): { x: number; y: number } {
+  const col = idx % 3;
+  const row = Math.floor(idx / 3);
+  const ranges = [
+    { min: 0.05, max: 0.28 },
+    { min: 0.38, max: 0.62 },
+    { min: 0.72, max: 0.95 },
+  ];
+  const rand = (min: number, max: number) => min + Math.random() * (max - min);
+  return { x: rand(ranges[col].min, ranges[col].max), y: rand(ranges[row].min, ranges[row].max) };
+}
+
 // F09: テキストから #タグ を抽出
 // 全角 ＃ を半角 # に正規化してからマッチする
 function parseHashtags(text: string): string[] {
@@ -108,6 +125,12 @@ export const PostScreen = () => {
 
   // numberPost: 数値投稿
   const [numberInput, setNumberInput] = useState('');
+
+  // 連続投稿モード
+  const [continuousPost, setContinuousPost] = useState(() => loadContinuousPost());
+
+  // 位置選択グリッド（null = 未選択 = ランダム配置）
+  const [selectedArea, setSelectedArea] = useState<number | null>(null);
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
   const { showHossii } = state;
@@ -291,6 +314,8 @@ export const PostScreen = () => {
         }
       }
 
+      const areaPos = selectedArea !== null ? areaToPosition(selectedArea) : null;
+
       addHossii({
         message: message.trim(),
         emotion: selectedEmotion ?? undefined,
@@ -300,6 +325,9 @@ export const PostScreen = () => {
         tags: selectedPresetTags.length > 0 ? selectedPresetTags : undefined,
         imageUrl,
         numberValue: hasNumber ? parsedNumber! : undefined,
+        positionX: areaPos?.x,
+        positionY: areaPos?.y,
+        isPositionFixed: selectedArea !== null,
       });
 
       // スタンプを獲得
@@ -312,11 +340,12 @@ export const PostScreen = () => {
         if (isNewCard) {
           setToast({ message: '🎉 スタンプカードが完成したよ！', type: 'success' });
         } else {
-          let toastMsg = '置いたよ〜！⭐ スタンプ+1';
+          const suffix = continuousPost ? ' 続けてどうぞ ⭐ スタンプ+1' : '〜！⭐ スタンプ+1';
+          let toastMsg = `置いたよ${suffix}`;
           if (selectedEmotion) {
             const emoji = EMOJI_BY_EMOTION[selectedEmotion];
             const label = EMOTION_LABELS[selectedEmotion];
-            toastMsg = `${emoji} ${label} を置いたよ！⭐ スタンプ+1`;
+            toastMsg = `${emoji} ${label} を置いたよ！${continuousPost ? '続けてどうぞ ' : ''}⭐ スタンプ+1`;
           }
           setToast({ message: toastMsg, type: 'success' });
         }
@@ -331,12 +360,15 @@ export const PostScreen = () => {
       setHashtagInput('');
       setSelectedPresetTags([]);
       setNumberInput('');
+      setSelectedArea(null);
       handleImageRemove();
       shuffleGreeting();
 
-      setTimeout(() => {
-        navigate('screen');
-      }, 800);
+      if (!continuousPost) {
+        setTimeout(() => {
+          navigate('screen');
+        }, 800);
+      }
     } finally {
       setSending(false);
     }
@@ -587,6 +619,30 @@ export const PostScreen = () => {
           </div>
         )}
 
+        {/* 位置選択グリッド */}
+        <div className={styles.section}>
+          <div className={styles.label}>置く場所（任意）</div>
+          <div className={styles.areaGrid}>
+            {AREA_LABELS.map((label, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSelectedArea(selectedArea === idx ? null : idx)}
+                className={`${styles.areaCell} ${selectedArea === idx ? styles.areaCellSelected : ''}`}
+                aria-label={label}
+                title={label}
+              >
+                <span className={styles.areaCellLabel}>{label}</span>
+              </button>
+            ))}
+          </div>
+          <div className={styles.areaHint}>
+            {selectedArea !== null
+              ? `選択中: ${AREA_LABELS[selectedArea]}`
+              : 'スペース全体にランダム配置'}
+          </div>
+        </div>
+
         {/* 送信ボタン */}
         <button
           type="button"
@@ -596,6 +652,20 @@ export const PostScreen = () => {
         >
           {sending ? '送信中...' : '気持ちを置く'}
         </button>
+
+        {/* 連続投稿チェックボックス */}
+        <label className={styles.continuousPostLabel}>
+          <input
+            type="checkbox"
+            checked={continuousPost}
+            onChange={(e) => {
+              setContinuousPost(e.target.checked);
+              saveContinuousPost(e.target.checked);
+            }}
+            className={styles.continuousPostCheckbox}
+          />
+          連続で気持ちを置く
+        </label>
       </main>
 
       {/* Toast */}

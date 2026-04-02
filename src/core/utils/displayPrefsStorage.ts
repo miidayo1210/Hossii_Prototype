@@ -99,3 +99,23 @@ export function saveViewMode(mode: ViewMode): void {
 
 // suppress unused variable warning on VALID_LIMITS (used for type safety)
 void VALID_LIMITS;
+
+// ---- ContinuousPost ----
+
+const CONTINUOUS_POST_KEY = 'hossii.continuousPost';
+
+export function loadContinuousPost(): boolean {
+  try {
+    return localStorage.getItem(CONTINUOUS_POST_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function saveContinuousPost(value: boolean): void {
+  try {
+    localStorage.setItem(CONTINUOUS_POST_KEY, String(value));
+  } catch {
+    // ignore
+  }
+}
