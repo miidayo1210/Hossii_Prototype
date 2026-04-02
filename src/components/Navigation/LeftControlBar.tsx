@@ -1,6 +1,7 @@
 import { Maximize2, Minimize2, Eye, EyeOff, Mic, MicOff, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import type { DisplayPeriod, DisplayLimit, ViewMode } from '../../core/utils/displayPrefsStorage';
+import type { Space } from '../../core/types/space';
 import styles from './LeftControlBar.module.css';
 
 export type ControlState = {
@@ -22,6 +23,9 @@ type Props = {
   onDisplayLimitChange: (l: DisplayLimit) => void;
   viewMode: ViewMode;
   onViewModeChange: (m: ViewMode) => void;
+  neighbors?: Space[];
+  onWarp?: () => void;
+  isVisiting?: boolean;
 };
 
 const PERIOD_OPTIONS: { value: DisplayPeriod; label: string }[] = [
@@ -57,6 +61,9 @@ export const LeftControlBar = ({
   onDisplayLimitChange,
   viewMode,
   onViewModeChange,
+  neighbors = [],
+  onWarp,
+  isVisiting = false,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
 
@@ -73,7 +80,7 @@ export const LeftControlBar = ({
     <aside className={styles.controlBar}>
       {/* --- 既存トグルボタン群 --- */}
       <button
-        className={`${styles.controlButton} ${controls.isFullscreen ? styles.active : ''}`}
+        className={`${styles.controlButton} ${styles.mobileVisible} ${controls.isFullscreen ? styles.active : ''}`}
         onClick={onFullscreenToggle}
         aria-label="画面サイズ調整"
         title="画面サイズ調整"
@@ -82,7 +89,7 @@ export const LeftControlBar = ({
       </button>
 
       <button
-        className={`${styles.controlButton} ${controls.hossiiVisible ? styles.active : ''}`}
+        className={`${styles.controlButton} ${styles.mobileVisible} ${controls.hossiiVisible ? styles.active : ''}`}
         onClick={() => onToggle('hossiiVisible')}
         aria-label="Hossii表示"
         title="Hossii表示"
@@ -91,7 +98,7 @@ export const LeftControlBar = ({
       </button>
 
       <button
-        className={`${styles.controlButton} ${controls.micEnabled ? styles.active : ''}`}
+        className={`${styles.controlButton} ${styles.mobileVisible} ${controls.micEnabled ? styles.active : ''}`}
         onClick={() => onToggle('micEnabled')}
         aria-label="マイク/音声"
         title="マイク/音声"
@@ -100,7 +107,7 @@ export const LeftControlBar = ({
       </button>
 
       <button
-        className={`${styles.controlButton} ${controls.voiceEnabled ? styles.active : ''}`}
+        className={`${styles.controlButton} ${styles.mobileVisible} ${controls.voiceEnabled ? styles.active : ''}`}
         onClick={() => onToggle('voiceEnabled')}
         aria-label="Hossiiの声"
         title="Hossiiの声（読み上げON/OFF）"
@@ -117,6 +124,18 @@ export const LeftControlBar = ({
         <ZoomIn size={18} />
         <span className={styles.scaleLabel}>{scalePercent}%</span>
       </button>
+
+      {/* --- 隣の島ワープボタン --- */}
+      {neighbors.length > 0 && !isVisiting && (
+        <button
+          className={`${styles.controlButton} ${styles.mobileVisible}`}
+          onClick={onWarp}
+          aria-label="隣の島にワープ"
+          title="隣の島にワープ"
+        >
+          🏝
+        </button>
+      )}
 
       {/* --- 区切り線 --- */}
       <div className={styles.divider} />
@@ -141,36 +160,40 @@ export const LeftControlBar = ({
       <div className={styles.divider} />
 
       {/* --- F11: 期間フィルタ --- */}
-      <div className={styles.groupLabel}>期間</div>
-      <div className={styles.buttonGroup}>
-        {PERIOD_OPTIONS.map(({ value, label }) => (
-          <button
-            key={value}
-            className={`${styles.miniButton} ${displayPeriod === value ? styles.miniActive : ''}`}
-            onClick={() => onDisplayPeriodChange(value)}
-            title={`表示期間: ${label}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className={styles.periodGroup}>
+        <div className={styles.groupLabel}>期間</div>
+        <div className={styles.buttonGroup}>
+          {PERIOD_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              className={`${styles.miniButton} ${displayPeriod === value ? styles.miniActive : ''}`}
+              onClick={() => onDisplayPeriodChange(value)}
+              title={`表示期間: ${label}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* --- 区切り線 --- */}
       <div className={styles.divider} />
 
       {/* --- F12: 表示件数 --- */}
-      <div className={styles.groupLabel}>件数</div>
-      <div className={styles.buttonGroup}>
-        {LIMIT_OPTIONS.map(({ value, label }) => (
-          <button
-            key={String(value)}
-            className={`${styles.miniButton} ${displayLimit === value ? styles.miniActive : ''}`}
-            onClick={() => handleLimitChange(value)}
-            title={`表示件数: ${label === '∞' ? '無制限' : label + '件'}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className={styles.limitGroup}>
+        <div className={styles.groupLabel}>件数</div>
+        <div className={styles.buttonGroup}>
+          {LIMIT_OPTIONS.map(({ value, label }) => (
+            <button
+              key={String(value)}
+              className={`${styles.miniButton} ${displayLimit === value ? styles.miniActive : ''}`}
+              onClick={() => handleLimitChange(value)}
+              title={`表示件数: ${label === '∞' ? '無制限' : label + '件'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </aside>
   );

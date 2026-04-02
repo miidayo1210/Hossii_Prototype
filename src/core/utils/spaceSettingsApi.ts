@@ -13,6 +13,7 @@ type SupabaseSpaceSettings = {
   card_type: string;
   hossii_color: string;
   bubble_edit_permission: string;
+  bottle_frequency: string;
 };
 
 function toSpaceSettings(row: SupabaseSpaceSettings): SpaceSettings {
@@ -29,6 +30,7 @@ function toSpaceSettings(row: SupabaseSpaceSettings): SpaceSettings {
     cardType: row.card_type as SpaceSettings['cardType'],
     hossiiColor: row.hossii_color as SpaceSettings['hossiiColor'],
     bubbleEditPermission: (row.bubble_edit_permission ?? 'all') as SpaceSettings['bubbleEditPermission'],
+    bottleFrequency: (row.bottle_frequency ?? '3d-7d') as SpaceSettings['bottleFrequency'],
   };
 }
 
@@ -44,6 +46,7 @@ function toRow(settings: SpaceSettings): SupabaseSpaceSettings {
     card_type: settings.cardType,
     hossii_color: settings.hossiiColor,
     bubble_edit_permission: settings.bubbleEditPermission ?? 'all',
+    bottle_frequency: settings.bottleFrequency ?? '3d-7d',
   };
 }
 

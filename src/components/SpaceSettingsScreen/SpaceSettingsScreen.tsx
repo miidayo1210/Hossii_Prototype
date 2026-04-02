@@ -15,9 +15,10 @@ import { ModerationTab } from './ModerationTab';
 import { DecorationTab } from './DecorationTab';
 import { FeatureFlagsTab } from './FeatureFlagsTab';
 import { TagsTab } from './TagsTab';
+import { NeighborsTab } from './NeighborsTab';
 import styles from './SpaceSettingsScreen.module.css';
 
-type Tab = 'general' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration' | 'featureFlags' | 'tags';
+type Tab = 'general' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration' | 'featureFlags' | 'tags' | 'neighbors';
 
 export const SpaceSettingsScreen = () => {
   const { navigate } = useRouter();
@@ -151,6 +152,14 @@ export const SpaceSettingsScreen = () => {
                 Feature Flags
               </button>
             )}
+            {isAdmin && (
+              <button
+                className={`${styles.tab} ${activeTab === 'neighbors' ? styles.activeTab : ''}`}
+                onClick={() => setActiveTab('neighbors')}
+              >
+                隣の島
+              </button>
+            )}
           </nav>
         </aside>
 
@@ -194,6 +203,13 @@ export const SpaceSettingsScreen = () => {
           )}
           {activeTab === 'featureFlags' && activeSpace && (
             <FeatureFlagsTab spaceId={activeSpace.id} />
+          )}
+          {activeTab === 'neighbors' && activeSpace && (
+            <NeighborsTab
+              settings={settings}
+              onUpdate={setSettings}
+              spaceId={activeSpace.id}
+            />
           )}
         </main>
       </div>

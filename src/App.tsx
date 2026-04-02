@@ -16,6 +16,7 @@ import { AccountScreen } from './components/AccountScreen/AccountScreen';
 import { SpaceSettingsScreen } from './components/SpaceSettingsScreen/SpaceSettingsScreen';
 import { StampCardScreen } from './components/StampCardScreen/StampCardScreen';
 import { ReflectionScreen } from './components/ReflectionScreen/ReflectionScreen';
+import { NeighborsScreen } from './components/NeighborsScreen/NeighborsScreen';
 import { StartScreen } from './components/StartScreen/StartScreen';
 import { AdminLoginScreen } from './components/Auth/AdminLoginScreen';
 import { LoginScreen } from './components/Auth/LoginScreen';
@@ -507,6 +508,8 @@ const AppContent = () => {
         return <StampCardScreen />;
       case 'reflection':
         return <ReflectionScreen />;
+      case 'neighbors':
+        return <NeighborsScreen />;
       default:
         return <SpaceScreen />;
     }

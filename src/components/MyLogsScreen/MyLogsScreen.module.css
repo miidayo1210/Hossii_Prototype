@@ -78,6 +78,40 @@
   font-weight: 600;
 }
 
+/* 並び替えバー */
+.sortBar {
+  display: flex;
+  gap: 0.375rem;
+  max-width: 520px;
+  margin: 0.625rem auto 0;
+}
+
+.sortBtn {
+  padding: 0.3rem 0.875rem;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sortBtn:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: #a78bfa;
+  color: #7c3aed;
+}
+
+.sortBtnActive {
+  background: linear-gradient(135deg, #e9d5ff 0%, #fbcfe8 100%);
+  border-color: #a78bfa;
+  color: #7c3aed;
+  font-weight: 600;
+}
+
 /* メインコンテンツ */
 .main {
   flex: 1;

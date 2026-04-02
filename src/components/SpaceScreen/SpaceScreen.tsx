@@ -6,7 +6,7 @@ import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useRe
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/AuthContext';
-import type { EmotionKey } from '../../core/types';
+import type { EmotionKey, Hossii } from '../../core/types';
 import type { SpaceSettings } from '../../core/types/settings';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
@@ -16,6 +16,8 @@ import { incrementLike } from '../../core/utils/likesApi';
 import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
+import { VisitBanner } from './VisitBanner';
+import { MessageBottle } from '../MessageBottle/MessageBottle';
 import { PostDetailModal } from '../PostDetailModal/PostDetailModal';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { TopBar } from '../Navigation/TopBar';
@@ -25,6 +27,17 @@ import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { StarLayer } from '../StarLayer/StarLayer';
 import { SlideshowView } from '../Slideshow/SlideshowView';
+import {
+  fetchNeighbors,
+  pickRandomNeighbor,
+  fetchLastDeliveredAt,
+  fetchNextBottle,
+  recordBottleDelivery,
+  calcBottleIntervalMs,
+  type BottlePayload,
+} from '../../core/utils/neighborsApi';
+import { fetchHossiis } from '../../core/utils/hossiisApi';
+import type { Space } from '../../core/types/space';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
@@ -57,6 +70,7 @@ export const SpaceScreen = () => {
     setShowHossii,
     setListenMode,
     setListenConsent,
+    setVisitingSpace,
     updateHossiiColorAction,
     updateHossiiPositionAction,
     updateHossiiScaleAction,
@@ -65,8 +79,10 @@ export const SpaceScreen = () => {
   const {
     showHossii, listenMode, hasConsentedToListen, emotionLogEnabled, speechLogEnabled,
     speechLevels, activeSpaceId, displayScale, displayPeriod, displayLimit, viewMode,
+    visitingSpaceId,
   } = state;
   const activeSpace = getActiveSpace();
+  const isVisiting = visitingSpaceId !== null;
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin ?? false;
   // 現在のユーザーID（匿名含む）
@@ -93,6 +109,14 @@ export const SpaceScreen = () => {
   // スペース設定の読み込み
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
 
+  // 隣人スペース一覧
+  const [neighbors, setNeighbors] = useState<Space[]>([]);
+  // 訪問中スペースの hossiis・スペース情報
+  const [visitingHossiis, setVisitingHossiis] = useState<Hossii[]>([]);
+  const [visitingSpaceInfo, setVisitingSpaceInfo] = useState<Space | null>(null);
+  // 漂着メッセージ
+  const [bottlePayload, setBottlePayload] = useState<BottlePayload | null>(null);
+
   // 設定を読み込む関数
   const loadSettings = useCallback(() => {
     if (activeSpace) {
@@ -114,6 +138,58 @@ export const SpaceScreen = () => {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [loadSettings]);
+
+  // 隣人スペース一覧を読み込む
+  useEffect(() => {
+    if (!activeSpaceId) return;
+    fetchNeighbors(activeSpaceId).then(setNeighbors);
+  }, [activeSpaceId]);
+
+  // 訪問モード: 訪問先スペースの hossiis と情報を読み込む
+  useEffect(() => {
+    if (!visitingSpaceId) {
+      setVisitingHossiis([]);
+      setVisitingSpaceInfo(null);
+      return;
+    }
+    // 訪問先スペースの情報を neighbors から取得
+    const found = neighbors.find((n) => n.id === visitingSpaceId);
+    if (found) setVisitingSpaceInfo(found);
+
+    fetchHossiis(visitingSpaceId).then(setVisitingHossiis);
+  }, [visitingSpaceId, neighbors]);
+
+  // ワープ: ランダムな隣スペースを訪問モードで開く
+  const handleWarp = useCallback(() => {
+    if (neighbors.length === 0) return;
+    const target = pickRandomNeighbor(neighbors);
+    setVisitingSpace(target.id);
+  }, [neighbors, setVisitingSpace]);
+
+  // 漂着メッセージ: スペース画面を開いたタイミングで配信チェック
+  useEffect(() => {
+    if (!activeSpaceId || isVisiting || neighbors.length === 0) return;
+    const frequency = spaceSettings?.bottleFrequency ?? '3d-7d';
+    if (frequency === 'off') return;
+
+    const check = async () => {
+      const lastDeliveredAt = await fetchLastDeliveredAt(activeSpaceId);
+      const intervalMs = calcBottleIntervalMs(frequency);
+      const now = Date.now();
+      const lastMs = lastDeliveredAt ? lastDeliveredAt.getTime() : 0;
+
+      if (now - lastMs < intervalMs) return;
+
+      const neighborIds = neighbors.map((n) => n.id);
+      const payload = await fetchNextBottle(activeSpaceId, neighborIds, frequency);
+      if (payload) {
+        setBottlePayload(payload);
+      }
+    };
+
+    check();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSpaceId, neighbors.length, spaceSettings?.bottleFrequency]);
 
   const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
 
@@ -298,8 +374,8 @@ export const SpaceScreen = () => {
     enabled: controlState.voiceEnabled,
   });
 
-  // アクティブなスペースのログのみ取得
-  const hossiis = getActiveSpaceHossiis();
+  // 訪問モード中は訪問先 hossiis を使用、それ以外は自スペース
+  const hossiis = isVisiting ? visitingHossiis : getActiveSpaceHossiis();
 
   // カケラ粒子を発生させるコールバック
   const handleParticle = useCallback((emotion: EmotionKey) => {
@@ -450,6 +526,15 @@ export const SpaceScreen = () => {
 
   return (
     <div className={`${styles.container} ${backgroundClass}`} style={backgroundStyle}>
+      {/* 訪問モードバナー */}
+      {isVisiting && visitingSpaceInfo && (
+        <VisitBanner
+          spaceName={visitingSpaceInfo.name}
+          spaceURL={visitingSpaceInfo.spaceURL}
+          onBack={() => setVisitingSpace(null)}
+        />
+      )}
+
       {/* Supabase から hossiis をロード中のオーバーレイ */}
       {!hossiiLoadedFromSupabase && (
         <div style={{
@@ -689,6 +774,17 @@ export const SpaceScreen = () => {
         );
       })}
 
+      {/* 漂着メッセージボトル */}
+      {bottlePayload && !isVisiting && (
+        <MessageBottle
+          payload={bottlePayload}
+          onOpen={() => {
+            recordBottleDelivery(activeSpaceId, bottlePayload.hossii.id, bottlePayload.fromSpace.id);
+          }}
+          onDismiss={() => setBottlePayload(null)}
+        />
+      )}
+
       {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QRコードパネル（スライドショー中は非表示） */}
       {viewMode !== 'slideshow' && (
         <>
@@ -706,6 +802,9 @@ export const SpaceScreen = () => {
             onDisplayLimitChange={setDisplayLimit}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            neighbors={neighbors}
+            onWarp={handleWarp}
+            isVisiting={isVisiting}
           />
           <QRCodePanel />
         </>

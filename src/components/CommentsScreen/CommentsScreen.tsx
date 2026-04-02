@@ -19,12 +19,20 @@ type LikeButtonProps = {
 
 const LikeButton = ({ hossii, likedByMe, onLike }: LikeButtonProps) => {
   const [localLiked, setLocalLiked] = useState(likedByMe);
-  const [localCount, setLocalCount] = useState(hossii.likeCount ?? 0);
+  // カウントは props の likeCount をベースに、ボタン操作分の差分だけローカルで持つ。
+  // ソート切り替えなどで props が変わっても正しい件数を表示できる。
+  const [delta, setDelta] = useState(0);
 
   useEffect(() => {
     setLocalLiked(likedByMe);
-    setLocalCount(hossii.likeCount ?? 0);
-  }, [likedByMe, hossii.likeCount]);
+  }, [likedByMe]);
+
+  // store 側のカウントが更新されたら差分をリセット（二重加算防止）
+  useEffect(() => {
+    setDelta(0);
+  }, [hossii.likeCount]);
+
+  const displayCount = Math.max(0, (hossii.likeCount ?? 0) + delta);
 
   return (
     <button
@@ -32,12 +40,12 @@ const LikeButton = ({ hossii, likedByMe, onLike }: LikeButtonProps) => {
       onClick={() => {
         const newLiked = !localLiked;
         setLocalLiked(newLiked);
-        setLocalCount((c) => newLiked ? c + 1 : Math.max(0, c - 1));
+        setDelta((d) => newLiked ? d + 1 : d - 1);
         onLike(hossii.id);
       }}
       aria-label={localLiked ? 'いいねを取り消す' : 'いいね'}
     >
-      {localLiked ? '❤️' : '🤍'}{localCount > 0 && ` ${localCount}`}
+      {localLiked ? '❤️' : '🤍'} {displayCount}
     </button>
   );
 };
@@ -67,6 +75,7 @@ export const CommentsScreen = () => {
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(activeSpaceId));
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [sortOrder, setSortOrder] = useState<'newest' | 'likes'>('newest');
 
   // タグフィルター
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -127,10 +136,12 @@ export const CommentsScreen = () => {
     }
   }, [currentUser]);
 
-  // 新しい順にソートしてフィルタ適用
+  // ソート＋フィルタ適用
   const sortedHossiis = useMemo(() => {
-    const sorted = [...hossiis].sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    const sorted = [...hossiis].sort((a, b) =>
+      sortOrder === 'likes'
+        ? (b.likeCount ?? 0) - (a.likeCount ?? 0)
+        : b.createdAt.getTime() - a.createdAt.getTime()
     );
     let result = applyFilters(sorted, filters);
     if (selectedTags.length > 0) {
@@ -141,7 +152,7 @@ export const CommentsScreen = () => {
       });
     }
     return result;
-  }, [hossiis, filters, selectedTags]);
+  }, [hossiis, filters, selectedTags, sortOrder]);
 
   return (
     <div className={styles.container}>
@@ -158,6 +169,23 @@ export const CommentsScreen = () => {
           {sortedHossiis.length} 件の投稿
         </div>
         <div className={styles.filterContainer}>
+          {/* 並び替えバー */}
+          <div className={styles.sortBar}>
+            <button
+              type="button"
+              className={`${styles.sortBtn} ${sortOrder === 'newest' ? styles.sortBtnActive : ''}`}
+              onClick={() => setSortOrder('newest')}
+            >
+              新着順
+            </button>
+            <button
+              type="button"
+              className={`${styles.sortBtn} ${sortOrder === 'likes' ? styles.sortBtnActive : ''}`}
+              onClick={() => setSortOrder('likes')}
+            >
+              ❤️ いいね順
+            </button>
+          </div>
           <FilterBar filters={filters} onFilterChange={handleFilterChange} />
           {/* タグフィルター（タグが1件以上ある場合のみ表示） */}
           {allTagCandidates.length > 0 && (
@@ -222,7 +250,9 @@ export const CommentsScreen = () => {
             </div>
           ) : (
             sortedHossiis.map((hossii) => {
-              const timestamp = hossii.createdAt.toLocaleTimeString('ja-JP', {
+              const timestamp = hossii.createdAt.toLocaleString('ja-JP', {
+                month: 'numeric',
+                day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
               });
@@ -290,12 +320,16 @@ export const CommentsScreen = () => {
                       )}
                       <div className={styles.meta}>
                         <span className={styles.time}>{timestamp}</span>
-                        {flags.likes_enabled && (
+                        {flags.likes_enabled ? (
                           <LikeButton
                             hossii={hossii}
                             likedByMe={likedIds.has(hossii.id)}
                             onLike={handleLike}
                           />
+                        ) : (
+                          <span className={styles.likeCount}>
+                            🤍 {hossii.likeCount ?? 0}
+                          </span>
                         )}
                       </div>
                     </div>

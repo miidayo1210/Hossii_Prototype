@@ -256,6 +256,7 @@ type ExtendedHossiiState = HossiiState & {
   displayPeriod: DisplayPeriod;
   displayLimit: DisplayLimit;
   viewMode: ViewMode;
+  visitingSpaceId: string | null;
 };
 
 // 拡張Action型
@@ -288,7 +289,8 @@ type ExtendedHossiiAction =
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
   | { type: 'RESTORE_HOSSII'; payload: string }
-  | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii };
+  | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii }
+  | { type: 'SET_VISITING_SPACE'; payload: string | null };
 
 // アクティブなニックネームを取得するヘルパー
 const getActiveNicknameFromState = (state: ExtendedHossiiState): string => {
@@ -593,6 +595,10 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return { ...state, viewMode: action.payload };
       }
 
+      case 'SET_VISITING_SPACE': {
+        return { ...state, visitingSpaceId: action.payload };
+      }
+
       case 'UPDATE_HOSSII_POSITION': {
         const { id, positionX, positionY } = action.payload;
         const newHossiis = state.hossiis.map((h) =>
@@ -692,6 +698,7 @@ type HossiiContextValue = {
   setDisplayPeriod: (period: DisplayPeriod) => void;
   setDisplayLimit: (limit: DisplayLimit) => void;
   setViewMode: (mode: ViewMode) => void;
+  setVisitingSpace: (spaceId: string | null) => void;
   updateHossiiColorAction: (id: string, color: string | null) => void;
   updateHossiiPositionAction: (id: string, positionX: number, positionY: number) => void;
   updateHossiiScaleAction: (id: string, scale: number) => void;
@@ -755,6 +762,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     displayPeriod: initialDisplayPeriod,
     displayLimit: initialDisplayLimit,
     viewMode: initialViewMode,
+    visitingSpaceId: null,
   });
 
   // 自分が Supabase に INSERT した ID を追跡（Realtime 重複回避）
@@ -1103,6 +1111,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     dispatch({ type: 'SET_VIEW_MODE', payload: mode });
   }, []);
 
+  const setVisitingSpace = useCallback((spaceId: string | null) => {
+    dispatch({ type: 'SET_VISITING_SPACE', payload: spaceId });
+  }, []);
+
   const updateHossiiColorAction = useCallback((id: string, color: string | null) => {
     dispatch({ type: 'UPDATE_HOSSII_COLOR', payload: { id, color } });
     if (isSupabaseConfigured) {
@@ -1178,6 +1190,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         setDisplayPeriod,
         setDisplayLimit,
         setViewMode,
+        setVisitingSpace,
         updateHossiiColorAction,
         updateHossiiPositionAction,
         updateHossiiScaleAction,

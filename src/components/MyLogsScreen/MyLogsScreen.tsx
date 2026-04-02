@@ -28,6 +28,7 @@ export const MyLogsScreen = () => {
   const { hossiis, spaces, profile, activeSpaceId } = state;
 
   const [filter, setFilter] = useState<FilterType>('all');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'likes'>('newest');
   // 拡大表示する画像URL（null のときライトボックス非表示）
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -58,9 +59,12 @@ export const MyLogsScreen = () => {
       logs = logs.filter((h) => h.spaceId === activeSpaceId);
     }
 
-    // 新しい順
-    return logs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [hossiis, profile?.id, filter, activeSpaceId]);
+    return logs.sort((a, b) =>
+      sortOrder === 'likes'
+        ? (b.likeCount ?? 0) - (a.likeCount ?? 0)
+        : b.createdAt.getTime() - a.createdAt.getTime()
+    );
+  }, [hossiis, profile?.id, filter, activeSpaceId, sortOrder]);
 
   // 現在のスペース名
   const currentSpaceName = getSpaceName(activeSpaceId);
@@ -93,6 +97,23 @@ export const MyLogsScreen = () => {
               このスペース
             </button>
           </div>
+        </div>
+        {/* 並び替えバー */}
+        <div className={styles.sortBar}>
+          <button
+            type="button"
+            className={`${styles.sortBtn} ${sortOrder === 'newest' ? styles.sortBtnActive : ''}`}
+            onClick={() => setSortOrder('newest')}
+          >
+            新着順
+          </button>
+          <button
+            type="button"
+            className={`${styles.sortBtn} ${sortOrder === 'likes' ? styles.sortBtnActive : ''}`}
+            onClick={() => setSortOrder('likes')}
+          >
+            ❤️ いいね順
+          </button>
         </div>
       </header>
 

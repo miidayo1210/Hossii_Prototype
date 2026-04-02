@@ -2,6 +2,8 @@
 
 export type CardType = 'stamp' | 'constellation' | 'graph';
 
+export type BottleFrequency = '1d' | '3d-7d' | '2w' | '1m' | 'off';
+
 export type HossiiColor = 'pink' | 'blue' | 'yellow' | 'green' | 'purple';
 
 export type SpaceFeatures = {
@@ -22,6 +24,7 @@ export type SpaceSettings = {
   cardType: CardType;
   hossiiColor: HossiiColor;
   bubbleEditPermission: BubbleEditPermission;
+  bottleFrequency: BottleFrequency;
 };
 
 export const DEFAULT_SPACE_FEATURES: SpaceFeatures = {
@@ -37,4 +40,5 @@ export const DEFAULT_SPACE_SETTINGS: Omit<SpaceSettings, 'spaceId' | 'spaceName'
   cardType: 'constellation',
   hossiiColor: 'pink',
   bubbleEditPermission: 'all',
+  bottleFrequency: '3d-7d',
 };
