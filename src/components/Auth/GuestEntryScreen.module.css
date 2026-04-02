@@ -165,6 +165,52 @@
   background: #faf5ff;
 }
 
+.comingSoonButton {
+  position: relative;
+  opacity: 0.5;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.comingSoonButton:hover {
+  border-color: #e5e7eb;
+  background: #fff;
+}
+
+.comingSoonBadge {
+  display: inline-block;
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.comingSoonLink {
+  opacity: 0.45;
+  cursor: not-allowed;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.comingSoonLink:hover {
+  color: #7c3aed;
+}
+
+.comingSoonLink .comingSoonBadge {
+  font-size: 0.5625rem;
+}
+
 .signUpLink {
   background: none;
   border: none;

@@ -54,17 +54,19 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested, on
             </button>
             <button
               type="button"
-              className={styles.secondaryButton}
-              onClick={onLoginRequested}
+              className={`${styles.secondaryButton} ${styles.comingSoonButton}`}
+              disabled
             >
               アカウントでログイン
+              <span className={styles.comingSoonBadge}>Coming Soon</span>
             </button>
             <button
               type="button"
-              className={styles.signUpLink}
-              onClick={onSignUpRequested}
+              className={`${styles.signUpLink} ${styles.comingSoonLink}`}
+              disabled
             >
               新規登録の方はこちら
+              <span className={styles.comingSoonBadge}>Coming Soon</span>
             </button>
           </div>
         )}
