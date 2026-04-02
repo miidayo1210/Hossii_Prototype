@@ -24,8 +24,6 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
 
-  const presetTags = space?.presetTags ?? [];
-
   // ページリロード後も非表示投稿を確認・復元できるよう、DB から全件取得する
   const [dbHossiis, setDbHossiis] = useState<Hossii[]>([]);
   useEffect(() => {
@@ -43,13 +41,14 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
 
   // フィルタ候補: presetTags ＋ 投稿に実際についているタグ（tags / hashtags）を収集
   const allTagCandidates = useMemo(() => {
+    const presetTags = space?.presetTags ?? [];
     const set = new Set<string>(presetTags); // "#感想" 形式
     spaceHossiis.forEach((h) => {
       h.tags?.forEach((t) => set.add(`#${t}`));
       h.hashtags?.forEach((t) => set.add(`#${t}`));
     });
     return Array.from(set).sort();
-  }, [presetTags, spaceHossiis]);
+  }, [space?.presetTags, spaceHossiis]);
 
   const filtered = useMemo(() => {
     return spaceHossiis

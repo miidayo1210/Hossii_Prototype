@@ -104,9 +104,10 @@ export const SpacesScreen = () => {
   const objectURLsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    const urls = objectURLsRef.current;
     return () => {
-      objectURLsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      objectURLsRef.current.clear();
+      urls.forEach((url) => URL.revokeObjectURL(url));
+      urls.clear();
     };
   }, []);
 

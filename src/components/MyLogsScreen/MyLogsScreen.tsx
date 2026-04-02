@@ -64,7 +64,7 @@ export const MyLogsScreen = () => {
         ? (b.likeCount ?? 0) - (a.likeCount ?? 0)
         : b.createdAt.getTime() - a.createdAt.getTime()
     );
-  }, [hossiis, profile?.id, filter, activeSpaceId, sortOrder]);
+  }, [hossiis, profile, filter, activeSpaceId, sortOrder]);
 
   // 現在のスペース名
   const currentSpaceName = getSpaceName(activeSpaceId);

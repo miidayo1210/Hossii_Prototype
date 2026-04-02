@@ -12,8 +12,9 @@ export const BackgroundTab = ({ space, onUpdateSpace }: Props) => {
   const objectURLsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    const urls = objectURLsRef.current;
     return () => {
-      objectURLsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      urls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 

@@ -157,7 +157,7 @@ export async function fetchNextBottle(
   const shuffled = [...neighborSpaceIds].sort(() => Math.random() - 0.5);
 
   for (const fromSpaceId of shuffled) {
-    let query = supabase
+    const query = supabase
       .from('hossiis')
       .select('*')
       .eq('space_id', fromSpaceId)

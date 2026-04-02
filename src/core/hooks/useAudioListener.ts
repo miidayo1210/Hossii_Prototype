@@ -60,6 +60,20 @@ export function useAudioListener({ enabled, onAudioEvent }: UseAudioListenerOpti
   const silenceStartRef = useRef<number | null>(null);
   const volumeHistoryRef = useRef<number[]>([]);
 
+  // 笑い声パターン検出（音量の変動が激しい）
+  const detectLaughPattern = useCallback(() => {
+    const history = volumeHistoryRef.current;
+    if (history.length < 30) return false;
+
+    // 直近30フレームの分散を計算
+    const recent = history.slice(-30);
+    const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const variance = recent.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / recent.length;
+
+    // 分散が大きい = 音量の変動が激しい = 笑い声の可能性
+    return variance > 0.005 && avg > LAUGH_THRESHOLD * 0.5;
+  }, []);
+
   // オーディオ分析ループ
   const analyzeAudio = useCallback(() => {
     if (!analyserRef.current) return;
@@ -133,21 +147,7 @@ export function useAudioListener({ enabled, onAudioEvent }: UseAudioListenerOpti
     }
 
     animationFrameRef.current = requestAnimationFrame(analyzeAudio);
-  }, [onAudioEvent]);
-
-  // 笑い声パターン検出（音量の変動が激しい）
-  const detectLaughPattern = useCallback(() => {
-    const history = volumeHistoryRef.current;
-    if (history.length < 30) return false;
-
-    // 直近30フレームの分散を計算
-    const recent = history.slice(-30);
-    const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
-    const variance = recent.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / recent.length;
-
-    // 分散が大きい = 音量の変動が激しい = 笑い声の可能性
-    return variance > 0.005 && avg > LAUGH_THRESHOLD * 0.5;
-  }, []);
+  }, [onAudioEvent, detectLaughPattern]);
 
   // マイク開始
   const startListening = useCallback(async () => {
