@@ -177,6 +177,10 @@ export const PostScreen = ({
   }, [featureFlags.position_selector]);
 
   useEffect(() => {
+    setSelectedArea(null);
+  }, [state.activeSpaceId]);
+
+  useEffect(() => {
     const activeSpace = getActiveSpace();
     if (activeSpace) {
       const settings = loadSpaceSettings(activeSpace.id, activeSpace.name);
@@ -397,7 +401,7 @@ export const PostScreen = ({
         numberValue: hasNumber ? parsedNumber! : undefined,
         positionX: areaPos?.x,
         positionY: areaPos?.y,
-        isPositionFixed: panelMode ? true : positionGridActive && selectedArea !== null,
+        isPositionFixed: !!areaPos,
       });
 
       // スタンプを獲得
