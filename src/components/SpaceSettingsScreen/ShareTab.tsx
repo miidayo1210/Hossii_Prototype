@@ -61,6 +61,7 @@ export const ShareTab = () => {
 
   const handleDownloadQR = useCallback(() => {
     if (!qrRef.current || !activeSpace) return;
+    const space = activeSpace;
     const svg = qrRef.current.querySelector('svg');
     if (!svg) return;
 
@@ -83,7 +84,7 @@ export const ShareTab = () => {
       URL.revokeObjectURL(url);
 
       const link = document.createElement('a');
-      link.download = `qr-${activeSpace.spaceURL ?? activeSpace.id}.png`;
+      link.download = `qr-${space.spaceURL ?? space.id}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     };

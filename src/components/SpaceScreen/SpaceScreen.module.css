@@ -218,6 +218,8 @@
   border: 1px solid rgba(236, 72, 153, 0.25);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   animation: indicatorPulse 2s ease-in-out infinite;
+  cursor: pointer;
+  user-select: none;
 }
 
 .listeningIcon {
@@ -724,46 +726,18 @@
   line-height: 1;
 }
 
-/* クイック投稿パネル: PC サイドパネル */
-.sidePanelWrapper {
-  position: absolute;
-  top: 4rem;
-  right: 0;
-  width: 25%;
-  min-width: 300px;
-  height: calc(100% - 4rem);
-  overflow-y: auto;
+/* クイック投稿（FloatingPanelShell の見た目 — 位置・サイズは JS） */
+.quickPostSideChrome {
   background: linear-gradient(160deg, #fff 0%, #fdf6ff 100%);
   border-radius: 20px 0 0 20px;
   border-left: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow:
     -10px 4px 40px rgba(139, 92, 246, 0.18),
     -2px 0 12px rgba(0, 0, 0, 0.06);
-  animation: slideInRight 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  z-index: 100;
 }
 
-/* クイック投稿パネル: モバイル ボトムシート */
-.bottomSheetWrapper {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 55vh;
-  overflow-y: auto;
+.quickPostBottomChrome {
   background: white;
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
-  animation: slideInUp 0.2s ease-out;
-  z-index: 100;
-}
-
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
-}
-
-@keyframes slideInUp {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
 }

@@ -1,0 +1,41 @@
+.root {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 999999;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  font-size: 11px;
+  line-height: 1;
+  color: #a78bfa;
+  filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.55));
+  animation: starPop 0.38s ease-out forwards;
+}
+
+@keyframes starPop {
+  0% {
+    transform: translate(0, 0) scale(0.55) rotate(-6deg);
+    opacity: 0;
+  }
+  32% {
+    opacity: 0.72;
+    transform: translate(var(--tx), var(--ty)) scale(1.02) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--tx) * 1.1), calc(var(--ty) * 1.1)) scale(0.78) rotate(4deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    display: none;
+  }
+}

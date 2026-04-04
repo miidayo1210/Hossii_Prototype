@@ -102,9 +102,25 @@ type Props = {
   panelMode?: 'side' | 'bottom';
   initialPosition?: { x: number; y: number };
   onClose?: () => void;
+  /** 音声候補から開いたときのメッセージ初期値 */
+  initialMessage?: string;
+  /** 音声パネル候補の編集モード（保存 / 気持ちを置く） */
+  speechEditMode?: boolean;
+  /** 保存時に置換する元の候補文字列 */
+  speechEditOriginal?: string;
+  /** 保存: 候補テキストのみ更新（投稿しない） */
+  onSaveSpeechDraft?: (originalCandidate: string, editedMessage: string) => void;
 };
 
-export const PostScreen = ({ panelMode, initialPosition, onClose }: Props) => {
+export const PostScreen = ({
+  panelMode,
+  initialPosition,
+  onClose,
+  initialMessage,
+  speechEditMode,
+  speechEditOriginal,
+  onSaveSpeechDraft,
+}: Props) => {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -193,6 +209,13 @@ export const PostScreen = ({ panelMode, initialPosition, onClose }: Props) => {
   useEffect(() => {
     shuffleGreeting();
   }, []);
+
+  // 音声候補から「編集」で開いたときメッセージを反映
+  useEffect(() => {
+    if (initialMessage !== undefined && initialMessage !== null) {
+      setMessage(initialMessage);
+    }
+  }, [initialMessage]);
 
   // Toast自動消去
   useEffect(() => {
@@ -397,12 +420,23 @@ export const PostScreen = ({ panelMode, initialPosition, onClose }: Props) => {
     handleSubmit();
   };
 
+  const handleSaveSpeechDraftClick = () => {
+    if (!onSaveSpeechDraft || speechEditOriginal === undefined) return;
+    onSaveSpeechDraft(speechEditOriginal, message.trim());
+    setToast({ message: '候補テキストを更新したよ', type: 'success' });
+  };
+
   return (
     <div className={`${styles.container}${panelMode ? ` ${styles.panelContainer}` : ''}`}>
       {/* パネルモード: 閉じるボタン */}
       {panelMode && (
         <div className={styles.panelCloseBar}>
-          <button type="button" onClick={onClose} className={styles.panelCloseButton}>
+          <button
+            type="button"
+            onClick={onClose}
+            className={styles.panelCloseButton}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
             ✕ 閉じる
           </button>
         </div>
@@ -650,7 +684,7 @@ export const PostScreen = ({ panelMode, initialPosition, onClose }: Props) => {
         )}
 
         {/* 位置選択グリッド（パネルモード時は非表示：ダブルクリック座標を使用） */}
-        {!panelMode && <div className={panelMode ? styles.panelSection : styles.section}>
+        {!panelMode && <div className={styles.section}>
           <div className={styles.label}>置く場所（任意）</div>
           <div className={styles.areaGrid}>
             {AREA_LABELS.map((label, idx) => (
@@ -673,30 +707,54 @@ export const PostScreen = ({ panelMode, initialPosition, onClose }: Props) => {
           </div>
         </div>}
 
-        {/* 送信ボタン */}
-        <button
-          type="button"
-          onClick={handleSubmitClick}
-          onAnimationEnd={() => setPoyonActive(false)}
-          disabled={sending || !canSubmit}
-          className={`${styles.submitButton}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
-        >
-          {sending ? '送信中...' : '気持ちを置く'}
-        </button>
+        {/* 送信ボタン（音声候補編集時は 保存 + 気持ちを置く） */}
+        {speechEditMode && panelMode ? (
+          <div className={styles.speechEditActions}>
+            <button
+              type="button"
+              onClick={handleSaveSpeechDraftClick}
+              disabled={sending}
+              className={styles.saveDraftButton}
+            >
+              保存
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmitClick}
+              onAnimationEnd={() => setPoyonActive(false)}
+              disabled={sending || !canSubmit}
+              className={`${styles.submitButton} ${styles.submitButtonHalf}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
+            >
+              {sending ? '送信中...' : '気持ちを置く'}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmitClick}
+            onAnimationEnd={() => setPoyonActive(false)}
+            disabled={sending || !canSubmit}
+            className={`${styles.submitButton}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
+          >
+            {sending ? '送信中...' : '気持ちを置く'}
+          </button>
+        )}
 
-        {/* 連続投稿チェックボックス */}
-        <label className={styles.continuousPostLabel}>
-          <input
-            type="checkbox"
-            checked={continuousPost}
-            onChange={(e) => {
-              setContinuousPost(e.target.checked);
-              saveContinuousPost(e.target.checked);
-            }}
-            className={styles.continuousPostCheckbox}
-          />
-          連続で気持ちを置く
-        </label>
+        {/* 連続投稿チェックボックス（音声候補編集時は非表示） */}
+        {!(speechEditMode && panelMode) && (
+          <label className={styles.continuousPostLabel}>
+            <input
+              type="checkbox"
+              checked={continuousPost}
+              onChange={(e) => {
+                setContinuousPost(e.target.checked);
+                saveContinuousPost(e.target.checked);
+              }}
+              className={styles.continuousPostCheckbox}
+            />
+            連続で気持ちを置く
+          </label>
+        )}
       </main>
 
       {/* Toast */}

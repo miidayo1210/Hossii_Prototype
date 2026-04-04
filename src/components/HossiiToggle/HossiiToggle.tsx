@@ -10,14 +10,12 @@ export const HossiiToggle = () => {
       showHossii,
       listenMode,
       hasConsentedToListen,
-      emotionLogEnabled,
       speechLogEnabled,
       speechLevels,
     },
     setShowHossii,
     setListenMode,
     setListenConsent,
-    setEmotionLogEnabled,
     setSpeechLogEnabled,
     setSpeechLevels,
   } = useDisplayPrefs();
@@ -94,18 +92,6 @@ export const HossiiToggle = () => {
         {/* Listen オプション（Listen ON時のみ表示） */}
         {listenMode && (
           <div className={styles.listenOptions}>
-            {/* 感情ログ ON/OFF */}
-            <label className={styles.optionRow}>
-              <input
-                type="checkbox"
-                checked={emotionLogEnabled}
-                onChange={() => setEmotionLogEnabled(!emotionLogEnabled)}
-                className={styles.checkbox}
-              />
-              <span className={styles.optionIcon}>💭</span>
-              <span className={styles.optionLabel}>感情ログ</span>
-            </label>
-
             {/* ことばログ ON/OFF */}
             <label className={styles.optionRow}>
               <input

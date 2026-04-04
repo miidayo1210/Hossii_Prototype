@@ -32,6 +32,7 @@ import { BottomNavBar } from './components/Navigation/BottomNavBar';
 import { DEFAULT_QUICK_EMOTIONS } from './core/types/space';
 import { mockHossiis } from './demo/mockData';
 import styles from './App.module.css';
+import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
 
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
@@ -542,6 +543,7 @@ const AppContent = () => {
 const App = () => {
   return (
     <AuthProvider>
+      <GlobalClickStarBurst />
       <AdminNavigationProvider>
         <DisplayPrefsProvider>
           <HossiiProvider initialHossiis={mockHossiis}>

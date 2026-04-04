@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
-import { useAudioListener, type AudioEvent } from '../../core/hooks/useAudioListener';
 import { useSpeechRecognition, type SpeechEvent } from '../../core/hooks/useSpeechRecognition';
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
@@ -30,6 +30,12 @@ import { StarLayer } from '../StarLayer/StarLayer';
 import { SlideshowView } from '../Slideshow/SlideshowView';
 import { PostScreen } from '../PostScreen/PostScreen';
 import { recordBottleDelivery } from '../../core/utils/neighborsApi';
+import { SpeechPanel } from '../SpeechPanel/SpeechPanel';
+import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
+import {
+  getDefaultQuickPostBottomRect,
+  getDefaultQuickPostSideRect,
+} from '../../core/utils/floatingPanelStorage';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
@@ -64,7 +70,7 @@ export const SpaceScreen = () => {
   const { activeSpaceId, visitingSpaceId } = state;
   const {
     prefs: {
-      showHossii, listenMode, hasConsentedToListen, emotionLogEnabled, speechLogEnabled,
+      showHossii, listenMode, hasConsentedToListen, speechLogEnabled,
       speechLevels, displayScale, displayPeriod, displayLimit, viewMode,
     },
     setShowHossii,
@@ -74,6 +80,7 @@ export const SpaceScreen = () => {
     setDisplayPeriod,
     setDisplayLimit,
     setViewMode,
+    setSpeechLevels,
   } = useDisplayPrefs();
   const activeSpace = getActiveSpace();
   const isVisiting = visitingSpaceId !== null;
@@ -89,7 +96,65 @@ export const SpaceScreen = () => {
   const prevLatestIdRef = useRef<string | null>(null);
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const quickPostDefaultRect = useMemo(
+    () => (isMobile ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
+    [isMobile]
+  );
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  // 音声パネルの開閉と蓄積テキスト
+  const [panelConfirmedText, setPanelConfirmedText] = useState('');
+  /** listenMode と連動。マイク ON で自動表示（Listening の再タップは折りたたみ用） */
+  const [speechPanelOpen, setSpeechPanelOpen] = useState(listenMode);
+
+  /** 音声候補の × で除外した文字列 */
+  const [dismissedSpeechCandidates, setDismissedSpeechCandidates] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (listenMode) {
+      setSpeechPanelOpen(true);
+    } else {
+      setSpeechPanelOpen(false);
+      setPanelConfirmedText('');
+      setDismissedSpeechCandidates([]);
+    }
+  }, [listenMode]);
+  /** 右パネル「編集」から開いたときの置換元テキスト */
+  const [speechEditOriginal, setSpeechEditOriginal] = useState<string | undefined>();
+  const [speechPostInitialMessage, setSpeechPostInitialMessage] = useState<string | undefined>();
+  const [postScreenKey, setPostScreenKey] = useState(0);
+
+  // クイック投稿パネル（setQuickPostPos を下のコールバックより先に宣言）
+  const [quickPostPos, setQuickPostPos] = useState<{ x: number; y: number } | null>(null);
+
+  const resetQuickPostSpeechState = useCallback(() => {
+    setSpeechEditOriginal(undefined);
+    setSpeechPostInitialMessage(undefined);
+  }, []);
+
+  const handleQuickPostClose = useCallback(() => {
+    setQuickPostPos(null);
+    resetQuickPostSpeechState();
+  }, [resetQuickPostSpeechState]);
+
+  const handleSaveSpeechDraft = useCallback((original: string, edited: string) => {
+    setPanelConfirmedText((prev) => {
+      const i = prev.indexOf(original);
+      if (i === -1) return prev;
+      return prev.slice(0, i) + edited + prev.slice(i + original.length);
+    });
+    setSpeechEditOriginal(edited);
+  }, []);
+
+  const openSpeechCandidateEditor = useCallback((candidate: string) => {
+    setSpeechEditOriginal(candidate);
+    setSpeechPostInitialMessage(candidate);
+    setPostScreenKey((k) => k + 1);
+    setQuickPostPos((prev) => prev ?? { x: 50, y: 50 });
+  }, []);
+
+  const dismissSpeechCandidate = useCallback((text: string) => {
+    setDismissedSpeechCandidates((prev) => [...prev, text]);
+  }, []);
   // モバイル: プレビュー表示するHossiiのID（8秒ごとにローテーション、最大3件）
   const [previewHossiiIds, setPreviewHossiiIds] = useState<Set<string>>(new Set());
 
@@ -149,19 +214,19 @@ export const SpaceScreen = () => {
   // 同意モーダル表示フラグ
   const [showListenConsent, setShowListenConsent] = useState(false);
 
-  // クイック投稿パネル: ダブルクリック座標（null = 非表示）
-  const [quickPostPos, setQuickPostPos] = useState<{ x: number; y: number } | null>(null);
-
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (quickPostPos) {
       setQuickPostPos(null);
+      resetQuickPostSpeechState();
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
+    resetQuickPostSpeechState();
+    setPostScreenKey((k) => k + 1);
     setQuickPostPos({ x, y });
-  }, [quickPostPos]);
+  }, [quickPostPos, resetQuickPostSpeechState]);
 
   const handleControlToggle = useCallback((key: keyof ControlState) => {
     if (key === 'hossiiVisible') {
@@ -264,28 +329,10 @@ export const SpaceScreen = () => {
     onReaction: handleBroadcastReaction,
   });
 
-  // Listen モードで検出された音声イベントを処理（感情ログ/笑いログ）
-  const handleAudioEvent = useCallback((event: AudioEvent) => {
-    // 感情ログが無効なら無視
-    if (!emotionLogEnabled) return;
-
-    // 笑いログは別扱い（メッセージなし）
-    const isLaughter = event.type === 'laugh';
-
-    // Hossii として自動投稿
-    addHossii({
-      message: isLaughter ? '' : event.message, // 笑いは空
-      emotion: event.emotion,
-      authorNameOverride: 'Hossii',
-      logType: 'emotion',
-      origin: 'auto',
-      autoType: isLaughter ? 'laughter' : 'emotion',
-      language: event.language,
-    });
-  }, [addHossii, emotionLogEnabled]);
-
   // 音声認識イベントを処理（ことばログ）
+  // speechLogEnabled が ON の場合のみ自動投稿する。OFF でもパネル用 onFinalSegment は動作する
   const handleSpeechEvent = useCallback((event: SpeechEvent) => {
+    if (!speechLogEnabled) return;
     addHossii({
       message: event.text,
       authorNameOverride: 'Hossii',
@@ -295,19 +342,22 @@ export const SpaceScreen = () => {
       autoType: 'speech',
       language: event.language,
     });
-  }, [addHossii]);
+  }, [addHossii, speechLogEnabled]);
 
-  // 音声リスナー（感情ログ用）
-  const { isListening } = useAudioListener({
-    enabled: listenMode && emotionLogEnabled,
-    onAudioEvent: handleAudioEvent,
-  });
+  // 音声パネル用: 確定テキストを蓄積（最大300文字）
+  const handleFinalSegment = useCallback((text: string) => {
+    setPanelConfirmedText(prev => {
+      const next = prev + text;
+      return next.length > 300 ? next.slice(-300) : next;
+    });
+  }, []);
 
-  // 音声認識（ことばログ用）
-  useSpeechRecognition({
-    enabled: listenMode && speechLogEnabled,
+  // 音声認識（listenMode ON の間は常に動作。auto-post は handleSpeechEvent 内で speechLogEnabled を確認）
+  const { interimText, isRecognizing } = useSpeechRecognition({
+    enabled: listenMode,
     speechLevels,
     onSpeechEvent: handleSpeechEvent,
+    onFinalSegment: handleFinalSegment,
   });
 
   // Hossii AI Brain（音声トグルONの時のみ有効）
@@ -615,7 +665,7 @@ export const SpaceScreen = () => {
           lastTriggerId={reactionTrigger?.id}
           emotion={reactionTrigger?.emotion}
           onParticle={handleParticle}
-          isListening={isListening}
+          isListening={isRecognizing}
           hossiiColor={spaceSettings?.hossiiColor}
           brainMessage={brainMessage?.text ?? null}
           hossiis={displayHossiis}
@@ -624,13 +674,40 @@ export const SpaceScreen = () => {
         />
       )}
 
-      {/* Listening インジケーター */}
+      {/* Listening インジケーター（タップで音声パネル開閉） */}
       {listenMode && (
-        <div className={styles.listeningIndicator}>
+        <div
+          className={styles.listeningIndicator}
+          onClick={() => setSpeechPanelOpen(prev => !prev)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSpeechPanelOpen(prev => !prev); }}
+        >
           <span className={styles.listeningIcon}>🎙</span>
           <span className={styles.listeningText}>Listening</span>
         </div>
       )}
+
+      {/* 音声パネル（body に portal で描画 — 親の overflow により fixed が隠れるのを防ぐ） */}
+      {listenMode &&
+        speechPanelOpen &&
+        createPortal(
+          <SpeechPanel
+            confirmedText={panelConfirmedText}
+            interimText={interimText}
+            speechLevels={speechLevels}
+            setSpeechLevels={setSpeechLevels}
+            onPost={(text) => addHossii({ message: text, logType: 'speech', origin: 'manual' })}
+            onEditCandidate={openSpeechCandidateEditor}
+            onDismissCandidate={dismissSpeechCandidate}
+            dismissedCandidates={dismissedSpeechCandidates}
+            onClose={() => {
+              setSpeechPanelOpen(false);
+              setPanelConfirmedText('');
+            }}
+          />,
+          document.body
+        )}
 
       {/* モバイル: 詳細モーダル */}
       {selectedPost && (
@@ -753,13 +830,25 @@ export const SpaceScreen = () => {
 
       {/* クイック投稿パネル */}
       {quickPostPos && (
-        <div className={isMobile ? styles.bottomSheetWrapper : styles.sidePanelWrapper}>
+        <FloatingPanelShell
+          storageKey={isMobile ? 'quickPost.mobile' : 'quickPost.desktop'}
+          defaultRect={quickPostDefaultRect}
+          minW={isMobile ? 200 : 280}
+          minH={isMobile ? 240 : 320}
+          zIndex={310}
+          className={isMobile ? styles.quickPostBottomChrome : styles.quickPostSideChrome}
+        >
           <PostScreen
+            key={postScreenKey}
             panelMode={isMobile ? 'bottom' : 'side'}
             initialPosition={quickPostPos}
-            onClose={() => setQuickPostPos(null)}
+            initialMessage={speechPostInitialMessage}
+            speechEditMode={!!speechEditOriginal}
+            speechEditOriginal={speechEditOriginal}
+            onSaveSpeechDraft={handleSaveSpeechDraft}
+            onClose={handleQuickPostClose}
           />
-        </div>
+        </FloatingPanelShell>
       )}
     </div>
   );

@@ -1,0 +1,139 @@
+.shell {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.shellDragging {
+  cursor: grabbing;
+}
+
+/* 移動対象外の UI は手カーソルを上書き */
+.shell button:not([data-floating-resize]),
+.shell [role='button']:not([data-floating-resize]) {
+  cursor: pointer;
+}
+
+.shell a[href] {
+  cursor: pointer;
+}
+
+.shell input,
+.shell textarea,
+.shell select {
+  cursor: text;
+}
+
+.shell label {
+  cursor: pointer;
+}
+
+.shell [data-no-drag] {
+  cursor: auto;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* 共通: 透明ヒット領域 */
+.resizeHandle {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+/* 横縁（上・下）: 高さのみ */
+.resizeN {
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.resizeS {
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+/* 縦縁（左・右）: 幅のみ */
+.resizeE {
+  right: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.resizeW {
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+/* 角: 斜め（両方） */
+.resizeNE {
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  z-index: 4;
+  cursor: nesw-resize;
+}
+
+.resizeNW {
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  z-index: 4;
+  cursor: nwse-resize;
+}
+
+.resizeSE {
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  z-index: 4;
+  cursor: nwse-resize;
+}
+
+.resizeSW {
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  z-index: 4;
+  cursor: nesw-resize;
+}
+
+.resizeHandle:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.resizeNE:hover,
+.resizeNW:hover,
+.resizeSE:hover,
+.resizeSW:hover {
+  background: rgba(139, 92, 246, 0.12);
+}

@@ -1,3 +1,7 @@
+/**
+ * マイク音量から笑い声・大きな音・無音を推定して自動投稿するフック。
+ * 2026-04: 誤検知が多いため SpaceScreen からの利用は停止。コードは将来の再設計用に保持。
+ */
 import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react';
 import type { EmotionKey, LanguageCode } from '../types';
 

@@ -13,6 +13,7 @@ type UseSpeechRecognitionOptions = {
   enabled: boolean;
   speechLevels: SpeechLevelSettings;
   onSpeechEvent: (event: SpeechEvent) => void;
+  onFinalSegment?: (text: string) => void;
 };
 
 // 設定パラメータ
@@ -104,9 +105,12 @@ export function useSpeechRecognition({
   enabled,
   speechLevels,
   onSpeechEvent,
+  onFinalSegment,
 }: UseSpeechRecognitionOptions) {
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [interimText, setInterimText] = useState('');
+  const onFinalSegmentRef = useRef(onFinalSegment);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const bufferRef = useRef<string>('');
@@ -115,9 +119,10 @@ export function useSpeechRecognition({
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechLevelsRef = useRef(speechLevels);
 
-  // speechLevels を ref で保持
+  // speechLevels / onFinalSegment を ref で保持
   useLayoutEffect(() => {
     speechLevelsRef.current = speechLevels;
+    onFinalSegmentRef.current = onFinalSegment;
   });
 
   // バッファをフラッシュ
@@ -168,15 +173,25 @@ export function useSpeechRecognition({
       }
 
       let finalTranscript = '';
+      let interimTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           finalTranscript += result[0].transcript;
+        } else {
+          interimTranscript += result[0].transcript;
         }
       }
 
+      // パネル用: interim テキストをリアルタイムで反映
+      setInterimText(interimTranscript);
+
       if (finalTranscript) {
+        // パネル用: 確定テキストを通知（ノイズフィルタ前の生テキスト）
+        onFinalSegmentRef.current?.(finalTranscript);
+        setInterimText('');
+
         // 言語を検出してノイズフィルタを適用
         const detectedLanguage = detectLanguage(finalTranscript);
         if (!isNoise(finalTranscript, detectedLanguage)) {
@@ -283,5 +298,6 @@ export function useSpeechRecognition({
   return {
     isRecognizing,
     error,
+    interimText,
   };
 }

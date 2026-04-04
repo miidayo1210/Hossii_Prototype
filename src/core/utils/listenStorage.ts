@@ -61,24 +61,20 @@ export function saveListenConsent(consented: boolean): void {
 }
 
 /**
- * 感情ログ有効状態を読み込む（デフォルト: true）
+ * 感情ログ（マイク音量からの笑い声・環境音の自動感情投稿）
+ *
+ * 現状は機能を停止しているため、常に `false` を返し、保存時も `false` を書き込む
+ * （既存の `true` を残し続けない）。
  */
 export function loadEmotionLogEnabled(): boolean {
-  try {
-    const raw = localStorage.getItem(EMOTION_LOG_KEY);
-    if (raw === null) return true; // デフォルト true
-    return raw === 'true';
-  } catch {
-    return true;
-  }
+  return false;
 }
 
-/**
- * 感情ログ有効状態を保存
- */
+/** @deprecated 感情ログ自動投稿は停止中。保存しても常に false 相当。 */
 export function saveEmotionLogEnabled(enabled: boolean): void {
+  void enabled;
   try {
-    localStorage.setItem(EMOTION_LOG_KEY, String(enabled));
+    localStorage.setItem(EMOTION_LOG_KEY, 'false');
   } catch {
     // ignore
   }

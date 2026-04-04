@@ -1,0 +1,226 @@
+/* FloatingPanelShell 外枠（位置・サイズは JS で管理） */
+.floatingChrome {
+  background: linear-gradient(180deg, #faf8ff 0%, #fff 12%, #fdf6ff 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  box-shadow:
+    0 8px 32px rgba(139, 92, 246, 0.15),
+    0 2px 12px rgba(0, 0, 0, 0.08);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-sizing: border-box;
+}
+
+.panelInner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ヘッダー */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.12);
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.headerIcon {
+  font-size: 1rem;
+}
+
+.headerTitle {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4b2e83;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #9ca3af;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.closeButton:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #374151;
+}
+
+/* 全文表示エリア */
+.textArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  word-break: break-all;
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+}
+
+.confirmedText {
+  color: #1f2937;
+}
+
+.interimText {
+  color: #9ca3af;
+}
+
+.placeholder {
+  color: #d1d5db;
+  font-size: 0.8125rem;
+}
+
+/* 区切り線 */
+.divider {
+  height: 1px;
+  background: rgba(139, 92, 246, 0.12);
+  flex-shrink: 0;
+}
+
+/* 候補リスト */
+.candidatesSection {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem 0.5rem;
+  max-height: 38%;
+  overflow-y: auto;
+}
+
+.candidatesLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.candidatesList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.candidateRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-radius: 0.625rem;
+  line-height: 1.45;
+}
+
+.candidateText {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: #3b0764;
+  word-break: break-all;
+}
+
+.candidateActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.candidateActionBtn {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.6875rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+  color: #5b21b6;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.candidateActionBtn:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.55);
+}
+
+.candidateActionPrimary {
+  border-color: rgba(124, 58, 237, 0.45);
+  font-weight: 600;
+}
+
+.candidateActionDismiss {
+  min-width: 1.5rem;
+  padding: 0.2rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: #9ca3af;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.candidateActionDismiss:hover {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(254, 226, 226, 0.5);
+}
+
+.noCandidates {
+  font-size: 0.8125rem;
+  color: #d1d5db;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+/* 粒度設定 */
+.granularityRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid rgba(139, 92, 246, 0.12);
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.granularityLabel {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.granularityButton {
+  flex: 1;
+  padding: 0.375rem 0;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 0.5rem;
+  background: transparent;
+  font-size: 0.75rem;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.granularityButton:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #4b2e83;
+}
+
+.granularityActive {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.5);
+  color: #4b2e83;
+  font-weight: 600;
+}
