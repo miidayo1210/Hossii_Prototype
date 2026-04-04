@@ -1,6 +1,6 @@
 /**
  * Display Preferences Storage
- * Manages display period filter, display limit, and view mode settings.
+ * Manages display period filter, display limit, view mode, and bubble layout mode settings.
  */
 
 // ---- DisplayPeriod ----
@@ -92,6 +92,61 @@ export function loadViewMode(): ViewMode {
 export function saveViewMode(mode: ViewMode): void {
   try {
     localStorage.setItem(VIEW_MODE_KEY, mode);
+  } catch {
+    // ignore
+  }
+}
+
+// ---- LayoutMode ----
+
+export type LayoutMode = 'random' | 'ordered';
+
+const LAYOUT_MODE_KEY = 'hossii.layoutMode';
+const DEFAULT_LAYOUT_MODE: LayoutMode = 'random';
+
+const VALID_LAYOUT_MODES: LayoutMode[] = ['random', 'ordered'];
+
+export function loadLayoutMode(): LayoutMode {
+  try {
+    const raw = localStorage.getItem(LAYOUT_MODE_KEY);
+    if (raw && (VALID_LAYOUT_MODES as string[]).includes(raw)) return raw as LayoutMode;
+    return DEFAULT_LAYOUT_MODE;
+  } catch {
+    return DEFAULT_LAYOUT_MODE;
+  }
+}
+
+export function saveLayoutMode(mode: LayoutMode): void {
+  try {
+    localStorage.setItem(LAYOUT_MODE_KEY, mode);
+  } catch {
+    // ignore
+  }
+}
+
+// ---- OrderedSortDirection（投稿順格子のセル詰め順。表示の形は同じ） ----
+
+/** `desc`: 左上が新しい投稿（既定）。`asc`: 左上が古い投稿 */
+export type OrderedSortDirection = 'asc' | 'desc';
+
+const ORDERED_SORT_KEY = 'hossii.orderedSortDirection';
+const DEFAULT_ORDERED_SORT: OrderedSortDirection = 'desc';
+
+const VALID_ORDERED_SORT: OrderedSortDirection[] = ['asc', 'desc'];
+
+export function loadOrderedSortDirection(): OrderedSortDirection {
+  try {
+    const raw = localStorage.getItem(ORDERED_SORT_KEY);
+    if (raw && (VALID_ORDERED_SORT as string[]).includes(raw)) return raw as OrderedSortDirection;
+    return DEFAULT_ORDERED_SORT;
+  } catch {
+    return DEFAULT_ORDERED_SORT;
+  }
+}
+
+export function saveOrderedSortDirection(direction: OrderedSortDirection): void {
+  try {
+    localStorage.setItem(ORDERED_SORT_KEY, direction);
   } catch {
     // ignore
   }

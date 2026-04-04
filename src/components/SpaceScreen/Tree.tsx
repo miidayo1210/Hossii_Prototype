@@ -71,6 +71,10 @@ type BubbleProps = {
   onLike?: (id: string) => void;
   /** カスタム吹き出し形状PNGのパス（指定するとmask-imageでPNG形状に切り抜かれる） */
   bubbleShapePng?: string;
+  /** 投稿順レイアウト時: 左上基準でスケール・見た目を揃える */
+  layoutAlignTopLeft?: boolean;
+  /** 投稿順モード時のみ: 格子セル番号に応じた重ね順（大きいほど手前＝右下ほど上） */
+  orderedStackZ?: number;
 };
 
 export const Bubble = ({
@@ -89,6 +93,8 @@ export const Bubble = ({
   likesEnabled = false,
   onLike,
   bubbleShapePng,
+  layoutAlignTopLeft = false,
+  orderedStackZ,
 }: BubbleProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -302,13 +308,16 @@ export const Bubble = ({
   const extraTagCount = hashtags.length - MAX_VISIBLE_TAGS;
   const showFooter = viewMode === 'full' && (hashtags.length > 0 || likesEnabled);
 
-  const bubbleStyle: React.CSSProperties = {
+  const bubbleStyle: React.CSSProperties & { '--bubble-stack'?: number } = {
     left: `${displayPos.x}%`,
     top: `${displayPos.y}%`,
     animationDelay: isDragging ? '0s' : animationDelay,
     animationDuration,
-    animationPlayState: isDragging || isSelected ? 'paused' : 'running',
+    animationPlayState: isDragging || isSelected || layoutAlignTopLeft ? 'paused' : 'running',
   };
+  if (orderedStackZ != null) {
+    bubbleStyle['--bubble-stack'] = orderedStackZ;
+  }
   if (hossii.bubbleColor) {
     bubbleStyle.backgroundColor = hossii.bubbleColor;
     bubbleStyle.borderColor = hossii.bubbleColor;
@@ -331,6 +340,7 @@ export const Bubble = ({
   const classNames = [
     styles.bubble,
     bubbleShapePng ? styles.bubbleCustomShape : '',
+    layoutAlignTopLeft ? styles.bubbleLayoutGrid : '',
     isActive && !isSelected ? styles.bubbleActive : '',
     isSelected ? (bubbleShapePng ? styles.bubbleSelectedShape : styles.bubbleSelected) : '',
     dragPos ? styles.bubbleDragging : '',

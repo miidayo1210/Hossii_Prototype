@@ -13,6 +13,29 @@
   transform: translate(-50%, -50%) scale(1.3);
 }
 
+/* 投稿順格子: 左上基準（translate なし）で (x%,y%) に配置 */
+.starAnchorTopLeft {
+  transform: none;
+}
+
+.starAnchorTopLeft:hover {
+  transform: scale(1.3);
+  transform-origin: left top;
+}
+
+/* 投稿順格子: セル番号が大きいほど手前（右下が最前面） */
+.starOrderedStack {
+  z-index: var(--star-stack);
+}
+
+.starOrderedStack:hover {
+  z-index: calc(var(--star-stack) + 10);
+}
+
+.starAnchorTopLeft.starOrderedStack:hover {
+  z-index: calc(var(--star-stack) + 10);
+}
+
 .starDot {
   display: block;
   font-size: 14px;

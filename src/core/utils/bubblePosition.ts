@@ -17,3 +17,18 @@ export function createBubblePosition(index: number): { x: number; y: number } {
 
   return { x, y };
 }
+
+/** 投稿の新しい順（index 0 = 最新）を左上から右へ折り返しながら格子配置する。 */
+export function createOrderedBubblePosition(index: number, total: number): { x: number; y: number } {
+  if (total <= 0) return { x: 50, y: 50 };
+  const cols = Math.max(1, Math.ceil(Math.sqrt(total)));
+  const rows = Math.ceil(total / cols);
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+  // 各セルの左上を揃える（createBubblePosition と同じ 8〜92% × 12〜78% の枠内を行×列で等分割）
+  const cellW = 84 / cols;
+  const cellH = 66 / Math.max(rows, 1);
+  const x = 8 + col * cellW;
+  const y = 12 + row * cellH;
+  return { x, y };
+}

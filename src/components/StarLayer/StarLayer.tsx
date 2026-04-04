@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import styles from './StarLayer.module.css';
@@ -48,14 +48,10 @@ export const StarLayer = () => {
 
   const [stars, setStars] = useState<Star[]>([]);
   const prevHossiiCountRef = useRef<number>(0);
-  const hossiisRef = useRef(hossiis);
-  useLayoutEffect(() => {
-    hossiisRef.current = hossiis;
-  });
 
-  // スペースが切り替わったら星をリセット
+  // スペースが切り替わったら星をリセット（このレンダー時点の hossiis を使う。ref だと別タスクで古い配列を読む可能性がある）
   useEffect(() => {
-    const h = hossiisRef.current;
+    const h = hossiis;
     const initialStars = h.slice(0, 20).map(() => createStar());
     const count = h.length;
     const id = setTimeout(() => {
@@ -63,6 +59,8 @@ export const StarLayer = () => {
       prevHossiiCountRef.current = count;
     }, 0);
     return () => clearTimeout(id);
+    // activeSpaceId 変更時のそのコミットの hossiis のみが必要。投稿のたびに星を初期化しないよう hossiis は入れない
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on space switch; hossiis is paired with activeSpaceId in the same render
   }, [activeSpaceId]);
 
   // 初期化: 既存の投稿数に基づいて星を生成

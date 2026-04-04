@@ -230,6 +230,10 @@ export function HossiiLive({
   const interactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInteractionTimeRef = useRef<number>(0);
+  // レンダー中に Date.now を呼ばず、マウント直後に現在時刻へ揃える（0 のままだと経過時間が異常に大きくなる）
+  useLayoutEffect(() => {
+    lastInteractionTimeRef.current = Date.now();
+  }, []);
   // emotion を ref で保持（effect の依存配列から外すため）
   const emotionRef = useRef<EmotionKey | null | undefined>(emotion);
   // stale closure 回避: 表情 state を ref でミラー

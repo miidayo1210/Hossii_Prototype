@@ -5,13 +5,25 @@ type Props = {
   hossii: Hossii;
   x: number; // % position
   y: number; // % position
+  /** center: 従来どおり星の中心が (x,y)。topLeft: 格子整列用に星ボタンの左上が (x,y) */
+  anchor?: 'center' | 'topLeft';
   onClick: () => void;
   showPreview?: boolean;
+  /** 投稿順モード時: 格子セルに応じた重ね順（大きいほど手前） */
+  orderedStackZ?: number;
 };
 
 const MAX_PREVIEW_TEXT = 40;
 
-export const StarView = ({ hossii, x, y, onClick, showPreview }: Props) => {
+export const StarView = ({
+  hossii,
+  x,
+  y,
+  anchor = 'center',
+  onClick,
+  showPreview,
+  orderedStackZ,
+}: Props) => {
   const isLaughter = hossii.autoType === 'laughter';
   const emotion = hossii.emotion;
 
@@ -29,13 +41,14 @@ export const StarView = ({ hossii, x, y, onClick, showPreview }: Props) => {
 
   return (
     <button
-      className={`${styles.star} ${showPreview ? styles.starHighlight : ''}`}
+      className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''}`}
       style={{
         left: `${x}%`,
         top: `${y}%`,
         '--pulse-delay': `${pulseDelay}s`,
         '--float-delay': `${floatDelay}s`,
         '--pulse-duration': `${pulseDuration}s`,
+        ...(orderedStackZ != null ? { '--star-stack': orderedStackZ } : {}),
       } as React.CSSProperties}
       onClick={onClick}
       aria-label={`${hossii.authorName || 'Post'} from ${hossii.createdAt.toLocaleTimeString()}`}

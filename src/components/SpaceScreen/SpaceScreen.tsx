@@ -12,7 +12,7 @@ import { useNeighborSpace } from './useNeighborSpace';
 import type { EmotionKey } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
-import { createBubblePosition } from '../../core/utils/bubblePosition';
+import { createBubblePosition, createOrderedBubblePosition } from '../../core/utils/bubblePosition';
 import { incrementLike } from '../../core/utils/likesApi';
 import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
 import { Bubble } from './Tree';
@@ -71,7 +71,8 @@ export const SpaceScreen = () => {
   const {
     prefs: {
       showHossii, listenMode, hasConsentedToListen, speechLogEnabled,
-      speechLevels, displayScale, displayPeriod, displayLimit, viewMode,
+      speechLevels, displayScale, displayPeriod, displayLimit, viewMode, layoutMode,
+      orderedSortDirection,
     },
     setShowHossii,
     setListenMode,
@@ -80,6 +81,8 @@ export const SpaceScreen = () => {
     setDisplayPeriod,
     setDisplayLimit,
     setViewMode,
+    setLayoutMode,
+    setOrderedSortDirection,
     setSpeechLevels,
   } = useDisplayPrefs();
   const activeSpace = getActiveSpace();
@@ -408,8 +411,13 @@ export const SpaceScreen = () => {
 
   // 各バブルの位置を事前計算（メモ化）
   const bubblePositions = useMemo(() => {
-    return displayHossiis.map((_, index) => createBubblePosition(index));
-  }, [displayHossiis]);
+    if (layoutMode === 'ordered') {
+      return displayHossiis.map((_, i) =>
+        createOrderedBubblePosition(i, displayHossiis.length)
+      );
+    }
+    return displayHossiis.map((_, i) => createBubblePosition(i));
+  }, [displayHossiis, layoutMode]);
 
   // モバイル: コンテンツ（テキストor画像）を持つ投稿をランダムで3件プレビュー表示（8秒ローテーション）
   useEffect(() => {
@@ -558,6 +566,30 @@ export const SpaceScreen = () => {
         🌳 {activeSpace?.name ?? 'My Space'}
       </div>
 
+      {/* 投稿順モード: 格子の形はそのまま、左上〜右下の詰め順だけ昇順・降順で切替 */}
+      {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
+        <div className={styles.orderedSortToolbar} role="group" aria-label="投稿順の整列方向">
+          <button
+            type="button"
+            className={`${styles.orderedSortButton} ${orderedSortDirection === 'desc' ? styles.orderedSortButtonActive : ''}`}
+            title="新しい投稿を左上から（降順）"
+            aria-pressed={orderedSortDirection === 'desc'}
+            onClick={() => setOrderedSortDirection('desc')}
+          >
+            降順
+          </button>
+          <button
+            type="button"
+            className={`${styles.orderedSortButton} ${orderedSortDirection === 'asc' ? styles.orderedSortButtonActive : ''}`}
+            title="古い投稿を左上から（昇順）"
+            aria-pressed={orderedSortDirection === 'asc'}
+            onClick={() => setOrderedSortDirection('asc')}
+          >
+            昇順
+          </button>
+        </div>
+      )}
+
       {/* 共有ボタン（右上） */}
       <button
         type="button"
@@ -598,10 +630,22 @@ export const SpaceScreen = () => {
           </div>
         ) : (
           displayHossiis.map((hossii, index) => {
-            // F02: 固定座標があればそれを優先、なければ index シード計算にフォールバック
-            const pos = hossii.isPositionFixed && hossii.positionX != null && hossii.positionY != null
-              ? { x: hossii.positionX, y: hossii.positionY }
-              : bubblePositions[index];
+            const n = displayHossiis.length;
+            // 投稿順: 降順＝新しいほど左上（index 一致）、昇順＝古いほど左上（セル index を反転）
+            const orderedGridIndex =
+              layoutMode === 'ordered' && orderedSortDirection === 'asc'
+                ? n - 1 - index
+                : index;
+            // ランダム: 固定座標があれば優先。投稿順: 常に格子の計算座標（全件きれいに整列）
+            const pos =
+              layoutMode === 'random' &&
+              hossii.isPositionFixed &&
+              hossii.positionX != null &&
+              hossii.positionY != null
+                ? { x: hossii.positionX, y: hossii.positionY }
+                : layoutMode === 'ordered'
+                  ? bubblePositions[orderedGridIndex]
+                  : bubblePositions[index];
 
             const isThisSelected = selectedBubbleId === hossii.id;
 
@@ -613,8 +657,12 @@ export const SpaceScreen = () => {
                   hossii={hossii}
                   x={pos.x}
                   y={pos.y}
+                  anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
                   onClick={() => setSelectedPostId(hossii.id)}
                   showPreview={previewHossiiIds.has(hossii.id)}
+                  orderedStackZ={
+                    layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
+                  }
                 />
               );
             }
@@ -625,6 +673,9 @@ export const SpaceScreen = () => {
                 hossii={hossii}
                 index={index}
                 position={pos}
+                orderedStackZ={
+                  layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
+                }
                 isActive={activeBubbleId === hossii.id}
                 onActivate={() =>
                   setActiveBubbleId(
@@ -641,6 +692,7 @@ export const SpaceScreen = () => {
                 likesEnabled={spaceSettings?.features.likesEnabled ?? false}
                 onLike={handleLike}
                 bubbleShapePng={hossii.bubbleShapePng ?? activeSpace?.bubbleShapePng}
+                layoutAlignTopLeft={layoutMode === 'ordered'}
               />
             );
           })
@@ -820,6 +872,8 @@ export const SpaceScreen = () => {
             onDisplayLimitChange={setDisplayLimit}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            layoutMode={layoutMode}
+            onLayoutModeChange={setLayoutMode}
             neighbors={neighbors}
             onWarp={handleWarp}
             isVisiting={isVisiting}

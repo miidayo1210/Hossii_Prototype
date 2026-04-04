@@ -1,6 +1,6 @@
 import { Maximize2, Minimize2, Eye, EyeOff, Mic, MicOff, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
-import type { DisplayPeriod, DisplayLimit, ViewMode } from '../../core/utils/displayPrefsStorage';
+import type { DisplayPeriod, DisplayLimit, ViewMode, LayoutMode } from '../../core/utils/displayPrefsStorage';
 import type { Space } from '../../core/types/space';
 import styles from './LeftControlBar.module.css';
 
@@ -23,6 +23,8 @@ type Props = {
   onDisplayLimitChange: (l: DisplayLimit) => void;
   viewMode: ViewMode;
   onViewModeChange: (m: ViewMode) => void;
+  layoutMode: LayoutMode;
+  onLayoutModeChange: (m: LayoutMode) => void;
   neighbors?: Space[];
   onWarp?: () => void;
   isVisiting?: boolean;
@@ -49,6 +51,11 @@ const VIEW_MODE_OPTIONS: { value: ViewMode; label: string; title: string }[] = [
   { value: 'slideshow', label: '🎞', title: 'スライドショー' },
 ];
 
+const LAYOUT_MODE_OPTIONS: { value: LayoutMode; label: string; title: string }[] = [
+  { value: 'random', label: '🔀', title: 'ランダム配置' },
+  { value: 'ordered', label: '↔️', title: '投稿順に整列' },
+];
+
 export const LeftControlBar = ({
   controls,
   onToggle,
@@ -61,6 +68,8 @@ export const LeftControlBar = ({
   onDisplayLimitChange,
   viewMode,
   onViewModeChange,
+  layoutMode,
+  onLayoutModeChange,
   neighbors = [],
   onWarp,
   isVisiting = false,
@@ -148,6 +157,25 @@ export const LeftControlBar = ({
             key={value}
             className={`${styles.miniButton} ${viewMode === value ? styles.miniActive : ''}`}
             onClick={() => onViewModeChange(value)}
+            title={title}
+            aria-label={title}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* --- 区切り線 --- */}
+      <div className={styles.divider} />
+
+      {/* 吹き出し並び: ランダム / 投稿順 */}
+      <div className={styles.groupLabel}>並び</div>
+      <div className={styles.buttonGroup}>
+        {LAYOUT_MODE_OPTIONS.map(({ value, label, title }) => (
+          <button
+            key={value}
+            className={`${styles.miniButton} ${layoutMode === value ? styles.miniActive : ''}`}
+            onClick={() => onLayoutModeChange(value)}
             title={title}
             aria-label={title}
           >
