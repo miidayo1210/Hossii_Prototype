@@ -40,6 +40,11 @@ const FLAG_LIST: FlagMeta[] = [
     label: '吹き出し形状カスタマイズ',
     description: '投稿ごとに吹き出しの形を選択できるようにします。',
   },
+  {
+    key: 'position_selector',
+    label: '投稿位置の指定',
+    description: '投稿時に3×3グリッドでスペース内のエリアを指定できるようにします。',
+  },
 ];
 
 export const FeatureFlagsTab = ({ spaceId }: Props) => {

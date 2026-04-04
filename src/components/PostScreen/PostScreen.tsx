@@ -171,6 +171,12 @@ export const PostScreen = ({
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
 
   useEffect(() => {
+    if (!featureFlags.position_selector) {
+      setSelectedArea(null);
+    }
+  }, [featureFlags.position_selector]);
+
+  useEffect(() => {
     const activeSpace = getActiveSpace();
     if (activeSpace) {
       const settings = loadSpaceSettings(activeSpace.id, activeSpace.name);
@@ -372,12 +378,13 @@ export const PostScreen = ({
         }
       }
 
+      const positionGridActive = !panelMode && featureFlags.position_selector;
       const areaPos =
         panelMode && initialPosition
           ? initialPosition
-          : selectedArea !== null
-          ? areaToPosition(selectedArea)
-          : null;
+          : positionGridActive && selectedArea !== null
+            ? areaToPosition(selectedArea)
+            : null;
 
       addHossii({
         message: message.trim(),
@@ -390,7 +397,7 @@ export const PostScreen = ({
         numberValue: hasNumber ? parsedNumber! : undefined,
         positionX: areaPos?.x,
         positionY: areaPos?.y,
-        isPositionFixed: panelMode ? true : selectedArea !== null,
+        isPositionFixed: panelMode ? true : positionGridActive && selectedArea !== null,
       });
 
       // スタンプを獲得
@@ -779,29 +786,31 @@ export const PostScreen = ({
           </div>
         )}
 
-        {/* 位置選択グリッド（パネルモード時は非表示：ダブルクリック座標を使用） */}
-        {!panelMode && <div className={styles.section}>
-          <div className={styles.label}>置く場所（任意）</div>
-          <div className={styles.areaGrid}>
-            {AREA_LABELS.map((label, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setSelectedArea(selectedArea === idx ? null : idx)}
-                className={`${styles.areaCell} ${selectedArea === idx ? styles.areaCellSelected : ''}`}
-                aria-label={label}
-                title={label}
-              >
-                <span className={styles.areaCellLabel}>{label}</span>
-              </button>
-            ))}
+        {/* 位置選択グリッド（position_selector が ON かつフル画面時のみ。パネルはダブルクリック座標） */}
+        {!panelMode && featureFlags.position_selector && (
+          <div className={styles.section}>
+            <div className={styles.label}>置く場所（任意）</div>
+            <div className={styles.areaGrid}>
+              {AREA_LABELS.map((label, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedArea(selectedArea === idx ? null : idx)}
+                  className={`${styles.areaCell} ${selectedArea === idx ? styles.areaCellSelected : ''}`}
+                  aria-label={label}
+                  title={label}
+                >
+                  <span className={styles.areaCellLabel}>{label}</span>
+                </button>
+              ))}
+            </div>
+            <div className={styles.areaHint}>
+              {selectedArea !== null
+                ? `選択中: ${AREA_LABELS[selectedArea]}`
+                : 'スペース全体にランダム配置'}
+            </div>
           </div>
-          <div className={styles.areaHint}>
-            {selectedArea !== null
-              ? `選択中: ${AREA_LABELS[selectedArea]}`
-              : 'スペース全体にランダム配置'}
-          </div>
-        </div>}
+        )}
 
         {/* 送信ボタン（音声候補編集時は 保存 + 気持ちを置く） */}
         {speechEditMode && panelMode ? (
