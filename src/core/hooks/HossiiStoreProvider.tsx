@@ -809,7 +809,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       numberValue: input.numberValue,
       positionX: input.positionX ?? initialPos.x,
       positionY: input.positionY ?? initialPos.y,
-      isPositionFixed: input.isPositionFixed ?? true,
+      isPositionFixed: input.isPositionFixed ?? false,
     };
 
     // 楽観的更新（即時 UI 反映）

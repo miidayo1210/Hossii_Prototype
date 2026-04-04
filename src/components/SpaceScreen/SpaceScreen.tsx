@@ -28,6 +28,7 @@ import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { StarLayer } from '../StarLayer/StarLayer';
 import { SlideshowView } from '../Slideshow/SlideshowView';
+import { PostScreen } from '../PostScreen/PostScreen';
 import { recordBottleDelivery } from '../../core/utils/neighborsApi';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
@@ -147,6 +148,20 @@ export const SpaceScreen = () => {
 
   // 同意モーダル表示フラグ
   const [showListenConsent, setShowListenConsent] = useState(false);
+
+  // クイック投稿パネル: ダブルクリック座標（null = 非表示）
+  const [quickPostPos, setQuickPostPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (quickPostPos) {
+      setQuickPostPos(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setQuickPostPos({ x, y });
+  }, [quickPostPos]);
 
   const handleControlToggle = useCallback((key: keyof ControlState) => {
     if (key === 'hossiiVisible') {
@@ -451,7 +466,7 @@ export const SpaceScreen = () => {
     : null;
 
   return (
-    <div className={`${styles.container} ${backgroundClass}`} style={backgroundStyle}>
+    <div className={`${styles.container} ${backgroundClass}`} style={backgroundStyle} onDoubleClick={handleDoubleClick}>
       {/* 訪問モードバナー */}
       {isVisiting && visitingSpaceInfo && (
         <VisitBanner
@@ -734,6 +749,17 @@ export const SpaceScreen = () => {
           />
           <QRCodePanel />
         </>
+      )}
+
+      {/* クイック投稿パネル */}
+      {quickPostPos && (
+        <div className={isMobile ? styles.bottomSheetWrapper : styles.sidePanelWrapper}>
+          <PostScreen
+            panelMode={isMobile ? 'bottom' : 'side'}
+            initialPosition={quickPostPos}
+            onClose={() => setQuickPostPos(null)}
+          />
+        </div>
       )}
     </div>
   );

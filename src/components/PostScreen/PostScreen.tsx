@@ -98,10 +98,17 @@ function parseHashtags(text: string): string[] {
   return [...new Set(matches.map((t) => t.slice(1)))];
 }
 
-export const PostScreen = () => {
+type Props = {
+  panelMode?: 'side' | 'bottom';
+  initialPosition?: { x: number; y: number };
+  onClose?: () => void;
+};
+
+export const PostScreen = ({ panelMode, initialPosition, onClose }: Props) => {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [poyonActive, setPoyonActive] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [greeting, setGreeting] = useState('');
 
@@ -315,7 +322,12 @@ export const PostScreen = () => {
         }
       }
 
-      const areaPos = selectedArea !== null ? areaToPosition(selectedArea) : null;
+      const areaPos =
+        panelMode && initialPosition
+          ? initialPosition
+          : selectedArea !== null
+          ? areaToPosition(selectedArea)
+          : null;
 
       addHossii({
         message: message.trim(),
@@ -328,7 +340,7 @@ export const PostScreen = () => {
         numberValue: hasNumber ? parsedNumber! : undefined,
         positionX: areaPos?.x,
         positionY: areaPos?.y,
-        isPositionFixed: selectedArea !== null,
+        isPositionFixed: panelMode ? true : selectedArea !== null,
       });
 
       // スタンプを獲得
@@ -365,7 +377,10 @@ export const PostScreen = () => {
       handleImageRemove();
       shuffleGreeting();
 
-      if (!continuousPost) {
+      if (panelMode) {
+        // Toast を見せてから閉じる（即時クローズだと Toast が表示されない）
+        setTimeout(() => onClose?.(), 700);
+      } else if (!continuousPost) {
         setTimeout(() => {
           navigate('screen');
         }, 800);
@@ -377,13 +392,27 @@ export const PostScreen = () => {
 
   const canSubmit = selectedEmotion || message.trim() || imagePreview || numberInput.trim() !== '';
 
-  return (
-    <div className={styles.container}>
-      {/* 右上メニュー */}
-      <TopRightMenu />
+  const handleSubmitClick = () => {
+    setPoyonActive(true);
+    handleSubmit();
+  };
 
-      {/* ヘッダー：Hossii（showHossii時のみ） */}
-      {showHossii && (
+  return (
+    <div className={`${styles.container}${panelMode ? ` ${styles.panelContainer}` : ''}`}>
+      {/* パネルモード: 閉じるボタン */}
+      {panelMode && (
+        <div className={styles.panelCloseBar}>
+          <button type="button" onClick={onClose} className={styles.panelCloseButton}>
+            ✕ 閉じる
+          </button>
+        </div>
+      )}
+
+      {/* 右上メニュー（パネルモード時は非表示） */}
+      {!panelMode && <TopRightMenu />}
+
+      {/* ヘッダー：Hossii（showHossii時のみ・パネルモード時は非表示） */}
+      {showHossii && !panelMode && (
         <header className={styles.header}>
           <HossiiMini onClick={shuffleGreeting} hossiiColor={spaceSettings?.hossiiColor} />
           <div className={styles.greetingArea}>
@@ -393,7 +422,7 @@ export const PostScreen = () => {
       )}
 
       {/* メインコンテンツ */}
-      <main className={styles.main}>
+      <main className={panelMode ? styles.panelMain : styles.main}>
         <h2 className={styles.title}>気持ちを置く 🌸</h2>
 
         {/* 全ての機能が無効の場合の警告 */}
@@ -409,7 +438,7 @@ export const PostScreen = () => {
 
         {/* メッセージ入力 - commentPost が有効の場合のみ */}
         {spaceSettings?.features.commentPost !== false && (
-          <div className={styles.section}>
+          <div className={panelMode ? styles.panelSection : styles.section}>
             <div className={styles.label}>メッセージ</div>
             <textarea
               value={message}
@@ -423,7 +452,7 @@ export const PostScreen = () => {
 
         {/* クイック感情バー - emotionPost が有効の場合のみ */}
         {spaceSettings?.features.emotionPost !== false && (
-          <div className={styles.section}>
+          <div className={panelMode ? styles.panelSection : styles.section}>
             <div className={styles.label}>気持ちをつける（任意）</div>
             <div className={styles.emotionBar}>
               {emotionButtons.map((btn) => (
@@ -449,7 +478,7 @@ export const PostScreen = () => {
         )}
 
         {/* F01: 吹き出し色選択 */}
-        <div className={styles.section}>
+        <div className={panelMode ? styles.panelSection : styles.section}>
           <div className={styles.label}>吹き出しの色（任意）</div>
           <div className={styles.colorPalette}>
             <button
@@ -476,7 +505,7 @@ export const PostScreen = () => {
 
         {/* B02: 吹き出し形状選択（bubble_shapes_extended が ON の場合のみ） */}
         {featureFlags.bubble_shapes_extended && (
-          <div className={styles.section}>
+          <div className={panelMode ? styles.panelSection : styles.section}>
             <div className={styles.label}>吹き出しの形（任意）</div>
             <div className={styles.shapePicker}>
               <button
@@ -505,7 +534,7 @@ export const PostScreen = () => {
         )}
 
         {/* F09: ハッシュタグ */}
-        <div className={styles.section}>
+        <div className={panelMode ? styles.panelSection : styles.section}>
           <div className={styles.label}>ハッシュタグ（任意）</div>
 
           {/* プリセットタグ（スペースに登録されている場合のみ表示） */}
@@ -562,7 +591,7 @@ export const PostScreen = () => {
 
         {/* numberPost: 数値入力 - numberPost が有効の場合のみ */}
         {spaceSettings?.features.numberPost && (
-          <div className={styles.section}>
+          <div className={panelMode ? styles.panelSection : styles.section}>
             <div className={styles.label}>数値（任意）</div>
             <input
               type="number"
@@ -577,7 +606,7 @@ export const PostScreen = () => {
 
         {/* F10: 写真添付 / F08: お絵描き - photoPost が有効の場合のみ */}
         {spaceSettings?.features.photoPost !== false && (
-          <div className={styles.section}>
+          <div className={panelMode ? styles.panelSection : styles.section}>
             <div className={styles.label}>写真 / お絵描き（任意）</div>
             {imagePreview ? (
               <div className={styles.imagePreviewContainer}>
@@ -620,8 +649,8 @@ export const PostScreen = () => {
           </div>
         )}
 
-        {/* 位置選択グリッド */}
-        <div className={styles.section}>
+        {/* 位置選択グリッド（パネルモード時は非表示：ダブルクリック座標を使用） */}
+        {!panelMode && <div className={panelMode ? styles.panelSection : styles.section}>
           <div className={styles.label}>置く場所（任意）</div>
           <div className={styles.areaGrid}>
             {AREA_LABELS.map((label, idx) => (
@@ -642,14 +671,15 @@ export const PostScreen = () => {
               ? `選択中: ${AREA_LABELS[selectedArea]}`
               : 'スペース全体にランダム配置'}
           </div>
-        </div>
+        </div>}
 
         {/* 送信ボタン */}
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={handleSubmitClick}
+          onAnimationEnd={() => setPoyonActive(false)}
           disabled={sending || !canSubmit}
-          className={styles.submitButton}
+          className={`${styles.submitButton}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
         >
           {sending ? '送信中...' : '気持ちを置く'}
         </button>

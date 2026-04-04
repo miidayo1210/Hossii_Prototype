@@ -6,6 +6,50 @@
   background: linear-gradient(135deg, #fdf2f8 0%, #faf5ff 50%, #eff6ff 100%);
 }
 
+/* パネルモード: min-height を上書き */
+.panelContainer {
+  min-height: unset;
+  height: 100%;
+}
+
+/* パネルモード: コンパクトなメインエリア */
+.panelMain {
+  flex: 1;
+  overflow-y: auto;
+  max-width: 42rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0.75rem 0.75rem;
+}
+
+/* パネルモード: セクション間マージンを縮小 */
+.panelSection {
+  margin-bottom: 0.75rem;
+}
+
+/* パネルモード: 閉じるボタンバー */
+.panelCloseBar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0.75rem 0;
+  flex-shrink: 0;
+}
+
+.panelCloseButton {
+  background: none;
+  border: 1px solid #e9d5ff;
+  border-radius: 6px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  color: #7c3aed;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.panelCloseButton:hover {
+  background: #f3e8ff;
+}
+
 /* ヘッダー：Hossii */
 .header {
   flex-shrink: 0;
@@ -264,16 +308,26 @@
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: relative;
+  top: 0;
+  box-shadow:
+    0 5px 0 #7c3aed,
+    0 8px 16px rgba(124, 58, 237, 0.35);
+  transition: top 0.08s ease, box-shadow 0.08s ease, transform 0.2s;
 }
 
 .submitButton:hover:not(:disabled) {
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 5px 0 #7c3aed,
+    0 10px 20px rgba(124, 58, 237, 0.4);
   transform: translateY(-1px);
 }
 
 .submitButton:active:not(:disabled) {
+  top: 3px;
+  box-shadow:
+    0 2px 0 #7c3aed,
+    0 4px 8px rgba(124, 58, 237, 0.25);
   transform: translateY(0);
 }
 
@@ -281,6 +335,19 @@
   background: #d8b4fe;
   cursor: not-allowed;
   box-shadow: none;
+  top: 0;
+}
+
+@keyframes poyon {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(0.91); }
+  55%  { transform: scale(1.07); }
+  75%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+.submitButtonPoyon {
+  animation: poyon 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
 
 /* Toast */
