@@ -79,6 +79,15 @@ export function getDefaultQuickPostBottomRect(): FloatingRect {
   return { x: 0, y: vh - h, w: vw, h };
 }
 
+/** クイックログパネル（#57）— 既定矩形はクイック投稿と同系。storageKey は `logList.desktop` / `logList.mobile` */
+export function getDefaultQuickLogSideRect(): FloatingRect {
+  return getDefaultQuickPostSideRect();
+}
+
+export function getDefaultQuickLogBottomRect(): FloatingRect {
+  return getDefaultQuickPostBottomRect();
+}
+
 export function getDefaultQrRect(): FloatingRect {
   if (typeof window === 'undefined') return { x: 900, y: 500, w: 220, h: 260 };
   const vw = window.innerWidth;

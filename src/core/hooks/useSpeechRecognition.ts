@@ -12,7 +12,8 @@ export type SpeechEvent = {
 type UseSpeechRecognitionOptions = {
   enabled: boolean;
   speechLevels: SpeechLevelSettings;
-  onSpeechEvent: (event: SpeechEvent) => void;
+  /** 未指定時はバッファ蓄積・無音フラッシュを行わない（文字起こし用 `onFinalSegment` のみ） */
+  onSpeechEvent?: (event: SpeechEvent) => void;
   onFinalSegment?: (text: string) => void;
 };
 
@@ -111,6 +112,7 @@ export function useSpeechRecognition({
   const [error, setError] = useState<string | null>(null);
   const [interimText, setInterimText] = useState('');
   const onFinalSegmentRef = useRef(onFinalSegment);
+  const onSpeechEventRef = useRef(onSpeechEvent);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const bufferRef = useRef<string>('');
@@ -119,14 +121,21 @@ export function useSpeechRecognition({
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechLevelsRef = useRef(speechLevels);
 
-  // speechLevels / onFinalSegment を ref で保持
+  // speechLevels / onFinalSegment / onSpeechEvent を ref で保持
   useLayoutEffect(() => {
     speechLevelsRef.current = speechLevels;
     onFinalSegmentRef.current = onFinalSegment;
+    onSpeechEventRef.current = onSpeechEvent;
   });
 
-  // バッファをフラッシュ
+  // バッファをフラッシュ（onSpeechEvent があるときのみ自動投稿用）
   const flushBuffer = useCallback(() => {
+    const post = onSpeechEventRef.current;
+    if (!post) {
+      bufferRef.current = '';
+      return;
+    }
+
     const text = bufferRef.current.trim();
     if (!text) return;
 
@@ -157,11 +166,11 @@ export function useSpeechRecognition({
     }
 
     // イベント発火（言語情報を含む）
-    onSpeechEvent({ text, level, language: detectedLanguage });
+    post({ text, level, language: detectedLanguage });
     lastTextRef.current = text;
     lastFlushTimeRef.current = now;
     bufferRef.current = '';
-  }, [onSpeechEvent]);
+  }, []);
 
   // 認識結果を処理
   const handleResult = useCallback(
@@ -192,22 +201,25 @@ export function useSpeechRecognition({
         onFinalSegmentRef.current?.(finalTranscript);
         setInterimText('');
 
-        // 言語を検出してノイズフィルタを適用
-        const detectedLanguage = detectLanguage(finalTranscript);
-        if (!isNoise(finalTranscript, detectedLanguage)) {
-          bufferRef.current += finalTranscript;
+        if (onSpeechEventRef.current) {
+          // 言語を検出してノイズフィルタを適用（自動投稿バッファのみ）
+          const detectedLanguage = detectLanguage(finalTranscript);
+          if (!isNoise(finalTranscript, detectedLanguage)) {
+            bufferRef.current += finalTranscript;
 
-          // バッファが上限に達したらフラッシュ
-          if (bufferRef.current.length >= MAX_BUFFER_LENGTH) {
-            flushBuffer();
+            if (bufferRef.current.length >= MAX_BUFFER_LENGTH) {
+              flushBuffer();
+            }
           }
         }
       }
 
-      // 無音検出用タイムアウトを設定
-      flushTimeoutRef.current = setTimeout(() => {
-        flushBuffer();
-      }, SILENCE_FLUSH_DELAY);
+      // 無音検出用タイムアウト（自動投稿バッファがあるときのみ）
+      if (onSpeechEventRef.current) {
+        flushTimeoutRef.current = setTimeout(() => {
+          flushBuffer();
+        }, SILENCE_FLUSH_DELAY);
+      }
     },
     [flushBuffer]
   );

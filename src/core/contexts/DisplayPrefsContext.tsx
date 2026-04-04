@@ -4,7 +4,6 @@ import {
   loadListenMode, saveListenMode,
   loadListenConsent, saveListenConsent,
   loadEmotionLogEnabled, saveEmotionLogEnabled,
-  loadSpeechLogEnabled, saveSpeechLogEnabled,
   loadSpeechLevels, saveSpeechLevels,
   type SpeechLevelSettings,
 } from '../utils/listenStorage';
@@ -29,7 +28,6 @@ export type DisplayPrefsState = {
   listenMode: boolean;
   hasConsentedToListen: boolean;
   emotionLogEnabled: boolean;
-  speechLogEnabled: boolean;
   speechLevels: SpeechLevelSettings;
   displayScale: DisplayScale;
   displayPeriod: DisplayPeriod;
@@ -46,7 +44,6 @@ type DisplayPrefsAction =
   | { type: 'SET_LISTEN_MODE'; payload: boolean }
   | { type: 'SET_LISTEN_CONSENT'; payload: boolean }
   | { type: 'SET_EMOTION_LOG_ENABLED'; payload: boolean }
-  | { type: 'SET_SPEECH_LOG_ENABLED'; payload: boolean }
   | { type: 'SET_SPEECH_LEVELS'; payload: SpeechLevelSettings }
   | { type: 'SET_DISPLAY_SCALE'; payload: DisplayScale }
   | { type: 'SET_DISPLAY_PERIOD'; payload: DisplayPeriod }
@@ -71,9 +68,6 @@ function displayPrefsReducer(state: DisplayPrefsState, action: DisplayPrefsActio
     case 'SET_EMOTION_LOG_ENABLED':
       saveEmotionLogEnabled(action.payload);
       return { ...state, emotionLogEnabled: action.payload };
-    case 'SET_SPEECH_LOG_ENABLED':
-      saveSpeechLogEnabled(action.payload);
-      return { ...state, speechLogEnabled: action.payload };
     case 'SET_SPEECH_LEVELS':
       saveSpeechLevels(action.payload);
       return { ...state, speechLevels: action.payload };
@@ -108,7 +102,6 @@ export type DisplayPrefsContextType = {
   setListenMode: (enabled: boolean) => void;
   setListenConsent: (consented: boolean) => void;
   setEmotionLogEnabled: (enabled: boolean) => void;
-  setSpeechLogEnabled: (enabled: boolean) => void;
   setSpeechLevels: (levels: SpeechLevelSettings) => void;
   setDisplayScale: (scale: DisplayScale) => void;
   setDisplayPeriod: (period: DisplayPeriod) => void;
@@ -138,7 +131,6 @@ export const DisplayPrefsProvider = ({ children }: { children: ReactNode }) => {
     listenMode: loadListenMode(),
     hasConsentedToListen: loadListenConsent(),
     emotionLogEnabled: loadEmotionLogEnabled(),
-    speechLogEnabled: loadSpeechLogEnabled(),
     speechLevels: loadSpeechLevels(),
     displayScale: loadDisplayScale(),
     displayPeriod: loadDisplayPeriod(),
@@ -152,7 +144,6 @@ export const DisplayPrefsProvider = ({ children }: { children: ReactNode }) => {
   const setListenMode = useCallback((enabled: boolean) => dispatch({ type: 'SET_LISTEN_MODE', payload: enabled }), []);
   const setListenConsent = useCallback((consented: boolean) => dispatch({ type: 'SET_LISTEN_CONSENT', payload: consented }), []);
   const setEmotionLogEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_EMOTION_LOG_ENABLED', payload: enabled }), []);
-  const setSpeechLogEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_SPEECH_LOG_ENABLED', payload: enabled }), []);
   const setSpeechLevels = useCallback((levels: SpeechLevelSettings) => dispatch({ type: 'SET_SPEECH_LEVELS', payload: levels }), []);
   const setDisplayScale = useCallback((scale: DisplayScale) => dispatch({ type: 'SET_DISPLAY_SCALE', payload: scale }), []);
   const setDisplayPeriod = useCallback((period: DisplayPeriod) => dispatch({ type: 'SET_DISPLAY_PERIOD', payload: period }), []);
@@ -170,7 +161,6 @@ export const DisplayPrefsProvider = ({ children }: { children: ReactNode }) => {
     setListenMode,
     setListenConsent,
     setEmotionLogEnabled,
-    setSpeechLogEnabled,
     setSpeechLevels,
     setDisplayScale,
     setDisplayPeriod,
@@ -184,7 +174,6 @@ export const DisplayPrefsProvider = ({ children }: { children: ReactNode }) => {
     setListenMode,
     setListenConsent,
     setEmotionLogEnabled,
-    setSpeechLogEnabled,
     setSpeechLevels,
     setDisplayScale,
     setDisplayPeriod,

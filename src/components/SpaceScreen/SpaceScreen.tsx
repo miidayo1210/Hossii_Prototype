@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
-import { useSpeechRecognition, type SpeechEvent } from '../../core/hooks/useSpeechRecognition';
+import { useSpeechRecognition } from '../../core/hooks/useSpeechRecognition';
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
@@ -14,6 +14,7 @@ import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { createBubblePosition, createOrderedBubblePosition } from '../../core/utils/bubblePosition';
 import { incrementLike } from '../../core/utils/likesApi';
+import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
@@ -32,7 +33,11 @@ import { PostScreen } from '../PostScreen/PostScreen';
 import { recordBottleDelivery } from '../../core/utils/neighborsApi';
 import { SpeechPanel } from '../SpeechPanel/SpeechPanel';
 import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
+import { LogListBody } from '../CommentsScreen/LogListBody';
+import { SpacePanelCubeDock } from './SpacePanelCubeDock';
 import {
+  getDefaultQuickLogBottomRect,
+  getDefaultQuickLogSideRect,
   getDefaultQuickPostBottomRect,
   getDefaultQuickPostSideRect,
 } from '../../core/utils/floatingPanelStorage';
@@ -70,7 +75,7 @@ export const SpaceScreen = () => {
   const { activeSpaceId, visitingSpaceId } = state;
   const {
     prefs: {
-      showHossii, listenMode, hasConsentedToListen, speechLogEnabled,
+      showHossii, listenMode, hasConsentedToListen,
       speechLevels, displayScale, displayPeriod, displayLimit, viewMode, layoutMode,
       orderedSortDirection,
     },
@@ -103,6 +108,10 @@ export const SpaceScreen = () => {
     () => (isMobile ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
     [isMobile]
   );
+  const quickLogDefaultRect = useMemo(
+    () => (isMobile ? getDefaultQuickLogBottomRect() : getDefaultQuickLogSideRect()),
+    [isMobile]
+  );
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   // 音声パネルの開閉と蓄積テキスト
   const [panelConfirmedText, setPanelConfirmedText] = useState('');
@@ -112,11 +121,15 @@ export const SpaceScreen = () => {
   /** 音声候補の × で除外した文字列 */
   const [dismissedSpeechCandidates, setDismissedSpeechCandidates] = useState<string[]>([]);
 
+  /** 左バー等で Listen ON にしたときはパネルも開く。OFF にしてもパネルは自動では閉じない（右キューブで開いた場合など） */
   useEffect(() => {
     if (listenMode) {
       setSpeechPanelOpen(true);
-    } else {
-      setSpeechPanelOpen(false);
+    }
+  }, [listenMode]);
+
+  useEffect(() => {
+    if (!listenMode) {
       setPanelConfirmedText('');
       setDismissedSpeechCandidates([]);
     }
@@ -128,6 +141,9 @@ export const SpaceScreen = () => {
 
   // クイック投稿パネル（setQuickPostPos を下のコールバックより先に宣言）
   const [quickPostPos, setQuickPostPos] = useState<{ x: number; y: number } | null>(null);
+  /** ダブルクリック→クイック投稿オープンを遅延させ、トリプルクリックでログパネルに譲る */
+  const pendingQuickPostOpenRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
 
   const resetQuickPostSpeechState = useCallback(() => {
     setSpeechEditOriginal(undefined);
@@ -138,6 +154,53 @@ export const SpaceScreen = () => {
     setQuickPostPos(null);
     resetQuickPostSpeechState();
   }, [resetQuickPostSpeechState]);
+
+  const handleQuickLogClose = useCallback(() => {
+    setQuickLogOpen(false);
+  }, []);
+
+  const handleQuickLogToggle = useCallback(() => {
+    setQuickLogOpen((v) => !v);
+  }, []);
+
+  /** 右側キューブから音声パネルを開く／閉じる（閉じるときは全文リセット） */
+  const handleSpeechDockToggle = useCallback(() => {
+    if (isVisiting) return;
+    setSpeechPanelOpen((wasOpen) => {
+      if (wasOpen) {
+        setPanelConfirmedText('');
+        setDismissedSpeechCandidates([]);
+      }
+      return !wasOpen;
+    });
+  }, [isVisiting]);
+
+  /** 右側キューブから投稿パネルを開く（中央付きの既定位置）／閉じる */
+  const handleQuickPostDockToggle = useCallback(() => {
+    if (isVisiting) return;
+    if (quickPostPos) {
+      handleQuickPostClose();
+      return;
+    }
+    resetQuickPostSpeechState();
+    setPostScreenKey((k) => k + 1);
+    setQuickPostPos({ x: 50, y: 50 });
+  }, [isVisiting, quickPostPos, handleQuickPostClose, resetQuickPostSpeechState]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingQuickPostOpenRef.current) {
+        clearTimeout(pendingQuickPostOpenRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isVisiting && pendingQuickPostOpenRef.current) {
+      clearTimeout(pendingQuickPostOpenRef.current);
+      pendingQuickPostOpenRef.current = null;
+    }
+  }, [isVisiting]);
 
   const handleSaveSpeechDraft = useCallback((original: string, edited: string) => {
     setPanelConfirmedText((prev) => {
@@ -178,6 +241,7 @@ export const SpaceScreen = () => {
     bottlePayload,
     setBottlePayload,
     handleWarp,
+    removeVisitingHossii,
   } = useNeighborSpace({
     activeSpaceId,
     visitingSpaceId,
@@ -185,6 +249,10 @@ export const SpaceScreen = () => {
     spaceSettings,
     setVisitingSpace,
   });
+
+  // 訪問中は背景・タイトル・装飾を訪問先に合わせる（投稿 0 件でも自スペースの見た目が残らないようにする）
+  const spaceForVisual =
+    isVisiting && visitingSpaceInfo ? visitingSpaceInfo : activeSpace;
 
   const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
 
@@ -217,7 +285,18 @@ export const SpaceScreen = () => {
   // 同意モーダル表示フラグ
   const [showListenConsent, setShowListenConsent] = useState(false);
 
+  const handleContainerClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.detail !== 3) return;
+    if (pendingQuickPostOpenRef.current) {
+      clearTimeout(pendingQuickPostOpenRef.current);
+      pendingQuickPostOpenRef.current = null;
+    }
+    setQuickLogOpen((v) => !v);
+  }, []);
+
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // 訪問モードは閲覧専用（仕様 44）。クイック投稿は自 activeSpace へ投稿されるためここでは開かない
+    if (isVisiting) return;
     if (quickPostPos) {
       setQuickPostPos(null);
       resetQuickPostSpeechState();
@@ -228,8 +307,18 @@ export const SpaceScreen = () => {
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     resetQuickPostSpeechState();
     setPostScreenKey((k) => k + 1);
-    setQuickPostPos({ x, y });
-  }, [quickPostPos, resetQuickPostSpeechState]);
+    pendingQuickPostOpenRef.current = setTimeout(() => {
+      pendingQuickPostOpenRef.current = null;
+      setQuickPostPos({ x, y });
+    }, 320);
+  }, [isVisiting, quickPostPos, resetQuickPostSpeechState]);
+
+  useEffect(() => {
+    if (isVisiting && quickPostPos) {
+      setQuickPostPos(null);
+      resetQuickPostSpeechState();
+    }
+  }, [isVisiting, quickPostPos, resetQuickPostSpeechState]);
 
   const handleControlToggle = useCallback((key: keyof ControlState) => {
     if (key === 'hossiiVisible') {
@@ -248,6 +337,17 @@ export const SpaceScreen = () => {
       setControlState((prev) => ({ ...prev, [key]: !prev[key] }));
     }
   }, [showHossii, listenMode, hasConsentedToListen, setShowHossii, setListenMode]);
+
+  /** 音声パネル内の Listen ON/OFF（左バーと同じ同意フロー） */
+  const handleSpeechPanelListenToggle = useCallback(() => {
+    if (listenMode) {
+      setListenMode(false);
+    } else if (hasConsentedToListen) {
+      setListenMode(true);
+    } else {
+      setShowListenConsent(true);
+    }
+  }, [listenMode, hasConsentedToListen, setListenMode]);
 
   const handleFullscreenToggle = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -332,22 +432,7 @@ export const SpaceScreen = () => {
     onReaction: handleBroadcastReaction,
   });
 
-  // 音声認識イベントを処理（ことばログ）
-  // speechLogEnabled が ON の場合のみ自動投稿する。OFF でもパネル用 onFinalSegment は動作する
-  const handleSpeechEvent = useCallback((event: SpeechEvent) => {
-    if (!speechLogEnabled) return;
-    addHossii({
-      message: event.text,
-      authorNameOverride: 'Hossii',
-      logType: 'speech',
-      speechLevel: event.level,
-      origin: 'auto',
-      autoType: 'speech',
-      language: event.language,
-    });
-  }, [addHossii, speechLogEnabled]);
-
-  // 音声パネル用: 確定テキストを蓄積（最大300文字）
+  // 音声パネル用: 確定テキストを蓄積（最大300文字）。スペースへの自動投稿は行わない（候補の手動投稿のみ）
   const handleFinalSegment = useCallback((text: string) => {
     setPanelConfirmedText(prev => {
       const next = prev + text;
@@ -355,11 +440,10 @@ export const SpaceScreen = () => {
     });
   }, []);
 
-  // 音声認識（listenMode ON の間は常に動作。auto-post は handleSpeechEvent 内で speechLogEnabled を確認）
+  // 音声認識（listenMode ON の間は常に動作。onSpeechEvent は渡さず文字起こし＋パネル候補のみ）
   const { interimText, isRecognizing } = useSpeechRecognition({
     enabled: listenMode,
     speechLevels,
-    onSpeechEvent: handleSpeechEvent,
     onFinalSegment: handleFinalSegment,
   });
 
@@ -400,7 +484,7 @@ export const SpaceScreen = () => {
     const cutoff = getPeriodCutoff(displayPeriod);
     const limit = displayLimit === 'unlimited' ? Infinity : displayLimit;
     const visible = hossiis.filter((h) => {
-      if (h.isHidden) return false;
+      if (coerceIsHidden(h.isHidden)) return false;
       if (cutoff && h.createdAt < cutoff) return false;
       if (viewMode === 'image' && !h.imageUrl) return false;
       return true;
@@ -478,9 +562,9 @@ export const SpaceScreen = () => {
     return null;
   }, [broadcastedReaction, latestHossii]);
 
-  // 背景スタイルを生成
+  // 背景スタイルを生成（訪問中は visitingSpaceInfo の background を使用）
   const { backgroundClass, backgroundStyle } = useMemo(() => {
-    const bg = activeSpace?.background;
+    const bg = spaceForVisual?.background;
     if (!bg) {
       // デフォルト背景（パターン: mist）
       return {
@@ -516,15 +600,28 @@ export const SpaceScreen = () => {
       backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
       backgroundStyle: {},
     };
-  }, [activeSpace]);
+  }, [spaceForVisual]);
 
   // モバイルモーダル用の選択された投稿
   const selectedPost = selectedPostId
     ? displayHossiis.find(h => h.id === selectedPostId)
     : null;
 
+  // クイックログパネル: 画面上のスペース（訪問中は隣人）と一覧を揃える
+  const logListSpaceId = isVisiting ? visitingSpaceId : activeSpaceId;
+  const logListHossiis = isVisiting ? visitingHossiis : getActiveSpaceHossiis();
+  const logPresetTags =
+    isVisiting && visitingSpaceInfo
+      ? visitingSpaceInfo.presetTags ?? []
+      : activeSpace?.presetTags ?? [];
+
   return (
-    <div className={`${styles.container} ${backgroundClass}`} style={backgroundStyle} onDoubleClick={handleDoubleClick}>
+    <div
+      className={`${styles.container} ${backgroundClass}`}
+      style={backgroundStyle}
+      onClick={handleContainerClick}
+      onDoubleClick={handleDoubleClick}
+    >
       {/* 訪問モードバナー */}
       {isVisiting && visitingSpaceInfo && (
         <VisitBanner
@@ -563,7 +660,7 @@ export const SpaceScreen = () => {
 
       {/* スペースタイトル（情報レイヤー） */}
       <div className={styles.spaceTitle}>
-        🌳 {activeSpace?.name ?? 'My Space'}
+        🌳 {spaceForVisual?.name ?? 'My Space'}
       </div>
 
       {/* 投稿順モード: 格子の形はそのまま、左上〜右下の詰め順だけ昇順・降順で切替 */}
@@ -691,7 +788,7 @@ export const SpaceScreen = () => {
                 canEdit={canEditBubble(hossii)}
                 likesEnabled={spaceSettings?.features.likesEnabled ?? false}
                 onLike={handleLike}
-                bubbleShapePng={hossii.bubbleShapePng ?? activeSpace?.bubbleShapePng}
+                bubbleShapePng={hossii.bubbleShapePng ?? spaceForVisual?.bubbleShapePng}
                 layoutAlignTopLeft={layoutMode === 'ordered'}
               />
             );
@@ -741,10 +838,11 @@ export const SpaceScreen = () => {
       )}
 
       {/* 音声パネル（body に portal で描画 — 親の overflow により fixed が隠れるのを防ぐ） */}
-      {listenMode &&
-        speechPanelOpen &&
+      {speechPanelOpen &&
         createPortal(
           <SpeechPanel
+            listenMode={listenMode}
+            onListenToggle={handleSpeechPanelListenToggle}
             confirmedText={panelConfirmedText}
             interimText={interimText}
             speechLevels={speechLevels}
@@ -756,6 +854,7 @@ export const SpaceScreen = () => {
             onClose={() => {
               setSpeechPanelOpen(false);
               setPanelConfirmedText('');
+              setDismissedSpeechCandidates([]);
             }}
           />,
           document.body
@@ -809,7 +908,7 @@ export const SpaceScreen = () => {
       )}
 
       {/* A02: スペース装飾オーバーレイ */}
-      {(activeSpace?.decorations ?? []).map((decoration: SpaceDecoration) => {
+      {(spaceForVisual?.decorations ?? []).map((decoration: SpaceDecoration) => {
         const isOpen = selectedDecorationId === decoration.id;
         return (
           <div
@@ -877,8 +976,20 @@ export const SpaceScreen = () => {
             neighbors={neighbors}
             onWarp={handleWarp}
             isVisiting={isVisiting}
+            quickLogOpen={quickLogOpen}
+            onQuickLogToggle={handleQuickLogToggle}
           />
           <QRCodePanel />
+          <SpacePanelCubeDock
+            quickPostOpen={!!quickPostPos}
+            quickLogOpen={quickLogOpen}
+            speechPanelOpen={speechPanelOpen}
+            onQuickPostToggle={handleQuickPostDockToggle}
+            onQuickLogToggle={handleQuickLogToggle}
+            onSpeechPanelToggle={handleSpeechDockToggle}
+            postDisabled={isVisiting}
+            speechDisabled={isVisiting}
+          />
         </>
       )}
 
@@ -901,6 +1012,26 @@ export const SpaceScreen = () => {
             speechEditOriginal={speechEditOriginal}
             onSaveSpeechDraft={handleSaveSpeechDraft}
             onClose={handleQuickPostClose}
+          />
+        </FloatingPanelShell>
+      )}
+
+      {quickLogOpen && (
+        <FloatingPanelShell
+          storageKey={isMobile ? 'logList.mobile' : 'logList.desktop'}
+          defaultRect={quickLogDefaultRect}
+          minW={isMobile ? 200 : 280}
+          minH={isMobile ? 240 : 320}
+          zIndex={320}
+          className={isMobile ? styles.quickLogBottomChrome : styles.quickLogSideChrome}
+        >
+          <LogListBody
+            hossiis={logListHossiis}
+            spaceId={logListSpaceId}
+            presetTags={logPresetTags}
+            panelMode
+            onClose={handleQuickLogClose}
+            onAfterAdminHide={isVisiting ? removeVisitingHossii : undefined}
           />
         </FloatingPanelShell>
       )}

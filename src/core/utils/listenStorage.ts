@@ -3,7 +3,6 @@ import type { SpeechLevel } from '../types';
 const LISTEN_MODE_KEY = 'hossii.listenMode';
 const LISTEN_CONSENT_KEY = 'hossii.listenConsent';
 const EMOTION_LOG_KEY = 'hossii.emotionLogEnabled';
-const SPEECH_LOG_KEY = 'hossii.speechLogEnabled';
 const SPEECH_LEVELS_KEY = 'hossii.speechLevels';
 
 export type SpeechLevelSettings = Record<SpeechLevel, boolean>;
@@ -75,29 +74,6 @@ export function saveEmotionLogEnabled(enabled: boolean): void {
   void enabled;
   try {
     localStorage.setItem(EMOTION_LOG_KEY, 'false');
-  } catch {
-    // ignore
-  }
-}
-
-/**
- * 音声ログ有効状態を読み込む（デフォルト: false）
- */
-export function loadSpeechLogEnabled(): boolean {
-  try {
-    const raw = localStorage.getItem(SPEECH_LOG_KEY);
-    return raw === 'true';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 音声ログ有効状態を保存
- */
-export function saveSpeechLogEnabled(enabled: boolean): void {
-  try {
-    localStorage.setItem(SPEECH_LOG_KEY, String(enabled));
   } catch {
     // ignore
   }

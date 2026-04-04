@@ -39,6 +39,20 @@ export type HossiiRow = {
   like_count: number;
 };
 
+/**
+ * is_hidden を厳密に boolean へ（PostgREST / 型ゆれで string や数値が来る場合がある）
+ * 文字列 "false" は truthy なので、素の `!h.isHidden` だと一覧から全件消えることがある。
+ */
+export function coerceIsHidden(value: unknown): boolean {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0 || value == null) return false;
+  if (typeof value === 'string') {
+    const s = value.trim().toLowerCase();
+    return s === 'true' || s === '1' || s === 't' || s === 'yes';
+  }
+  return false;
+}
+
 // HossiiRow → Hossii（camelCase）
 export function rowToHossii(row: HossiiRow): Hossii {
   return {
@@ -62,7 +76,7 @@ export function rowToHossii(row: HossiiRow): Hossii {
     positionY: row.position_y ?? undefined,
     isPositionFixed: row.is_position_fixed ?? false,
     scale: row.scale ?? 1.0,
-    isHidden: row.is_hidden ?? false,
+    isHidden: coerceIsHidden(row.is_hidden),
     hiddenAt: row.hidden_at ? new Date(row.hidden_at) : undefined,
     hiddenBy: row.hidden_by ?? undefined,
     numberValue: row.number_value ?? undefined,

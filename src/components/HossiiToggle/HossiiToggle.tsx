@@ -1,23 +1,14 @@
 import { useState } from 'react';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
-import type { SpeechLevel } from '../../core/types';
 import styles from './HossiiToggle.module.css';
 
 export const HossiiToggle = () => {
   const {
-    prefs: {
-      showHossii,
-      listenMode,
-      hasConsentedToListen,
-      speechLogEnabled,
-      speechLevels,
-    },
+    prefs: { showHossii, listenMode, hasConsentedToListen },
     setShowHossii,
     setListenMode,
     setListenConsent,
-    setSpeechLogEnabled,
-    setSpeechLevels,
   } = useDisplayPrefs();
   const [showConsentModal, setShowConsentModal] = useState(false);
 
@@ -51,13 +42,6 @@ export const HossiiToggle = () => {
     setShowConsentModal(false);
   };
 
-  const handleSpeechLevelChange = (level: SpeechLevel) => {
-    setSpeechLevels({
-      ...speechLevels,
-      [level]: !speechLevels[level],
-    });
-  };
-
   return (
     <>
       <div className={styles.container}>
@@ -88,56 +72,6 @@ export const HossiiToggle = () => {
             {listenMode ? 'ON' : 'OFF'}
           </span>
         </button>
-
-        {/* Listen オプション（Listen ON時のみ表示） */}
-        {listenMode && (
-          <div className={styles.listenOptions}>
-            {/* ことばログ ON/OFF */}
-            <label className={styles.optionRow}>
-              <input
-                type="checkbox"
-                checked={speechLogEnabled}
-                onChange={() => setSpeechLogEnabled(!speechLogEnabled)}
-                className={styles.checkbox}
-              />
-              <span className={styles.optionIcon}>🎙</span>
-              <span className={styles.optionLabel}>ことばログ</span>
-            </label>
-
-            {/* ことばログ粒度設定（ことばログON時のみ） */}
-            {speechLogEnabled && (
-              <div className={styles.levelOptions}>
-                <label className={styles.levelRow}>
-                  <input
-                    type="checkbox"
-                    checked={speechLevels.word}
-                    onChange={() => handleSpeechLevelChange('word')}
-                    className={styles.checkbox}
-                  />
-                  <span className={styles.levelLabel}>単語</span>
-                </label>
-                <label className={styles.levelRow}>
-                  <input
-                    type="checkbox"
-                    checked={speechLevels.short}
-                    onChange={() => handleSpeechLevelChange('short')}
-                    className={styles.checkbox}
-                  />
-                  <span className={styles.levelLabel}>短文</span>
-                </label>
-                <label className={styles.levelRow}>
-                  <input
-                    type="checkbox"
-                    checked={speechLevels.long}
-                    onChange={() => handleSpeechLevelChange('long')}
-                    className={styles.checkbox}
-                  />
-                  <span className={styles.levelLabel}>長文</span>
-                </label>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* 同意確認モーダル */}

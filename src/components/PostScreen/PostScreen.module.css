@@ -338,6 +338,43 @@
   top: 0;
 }
 
+.submitButton:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* 送信ショートカット（⌘/Ctrl+Enter）の補助表記（本文と同じ字サイズ・横並び） */
+.submitButtonInner {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  line-height: 1.25;
+}
+
+.submitButtonLabel {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.submitShortcutSep {
+  font-size: inherit;
+  font-weight: inherit;
+  opacity: 0.65;
+  user-select: none;
+}
+
+.submitShortcutHint {
+  font-size: inherit;
+  font-weight: 600;
+  opacity: 0.92;
+  letter-spacing: 0.06em;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
 @keyframes poyon {
   0%   { transform: scale(1); }
   25%  { transform: scale(0.91); }
@@ -435,12 +472,55 @@
   line-height: 1.5;
 }
 
-/* F01: カラーパレット */
-.colorPalette {
+/* F01: カラーパレット（テーマ4 + スウォッチ行） */
+.colorPaletteToolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.paletteThemeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.paletteThemeButton {
+  width: 2.25rem;
+  height: 1.125rem;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  position: relative;
+  z-index: 0;
+}
+
+.paletteThemeButton:hover {
+  transform: scale(1.06);
+}
+
+.paletteThemeButton:focus-visible {
+  z-index: 1;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px #7c3aed;
+}
+
+.paletteThemeButtonSelected {
+  border-color: #1e1e1e;
+  box-shadow: 0 0 0 1px white, 0 0 0 3px #7c3aed;
+}
+
+.colorPaletteSwatchRow {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.25rem 0;
 }
 
 .colorSwatch {
@@ -449,13 +529,30 @@
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
   outline: none;
   padding: 0;
+  flex-shrink: 0;
+  /* キーボード Tab でも確実にフォーカス可能（空の円ボタン対策） */
+  position: relative;
+  z-index: 0;
 }
 
 .colorSwatch:hover {
   transform: scale(1.15);
+}
+
+.colorSwatch:focus-visible {
+  outline: none;
+  z-index: 1;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px #7c3aed;
+  transform: scale(1.1);
+}
+
+.colorSwatch.colorSwatchSelected:focus-visible {
+  transform: scale(1.2);
 }
 
 .colorSwatchSelected {

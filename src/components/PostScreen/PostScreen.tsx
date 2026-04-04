@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useId } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { useRouter } from '../../core/hooks/useRouter';
@@ -18,6 +18,12 @@ import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { EmotionKey, ToastState } from '../../core/types';
 import { loadContinuousPost, saveContinuousPost } from '../../core/utils/displayPrefsStorage';
+import {
+  BUBBLE_COLOR_PALETTES,
+  DEFAULT_BUBBLE_PALETTE_ID,
+  getBubblePalette,
+  type BubblePaletteId,
+} from '../../core/utils/bubbleColorPalettes';
 import styles from './PostScreen.module.css';
 
 // B02: 吹き出し形状プリセット（14種）
@@ -37,18 +43,6 @@ const BUBBLE_SHAPE_PRESETS: BubbleShapePreset[] = [
   { path: '/assets/bubble-shapes/Hossiiコメ枠コウモリ.png', label: 'コウモリ' },
   { path: '/assets/bubble-shapes/Hossiiコメ枠絵馬.png', label: '絵馬' },
   { path: '/assets/bubble-shapes/Hossiiコメ枠紙ひこうき.png', label: '紙ひこうき' },
-];
-
-// F01: 吹き出し色プリセット
-const BUBBLE_COLOR_PRESETS = [
-  '#FF6B6B',
-  '#4ECDC4',
-  '#45B7D1',
-  '#96CEB4',
-  '#FFEAA7',
-  '#DDA0DD',
-  '#98D8C8',
-  '#F7DC6F',
 ];
 
 // 感情のラベルマッピング（全種類）
@@ -128,8 +122,16 @@ export const PostScreen = ({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [greeting, setGreeting] = useState('');
 
-  // F01: 吹き出し色
+  // F01: 吹き出し色（テーマ + スウォッチ）
+  const [selectedPaletteId, setSelectedPaletteId] = useState<BubblePaletteId>(DEFAULT_BUBBLE_PALETTE_ID);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const activeColors = useMemo(() => getBubblePalette(selectedPaletteId).colors, [selectedPaletteId]);
+
+  const selectPalette = (id: BubblePaletteId) => {
+    setSelectedPaletteId(id);
+    const nextColors = getBubblePalette(id).colors;
+    setSelectedColor((c) => (c != null && nextColors.includes(c) ? c : null));
+  };
 
   // B02: 吹き出し形状
   const [selectedShape, setSelectedShape] = useState<string | null>(null);
@@ -143,6 +145,9 @@ export const PostScreen = ({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const messageTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const colorPaletteRef = useRef<HTMLDivElement>(null);
+  const bubbleColorLabelId = useId();
 
   // F08: お絵描きモーダル
   const [showDrawingModal, setShowDrawingModal] = useState(false);
@@ -224,6 +229,28 @@ export const PostScreen = ({
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // 投稿画面表示時はメッセージ欄にフォーカス（フルスクリーン・パネル共通。コメント無効時は textarea 非表示のためスキップ）
+  useEffect(() => {
+    if (spaceSettings?.features.commentPost === false) return;
+    const id = requestAnimationFrame(() => {
+      messageTextareaRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [spaceSettings?.features.commentPost]);
+
+  // パネル: Esc で閉じる（お絵描きモーダル優先）
+  useEffect(() => {
+    if (!panelMode || !onClose) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDrawingModal) return;
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [panelMode, onClose, showDrawingModal]);
 
   const shuffleGreeting = () => {
     const index = Math.floor(Math.random() * GREETING_POOL.length);
@@ -420,6 +447,42 @@ export const PostScreen = ({
     handleSubmit();
   };
 
+  /** テキストエリア内: ⌘/Ctrl+Enter で投稿（改行は Enter のみ） */
+  const handleMessageKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (!sending && canSubmit) handleSubmitClick();
+    }
+  };
+
+  /** 吹き出し色パレット: Tab で各スウォッチへ移動したあと、矢印/Home/End で隣へフォーカス移動 */
+  const handleColorPaletteKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = e.target;
+    if (!(el instanceof HTMLButtonElement)) return;
+    const root = colorPaletteRef.current;
+    if (!root?.contains(el)) return;
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('button[type="button"]'));
+    const i = buttons.indexOf(el);
+    if (i < 0) return;
+    let next = i;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      next = Math.min(i + 1, buttons.length - 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      next = Math.max(i - 1, 0);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      next = 0;
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      next = buttons.length - 1;
+    } else {
+      return;
+    }
+    if (next !== i) buttons[next]?.focus();
+  };
+
   const handleSaveSpeechDraftClick = () => {
     if (!onSaveSpeechDraft || speechEditOriginal === undefined) return;
     onSaveSpeechDraft(speechEditOriginal, message.trim());
@@ -475,11 +538,14 @@ export const PostScreen = ({
           <div className={panelMode ? styles.panelSection : styles.section}>
             <div className={styles.label}>メッセージ</div>
             <textarea
+              ref={messageTextareaRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleMessageKeyDown}
               placeholder="なんでも書いてね…（任意）"
               className={styles.textarea}
               maxLength={200}
+              title={panelMode ? '⌘+Enter（Windows は Ctrl+Enter）で投稿' : undefined}
             />
           </div>
         )}
@@ -511,29 +577,59 @@ export const PostScreen = ({
           </div>
         )}
 
-        {/* F01: 吹き出し色選択 */}
+        {/* F01: 吹き出し色選択（4テーマ + デフォルト + 各8色）。フォーカス順はテーマ4→デフォルト→8色 */}
         <div className={panelMode ? styles.panelSection : styles.section}>
-          <div className={styles.label}>吹き出しの色（任意）</div>
-          <div className={styles.colorPalette}>
-            <button
-              type="button"
-              className={`${styles.colorSwatch} ${selectedColor === null ? styles.colorSwatchSelected : ''}`}
-              style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}
-              onClick={() => setSelectedColor(null)}
-              title="デフォルト"
-              aria-label="デフォルト色"
-            />
-            {BUBBLE_COLOR_PRESETS.map((color) => (
+          <div className={styles.label} id={bubbleColorLabelId}>
+            吹き出しの色（任意）
+          </div>
+          <div
+            ref={colorPaletteRef}
+            className={styles.colorPaletteToolbar}
+            role="toolbar"
+            aria-labelledby={bubbleColorLabelId}
+            onKeyDown={handleColorPaletteKeyDown}
+          >
+            <div className={styles.paletteThemeRow} role="group" aria-label="色のテーマ">
+              {BUBBLE_COLOR_PALETTES.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`${styles.paletteThemeButton} ${
+                    selectedPaletteId === p.id ? styles.paletteThemeButtonSelected : ''
+                  }`}
+                  style={{
+                    background: `linear-gradient(135deg, ${p.previewStops[0]}, ${p.previewStops[1]}, ${p.previewStops[2]})`,
+                  }}
+                  onClick={() => selectPalette(p.id)}
+                  title={p.label}
+                  aria-label={`テーマ: ${p.label}`}
+                  aria-pressed={selectedPaletteId === p.id}
+                />
+              ))}
+            </div>
+            <div className={styles.colorPaletteSwatchRow}>
               <button
-                key={color}
                 type="button"
-                className={`${styles.colorSwatch} ${selectedColor === color ? styles.colorSwatchSelected : ''}`}
-                style={{ backgroundColor: color }}
-                onClick={() => setSelectedColor(selectedColor === color ? null : color)}
-                title={color}
-                aria-label={`色 ${color}`}
+                className={`${styles.colorSwatch} ${selectedColor === null ? styles.colorSwatchSelected : ''}`}
+                style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}
+                onClick={() => setSelectedColor(null)}
+                title="デフォルト"
+                aria-label="デフォルト色"
+                aria-pressed={selectedColor === null}
               />
-            ))}
+              {activeColors.map((color) => (
+                <button
+                  key={`${selectedPaletteId}-${color}`}
+                  type="button"
+                  className={`${styles.colorSwatch} ${selectedColor === color ? styles.colorSwatchSelected : ''}`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setSelectedColor(selectedColor === color ? null : color)}
+                  title={color}
+                  aria-label={`色 ${color}`}
+                  aria-pressed={selectedColor === color}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -724,8 +820,21 @@ export const PostScreen = ({
               onAnimationEnd={() => setPoyonActive(false)}
               disabled={sending || !canSubmit}
               className={`${styles.submitButton} ${styles.submitButtonHalf}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
+              title="⌘+Enter（Windows は Ctrl+Enter）でも投稿できます"
             >
-              {sending ? '送信中...' : '気持ちを置く'}
+              {sending ? (
+                '送信中...'
+              ) : (
+                <span className={styles.submitButtonInner}>
+                  <span className={styles.submitButtonLabel}>気持ちを置く</span>
+                  <span className={styles.submitShortcutSep} aria-hidden="true">
+                    ·
+                  </span>
+                  <span className={styles.submitShortcutHint} aria-hidden="true">
+                    ⌘/⌃↵
+                  </span>
+                </span>
+              )}
             </button>
           </div>
         ) : (
@@ -735,8 +844,21 @@ export const PostScreen = ({
             onAnimationEnd={() => setPoyonActive(false)}
             disabled={sending || !canSubmit}
             className={`${styles.submitButton}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
+            title="⌘+Enter（Windows は Ctrl+Enter）でも投稿できます"
           >
-            {sending ? '送信中...' : '気持ちを置く'}
+            {sending ? (
+              '送信中...'
+            ) : (
+              <span className={styles.submitButtonInner}>
+                <span className={styles.submitButtonLabel}>気持ちを置く</span>
+                <span className={styles.submitShortcutSep} aria-hidden="true">
+                  ·
+                </span>
+                <span className={styles.submitShortcutHint} aria-hidden="true">
+                  ⌘/⌃↵
+                </span>
+              </span>
+            )}
           </button>
         )}
 

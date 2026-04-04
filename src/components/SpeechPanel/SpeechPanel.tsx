@@ -5,6 +5,10 @@ import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import styles from './SpeechPanel.module.css';
 
 type Props = {
+  /** マイク（Listen）が有効か — 左バーまたはこのパネルのボタンと同期 */
+  listenMode: boolean;
+  /** Listen ON/OFF（未同意時は親が同意モーダルを出す） */
+  onListenToggle: () => void;
   confirmedText: string;
   interimText: string;
   speechLevels: SpeechLevelSettings;
@@ -41,6 +45,8 @@ function extractCandidates(text: string, level: PanelLevel): string[] {
 }
 
 function SpeechPanelInner({
+  listenMode,
+  onListenToggle,
   confirmedText,
   interimText,
   speechLevels,
@@ -85,6 +91,19 @@ function SpeechPanelInner({
         <span className={styles.headerTitle}>音声テキスト</span>
         <button
           type="button"
+          className={`${styles.micCompact} ${listenMode ? styles.micCompactOn : styles.micCompactOff}`}
+          onClick={onListenToggle}
+          onPointerDown={stopDrag}
+          aria-pressed={listenMode}
+          aria-label={`マイク${listenMode ? 'オフ' : 'オン'}`}
+        >
+          <span className={styles.micCompactEmoji} aria-hidden>
+            🎤
+          </span>
+          <span className={styles.micCompactLabel}>{listenMode ? 'ON' : 'OFF'}</span>
+        </button>
+        <button
+          type="button"
           className={styles.closeButton}
           onClick={onClose}
           onPointerDown={stopDrag}
@@ -94,7 +113,11 @@ function SpeechPanelInner({
       </div>
 
       <div className={styles.textArea} ref={textAreaRef} data-no-drag>
-        {confirmedText || interimText ? (
+        {!listenMode ? (
+          <span className={styles.placeholderMuted}>
+            音声入力を ON にすると、話した内容がここに文字起こしされます。
+          </span>
+        ) : confirmedText || interimText ? (
           <>
             <span className={styles.confirmedText}>{confirmedText}</span>
             {interimText && <span className={styles.interimText}>{interimText}</span>}

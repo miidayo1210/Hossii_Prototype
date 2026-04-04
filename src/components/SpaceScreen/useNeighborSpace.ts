@@ -86,6 +86,11 @@ export function useNeighborSpace({
     setVisitingSpace(target.id);
   }, [neighbors, setVisitingSpace]);
 
+  /** 管理者がログ一覧から非表示にしたあと、訪問先リストを即座に更新する */
+  const removeVisitingHossii = useCallback((id: string) => {
+    setVisitingHossiis((prev) => prev.filter((h) => h.id !== id));
+  }, []);
+
   return {
     neighbors,
     visitingHossiis,
@@ -93,5 +98,6 @@ export function useNeighborSpace({
     bottlePayload,
     setBottlePayload,
     handleWarp,
+    removeVisitingHossii,
   };
 }

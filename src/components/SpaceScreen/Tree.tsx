@@ -3,18 +3,10 @@ import { createPortal } from 'react-dom';
 import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import type { ViewMode } from '../../core/utils/displayPrefsStorage';
+import { BUBBLE_INLINE_EDIT_COLORS } from '../../core/utils/bubbleColorPalettes';
 import styles from './SpaceScreen.module.css';
 
-const BUBBLE_COLORS = [
-  '#FFB3B3', // 淡いレッド
-  '#FFD9B3', // 淡いオレンジ
-  '#FFFAB3', // 淡いイエロー
-  '#B3FFB8', // 淡いグリーン
-  '#B3E0FF', // 淡いブルー
-  '#D9B3FF', // 淡いパープル
-  '#FFB3E6', // 淡いピンク
-  '#FFFFFF', // ホワイト
-];
+const BUBBLE_COLORS = BUBBLE_INLINE_EDIT_COLORS;
 
 function getRelativeTime(date: Date): string {
   const now = new Date();

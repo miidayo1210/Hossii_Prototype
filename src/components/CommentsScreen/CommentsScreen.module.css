@@ -260,13 +260,39 @@
 .meta {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
   font-size: 0.75rem;
   color: #9ca3af;
 }
 
 .time {
   color: #9ca3af;
+}
+
+.metaEnd {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.adminHideButton {
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(254, 242, 242, 0.95);
+  color: #b91c1c;
+  transition: background 0.15s;
+}
+
+.adminHideButton:hover {
+  background: rgba(254, 226, 226, 0.98);
 }
 
 /* ---- カード内タグ ---- */
@@ -449,6 +475,69 @@
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.06);
+}
+
+/* クイックログパネル（FloatingPanelShell 内） */
+.panelRoot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panelCloseBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(6, 182, 212, 0.22);
+}
+
+.panelTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0e7490;
+  margin: 0;
+}
+
+.panelCloseButton {
+  background: none;
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  border-radius: 6px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  color: #0891b2;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.panelCloseButton:hover {
+  background: rgba(224, 247, 250, 0.85);
+}
+
+.headerPanel {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(6, 182, 212, 0.15);
+  padding: 0.5rem 0.75rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.headerPanel .filterContainer {
+  margin-top: 0.5rem;
+}
+
+.mainPanel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem 0.65rem;
 }
 
 /* Mobile: Bottom nav padding */

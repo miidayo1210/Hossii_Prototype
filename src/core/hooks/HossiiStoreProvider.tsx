@@ -49,6 +49,7 @@ import {
   hideHossiiInDb,
   restoreHossiiInDb,
   deleteAllHossiisInSpace,
+  coerceIsHidden,
   rowToHossii,
   type HossiiRow,
 } from '../utils/hossiisApi';
@@ -86,7 +87,7 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
     positionY: typeof raw.positionY === 'number' ? raw.positionY : undefined,
     isPositionFixed: typeof raw.isPositionFixed === 'boolean' ? raw.isPositionFixed : false,
     scale: typeof raw.scale === 'number' ? raw.scale : 1.0,
-    isHidden: typeof raw.isHidden === 'boolean' ? raw.isHidden : false,
+    isHidden: coerceIsHidden(raw.isHidden),
   };
 };
 

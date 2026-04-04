@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Eye, EyeOff, Mic, MicOff, Volume2, VolumeX, ZoomIn } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, EyeOff, Mic, MicOff, ScrollText, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import type { DisplayPeriod, DisplayLimit, ViewMode, LayoutMode } from '../../core/utils/displayPrefsStorage';
 import type { Space } from '../../core/types/space';
@@ -28,6 +28,9 @@ type Props = {
   neighbors?: Space[];
   onWarp?: () => void;
   isVisiting?: boolean;
+  /** クイックログパネル（#57）開閉 */
+  onQuickLogToggle?: () => void;
+  quickLogOpen?: boolean;
 };
 
 const PERIOD_OPTIONS: { value: DisplayPeriod; label: string }[] = [
@@ -73,6 +76,8 @@ export const LeftControlBar = ({
   neighbors = [],
   onWarp,
   isVisiting = false,
+  onQuickLogToggle,
+  quickLogOpen = false,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
 
@@ -133,6 +138,19 @@ export const LeftControlBar = ({
         <ZoomIn size={18} />
         <span className={styles.scaleLabel}>{scalePercent}%</span>
       </button>
+
+      {onQuickLogToggle && (
+        <button
+          type="button"
+          className={`${styles.controlButton} ${styles.mobileVisible} ${quickLogOpen ? styles.active : ''}`}
+          onClick={onQuickLogToggle}
+          aria-label="ログ一覧パネル"
+          title="ログ一覧パネル"
+          aria-pressed={quickLogOpen}
+        >
+          <ScrollText size={18} />
+        </button>
+      )}
 
       {/* --- 隣のスペースワープボタン --- */}
       {neighbors.length > 0 && !isVisiting && (
