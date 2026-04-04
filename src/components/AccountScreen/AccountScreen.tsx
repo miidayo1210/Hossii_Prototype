@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { LogOut, User, Mail } from 'lucide-react';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import styles from './AccountScreen.module.css';
 

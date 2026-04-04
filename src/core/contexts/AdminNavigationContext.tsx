@@ -1,22 +1,13 @@
-import { createContext, useContext, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { AdminNavigationContext } from './useAdminNavigation';
 
-type AdminNavigationState = {
+export type AdminNavigationState = {
   overrideCommunityId: string | null;
   overrideCommunityName: string | null;
   overrideCommunitySlug: string | null;
   setOverrideCommunity: (id: string, name: string, slug?: string | null) => void;
   clearOverrideCommunity: () => void;
-};
-
-const AdminNavigationContext = createContext<AdminNavigationState | undefined>(undefined);
-
-export const useAdminNavigation = () => {
-  const context = useContext(AdminNavigationContext);
-  if (!context) {
-    throw new Error('useAdminNavigation must be used within an AdminNavigationProvider');
-  }
-  return context;
 };
 
 type Props = { children: ReactNode };

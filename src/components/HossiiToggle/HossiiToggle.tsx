@@ -1,27 +1,26 @@
 import { useState } from 'react';
-import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import type { SpeechLevel } from '../../core/types';
 import styles from './HossiiToggle.module.css';
 
 export const HossiiToggle = () => {
   const {
-    state,
+    prefs: {
+      showHossii,
+      listenMode,
+      hasConsentedToListen,
+      emotionLogEnabled,
+      speechLogEnabled,
+      speechLevels,
+    },
     setShowHossii,
     setListenMode,
     setListenConsent,
     setEmotionLogEnabled,
     setSpeechLogEnabled,
     setSpeechLevels,
-  } = useHossiiStore();
-  const {
-    showHossii,
-    listenMode,
-    hasConsentedToListen,
-    emotionLogEnabled,
-    speechLogEnabled,
-    speechLevels,
-  } = state;
+  } = useDisplayPrefs();
   const [showConsentModal, setShowConsentModal] = useState(false);
 
   const handleHossiiToggle = () => {

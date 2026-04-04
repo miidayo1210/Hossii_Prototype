@@ -7,7 +7,7 @@ import type { Hossii } from '../../core/types';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { FilterBar } from '../FilterBar/FilterBar';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import styles from './CommentsScreen.module.css';
 

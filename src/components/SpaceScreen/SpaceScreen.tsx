@@ -1,16 +1,17 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { useAudioListener, type AudioEvent } from '../../core/hooks/useAudioListener';
 import { useSpeechRecognition, type SpeechEvent } from '../../core/hooks/useSpeechRecognition';
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
-import { useAuth } from '../../core/contexts/AuthContext';
-import type { EmotionKey, Hossii } from '../../core/types';
-import type { SpaceSettings } from '../../core/types/settings';
+import { useAuth } from '../../core/contexts/useAuth';
+import { useSpaceSettings } from './useSpaceSettings';
+import { useNeighborSpace } from './useNeighborSpace';
+import type { EmotionKey } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
-import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { createBubblePosition } from '../../core/utils/bubblePosition';
 import { incrementLike } from '../../core/utils/likesApi';
 import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
@@ -27,17 +28,7 @@ import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { StarLayer } from '../StarLayer/StarLayer';
 import { SlideshowView } from '../Slideshow/SlideshowView';
-import {
-  fetchNeighbors,
-  pickRandomNeighbor,
-  fetchLastDeliveredAt,
-  fetchNextBottle,
-  recordBottleDelivery,
-  calcBottleIntervalMs,
-  type BottlePayload,
-} from '../../core/utils/neighborsApi';
-import { fetchHossiis } from '../../core/utils/hossiisApi';
-import type { Space } from '../../core/types/space';
+import { recordBottleDelivery } from '../../core/utils/neighborsApi';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
@@ -63,24 +54,26 @@ export const SpaceScreen = () => {
     getActiveSpaceHossiis,
     getActiveSpace,
     addHossii,
-    setDisplayScale,
-    setDisplayPeriod,
-    setDisplayLimit,
-    setViewMode,
-    setShowHossii,
-    setListenMode,
-    setListenConsent,
     setVisitingSpace,
     updateHossiiColorAction,
     updateHossiiPositionAction,
     updateHossiiScaleAction,
     hideHossii,
   } = useHossiiStore();
+  const { activeSpaceId, visitingSpaceId } = state;
   const {
-    showHossii, listenMode, hasConsentedToListen, emotionLogEnabled, speechLogEnabled,
-    speechLevels, activeSpaceId, displayScale, displayPeriod, displayLimit, viewMode,
-    visitingSpaceId,
-  } = state;
+    prefs: {
+      showHossii, listenMode, hasConsentedToListen, emotionLogEnabled, speechLogEnabled,
+      speechLevels, displayScale, displayPeriod, displayLimit, viewMode,
+    },
+    setShowHossii,
+    setListenMode,
+    setListenConsent,
+    setDisplayScale,
+    setDisplayPeriod,
+    setDisplayLimit,
+    setViewMode,
+  } = useDisplayPrefs();
   const activeSpace = getActiveSpace();
   const isVisiting = visitingSpaceId !== null;
   const { currentUser } = useAuth();
@@ -102,94 +95,27 @@ export const SpaceScreen = () => {
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
 
-
   // A02: 選択中の装飾（ポップアップ表示用）
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
 
-  // スペース設定の読み込み
-  const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
+  // スペース設定（設定画面から戻ったときにフォーカスで再読み込み）
+  const { spaceSettings } = useSpaceSettings(activeSpace);
 
-  // 隣人スペース一覧
-  const [neighbors, setNeighbors] = useState<Space[]>([]);
-  // 訪問中スペースの hossiis・スペース情報
-  const [visitingHossiis, setVisitingHossiis] = useState<Hossii[]>([]);
-  const [visitingSpaceInfo, setVisitingSpaceInfo] = useState<Space | null>(null);
-  // 漂着メッセージ
-  const [bottlePayload, setBottlePayload] = useState<BottlePayload | null>(null);
-
-  // 設定を読み込む関数
-  const loadSettings = useCallback(() => {
-    if (activeSpace) {
-      const settings = loadSpaceSettings(activeSpace.id, activeSpace.name);
-      setSpaceSettings(settings);
-    }
-  }, [activeSpace]);
-
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
-
-  // フォーカス時に設定を再読み込み（設定画面から戻ってきたときなど）
-  useEffect(() => {
-    const handleFocus = () => {
-      loadSettings();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [loadSettings]);
-
-  // 隣人スペース一覧を読み込む
-  useEffect(() => {
-    if (!activeSpaceId) return;
-    fetchNeighbors(activeSpaceId).then(setNeighbors);
-  }, [activeSpaceId]);
-
-  // 訪問モード: 訪問先スペースの hossiis と情報を読み込む
-  useEffect(() => {
-    if (!visitingSpaceId) {
-      setVisitingHossiis([]);
-      setVisitingSpaceInfo(null);
-      return;
-    }
-    // 訪問先スペースの情報を neighbors から取得
-    const found = neighbors.find((n) => n.id === visitingSpaceId);
-    if (found) setVisitingSpaceInfo(found);
-
-    fetchHossiis(visitingSpaceId).then(setVisitingHossiis);
-  }, [visitingSpaceId, neighbors]);
-
-  // ワープ: ランダムな隣スペースを訪問モードで開く
-  const handleWarp = useCallback(() => {
-    if (neighbors.length === 0) return;
-    const target = pickRandomNeighbor(neighbors);
-    setVisitingSpace(target.id);
-  }, [neighbors, setVisitingSpace]);
-
-  // 漂着メッセージ: スペース画面を開いたタイミングで配信チェック
-  useEffect(() => {
-    if (!activeSpaceId || isVisiting || neighbors.length === 0) return;
-    const frequency = spaceSettings?.bottleFrequency ?? '3d-7d';
-    if (frequency === 'off') return;
-
-    const check = async () => {
-      const lastDeliveredAt = await fetchLastDeliveredAt(activeSpaceId);
-      const intervalMs = calcBottleIntervalMs(frequency);
-      const now = Date.now();
-      const lastMs = lastDeliveredAt ? lastDeliveredAt.getTime() : 0;
-
-      if (now - lastMs < intervalMs) return;
-
-      const neighborIds = neighbors.map((n) => n.id);
-      const payload = await fetchNextBottle(activeSpaceId, neighborIds, frequency);
-      if (payload) {
-        setBottlePayload(payload);
-      }
-    };
-
-    check();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSpaceId, neighbors.length, spaceSettings?.bottleFrequency]);
+  // 隣人スペース・訪問モード・漂着ボトル管理
+  const {
+    neighbors,
+    visitingHossiis,
+    visitingSpaceInfo,
+    bottlePayload,
+    setBottlePayload,
+    handleWarp,
+  } = useNeighborSpace({
+    activeSpaceId,
+    visitingSpaceId,
+    isVisiting,
+    spaceSettings,
+    setVisitingSpace,
+  });
 
   const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
 

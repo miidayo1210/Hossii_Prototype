@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { getAdminCommunity, createCommunity } from '../utils/communitiesApi';
 import type { CommunityStatus } from '../utils/communitiesApi';
 import { upsertUserProfile, fetchUserProfile } from '../utils/userProfilesApi';
+import { AuthContext } from './useAuth';
 
 export type AppUser = {
   uid: string;
@@ -19,7 +20,7 @@ export type AppUser = {
   communityStatus?: CommunityStatus;
 };
 
-type AuthContextType = {
+export type AuthContextType = {
   currentUser: AppUser | null;
   loading: boolean;
   isResolvingAuth: boolean;
@@ -37,16 +38,6 @@ type AuthContextType = {
   loginWithGoogle: (asAdmin?: boolean) => Promise<AppUser>;
   loginWithFacebook: () => Promise<AppUser>;
   refreshCommunitySlug: (newSlug: string) => void;
-};
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };
 
 type AuthProviderProps = {
@@ -143,35 +134,31 @@ const loadMockUser = (): MockUser | null => {
 const clearMockUser = () => localStorage.removeItem(MOCK_AUTH_KEY);
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() =>
+    !isSupabaseConfigured ? loadMockUser() : null
+  );
+  const [loading, setLoading] = useState(() => isSupabaseConfigured);
   const [isResolvingAuth, setIsResolvingAuth] = useState(false);
 
   // ===== セッション初期化 =====
+  // onAuthStateChange の INITIAL_SESSION イベントで初期セッションを処理することで、
+  // getSession + onAuthStateChange の二重発火（競合）を防ぐ
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setCurrentUser(loadMockUser());
-      setLoading(false);
-      return;
-    }
+    if (!isSupabaseConfigured) return;
 
-    // 既存セッションを取得して管理者チェック
-    supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
-        if (session) {
-          const appUser = await resolveAppUser(session.user);
-          setCurrentUser(appUser);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('[AuthContext] getSession error:', err);
-        setLoading(false);
-      });
-
-    // 認証状態の変化を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event: string, session: Session | null) => {
+      async (event, session) => {
+        if (event === 'INITIAL_SESSION') {
+          // 初回セッション確認完了（getSession 相当）
+          if (session) {
+            const appUser = await resolveAppUser(session.user);
+            setCurrentUser(appUser);
+          }
+          setLoading(false);
+          return;
+        }
+
+        // 以降の認証状態変化（ログイン・ログアウト・トークンリフレッシュ等）
         setIsResolvingAuth(true);
         if (session) {
           const appUser = await resolveAppUser(session.user);
@@ -187,7 +174,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   // ===== 参加者サインアップ =====
-  const signUp = async (
+  const signUp = useCallback(async (
     email: string,
     password: string,
     username: string,
@@ -207,10 +194,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     await upsertUserProfile(data.user.id, username, birthdate, gender);
 
     return resolveAppUser(data.user);
-  };
+  }, []);
 
   // ===== 参加者ログイン =====
-  const login = async (email: string, password: string): Promise<AppUser> => {
+  const login = useCallback(async (email: string, password: string): Promise<AppUser> => {
     if (!isSupabaseConfigured) {
       const user = createMockUser(email);
       setCurrentUser(user);
@@ -221,10 +208,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) throw error ?? new Error('Login failed');
     return resolveAppUser(data.user);
-  };
+  }, []);
 
   // ===== 管理者ログイン =====
-  const adminLogin = async (email: string, password: string): Promise<AppUser> => {
+  const adminLogin = useCallback(async (email: string, password: string): Promise<AppUser> => {
     if (!isSupabaseConfigured) {
       const isAdmin = checkIsAdmin(email);
       const user = createMockUser(email, undefined, isAdmin);
@@ -244,10 +231,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       throw new Error('管理者権限がありません。コミュニティ登録が必要です。');
     }
     return appUser;
-  };
+  }, []);
 
   // ===== 管理者サインアップ（コミュニティ登録申請）=====
-  const adminSignUp = async (
+  const adminSignUp = useCallback(async (
     email: string,
     password: string,
     communityName: string
@@ -288,10 +275,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       communityName,
       communityStatus: 'pending',
     };
-  };
+  }, []);
 
   // ===== ログアウト =====
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
     if (!isSupabaseConfigured) {
       setCurrentUser(null);
       clearMockUser();
@@ -301,10 +288,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // scope: 'local' でローカルセッションのみ削除（他タブへの影響を最小化し確実にログアウト）
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) throw error;
-  };
+  }, []);
 
   // ===== Google ログイン =====
-  const loginWithGoogle = async (_asAdmin = false): Promise<AppUser> => {
+  const loginWithGoogle = useCallback(async (_asAdmin = false): Promise<AppUser> => {
     if (!isSupabaseConfigured) {
       const user = createMockUser('google-user@example.com', 'google-user-demo', _asAdmin);
       setCurrentUser(user);
@@ -321,10 +308,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (error) throw error;
     // OAuth はリダイレクトなので、ここには到達しない
     return { uid: '', email: null, displayName: null, isAdmin: false };
-  };
+  }, []);
 
   // ===== Facebook ログイン =====
-  const loginWithFacebook = async (): Promise<AppUser> => {
+  const loginWithFacebook = useCallback(async (): Promise<AppUser> => {
     if (!isSupabaseConfigured) {
       const user = createMockUser('facebook-user@example.com', 'facebook-user-demo');
       setCurrentUser(user);
@@ -338,13 +325,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
     if (error) throw error;
     return { uid: '', email: null, displayName: null, isAdmin: false };
-  };
+  }, []);
 
-  const refreshCommunitySlug = (newSlug: string) => {
+  const refreshCommunitySlug = useCallback((newSlug: string) => {
     setCurrentUser((prev) => prev ? { ...prev, communitySlug: newSlug } : null);
-  };
+  }, []);
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     currentUser,
     loading,
     isResolvingAuth,
@@ -356,7 +343,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     loginWithGoogle,
     loginWithFacebook,
     refreshCommunitySlug,
-  };
+  }), [
+    currentUser,
+    loading,
+    isResolvingAuth,
+    signUp,
+    login,
+    adminLogin,
+    adminSignUp,
+    logout,
+    loginWithGoogle,
+    loginWithFacebook,
+    refreshCommunitySlug,
+  ]);
 
   if (loading) {
     return (

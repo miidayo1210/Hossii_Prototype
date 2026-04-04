@@ -1,4 +1,4 @@
-import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import styles from './DisplayScaleToggle.module.css';
 
@@ -8,8 +8,7 @@ import styles from './DisplayScaleToggle.module.css';
  * for better readability on projectors and high-resolution displays
  */
 export const DisplayScaleToggle = () => {
-  const { state, setDisplayScale } = useHossiiStore();
-  const { displayScale } = state;
+  const { prefs: { displayScale }, setDisplayScale } = useDisplayPrefs();
 
   const scales: Array<{ value: DisplayScale; label: string }> = [
     { value: 1, label: '100' },

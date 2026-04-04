@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsStorage';
 import { fetchSpaceSettings, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import type { SpaceSettings } from '../../core/types/settings';

@@ -12,7 +12,7 @@ type Props = {
   onSignUpRequested: () => void;
 };
 
-export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested: _onLoginRequested, onSignUpRequested: _onSignUpRequested }: Props) => {
+export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested, onSignUpRequested }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
   const [step, setStep] = useState<Step>('select');
   // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
@@ -54,19 +54,17 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested: _o
             </button>
             <button
               type="button"
-              className={`${styles.secondaryButton} ${styles.comingSoonButton}`}
-              disabled
+              className={styles.secondaryButton}
+              onClick={onLoginRequested}
             >
               アカウントでログイン
-              <span className={styles.comingSoonBadge}>Coming Soon</span>
             </button>
             <button
               type="button"
-              className={`${styles.signUpLink} ${styles.comingSoonLink}`}
-              disabled
+              className={styles.signUpLink}
+              onClick={onSignUpRequested}
             >
               新規登録の方はこちら
-              <span className={styles.comingSoonBadge}>Coming Soon</span>
             </button>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { saveImageLocally } from '../../core/utils/saveImageLocally';
 import styles from './DrawingModal.module.css';
 
@@ -31,9 +31,11 @@ export const DrawingModal = ({ onComplete, onClose }: Props) => {
   const penColorRef = useRef(PEN_COLORS[0]);
   const strokeSizeRef = useRef<number>(5);
 
-  toolRef.current = tool;
-  penColorRef.current = penColor;
-  strokeSizeRef.current = strokeSize;
+  useLayoutEffect(() => {
+    toolRef.current = tool;
+    penColorRef.current = penColor;
+    strokeSizeRef.current = strokeSize;
+  });
 
   const getCtx = () => canvasRef.current?.getContext('2d') ?? null;
 

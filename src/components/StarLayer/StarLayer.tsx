@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import styles from './StarLayer.module.css';
 
 type Star = {
@@ -40,32 +41,40 @@ function createStar(): Star {
 
 export const StarLayer = () => {
   const { state, getActiveSpaceHossiis } = useHossiiStore();
-  const { showHossii, activeSpaceId } = state;
-  const [stars, setStars] = useState<Star[]>([]);
-  const prevHossiiCountRef = useRef<number>(0);
-  const prevSpaceIdRef = useRef<string>(activeSpaceId);
-
+  const { activeSpaceId } = state;
+  const { prefs: { showHossii } } = useDisplayPrefs();
   // アクティブなスペースのログを取得
   const hossiis = getActiveSpaceHossiis();
 
+  const [stars, setStars] = useState<Star[]>([]);
+  const prevHossiiCountRef = useRef<number>(0);
+  const hossiisRef = useRef(hossiis);
+  useLayoutEffect(() => {
+    hossiisRef.current = hossiis;
+  });
+
   // スペースが切り替わったら星をリセット
   useEffect(() => {
-    if (prevSpaceIdRef.current !== activeSpaceId) {
-      prevSpaceIdRef.current = activeSpaceId;
-      // 初期星をスペースの投稿数に基づいて生成
-      const initialStars = hossiis.slice(0, 20).map(() => createStar());
+    const h = hossiisRef.current;
+    const initialStars = h.slice(0, 20).map(() => createStar());
+    const count = h.length;
+    const id = setTimeout(() => {
       setStars(initialStars);
-      prevHossiiCountRef.current = hossiis.length;
-    }
-  }, [activeSpaceId, hossiis]);
+      prevHossiiCountRef.current = count;
+    }, 0);
+    return () => clearTimeout(id);
+  }, [activeSpaceId]);
 
   // 初期化: 既存の投稿数に基づいて星を生成
   useEffect(() => {
-    if (stars.length === 0 && hossiis.length > 0) {
-      const initialStars = hossiis.slice(0, 20).map(() => createStar());
+    if (stars.length > 0 || hossiis.length === 0) return;
+    const initialStars = hossiis.slice(0, 20).map(() => createStar());
+    const count = hossiis.length;
+    const id = setTimeout(() => {
       setStars(initialStars);
-      prevHossiiCountRef.current = hossiis.length;
-    }
+      prevHossiiCountRef.current = count;
+    }, 0);
+    return () => clearTimeout(id);
   }, [hossiis, stars.length]);
 
   // 新しい投稿があったら星を追加

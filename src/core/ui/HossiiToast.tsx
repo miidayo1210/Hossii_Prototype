@@ -27,10 +27,7 @@ export function HossiiToast({
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (!show) {
-      setIsVisible(false);
-      return;
-    }
+    if (!show) return;
 
     // フェードイン（10ms後）
     const fadeInTimer = setTimeout(() => setIsVisible(true), 10);
@@ -45,6 +42,7 @@ export function HossiiToast({
     return () => {
       clearTimeout(fadeInTimer);
       clearTimeout(fadeOutTimer);
+      setIsVisible(false);
     };
   }, [show, onClose, duration]);
 

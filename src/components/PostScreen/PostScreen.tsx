@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { useRouter } from '../../core/hooks/useRouter';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { addStamp } from '../../core/utils/stampStorage';
@@ -85,7 +86,7 @@ function areaToPosition(idx: number): { x: number; y: number } {
     { min: 0.38, max: 0.62 },
     { min: 0.72, max: 0.95 },
   ];
-  const rand = (min: number, max: number) => min + Math.random() * (max - min);
+  const rand = (min: number, max: number) => (min + Math.random() * (max - min)) * 100;
   return { x: rand(ranges[col].min, ranges[col].max), y: rand(ranges[row].min, ranges[row].max) };
 }
 
@@ -133,7 +134,7 @@ export const PostScreen = () => {
   const [selectedArea, setSelectedArea] = useState<number | null>(null);
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
-  const { showHossii } = state;
+  const { prefs: { showHossii } } = useDisplayPrefs();
   const { navigate } = useRouter();
   const { currentUser } = useAuth();
   const { flags: featureFlags } = useFeatureFlags(state.activeSpaceId ?? undefined);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import { useFeatureFlags, invalidateFeatureFlagsCache } from '../../core/hooks/useFeatureFlags';
 import { setSpaceFeatureFlag, type FeatureFlagKey, type FeatureFlags } from '../../core/utils/featureFlagsApi';
 import styles from './FeatureFlagsTab.module.css';

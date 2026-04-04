@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Eye, EyeOff, Search, Tag, X } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import { fetchAllHossiisForModeration } from '../../core/utils/hossiisApi';
 import type { Hossii } from '../../core/types';
 import type { Space } from '../../core/types/space';

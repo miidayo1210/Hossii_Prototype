@@ -7,7 +7,7 @@
  * C. TapMotion - タップ時の逃げ/寄り反応
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import type { EmotionKey, Hossii } from '../../core/types';
 import type { HossiiColor } from '../../core/types/settings';
 import { getRandomBubble8, EMOJI_BY_EMOTION } from '../../core/assets/emotions';
@@ -200,8 +200,10 @@ export function HossiiLive({
     if (!onLikeTrigger) return;
     const joyFaces = ['joy', 'fun', 'laugh'] as EmotionKey[];
     const face = getHossiiFace(joyFaces[Math.floor(Math.random() * joyFaces.length)]);
-    setReactionFace(face);
-    setIsSpinning(true);
+    queueMicrotask(() => {
+      setReactionFace(face);
+      setIsSpinning(true);
+    });
     const spinTimer = setTimeout(() => setIsSpinning(false), 600);
     const faceTimer = setTimeout(() => setReactionFace(null), 1200 + Math.random() * 300);
     return () => {
@@ -227,10 +229,9 @@ export function HossiiLive({
   const moveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastInteractionTimeRef = useRef<number>(Date.now());
+  const lastInteractionTimeRef = useRef<number>(0);
   // emotion を ref で保持（effect の依存配列から外すため）
   const emotionRef = useRef<EmotionKey | null | undefined>(emotion);
-  emotionRef.current = emotion;
   // stale closure 回避: 表情 state を ref でミラー
   const reactionFaceRef = useRef<string | null>(null);
   useEffect(() => { reactionFaceRef.current = reactionFace; }, [reactionFace]);
@@ -241,9 +242,12 @@ export function HossiiLive({
 
   // F07: hossiis / readingEnabled を ref で保持
   const hossiisRef = useRef<Hossii[]>(hossiis);
-  hossiisRef.current = hossiis;
   const readingEnabledRef = useRef(readingEnabled);
-  readingEnabledRef.current = readingEnabled;
+  useLayoutEffect(() => {
+    emotionRef.current = emotion;
+    hossiisRef.current = hossiis;
+    readingEnabledRef.current = readingEnabled;
+  });
   // 直前に読み上げた投稿 ID（重複防止）
   const lastReadIdRef = useRef<string | null>(null);
   // SpeechSynthesis utterance ref（キャンセル用）
@@ -316,7 +320,7 @@ export function HossiiLive({
       clearTimeout(longBubbleTimerRef.current);
       longBubbleTimerRef.current = null;
     }
-    setLongBubble(null);
+    queueMicrotask(() => setLongBubble(null));
 
     // 既存のreactionタイマーをクリア
     if (reactionTimerRef.current) {
@@ -469,7 +473,7 @@ export function HossiiLive({
   // 投稿やタップ時に自発セリフをクリア
   useEffect(() => {
     if (lastTriggerId || bubble || longBubble) {
-      setIdleBubble(null);
+      queueMicrotask(() => setIdleBubble(null));
       lastInteractionTimeRef.current = Date.now();
     }
   }, [lastTriggerId, bubble, longBubble]);
@@ -586,9 +590,12 @@ export function HossiiLive({
     if (n <= 9) return 2;
     return 3;
   }, [hossiis]);
+  useLayoutEffect(() => {
+    energyLevelRef.current = energyLevel;
+  }, [energyLevel]);
+
   // レベル別アイドルアニメーション速度（秒）: Lv0=6s, Lv1=4s, Lv2=3s, Lv3=2s
   const idleAnimDuration = ([6, 4, 3, 2] as const)[energyLevel];
-  energyLevelRef.current = energyLevel;
 
   // コンテナのクラス名
   const containerClasses = [

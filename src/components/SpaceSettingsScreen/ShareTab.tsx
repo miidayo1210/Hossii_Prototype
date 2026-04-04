@@ -18,9 +18,7 @@ export const ShareTab = () => {
   const [copied, setCopied] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
-  if (!activeSpace) return null;
-
-  const spaceURL = activeSpace.spaceURL;
+  const spaceURL = activeSpace?.spaceURL ?? null;
   const shareURL = spaceURL
     ? communitySlug
       ? `${window.location.origin}/c/${communitySlug}/s/${spaceURL}`
@@ -29,7 +27,7 @@ export const ShareTab = () => {
 
   const validation = inputValue ? validateSpaceURL(inputValue) : null;
   const isUnique =
-    validation?.valid && inputValue !== spaceURL
+    validation?.valid && inputValue !== spaceURL && activeSpace
       ? isSpaceURLUnique(inputValue, state.spaces, activeSpace.id)
       : true;
 
@@ -47,22 +45,22 @@ export const ShareTab = () => {
     setIsSaved(false);
   };
 
-  const handleSave = useCallback(() => {
-    if (!canSave) return;
+  const handleSave = () => {
+    if (!canSave || !activeSpace) return;
     updateSpace(activeSpace.id, { spaceURL: inputValue });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
-  }, [canSave, activeSpace.id, inputValue, updateSpace]);
+  };
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = async () => {
     if (!shareURL) return;
     await navigator.clipboard.writeText(shareURL);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [shareURL]);
+  };
 
   const handleDownloadQR = useCallback(() => {
-    if (!qrRef.current) return;
+    if (!qrRef.current || !activeSpace) return;
     const svg = qrRef.current.querySelector('svg');
     if (!svg) return;
 
@@ -91,6 +89,8 @@ export const ShareTab = () => {
     };
     img.src = url;
   }, [activeSpace]);
+
+  if (!activeSpace) return null;
 
   return (
     <div className={styles.container}>

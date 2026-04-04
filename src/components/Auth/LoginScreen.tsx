@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Mail, Lock, LogIn, UserPlus, X, Eye, EyeOff, User } from 'lucide-react';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import styles from './LoginScreen.module.css';
 
 type AuthMode = 'login' | 'signup';
@@ -45,9 +45,10 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
           gender || null
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Authentication error:', err);
-      setError(getErrorMessage(err.code ?? err.message));
+      const authErr = err as { code?: string; message?: string };
+      setError(getErrorMessage(authErr.code ?? authErr.message ?? ''));
     } finally {
       setLoading(false);
     }
@@ -59,9 +60,10 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
 
     try {
       await loginWithGoogle();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Google login error:', err);
-      setError(getErrorMessage(err.code));
+      const authErr = err as { code?: string };
+      setError(getErrorMessage(authErr.code ?? ''));
     } finally {
       setLoading(false);
     }
@@ -73,9 +75,10 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
 
     try {
       await loginWithFacebook();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Facebook login error:', err);
-      setError(getErrorMessage(err.code));
+      const authErr = err as { code?: string };
+      setError(getErrorMessage(authErr.code ?? ''));
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,13 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 const BUCKET = 'hossii-images';
 const MAX_SIZE_BYTES = 1024 * 1024; // 1MB
 const MAX_DIMENSION = 1280;
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+function validateImageFile(file: File): void {
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    throw new Error(`サポートされていないファイル形式です。JPEG・PNG・WebP・GIF のみアップロードできます。（受信: ${file.type || '不明'}）`);
+  }
+}
 
 /** Canvas API でクライアント側圧縮 */
 export async function compressImage(file: File): Promise<Blob> {
@@ -68,6 +75,8 @@ export async function uploadBackgroundImage(
 ): Promise<string | null> {
   if (!isSupabaseConfigured) return null;
 
+  validateImageFile(file);
+
   let blob: Blob;
   try {
     blob = await compressImage(file);
@@ -119,6 +128,8 @@ export async function uploadHossiiImage(
   file: File
 ): Promise<string | null> {
   if (!isSupabaseConfigured) return null;
+
+  validateImageFile(file);
 
   let blob: Blob;
   try {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Mail, Lock, Building2, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import type { AppUser } from '../../core/contexts/AuthContext';
 import styles from './LoginScreen.module.css';
 import adminStyles from './AdminLoginScreen.module.css';

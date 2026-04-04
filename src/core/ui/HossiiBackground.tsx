@@ -6,7 +6,7 @@
  * 将来的に画像対応可能な構造を維持
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import styles from './HossiiBackground.module.css';
 
 type Props = {
@@ -24,7 +24,12 @@ export function HossiiBackground({
   variant = 'warm',
 }: Props) {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
-  const [isLoaded, setIsLoaded] = useState(!imageUrl);
+  const [loadedImageUrl, setLoadedImageUrl] = useState<string | undefined>(undefined);
+
+  const isLoaded = useMemo(
+    () => !imageUrl || loadedImageUrl === imageUrl,
+    [imageUrl, loadedImageUrl]
+  );
 
   useEffect(() => {
     function updateOrientation() {
@@ -49,14 +54,10 @@ export function HossiiBackground({
 
   // 画像プリロード
   useEffect(() => {
-    if (!imageUrl) {
-      setIsLoaded(true);
-      return;
-    }
-
+    if (!imageUrl) return;
     const img = new Image();
     img.src = imageUrl;
-    img.onload = () => setIsLoaded(true);
+    img.onload = () => setLoadedImageUrl(imageUrl);
   }, [imageUrl]);
 
   const variantClass = {

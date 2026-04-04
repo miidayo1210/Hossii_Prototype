@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
@@ -106,10 +106,12 @@ export const Bubble = ({
 
   // I: 画像ライトボックス
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // hossii.likeCount が外部から変わった場合（初回フェッチ完了後など）に同期
   useEffect(() => {
-    setLocalLikeCount(hossii.likeCount ?? 0);
+    const count = hossii.likeCount ?? 0;
+    queueMicrotask(() => setLocalLikeCount(count));
   }, [hossii.likeCount]);
 
   // I: ライトボックス表示中の Escape キーで閉じる
@@ -126,21 +128,23 @@ export const Bubble = ({
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragScaleRef = useRef<number | null>(null);
   const positionRef = useRef(position);
-  positionRef.current = position;
   const isSelectedRef = useRef(isSelected);
-  isSelectedRef.current = isSelected;
   const onSelectRef = useRef(onSelect);
-  onSelectRef.current = onSelect;
   const onPositionSaveRef = useRef(onPositionSave);
-  onPositionSaveRef.current = onPositionSave;
   const onScaleSaveRef = useRef(onScaleSave);
-  onScaleSaveRef.current = onScaleSave;
   const onColorSaveRef = useRef(onColorSave);
-  onColorSaveRef.current = onColorSave;
   const canEditRef = useRef(canEdit);
-  canEditRef.current = canEdit;
   const hossiiRef = useRef(hossii);
-  hossiiRef.current = hossii;
+  useLayoutEffect(() => {
+    positionRef.current = position;
+    isSelectedRef.current = isSelected;
+    onSelectRef.current = onSelect;
+    onPositionSaveRef.current = onPositionSave;
+    onScaleSaveRef.current = onScaleSave;
+    onColorSaveRef.current = onColorSave;
+    canEditRef.current = canEdit;
+    hossiiRef.current = hossii;
+  });
 
   // ドラッグセッション管理
   const dragStateRef = useRef<{
@@ -200,10 +204,13 @@ export const Bubble = ({
     const el = containerRef.current;
     if (!el) return;
 
-    const onPointerMove = (e: PointerEvent) => {
+      const onPointerMove = (e: PointerEvent) => {
       if (!dragStateRef.current) return;
       const { mode, startPX, startPY, startBX, startBY, startScale } = dragStateRef.current;
-      dragStateRef.current.moved = true;
+      if (!dragStateRef.current.moved) {
+        dragStateRef.current.moved = true;
+        setIsDragging(true);
+      }
 
       if (mode === 'moving') {
         const area = el.closest('[data-bubble-area]') as HTMLElement | null;
@@ -252,6 +259,7 @@ export const Bubble = ({
       dragScaleRef.current = null;
       setDragPos(null);
       setDragScale(null);
+      setIsDragging(false);
     };
 
     document.addEventListener('pointermove', onPointerMove);
@@ -293,8 +301,6 @@ export const Bubble = ({
   const visibleTags = hashtags.slice(0, MAX_VISIBLE_TAGS);
   const extraTagCount = hashtags.length - MAX_VISIBLE_TAGS;
   const showFooter = viewMode === 'full' && (hashtags.length > 0 || likesEnabled);
-
-  const isDragging = dragStateRef.current?.moved ?? false;
 
   const bubbleStyle: React.CSSProperties = {
     left: `${displayPos.x}%`,

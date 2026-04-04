@@ -1,10 +1,9 @@
 import {
   useReducer,
   useCallback,
-  createContext,
-  useContext,
   useMemo,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -31,33 +30,7 @@ import {
   loadSpaceNicknames,
   saveSpaceNicknames,
 } from '../utils/profileStorage';
-import { loadShowHossii, saveShowHossii } from '../utils/hossiiDisplayStorage';
-import {
-  loadListenMode,
-  saveListenMode,
-  loadListenConsent,
-  saveListenConsent,
-  loadEmotionLogEnabled,
-  saveEmotionLogEnabled,
-  loadSpeechLogEnabled,
-  saveSpeechLogEnabled,
-  loadSpeechLevels,
-  saveSpeechLevels,
-  type SpeechLevelSettings,
-} from '../utils/listenStorage';
 import { migrateHossiiOrigin, needsMigration, markMigrationComplete } from '../utils/migrateOldLogs';
-import { loadDisplayScale, saveDisplayScale, type DisplayScale } from '../utils/displayScaleStorage';
-import {
-  loadDisplayPeriod,
-  saveDisplayPeriod,
-  loadDisplayLimit,
-  saveDisplayLimit,
-  loadViewMode,
-  saveViewMode,
-  type DisplayPeriod,
-  type DisplayLimit,
-  type ViewMode,
-} from '../utils/displayPrefsStorage';
 
 // Supabase APIs
 import { supabase, isSupabaseConfigured } from '../supabase';
@@ -84,8 +57,9 @@ import {
   upsertProfile,
   upsertSpaceNickname,
 } from '../utils/profilesApi';
-import { useAuth } from '../contexts/AuthContext';
-import { useAdminNavigation } from '../contexts/AdminNavigationContext';
+import { useAuth } from '../contexts/useAuth';
+import { useAdminNavigation } from '../contexts/useAdminNavigation';
+import { HossiiContext } from './useHossiiStore';
 
 // createdAt を Date に正規化（Supabase から string で来ても対応）
 const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
@@ -246,16 +220,6 @@ type ExtendedHossiiState = HossiiState & {
   mode: AppMode;
   profile: UserProfile | null;
   spaceNicknames: SpaceNicknames;
-  showHossii: boolean;
-  listenMode: boolean;
-  hasConsentedToListen: boolean;
-  emotionLogEnabled: boolean;
-  speechLogEnabled: boolean;
-  speechLevels: SpeechLevelSettings;
-  displayScale: DisplayScale;
-  displayPeriod: DisplayPeriod;
-  displayLimit: DisplayLimit;
-  viewMode: ViewMode;
   visitingSpaceId: string | null;
 };
 
@@ -274,16 +238,6 @@ type ExtendedHossiiAction =
   | { type: 'SET_PROFILE'; payload: UserProfile }
   | { type: 'SET_DEFAULT_NICKNAME'; payload: string }
   | { type: 'SET_SPACE_NICKNAME'; payload: { spaceId: string; nickname: string } }
-  | { type: 'SET_SHOW_HOSSII'; payload: boolean }
-  | { type: 'SET_LISTEN_MODE'; payload: boolean }
-  | { type: 'SET_LISTEN_CONSENT'; payload: boolean }
-  | { type: 'SET_EMOTION_LOG_ENABLED'; payload: boolean }
-  | { type: 'SET_SPEECH_LOG_ENABLED'; payload: boolean }
-  | { type: 'SET_SPEECH_LEVELS'; payload: SpeechLevelSettings }
-  | { type: 'SET_DISPLAY_SCALE'; payload: DisplayScale }
-  | { type: 'SET_DISPLAY_PERIOD'; payload: DisplayPeriod }
-  | { type: 'SET_DISPLAY_LIMIT'; payload: DisplayLimit }
-  | { type: 'SET_VIEW_MODE'; payload: ViewMode }
   | { type: 'UPDATE_HOSSII_POSITION'; payload: { id: string; positionX: number; positionY: number } }
   | { type: 'UPDATE_HOSSII_SCALE'; payload: { id: string; scale: number } }
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
@@ -527,74 +481,6 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         };
       }
 
-      case 'SET_SHOW_HOSSII': {
-        saveShowHossii(action.payload);
-        return {
-          ...state,
-          showHossii: action.payload,
-        };
-      }
-
-      case 'SET_LISTEN_MODE': {
-        saveListenMode(action.payload);
-        return {
-          ...state,
-          listenMode: action.payload,
-        };
-      }
-
-      case 'SET_LISTEN_CONSENT': {
-        saveListenConsent(action.payload);
-        return {
-          ...state,
-          hasConsentedToListen: action.payload,
-        };
-      }
-
-      case 'SET_EMOTION_LOG_ENABLED': {
-        saveEmotionLogEnabled(action.payload);
-        return {
-          ...state,
-          emotionLogEnabled: action.payload,
-        };
-      }
-
-      case 'SET_SPEECH_LOG_ENABLED': {
-        saveSpeechLogEnabled(action.payload);
-        return {
-          ...state,
-          speechLogEnabled: action.payload,
-        };
-      }
-
-      case 'SET_SPEECH_LEVELS': {
-        saveSpeechLevels(action.payload);
-        return {
-          ...state,
-          speechLevels: action.payload,
-        };
-      }
-
-      case 'SET_DISPLAY_SCALE': {
-        saveDisplayScale(action.payload);
-        return { ...state, displayScale: action.payload };
-      }
-
-      case 'SET_DISPLAY_PERIOD': {
-        saveDisplayPeriod(action.payload);
-        return { ...state, displayPeriod: action.payload };
-      }
-
-      case 'SET_DISPLAY_LIMIT': {
-        saveDisplayLimit(action.payload);
-        return { ...state, displayLimit: action.payload };
-      }
-
-      case 'SET_VIEW_MODE': {
-        saveViewMode(action.payload);
-        return { ...state, viewMode: action.payload };
-      }
-
       case 'SET_VISITING_SPACE': {
         return { ...state, visitingSpaceId: action.payload };
       }
@@ -668,7 +554,7 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
   };
 };
 
-type HossiiContextValue = {
+export type HossiiContextValue = {
   state: ExtendedHossiiState;
   spacesLoadedFromSupabase: boolean;
   hossiiLoadedFromSupabase: boolean;
@@ -688,16 +574,6 @@ type HossiiContextValue = {
   setSpaceNickname: (spaceId: string, nickname: string) => void;
   getActiveNickname: () => string;
   hasNicknameForSpace: (spaceId: string) => boolean;
-  setShowHossii: (show: boolean) => void;
-  setListenMode: (enabled: boolean) => void;
-  setListenConsent: (consented: boolean) => void;
-  setEmotionLogEnabled: (enabled: boolean) => void;
-  setSpeechLogEnabled: (enabled: boolean) => void;
-  setSpeechLevels: (levels: SpeechLevelSettings) => void;
-  setDisplayScale: (scale: DisplayScale) => void;
-  setDisplayPeriod: (period: DisplayPeriod) => void;
-  setDisplayLimit: (limit: DisplayLimit) => void;
-  setViewMode: (mode: ViewMode) => void;
   setVisitingSpace: (spaceId: string | null) => void;
   updateHossiiColorAction: (id: string, color: string | null) => void;
   updateHossiiPositionAction: (id: string, positionX: number, positionY: number) => void;
@@ -705,8 +581,6 @@ type HossiiContextValue = {
   hideHossii: (id: string, adminId?: string) => void;
   restoreHossii: (id: string, adminId?: string) => void;
 };
-
-const HossiiContext = createContext<HossiiContextValue | null>(null);
 
 type HossiiProviderProps = {
   children: ReactNode;
@@ -723,16 +597,6 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const initialMode = useMemo(() => loadMode(), []);
   const initialProfile = useMemo(() => loadProfile(), []);
   const initialSpaceNicknames = useMemo(() => loadSpaceNicknames(), []);
-  const initialShowHossii = useMemo(() => loadShowHossii(), []);
-  const initialListenMode = useMemo(() => loadListenMode(), []);
-  const initialListenConsent = useMemo(() => loadListenConsent(), []);
-  const initialEmotionLogEnabled = useMemo(() => loadEmotionLogEnabled(), []);
-  const initialSpeechLogEnabled = useMemo(() => loadSpeechLogEnabled(), []);
-  const initialSpeechLevels = useMemo(() => loadSpeechLevels(), []);
-  const initialDisplayScale = useMemo(() => loadDisplayScale(), []);
-  const initialDisplayPeriod = useMemo(() => loadDisplayPeriod(), []);
-  const initialDisplayLimit = useMemo(() => loadDisplayLimit(), []);
-  const initialViewMode = useMemo(() => loadViewMode(), []);
 
   const activeSpaceIdRef = useMemo(() => ({ current: activeSpaceId }), [activeSpaceId]);
 
@@ -752,16 +616,6 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     mode: initialMode,
     profile: initialProfile,
     spaceNicknames: initialSpaceNicknames,
-    showHossii: initialShowHossii,
-    listenMode: initialListenMode,
-    hasConsentedToListen: initialListenConsent,
-    emotionLogEnabled: initialEmotionLogEnabled,
-    speechLogEnabled: initialSpeechLogEnabled,
-    speechLevels: initialSpeechLevels,
-    displayScale: initialDisplayScale,
-    displayPeriod: initialDisplayPeriod,
-    displayLimit: initialDisplayLimit,
-    viewMode: initialViewMode,
     visitingSpaceId: null,
   });
 
@@ -779,7 +633,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
   // 最新の state を ref で保持（コールバック内でのクロージャ問題を回避）
   const stateRef = useRef(state);
-  stateRef.current = state;
+  useLayoutEffect(() => {
+    stateRef.current = state;
+  });
 
   // Supabase からのスペース読み込みが完了したかどうか
   // Supabase 未設定の場合は localStorage のみを使うため即 true
@@ -813,8 +669,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     if (!isSupabaseConfigured) return;
 
     // ローディング開始と同時に古いデータを即クリア（フラッシュ防止）
-    setHossiiLoadedFromSupabase(false);
-    dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
+    queueMicrotask(() => {
+      setHossiiLoadedFromSupabase(false);
+      dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
+    });
 
     fetchHossiis(state.activeSpaceId).then((supabaseHossiis) => {
       dispatch({ type: 'SYNC_HOSSIIS', payload: supabaseHossiis });
@@ -1071,46 +929,6 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     return !!state.spaceNicknames[spaceId];
   }, [state.spaceNicknames]);
 
-  const setShowHossii = useCallback((show: boolean) => {
-    dispatch({ type: 'SET_SHOW_HOSSII', payload: show });
-  }, []);
-
-  const setListenMode = useCallback((enabled: boolean) => {
-    dispatch({ type: 'SET_LISTEN_MODE', payload: enabled });
-  }, []);
-
-  const setListenConsent = useCallback((consented: boolean) => {
-    dispatch({ type: 'SET_LISTEN_CONSENT', payload: consented });
-  }, []);
-
-  const setEmotionLogEnabled = useCallback((enabled: boolean) => {
-    dispatch({ type: 'SET_EMOTION_LOG_ENABLED', payload: enabled });
-  }, []);
-
-  const setSpeechLogEnabled = useCallback((enabled: boolean) => {
-    dispatch({ type: 'SET_SPEECH_LOG_ENABLED', payload: enabled });
-  }, []);
-
-  const setSpeechLevels = useCallback((levels: SpeechLevelSettings) => {
-    dispatch({ type: 'SET_SPEECH_LEVELS', payload: levels });
-  }, []);
-
-  const setDisplayScale = useCallback((scale: DisplayScale) => {
-    dispatch({ type: 'SET_DISPLAY_SCALE', payload: scale });
-  }, []);
-
-  const setDisplayPeriod = useCallback((period: DisplayPeriod) => {
-    dispatch({ type: 'SET_DISPLAY_PERIOD', payload: period });
-  }, []);
-
-  const setDisplayLimit = useCallback((limit: DisplayLimit) => {
-    dispatch({ type: 'SET_DISPLAY_LIMIT', payload: limit });
-  }, []);
-
-  const setViewMode = useCallback((mode: ViewMode) => {
-    dispatch({ type: 'SET_VIEW_MODE', payload: mode });
-  }, []);
-
   const setVisitingSpace = useCallback((spaceId: string | null) => {
     dispatch({ type: 'SET_VISITING_SPACE', payload: spaceId });
   }, []);
@@ -1180,16 +998,6 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         setSpaceNickname,
         getActiveNickname,
         hasNicknameForSpace,
-        setShowHossii,
-        setListenMode,
-        setListenConsent,
-        setEmotionLogEnabled,
-        setSpeechLogEnabled,
-        setSpeechLevels,
-        setDisplayScale,
-        setDisplayPeriod,
-        setDisplayLimit,
-        setViewMode,
         setVisitingSpace,
         updateHossiiColorAction,
         updateHossiiPositionAction,
@@ -1203,10 +1011,3 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   );
 };
 
-export const useHossiiStore = (): HossiiContextValue => {
-  const context = useContext(HossiiContext);
-  if (!context) {
-    throw new Error('useHossiiStore must be used within a HossiiProvider');
-  }
-  return context;
-};

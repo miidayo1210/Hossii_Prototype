@@ -1,10 +1,13 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from './core/hooks/useRouter';
-import { HossiiProvider, useHossiiStore } from './core/hooks/useHossiiStore';
+import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
+import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
 import { isSupabaseConfigured } from './core/supabase';
-import { AuthProvider, useAuth } from './core/contexts/AuthContext';
+import { AuthProvider } from './core/contexts/AuthContext';
+import { useAuth } from './core/contexts/useAuth';
 import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
+import { DisplayPrefsProvider, useDisplayPrefs } from './core/contexts/DisplayPrefsContext';
 import { PostScreen } from './components/PostScreen/PostScreen';
 import { SpaceScreen } from './components/SpaceScreen/SpaceScreen';
 import { CommentsScreen } from './components/CommentsScreen/CommentsScreen';
@@ -34,6 +37,7 @@ const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
   const { screen, navigate } = useRouter();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
+  const { prefs } = useDisplayPrefs();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -516,7 +520,7 @@ const AppContent = () => {
   };
 
   return (
-    <div className={styles.appRoot} data-scale={state.displayScale}>
+    <div className={styles.appRoot} data-scale={prefs.displayScale}>
       {renderScreen()}
       {showNicknameModal && pendingSpaceId && (
         <NicknameModal
@@ -539,9 +543,11 @@ const App = () => {
   return (
     <AuthProvider>
       <AdminNavigationProvider>
-        <HossiiProvider initialHossiis={mockHossiis}>
-          <AppContent />
-        </HossiiProvider>
+        <DisplayPrefsProvider>
+          <HossiiProvider initialHossiis={mockHossiis}>
+            <AppContent />
+          </HossiiProvider>
+        </DisplayPrefsProvider>
       </AdminNavigationProvider>
     </AuthProvider>
   );

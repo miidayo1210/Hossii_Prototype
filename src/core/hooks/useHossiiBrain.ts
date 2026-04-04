@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 
 export type HossiiBrainMessage = {
   text: string;
@@ -151,6 +151,8 @@ export const useHossiiBrain = ({ enabled, onMessage }: Props) => {
     }
   }, [enabled, speak]);
 
+  const scheduleIdleTalkRef = useRef<() => void>(() => {});
+
   // 独り言タイマー
   const scheduleIdleTalk = useCallback(() => {
     if (!enabled) return;
@@ -164,9 +166,13 @@ export const useHossiiBrain = ({ enabled, onMessage }: Props) => {
       speak(randomTalk);
 
       // 次の独り言をスケジュール
-      scheduleIdleTalk();
+      scheduleIdleTalkRef.current();
     }, delay);
   }, [enabled, speak]);
+
+  useLayoutEffect(() => {
+    scheduleIdleTalkRef.current = scheduleIdleTalk;
+  }, [scheduleIdleTalk]);
 
   // 独り言タイマーの開始
   useEffect(() => {

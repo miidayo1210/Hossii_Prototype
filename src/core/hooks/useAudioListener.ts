@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react';
 import type { EmotionKey, LanguageCode } from '../types';
 
 export type AudioEvent = {
@@ -74,6 +74,8 @@ export function useAudioListener({ enabled, onAudioEvent }: UseAudioListenerOpti
     return variance > 0.005 && avg > LAUGH_THRESHOLD * 0.5;
   }, []);
 
+  const analyzeAudioRef = useRef<() => void>(() => {});
+
   // オーディオ分析ループ
   const analyzeAudio = useCallback(() => {
     if (!analyserRef.current) return;
@@ -101,7 +103,7 @@ export function useAudioListener({ enabled, onAudioEvent }: UseAudioListenerOpti
 
     // クールダウン中はイベント発火しない
     if (timeSinceLastEvent < COOLDOWN) {
-      animationFrameRef.current = requestAnimationFrame(analyzeAudio);
+      animationFrameRef.current = requestAnimationFrame(analyzeAudioRef.current);
       return;
     }
 
@@ -146,8 +148,12 @@ export function useAudioListener({ enabled, onAudioEvent }: UseAudioListenerOpti
       silenceStartRef.current = null;
     }
 
-    animationFrameRef.current = requestAnimationFrame(analyzeAudio);
+    animationFrameRef.current = requestAnimationFrame(analyzeAudioRef.current);
   }, [onAudioEvent, detectLaughPattern]);
+
+  useLayoutEffect(() => {
+    analyzeAudioRef.current = analyzeAudio;
+  }, [analyzeAudio]);
 
   // マイク開始
   const startListening = useCallback(async () => {
@@ -171,7 +177,7 @@ export function useAudioListener({ enabled, onAudioEvent }: UseAudioListenerOpti
 
       // 分析ループ開始
       analyzeAudio();
-    } catch (err) {
+    } catch {
       setError('マイクへのアクセスが拒否されました');
       setIsListening(false);
     }
@@ -202,13 +208,16 @@ export function useAudioListener({ enabled, onAudioEvent }: UseAudioListenerOpti
 
   // enabled の変化に応じてマイクを開始/停止
   useEffect(() => {
-    if (enabled) {
-      startListening();
-    } else {
-      stopListening();
-    }
+    const id = setTimeout(() => {
+      if (enabled) {
+        void startListening();
+      } else {
+        stopListening();
+      }
+    }, 0);
 
     return () => {
+      clearTimeout(id);
       stopListening();
     };
   }, [enabled, startListening, stopListening]);

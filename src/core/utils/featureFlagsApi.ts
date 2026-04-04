@@ -69,8 +69,8 @@ function removeLocalOverride(spaceId: string, flagKey: string): void {
 // getFeatureFlagsForSpace
 // スペース単位のフラグを取得して、default + override をマージして返す
 //
-// 優先順位: localStorage override > Supabase override > default
-// （Supabase が利用できない場合や RLS で読み取れない場合も localStorage が有効）
+// 優先順位: Supabase override > default
+// （Supabase 取得失敗時のみ localStorage をフォールバックとして使用）
 // ============================================================
 export async function getFeatureFlagsForSpace(spaceId: string): Promise<FeatureFlags> {
   // Kill Switch が有効なら全フラグを false
@@ -78,45 +78,38 @@ export async function getFeatureFlagsForSpace(spaceId: string): Promise<FeatureF
     return buildAllFalse();
   }
 
-  const localOverrides = loadLocalOverrides(spaceId);
-
   // Supabase 未設定時（ローカル開発・テスト環境）は localStorage override + デフォルト値を返す
   if (!isSupabaseConfigured) {
+    const localOverrides = loadLocalOverrides(spaceId);
     return castToFeatureFlags({ ...buildDefaults(), ...localOverrides });
   }
 
   try {
-    // feature_flags テーブルからデフォルト値を全件取得
-    const { data: defaults, error: defaultsError } = await supabase
-      .from('feature_flags')
-      .select('key, default_enabled');
+    // feature_flags と space_feature_flags を並列取得
+    const [defaultsResult, overridesResult] = await Promise.all([
+      supabase.from('feature_flags').select('key, default_enabled'),
+      supabase.from('space_feature_flags').select('flag_key, enabled').eq('space_id', spaceId),
+    ]);
 
-    if (defaultsError) throw defaultsError;
-
-    // space_feature_flags テーブルからスペース固有の override を取得
-    const { data: remoteOverrides, error: overridesError } = await supabase
-      .from('space_feature_flags')
-      .select('flag_key, enabled')
-      .eq('space_id', spaceId);
-
-    if (overridesError) throw overridesError;
+    if (defaultsResult.error) throw defaultsResult.error;
+    if (overridesResult.error) throw overridesResult.error;
 
     // デフォルト値をマップに変換
     const result: Record<string, boolean> = {};
-    for (const row of (defaults ?? []) as FeatureFlagRow[]) {
+    for (const row of (defaultsResult.data ?? []) as FeatureFlagRow[]) {
       result[row.key] = row.default_enabled;
     }
 
-    // Supabase の override で上書き
-    for (const row of (remoteOverrides ?? []) as SpaceFeatureFlagRow[]) {
+    // Supabase の override で上書き（サーバー値を最優先）
+    for (const row of (overridesResult.data ?? []) as SpaceFeatureFlagRow[]) {
       result[row.flag_key] = row.enabled;
     }
 
-    // localStorage の override を最優先で上書き（Supabase 書き込み失敗時のフォールバック値）
-    return castToFeatureFlags({ ...result, ...localOverrides });
+    return castToFeatureFlags(result);
   } catch (err) {
-    // 取得失敗時は localStorage override + デフォルト値にフォールバック
+    // 取得失敗時のみ localStorage override + デフォルト値にフォールバック
     console.warn('[FeatureFlags] Failed to fetch flags, falling back to defaults.', err);
+    const localOverrides = loadLocalOverrides(spaceId);
     return castToFeatureFlags({ ...buildDefaults(), ...localOverrides });
   }
 }

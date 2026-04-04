@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import type { Hossii } from '../../core/types';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import styles from './SlideshowView.module.css';
@@ -31,7 +31,9 @@ export const SlideshowView = ({ hossiis, onExit }: Props) => {
 
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playingRef = useRef(isPlaying);
-  playingRef.current = isPlaying;
+  useLayoutEffect(() => {
+    playingRef.current = isPlaying;
+  });
 
   const total = shuffled.length;
 
@@ -77,11 +79,11 @@ export const SlideshowView = ({ hossiis, onExit }: Props) => {
 
   // マウント時に設定パネルを3秒後に隠す
   useEffect(() => {
-    resetControlsTimer();
+    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
     return () => {
       if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
     };
-  }, [resetControlsTimer]);
+  }, []);
 
   const handleTap = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();

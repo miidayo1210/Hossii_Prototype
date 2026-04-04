@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useState, useMemo } from 'react';
+import { useAuth } from '../../core/contexts/useAuth';
 import { getStampCount, getCurrentCardProgress, getCompletedCardCount, getStampCardTheme, saveStampCardTheme } from '../../core/utils/stampStorage';
 import type { StampCardTheme } from '../../core/types/stamp';
 import { STAMPS_PER_CARD } from '../../core/types/stamp';
@@ -17,24 +17,10 @@ const THEME_OPTIONS: Array<{ value: StampCardTheme; label: string; description: 
 
 export const StampCardScreen = () => {
   const { currentUser } = useAuth();
-  const [totalStamps, setTotalStamps] = useState(0);
-  const [currentProgress, setCurrentProgress] = useState(0);
-  const [completedCards, setCompletedCards] = useState(0);
-  const [selectedTheme, setSelectedTheme] = useState<StampCardTheme>('grid');
-
-  useEffect(() => {
-    if (currentUser) {
-      const total = getStampCount(currentUser.uid);
-      const progress = getCurrentCardProgress(currentUser.uid);
-      const completed = getCompletedCardCount(currentUser.uid);
-      const theme = getStampCardTheme();
-
-      setTotalStamps(total);
-      setCurrentProgress(progress);
-      setCompletedCards(completed);
-      setSelectedTheme(theme);
-    }
-  }, [currentUser]);
+  const totalStamps = useMemo(() => (currentUser ? getStampCount(currentUser.uid) : 0), [currentUser]);
+  const currentProgress = useMemo(() => (currentUser ? getCurrentCardProgress(currentUser.uid) : 0), [currentUser]);
+  const completedCards = useMemo(() => (currentUser ? getCompletedCardCount(currentUser.uid) : 0), [currentUser]);
+  const [selectedTheme, setSelectedTheme] = useState<StampCardTheme>(() => getStampCardTheme());
 
   const handleThemeChange = (theme: StampCardTheme) => {
     setSelectedTheme(theme);

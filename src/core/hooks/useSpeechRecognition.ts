@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react';
 import type { SpeechLevel, LanguageCode } from '../types';
 import type { SpeechLevelSettings } from '../utils/listenStorage';
 import { detectLanguage } from '../utils/languageDetection';
@@ -116,7 +116,9 @@ export function useSpeechRecognition({
   const speechLevelsRef = useRef(speechLevels);
 
   // speechLevels を ref で保持
-  speechLevelsRef.current = speechLevels;
+  useLayoutEffect(() => {
+    speechLevelsRef.current = speechLevels;
+  });
 
   // バッファをフラッシュ
   const flushBuffer = useCallback(() => {
@@ -236,7 +238,7 @@ export function useSpeechRecognition({
       recognitionRef.current = recognition;
       setIsRecognizing(true);
       setError(null);
-    } catch (err) {
+    } catch {
       setError('音声認識の開始に失敗しました');
       setIsRecognizing(false);
     }
@@ -264,13 +266,16 @@ export function useSpeechRecognition({
 
   // enabled の変化に応じて認識を開始/停止
   useEffect(() => {
-    if (enabled) {
-      startRecognition();
-    } else {
-      stopRecognition();
-    }
+    const id = setTimeout(() => {
+      if (enabled) {
+        startRecognition();
+      } else {
+        stopRecognition();
+      }
+    }, 0);
 
     return () => {
+      clearTimeout(id);
       stopRecognition();
     };
   }, [enabled, startRecognition, stopRecognition]);

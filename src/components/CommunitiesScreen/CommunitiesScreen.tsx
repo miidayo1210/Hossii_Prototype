@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../core/contexts/useAuth';
 import { useRouter } from '../../core/hooks/useRouter';
-import { useAdminNavigation } from '../../core/contexts/AdminNavigationContext';
+import { useAdminNavigation } from '../../core/contexts/useAdminNavigation';
 import { fetchAllCommunities } from '../../core/utils/communitiesApi';
 import type { Community, CommunityStatus } from '../../core/utils/communitiesApi';
 import { fetchCommunityStats } from '../../core/utils/spacesApi';

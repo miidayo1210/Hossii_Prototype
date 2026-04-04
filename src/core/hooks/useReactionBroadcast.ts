@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import type { EmotionKey, LogType, SpeechLevel } from '../types';
 
 /**
@@ -40,7 +40,9 @@ export function useReactionBroadcast({
   const channelRef = useRef<BroadcastChannel | null>(null);
   const seenNoncesRef = useRef<Set<string>>(new Set());
   const onReactionRef = useRef(onReaction);
-  onReactionRef.current = onReaction;
+  useLayoutEffect(() => {
+    onReactionRef.current = onReaction;
+  });
 
   // nonce をクリーンアップ（定期的に古いものを削除）
   useEffect(() => {
