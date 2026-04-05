@@ -26,7 +26,16 @@
   min-width: 0;
 }
 
-.qrContainer {
+.qrWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+}
+
+.qrHoverZone {
+  position: relative;
   padding: 0.5rem;
   background: #fff;
   border-radius: 1rem;
@@ -34,8 +43,65 @@
   line-height: 0;
 }
 
-.qrContainer svg {
+.qrCodeInner svg {
   display: block;
+}
+
+.qrImageActions {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.qrHoverZone:hover .qrImageActions,
+.qrHoverZone:focus-within .qrImageActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.qrImageActionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.97);
+  color: #4b5563;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.qrImageActionButton:hover {
+  background: rgba(243, 232, 255, 0.98);
+  color: #6d28d9;
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+.qrImageActionButton:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.45);
+  outline-offset: 1px;
+}
+
+@media (hover: none) {
+  .qrImageActions {
+    opacity: 0.92;
+    pointer-events: auto;
+  }
 }
 
 .qrLabel {
@@ -84,6 +150,14 @@
   background: rgba(240, 253, 244, 0.95);
   color: #15803d;
   cursor: default;
+}
+
+.qrImageCopyFeedback {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #15803d;
+  text-align: center;
 }
 
 @media (min-width: 769px) {
