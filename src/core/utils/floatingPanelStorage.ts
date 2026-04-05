@@ -109,5 +109,6 @@ export function getDefaultQrRect(): FloatingRect {
   const w = 220;
   const h = 260;
   const margin = 32;
-  return { x: vw - w - margin, y: vh - h - margin, w, h };
+  const reserve = getFloatingPanelBottomInsetPx();
+  return { x: vw - w - margin, y: vh - h - margin - reserve, w, h };
 }

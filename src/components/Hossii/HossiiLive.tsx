@@ -14,6 +14,7 @@ import { getRandomBubble8, EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getHossiiFace } from '../../core/assets/hossiiFaces';
 import { HOSSII_IDLE, getDefaultIdle, getRandomInteractionFace, getListeningFace } from '../../core/assets/hossiiIdle';
 import { MOBILE_BOTTOM_NAV_RESERVE_PX } from '../../core/utils/floatingPanelStorage';
+import { stripEmojisForSpeech } from '../../core/utils/stripEmojisForSpeech';
 import styles from './HossiiLive.module.css';
 
 type Props = {
@@ -417,11 +418,13 @@ export function HossiiLive({
   useEffect(() => {
     function speakText(text: string) {
       if (typeof window === 'undefined' || !window.speechSynthesis) return;
+      const forSpeech = stripEmojisForSpeech(text);
+      if (!forSpeech) return;
       // 前の読み上げを停止
       if (utteranceRef.current) {
         window.speechSynthesis.cancel();
       }
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(forSpeech);
       utterance.lang = 'ja-JP';
       utterance.rate = 1.0;
       utterance.pitch = 1.1;

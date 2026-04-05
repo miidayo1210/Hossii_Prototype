@@ -7,7 +7,7 @@ import { isSupabaseConfigured } from './core/supabase';
 import { AuthProvider } from './core/contexts/AuthContext';
 import { useAuth } from './core/contexts/useAuth';
 import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
-import { DisplayPrefsProvider, useDisplayPrefs } from './core/contexts/DisplayPrefsContext';
+import { DisplayPrefsProvider } from './core/contexts/DisplayPrefsContext';
 import { PostScreen } from './components/PostScreen/PostScreen';
 import { SpaceScreen } from './components/SpaceScreen/SpaceScreen';
 import { CommentsScreen } from './components/CommentsScreen/CommentsScreen';
@@ -32,13 +32,13 @@ import { BottomNavBar } from './components/Navigation/BottomNavBar';
 import { DEFAULT_QUICK_EMOTIONS } from './core/types/space';
 import { mockHossiis } from './demo/mockData';
 import styles from './App.module.css';
+import { ScaledContent } from './components/ScaledContent/ScaledContent';
 import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
 
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
   const { screen, navigate } = useRouter();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
-  const { prefs } = useDisplayPrefs();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -519,8 +519,12 @@ const AppContent = () => {
   };
 
   return (
-    <div className={styles.appRoot} data-scale={prefs.displayScale}>
-      {renderScreen()}
+    <div className={styles.appRoot}>
+      {screen === 'screen' ? (
+        renderScreen()
+      ) : (
+        <ScaledContent>{renderScreen()}</ScaledContent>
+      )}
       {showNicknameModal && pendingSpaceId && (
         <NicknameModal
           spaceId={pendingSpaceId}

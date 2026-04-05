@@ -1,0 +1,49 @@
+/* 表示倍率 — appRoot 全体ではなく、このラッパー内だけに適用する */
+.scaled {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.scaled[data-scale='0.75'] {
+  zoom: 0.75;
+}
+
+.scaled[data-scale='1'] {
+  zoom: 1;
+}
+
+.scaled[data-scale='1.25'] {
+  zoom: 1.25;
+}
+
+.scaled[data-scale='1.5'] {
+  zoom: 1.5;
+}
+
+@supports not (zoom: 1) {
+  .scaled {
+    transform-origin: top left;
+  }
+
+  .scaled[data-scale='0.75'] {
+    transform: scale(0.75);
+    width: calc(100% / 0.75);
+    min-height: calc(100vh / 0.75);
+  }
+
+  .scaled[data-scale='1'] {
+    transform: scale(1);
+  }
+
+  .scaled[data-scale='1.25'] {
+    transform: scale(1.25);
+    width: calc(100% / 1.25);
+    min-height: calc(100vh / 1.25);
+  }
+
+  .scaled[data-scale='1.5'] {
+    transform: scale(1.5);
+    width: calc(100% / 1.5);
+    min-height: calc(100vh / 1.5);
+  }
+}

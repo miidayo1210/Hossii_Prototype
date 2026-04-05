@@ -1,4 +1,4 @@
-import { useMemo, useLayoutEffect, useRef, useState } from 'react';
+import { useMemo, useLayoutEffect, useRef, useState, useCallback, useEffect } from 'react';
 import QRCode from 'react-qr-code';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { getDefaultQrRect } from '../../core/utils/floatingPanelStorage';
@@ -10,6 +10,7 @@ function QRCodePanelInner() {
   const activeSpace = getActiveSpace();
   const sizeBoxRef = useRef<HTMLDivElement>(null);
   const [qrSize, setQrSize] = useState(120);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const spaceUrl = activeSpace?.spaceURL
     ? communitySlug
@@ -36,6 +37,18 @@ function QRCodePanelInner() {
     return () => ro.disconnect();
   }, []);
 
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(spaceUrl).then(() => {
+      setLinkCopied(true);
+    });
+  }, [spaceUrl]);
+
+  useEffect(() => {
+    if (!linkCopied) return;
+    const t = window.setTimeout(() => setLinkCopied(false), 2000);
+    return () => window.clearTimeout(t);
+  }, [linkCopied]);
+
   return (
     <div className={styles.qrBody}>
       <div ref={sizeBoxRef} className={styles.qrSizeBox}>
@@ -53,6 +66,14 @@ function QRCodePanelInner() {
         <span className={styles.labelIcon}>📱</span>
         <span className={styles.labelText}>スマホで参加</span>
       </div>
+      <button
+        type="button"
+        className={`${styles.copyLinkButton} ${linkCopied ? styles.copyLinkButtonCopied : ''}`}
+        data-no-drag
+        onClick={handleCopyLink}
+      >
+        {linkCopied ? 'コピーしました' : 'リンクをコピー'}
+      </button>
     </div>
   );
 }
@@ -66,7 +87,7 @@ export const QRCodePanel = () => {
       defaultRect={defaultRect}
       minW={160}
       minH={160}
-      zIndex={85}
+      zIndex={200}
       className={styles.qrFloating}
     >
       <QRCodePanelInner />

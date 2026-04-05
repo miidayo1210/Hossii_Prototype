@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
+import { DISPLAY_SCALE_VALUES } from '../../core/utils/displayScaleStorage';
 import { useSpeechRecognition } from '../../core/hooks/useSpeechRecognition';
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
@@ -35,6 +36,7 @@ import { SpeechPanel } from '../SpeechPanel/SpeechPanel';
 import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import { LogListBody } from '../CommentsScreen/LogListBody';
 import { SpacePanelCubeDock } from './SpacePanelCubeDock';
+import { ScaledContent } from '../ScaledContent/ScaledContent';
 import {
   getDefaultQuickLogBottomRect,
   getDefaultQuickLogSideRect,
@@ -149,6 +151,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
   /** ダブルクリック→クイック投稿オープンを遅延させ、トリプルクリックでログパネルに譲る */
   const pendingQuickPostOpenRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
+  const [qrPanelVisible, setQrPanelVisible] = useState(true);
 
   const resetQuickPostSpeechState = useCallback(() => {
     setSpeechEditOriginal(undefined);
@@ -196,6 +199,29 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
     setPostScreenKey((k) => k + 1);
     setQuickPostPos({ x: 50, y: 50 });
   }, [isVisiting, quickPostPos, handleQuickPostClose, resetQuickPostSpeechState]);
+
+  /**
+   * クイック投稿パネル（ドックと同じトグル）
+   * - Ctrl+N: Mac/Win でページに届き、抑止できる
+   * - ⌘+⌥+N: Mac で ⌘+N がブラウザの「新しいウィンドウ」に取られるための代替（⌘+N 単体は登録しない）
+   */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      if (isVisiting) return;
+      if (e.code !== 'KeyN') return;
+
+      const ctrlN = e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
+      const cmdAltN = e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey;
+      if (!ctrlN && !cmdAltN) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      handleQuickPostDockToggle();
+    };
+    document.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [isVisiting, handleQuickPostDockToggle]);
 
   useEffect(() => {
     return () => {
@@ -372,9 +398,9 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
     }
   }, []);
 
-  // DisplayScale を循環させる（100% → 125% → 150% → 100%...）
+  // DisplayScale を循環させる（75% → 100% → 125% → 150% → 75%...）
   const handleDisplayScaleCycle = useCallback(() => {
-    const scales = [1, 1.25, 1.5] as const;
+    const scales = DISPLAY_SCALE_VALUES;
     const currentIndex = scales.indexOf(displayScale);
     const nextIndex = (currentIndex + 1) % scales.length;
     setDisplayScale(scales[nextIndex]);
@@ -628,11 +654,14 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
 
   return (
     <div
-      className={`${styles.container} ${backgroundClass}`}
-      style={backgroundStyle}
+      className={styles.container}
       onClick={handleContainerClick}
       onDoubleClick={handleDoubleClick}
     >
+      <ScaledContent
+        className={`${styles.scaledCanvas} ${backgroundClass}`}
+        style={backgroundStyle}
+      >
       {/* 訪問モードバナー */}
       {isVisiting && visitingSpaceInfo && (
         <VisitBanner
@@ -697,20 +726,6 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
           </button>
         </div>
       )}
-
-      {/* 共有ボタン（右上） */}
-      <button
-        type="button"
-        className={styles.shareButtonSmall}
-        aria-label="リンクをコピー"
-        onClick={() => {
-          const url = `${window.location.origin}${window.location.pathname}?space=${activeSpaceId}`;
-          navigator.clipboard.writeText(url);
-          alert('スペースのリンクをコピーしました');
-        }}
-      >
-        🔗
-      </button>
 
       {/* スライドショーモード */}
       {viewMode === 'slideshow' && (
@@ -848,51 +863,6 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
         </div>
       )}
 
-      {/* 音声パネル（body に portal で描画 — 親の overflow により fixed が隠れるのを防ぐ） */}
-      {speechPanelOpen &&
-        createPortal(
-          <SpeechPanel
-            listenMode={listenMode}
-            onListenToggle={handleSpeechPanelListenToggle}
-            confirmedText={panelConfirmedText}
-            interimText={interimText}
-            speechLevels={speechLevels}
-            setSpeechLevels={setSpeechLevels}
-            onPost={(text) => addHossii({ message: text, logType: 'speech', origin: 'manual' })}
-            onEditCandidate={openSpeechCandidateEditor}
-            onDismissCandidate={dismissSpeechCandidate}
-            dismissedCandidates={dismissedSpeechCandidates}
-            onClose={() => {
-              setSpeechPanelOpen(false);
-              setPanelConfirmedText('');
-              setDismissedSpeechCandidates([]);
-            }}
-          />,
-          document.body
-        )}
-
-      {/* モバイル: 詳細モーダル */}
-      {selectedPost && (
-        <PostDetailModal
-          hossii={selectedPost}
-          onClose={() => setSelectedPostId(null)}
-          likesEnabled={spaceSettings?.features.likesEnabled ?? false}
-          onLike={handleLike}
-        />
-      )}
-
-      {/* Listen 同意モーダル（左バーのマイクボタン用） */}
-      {showListenConsent && (
-        <ListenConsentModal
-          onConsent={() => {
-            setListenConsent(true);
-            setListenMode(true);
-            setShowListenConsent(false);
-          }}
-          onCancel={() => setShowListenConsent(false)}
-        />
-      )}
-
       {/* F14: 選択時ツールバー（中央ドラッグで移動・コーナーハンドルでリサイズ） */}
       {selectedBubbleId && (
         <div className={styles.editToolbar}>
@@ -964,8 +934,54 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
           onDismiss={() => setBottlePayload(null)}
         />
       )}
+      </ScaledContent>
 
-      {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QRコードパネル（スライドショー中は非表示） */}
+      {/* 音声パネル（body に portal — 表示倍率の zoom 対象外） */}
+      {speechPanelOpen &&
+        createPortal(
+          <SpeechPanel
+            listenMode={listenMode}
+            onListenToggle={handleSpeechPanelListenToggle}
+            confirmedText={panelConfirmedText}
+            interimText={interimText}
+            speechLevels={speechLevels}
+            setSpeechLevels={setSpeechLevels}
+            onPost={(text) => addHossii({ message: text, logType: 'speech', origin: 'manual' })}
+            onEditCandidate={openSpeechCandidateEditor}
+            onDismissCandidate={dismissSpeechCandidate}
+            dismissedCandidates={dismissedSpeechCandidates}
+            onClose={() => {
+              setSpeechPanelOpen(false);
+              setPanelConfirmedText('');
+              setDismissedSpeechCandidates([]);
+            }}
+          />,
+          document.body
+        )}
+
+      {/* モバイル: 詳細モーダル */}
+      {selectedPost && (
+        <PostDetailModal
+          hossii={selectedPost}
+          onClose={() => setSelectedPostId(null)}
+          likesEnabled={spaceSettings?.features.likesEnabled ?? false}
+          onLike={handleLike}
+        />
+      )}
+
+      {/* Listen 同意モーダル（左バーのマイクボタン用） */}
+      {showListenConsent && (
+        <ListenConsentModal
+          onConsent={() => {
+            setListenConsent(true);
+            setListenMode(true);
+            setShowListenConsent(false);
+          }}
+          onCancel={() => setShowListenConsent(false)}
+        />
+      )}
+
+      {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QR */}
       {viewMode !== 'slideshow' && (
         <>
           <TopBar />
@@ -987,10 +1003,9 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
             neighbors={neighbors}
             onWarp={handleWarp}
             isVisiting={isVisiting}
-            quickLogOpen={quickLogOpen}
-            onQuickLogToggle={isMobile ? undefined : handleQuickLogToggle}
+            qrPanelVisible={qrPanelVisible}
+            onQrToggle={() => setQrPanelVisible((v) => !v)}
           />
-          <QRCodePanel />
           {!isMobile && (
             <SpacePanelCubeDock
               quickPostOpen={!!quickPostPos}
@@ -1048,6 +1063,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
           />
         </FloatingPanelShell>
       )}
+      {viewMode !== 'slideshow' && qrPanelVisible && <QRCodePanel />}
     </div>
   );
 };

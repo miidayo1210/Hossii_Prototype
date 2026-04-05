@@ -3,7 +3,10 @@
  * Manages the app-wide display scale for better readability on projectors/high-resolution displays
  */
 
-export type DisplayScale = 1 | 1.25 | 1.5;
+export type DisplayScale = 0.75 | 1 | 1.25 | 1.5;
+
+/** UI と循環の順序（昇順） */
+export const DISPLAY_SCALE_VALUES: readonly DisplayScale[] = [0.75, 1, 1.25, 1.5];
 
 const DISPLAY_SCALE_KEY = 'hossii.displayScale';
 const DEFAULT_SCALE: DisplayScale = 1;
@@ -18,7 +21,7 @@ export function loadDisplayScale(): DisplayScale {
     if (!raw) return DEFAULT_SCALE;
 
     const parsed = parseFloat(raw);
-    if (parsed === 1 || parsed === 1.25 || parsed === 1.5) {
+    if (parsed === 0.75 || parsed === 1 || parsed === 1.25 || parsed === 1.5) {
       return parsed as DisplayScale;
     }
     return DEFAULT_SCALE;

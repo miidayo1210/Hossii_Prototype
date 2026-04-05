@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Eye, EyeOff, Mic, MicOff, ScrollText, Volume2, VolumeX, ZoomIn } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, EyeOff, Mic, MicOff, QrCode, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import type { DisplayPeriod, DisplayLimit, ViewMode, LayoutMode } from '../../core/utils/displayPrefsStorage';
 import type { Space } from '../../core/types/space';
@@ -28,9 +28,9 @@ type Props = {
   neighbors?: Space[];
   onWarp?: () => void;
   isVisiting?: boolean;
-  /** クイックログパネル（#57）開閉 */
-  onQuickLogToggle?: () => void;
-  quickLogOpen?: boolean;
+  /** QRコードパネルの表示切替 */
+  qrPanelVisible?: boolean;
+  onQrToggle?: () => void;
 };
 
 const PERIOD_OPTIONS: { value: DisplayPeriod; label: string }[] = [
@@ -76,8 +76,8 @@ export const LeftControlBar = ({
   neighbors = [],
   onWarp,
   isVisiting = false,
-  onQuickLogToggle,
-  quickLogOpen = false,
+  qrPanelVisible = true,
+  onQrToggle,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
 
@@ -139,16 +139,16 @@ export const LeftControlBar = ({
         <span className={styles.scaleLabel}>{scalePercent}%</span>
       </button>
 
-      {onQuickLogToggle && (
+      {onQrToggle && (
         <button
           type="button"
-          className={`${styles.controlButton} ${styles.mobileVisible} ${quickLogOpen ? styles.active : ''}`}
-          onClick={onQuickLogToggle}
-          aria-label="ログ一覧パネル"
-          title="ログ一覧パネル"
-          aria-pressed={quickLogOpen}
+          className={`${styles.controlButton} ${styles.mobileVisible} ${qrPanelVisible ? styles.active : ''}`}
+          onClick={onQrToggle}
+          aria-label={qrPanelVisible ? 'QRコードパネルを隠す' : 'QRコードパネルを表示'}
+          title={qrPanelVisible ? 'QRコードを非表示' : 'QRコードを表示'}
+          aria-pressed={qrPanelVisible}
         >
-          <ScrollText size={18} />
+          <QrCode size={18} />
         </button>
       )}
 
