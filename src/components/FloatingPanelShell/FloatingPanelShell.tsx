@@ -3,6 +3,7 @@ import {
   loadFloatingRect,
   saveFloatingRect,
   clampFloatingRect,
+  getFloatingPanelBottomInsetPx,
   type FloatingRect,
 } from '../../core/utils/floatingPanelStorage';
 import {
@@ -36,8 +37,9 @@ function applyResize(
   vh: number,
   minW: number,
   minH: number,
-  maxW?: number,
-  maxH?: number
+  maxW: number | undefined,
+  maxH: number | undefined,
+  bottomInset: number
 ): FloatingRect {
   let { x, y, w, h } = start;
   switch (dir) {
@@ -78,7 +80,7 @@ function applyResize(
     default:
       break;
   }
-  return clampFloatingRect({ x, y, w, h }, vw, vh, minW, minH, maxW, maxH);
+  return clampFloatingRect({ x, y, w, h }, vw, vh, minW, minH, maxW, maxH, bottomInset);
 }
 
 export function FloatingPanelShell({
@@ -96,7 +98,8 @@ export function FloatingPanelShell({
   const [rect, setRect] = useState<FloatingRect>(() => {
     if (typeof window === 'undefined') return defaultRect;
     const loaded = loadFloatingRect(storageKey, defaultRect);
-    return clampFloatingRect(loaded, window.innerWidth, window.innerHeight, minW, minH, maxW, maxH);
+    const inset = getFloatingPanelBottomInsetPx();
+    return clampFloatingRect(loaded, window.innerWidth, window.innerHeight, minW, minH, maxW, maxH, inset);
   });
 
   const rectRef = useRef(rect);
@@ -109,7 +112,8 @@ export function FloatingPanelShell({
     const onResize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      setRect((prev) => clampFloatingRect(prev, w, h, minW, minH, maxW, maxH));
+      const inset = getFloatingPanelBottomInsetPx();
+      setRect((prev) => clampFloatingRect(prev, w, h, minW, minH, maxW, maxH, inset));
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -151,7 +155,8 @@ export function FloatingPanelShell({
         };
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-        const c = clampFloatingRect(next, vw, vh, minW, minH, maxW, maxH);
+        const inset = getFloatingPanelBottomInsetPx();
+        const c = clampFloatingRect(next, vw, vh, minW, minH, maxW, maxH, inset);
         rectRef.current = c;
         setRect(c);
       };
@@ -202,6 +207,7 @@ export function FloatingPanelShell({
         const dy = ev.clientY - resizeStartRef.current.cy;
         const vw = window.innerWidth;
         const vh = window.innerHeight;
+        const inset = getFloatingPanelBottomInsetPx();
         const c = applyResize(
           resizeStartRef.current.dir,
           resizeStartRef.current.rect,
@@ -212,7 +218,8 @@ export function FloatingPanelShell({
           minW,
           minH,
           maxW,
-          maxH
+          maxH,
+          inset
         );
         rectRef.current = c;
         setRect(c);

@@ -13,6 +13,7 @@ import type { HossiiColor } from '../../core/types/settings';
 import { getRandomBubble8, EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getHossiiFace } from '../../core/assets/hossiiFaces';
 import { HOSSII_IDLE, getDefaultIdle, getRandomInteractionFace, getListeningFace } from '../../core/assets/hossiiIdle';
+import { MOBILE_BOTTOM_NAV_RESERVE_PX } from '../../core/utils/floatingPanelStorage';
 import styles from './HossiiLive.module.css';
 
 type Props = {
@@ -123,7 +124,7 @@ function getRandomPosition() {
   const { width, height } = getViewportSize();
   const hossiiSize = getCurrentHossiiSize();
   const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-  const bottomNavHeight = isMobile ? 60 : 0;
+  const bottomNavHeight = isMobile ? MOBILE_BOTTOM_NAV_RESERVE_PX : 0;
 
   const maxX = Math.max(0, width - hossiiSize - MARGIN);
   const maxY = Math.max(0, height - hossiiSize - MARGIN - bottomNavHeight);
@@ -138,7 +139,7 @@ function clampPosition(pos: { x: number; y: number }) {
   const { width, height } = getViewportSize();
   const hossiiSize = getCurrentHossiiSize();
   const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-  const bottomNavHeight = isMobile ? 60 : 0;
+  const bottomNavHeight = isMobile ? MOBILE_BOTTOM_NAV_RESERVE_PX : 0;
 
   const maxX = Math.max(0, width - hossiiSize - MARGIN);
   const maxY = Math.max(0, height - hossiiSize - MARGIN - bottomNavHeight);

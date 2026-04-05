@@ -8,11 +8,13 @@ type Step = 'select' | 'nickname';
 type Props = {
   spaceId: string;
   onEnterAsGuest: () => void;
-  onLoginRequested: () => void;
-  onSignUpRequested: () => void;
+  /** 将来のログイン導線用（現状は Coming soon のため未使用） */
+  onLoginRequested?: () => void;
+  /** 将来の新規登録導線用（現状は Coming soon のため未使用） */
+  onSignUpRequested?: () => void;
 };
 
-export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested, onSignUpRequested }: Props) => {
+export const GuestEntryScreen = ({ spaceId, onEnterAsGuest }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
   const [step, setStep] = useState<Step>('select');
   // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
@@ -54,18 +56,17 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested, on
             </button>
             <button
               type="button"
-              className={styles.secondaryButton}
-              onClick={onLoginRequested}
+              className={`${styles.secondaryButton} ${styles.comingSoonButton}`}
+              disabled
+              aria-disabled="true"
             >
-              アカウントでログイン
+              <span>アカウントでログイン</span>
+              <span className={styles.comingSoonBadge}>Coming soon</span>
             </button>
-            <button
-              type="button"
-              className={styles.signUpLink}
-              onClick={onSignUpRequested}
-            >
-              新規登録の方はこちら
-            </button>
+            <div className={styles.comingSoonMuted} role="status" aria-label="新規登録は準備中です">
+              <span>新規登録の方はこちら</span>
+              <span className={styles.comingSoonBadge}>Coming soon</span>
+            </div>
           </div>
         )}
 

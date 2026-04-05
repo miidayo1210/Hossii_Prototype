@@ -165,19 +165,34 @@
   background: #faf5ff;
 }
 
-.comingSoonButton {
-  position: relative;
-  opacity: 0.5;
-  cursor: not-allowed;
+.secondaryButton.comingSoonButton {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
   gap: 0.5rem;
+  opacity: 0.52;
+  color: #9ca3af;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
-.comingSoonButton:hover {
+.secondaryButton.comingSoonButton:hover {
   border-color: #e5e7eb;
   background: #fff;
+}
+
+.comingSoonMuted {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.125rem;
+  padding: 0.35rem 0.25rem;
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  text-align: center;
+  user-select: none;
 }
 
 .comingSoonBadge {

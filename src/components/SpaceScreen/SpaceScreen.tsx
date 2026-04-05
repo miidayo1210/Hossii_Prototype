@@ -44,6 +44,11 @@ import {
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
+type SpaceScreenProps = {
+  /** BottomNavBar の「ログ」からクイックログを開閉するコールバックを登録 */
+  registerQuickLogForBottomNav?: (toggle: (() => void) | null) => void;
+};
+
 /** カケラ粒子の型 */
 type Particle = {
   id: string;
@@ -59,7 +64,7 @@ type ReactionTrigger = {
   emotion?: EmotionKey;
 };
 
-export const SpaceScreen = () => {
+export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps = {}) => {
   const {
     state,
     hossiiLoadedFromSupabase,
@@ -162,6 +167,11 @@ export const SpaceScreen = () => {
   const handleQuickLogToggle = useCallback(() => {
     setQuickLogOpen((v) => !v);
   }, []);
+
+  useEffect(() => {
+    registerQuickLogForBottomNav?.(handleQuickLogToggle);
+    return () => registerQuickLogForBottomNav?.(null);
+  }, [registerQuickLogForBottomNav, handleQuickLogToggle]);
 
   /** 右側キューブから音声パネルを開く／閉じる（閉じるときは全文リセット） */
   const handleSpeechDockToggle = useCallback(() => {
@@ -286,13 +296,14 @@ export const SpaceScreen = () => {
   const [showListenConsent, setShowListenConsent] = useState(false);
 
   const handleContainerClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobile) return;
     if (e.detail !== 3) return;
     if (pendingQuickPostOpenRef.current) {
       clearTimeout(pendingQuickPostOpenRef.current);
       pendingQuickPostOpenRef.current = null;
     }
     setQuickLogOpen((v) => !v);
-  }, []);
+  }, [isMobile]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     // 訪問モードは閲覧専用（仕様 44）。クイック投稿は自 activeSpace へ投稿されるためここでは開かない
@@ -977,19 +988,21 @@ export const SpaceScreen = () => {
             onWarp={handleWarp}
             isVisiting={isVisiting}
             quickLogOpen={quickLogOpen}
-            onQuickLogToggle={handleQuickLogToggle}
+            onQuickLogToggle={isMobile ? undefined : handleQuickLogToggle}
           />
           <QRCodePanel />
-          <SpacePanelCubeDock
-            quickPostOpen={!!quickPostPos}
-            quickLogOpen={quickLogOpen}
-            speechPanelOpen={speechPanelOpen}
-            onQuickPostToggle={handleQuickPostDockToggle}
-            onQuickLogToggle={handleQuickLogToggle}
-            onSpeechPanelToggle={handleSpeechDockToggle}
-            postDisabled={isVisiting}
-            speechDisabled={isVisiting}
-          />
+          {!isMobile && (
+            <SpacePanelCubeDock
+              quickPostOpen={!!quickPostPos}
+              quickLogOpen={quickLogOpen}
+              speechPanelOpen={speechPanelOpen}
+              onQuickPostToggle={handleQuickPostDockToggle}
+              onQuickLogToggle={handleQuickLogToggle}
+              onSpeechPanelToggle={handleSpeechDockToggle}
+              postDisabled={isVisiting}
+              speechDisabled={isVisiting}
+            />
+          )}
         </>
       )}
 
