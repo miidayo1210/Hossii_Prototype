@@ -156,6 +156,64 @@
   z-index: calc(var(--bubble-stack) + 20);
 }
 
+/* 直近の新着投稿（表示中の一覧が新しい順なので先頭5件） */
+.bubbleRecentGlow {
+  outline: 2px solid rgba(167, 139, 250, 0.65);
+  outline-offset: 3px;
+  animation: bubbleRecentOutline 2.4s ease-in-out infinite;
+  z-index: 2;
+}
+
+.bubble.bubbleLayoutGrid.bubbleRecentGlow {
+  z-index: calc(var(--bubble-stack) + 2);
+}
+
+.bubbleRecentGlow:hover {
+  z-index: 12;
+}
+
+.bubble.bubbleLayoutGrid.bubbleRecentGlow:hover {
+  z-index: calc(var(--bubble-stack) + 12);
+}
+
+/* カスタム形状 PNG は box-shadow を消しているため filter で光らせる */
+.bubbleRecentGlowShape {
+  animation: bubbleRecentFilter 2.4s ease-in-out infinite;
+}
+
+@keyframes bubbleRecentOutline {
+  0%, 100% {
+    outline-color: rgba(167, 139, 250, 0.5);
+    outline-offset: 2px;
+  }
+  50% {
+    outline-color: rgba(139, 92, 246, 0.95);
+    outline-offset: 5px;
+  }
+}
+
+@keyframes bubbleRecentFilter {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.45));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(139, 92, 246, 0.72));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubbleRecentGlow {
+    animation: none;
+    outline-color: rgba(139, 92, 246, 0.78);
+    outline-offset: 3px;
+  }
+
+  .bubbleRecentGlowShape {
+    animation: none;
+    filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.55));
+  }
+}
+
 @keyframes bubbleFloat {
   0%, 100% {
     transform: translateY(0);

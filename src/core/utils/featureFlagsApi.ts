@@ -102,8 +102,20 @@ export async function getFeatureFlagsForSpace(spaceId: string): Promise<FeatureF
     }
 
     // Supabase の override で上書き（サーバー値を最優先）
-    for (const row of (overridesResult.data ?? []) as SpaceFeatureFlagRow[]) {
+    const overrideRows = (overridesResult.data ?? []) as SpaceFeatureFlagRow[];
+    for (const row of overrideRows) {
       result[row.flag_key] = row.enabled;
+    }
+
+    // space_feature_flags に行が無いキーだけ、localStorage のフォールバックを載せる。
+    // feature_flags にキーが無く upsert が FK で失敗した場合など、再取得直後に OFF に戻るのを防ぐ。
+    const overrideKeys = new Set(overrideRows.map((r) => r.flag_key));
+    const defaults = buildDefaults();
+    const localOverrides = loadLocalOverrides(spaceId);
+    for (const [key, val] of Object.entries(localOverrides)) {
+      if (!overrideKeys.has(key) && key in defaults) {
+        result[key] = val;
+      }
     }
 
     return castToFeatureFlags(result);

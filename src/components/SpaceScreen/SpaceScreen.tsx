@@ -530,6 +530,13 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
     return sorted.slice(0, limit);
   }, [hossiis, displayPeriod, displayLimit, viewMode]);
 
+  // 画面上の一覧は新しい順なので、先頭 N 件を「直近投稿」として視覚的に強調する
+  const RECENT_HIGHLIGHT_COUNT = 5;
+  const recentHighlightIds = useMemo(
+    () => new Set(displayHossiis.slice(0, RECENT_HIGHLIGHT_COUNT).map((h) => h.id)),
+    [displayHossiis]
+  );
+
   // 各バブルの位置を事前計算（メモ化）
   const bubblePositions = useMemo(() => {
     if (layoutMode === 'ordered') {
@@ -783,6 +790,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
                   anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
                   onClick={() => setSelectedPostId(hossii.id)}
                   showPreview={previewHossiiIds.has(hossii.id)}
+                  isRecentHighlight={recentHighlightIds.has(hossii.id)}
                   orderedStackZ={
                     layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
                   }
@@ -816,6 +824,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
                 onLike={handleLike}
                 bubbleShapePng={hossii.bubbleShapePng ?? spaceForVisual?.bubbleShapePng}
                 layoutAlignTopLeft={layoutMode === 'ordered'}
+                isRecentHighlight={recentHighlightIds.has(hossii.id)}
               />
             );
           })

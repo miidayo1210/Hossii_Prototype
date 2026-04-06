@@ -67,6 +67,8 @@ type BubbleProps = {
   layoutAlignTopLeft?: boolean;
   /** 投稿順モード時のみ: 格子セル番号に応じた重ね順（大きいほど手前＝右下ほど上） */
   orderedStackZ?: number;
+  /** 直近の新着投稿として紫の輪郭で強調する */
+  isRecentHighlight?: boolean;
 };
 
 export const Bubble = ({
@@ -87,6 +89,7 @@ export const Bubble = ({
   bubbleShapePng,
   layoutAlignTopLeft = false,
   orderedStackZ,
+  isRecentHighlight = false,
 }: BubbleProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -336,6 +339,7 @@ export const Bubble = ({
     isActive && !isSelected ? styles.bubbleActive : '',
     isSelected ? (bubbleShapePng ? styles.bubbleSelectedShape : styles.bubbleSelected) : '',
     dragPos ? styles.bubbleDragging : '',
+    isRecentHighlight && (bubbleShapePng ? styles.bubbleRecentGlowShape : styles.bubbleRecentGlow),
   ]
     .filter(Boolean)
     .join(' ');

@@ -439,8 +439,12 @@ export const PostScreen = ({
       shuffleGreeting();
 
       if (panelMode) {
-        // Toast を見せてから閉じる（即時クローズだと Toast が表示されない）
-        setTimeout(() => onClose?.(), 700);
+        if (!continuousPost) {
+          // Toast を見せてから閉じる（即時クローズだと Toast が表示されない）
+          setTimeout(() => onClose?.(), 700);
+        } else if (spaceSettings?.features.commentPost !== false) {
+          requestAnimationFrame(() => messageTextareaRef.current?.focus());
+        }
       } else if (!continuousPost) {
         setTimeout(() => {
           navigate('screen');

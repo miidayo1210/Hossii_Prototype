@@ -11,6 +11,8 @@ type Props = {
   showPreview?: boolean;
   /** 投稿順モード時: 格子セルに応じた重ね順（大きいほど手前） */
   orderedStackZ?: number;
+  /** 直近の新着投稿として強調する */
+  isRecentHighlight?: boolean;
 };
 
 const MAX_PREVIEW_TEXT = 40;
@@ -23,6 +25,7 @@ export const StarView = ({
   onClick,
   showPreview,
   orderedStackZ,
+  isRecentHighlight = false,
 }: Props) => {
   const isLaughter = hossii.autoType === 'laughter';
   const emotion = hossii.emotion;
@@ -41,7 +44,7 @@ export const StarView = ({
 
   return (
     <button
-      className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''}`}
+      className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''} ${isRecentHighlight ? styles.starRecentGlow : ''}`}
       style={{
         left: `${x}%`,
         top: `${y}%`,

@@ -201,6 +201,33 @@
   transform: scale(1.3);
 }
 
+/* 直近の新着投稿（先頭5件）: 紫の輪郭が脈動 */
+.starRecentGlow {
+  outline: 2px solid rgba(167, 139, 250, 0.7);
+  outline-offset: 3px;
+  border-radius: 999px;
+  animation: starRecentOutline 2.2s ease-in-out infinite;
+}
+
+@keyframes starRecentOutline {
+  0%, 100% {
+    outline-color: rgba(167, 139, 250, 0.55);
+    outline-offset: 2px;
+  }
+  50% {
+    outline-color: rgba(139, 92, 246, 0.95);
+    outline-offset: 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .starRecentGlow {
+    animation: none;
+    outline-color: rgba(139, 92, 246, 0.85);
+    outline-offset: 3px;
+  }
+}
+
 /* プレビューバブル */
 .previewBubble {
   position: absolute;
