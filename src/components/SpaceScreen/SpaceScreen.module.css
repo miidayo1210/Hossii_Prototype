@@ -42,12 +42,65 @@
   pointer-events: none; /* 操作の邪魔をしない */
 }
 
-/* 投稿順モード時: 右上に昇順・降順 */
-.orderedSortToolbar {
+/* 右上クラスタ（投稿数 / 投稿順ツールバー） */
+.spaceTopRightCluster {
   position: fixed;
   top: 12px;
   right: 12px;
   z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.spaceTopRightCluster > * {
+  pointer-events: auto;
+}
+
+/* PC: TopBar の下・右上ナビと重ならないようやや下げる */
+@media (min-width: 769px) {
+  .spaceTopRightCluster {
+    top: calc(4rem + 10px);
+    z-index: 95;
+  }
+}
+
+.postCountBadge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+
+.postCountBadgeValue {
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.postCountBadgeUnit {
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+@media (min-width: 769px) {
+  .postCountBadge {
+    background: rgba(30, 27, 46, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+  }
+}
+
+/* 投稿順モード時: 昇順・降順 */
+.orderedSortToolbar {
   display: flex;
   gap: 4px;
   padding: 2px;
@@ -57,12 +110,8 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* PC: TopBar（z-index:90）の下・スペース右上。固定ヘッダーに隠れないよう位置と重ね順を調整 */
 @media (min-width: 769px) {
   .orderedSortToolbar {
-    top: calc(4rem + 10px);
-    right: 12px;
-    z-index: 95;
     background: rgba(30, 27, 46, 0.88);
     border: 1px solid rgba(255, 255, 255, 0.22);
   }

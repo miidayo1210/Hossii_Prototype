@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Eye, EyeOff, Mic, MicOff, QrCode, Volume2, VolumeX, ZoomIn } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, EyeOff, Hash, Mic, MicOff, QrCode, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import type { DisplayPeriod, DisplayLimit, ViewMode, LayoutMode } from '../../core/utils/displayPrefsStorage';
 import type { Space } from '../../core/types/space';
@@ -31,6 +31,9 @@ type Props = {
   /** QRコードパネルの表示切替 */
   qrPanelVisible?: boolean;
   onQrToggle?: () => void;
+  /** スペース右上に現在の表示条件での投稿数を出す */
+  showPostCountBadge?: boolean;
+  onShowPostCountBadgeToggle?: () => void;
 };
 
 const PERIOD_OPTIONS: { value: DisplayPeriod; label: string }[] = [
@@ -78,6 +81,8 @@ export const LeftControlBar = ({
   isVisiting = false,
   qrPanelVisible = true,
   onQrToggle,
+  showPostCountBadge = false,
+  onShowPostCountBadgeToggle,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
 
@@ -138,6 +143,19 @@ export const LeftControlBar = ({
         <ZoomIn size={18} />
         <span className={styles.scaleLabel}>{scalePercent}%</span>
       </button>
+
+      {onShowPostCountBadgeToggle && (
+        <button
+          type="button"
+          className={`${styles.controlButton} ${styles.mobileVisible} ${showPostCountBadge ? styles.active : ''}`}
+          onClick={onShowPostCountBadgeToggle}
+          aria-label={showPostCountBadge ? '投稿数表示をオフ' : '投稿数表示をオン'}
+          title="表示中の投稿数（期間・件数・表示モードに連動）"
+          aria-pressed={showPostCountBadge}
+        >
+          <Hash size={18} />
+        </button>
+      )}
 
       {onQrToggle && (
         <button

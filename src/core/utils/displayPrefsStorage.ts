@@ -158,6 +158,26 @@ export function saveOrderedSortDirection(direction: OrderedSortDirection): void 
   }
 }
 
+// ---- スペース右上の投稿数バッジ表示 ----
+
+const SHOW_POST_COUNT_BADGE_KEY = 'hossii.showPostCountBadge';
+
+export function loadShowPostCountBadge(): boolean {
+  try {
+    return localStorage.getItem(SHOW_POST_COUNT_BADGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function saveShowPostCountBadge(value: boolean): void {
+  try {
+    localStorage.setItem(SHOW_POST_COUNT_BADGE_KEY, String(value));
+  } catch {
+    // ignore
+  }
+}
+
 // suppress unused variable warning on VALID_LIMITS (used for type safety)
 void VALID_LIMITS;
 

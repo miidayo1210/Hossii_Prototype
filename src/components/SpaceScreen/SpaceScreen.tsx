@@ -16,7 +16,7 @@ import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { createBubblePosition, createOrderedBubblePosition } from '../../core/utils/bubblePosition';
 import { incrementLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
-import { getPeriodCutoff } from '../../core/utils/displayPrefsStorage';
+import { getPeriodCutoff, loadShowPostCountBadge, saveShowPostCountBadge } from '../../core/utils/displayPrefsStorage';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
 import { VisitBanner } from './VisitBanner';
@@ -152,6 +152,15 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
   const pendingQuickPostOpenRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [qrPanelVisible, setQrPanelVisible] = useState(true);
+  const [showPostCountBadge, setShowPostCountBadge] = useState(loadShowPostCountBadge);
+
+  const handleShowPostCountBadgeToggle = useCallback(() => {
+    setShowPostCountBadge((v) => {
+      const next = !v;
+      saveShowPostCountBadge(next);
+      return next;
+    });
+  }, []);
 
   const resetQuickPostSpeechState = useCallback(() => {
     setSpeechEditOriginal(undefined);
@@ -710,27 +719,41 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
         🌳 {spaceForVisual?.name ?? 'My Space'}
       </div>
 
-      {/* 投稿順モード: 格子の形はそのまま、左上〜右下の詰め順だけ昇順・降順で切替 */}
-      {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
-        <div className={styles.orderedSortToolbar} role="group" aria-label="投稿順の整列方向">
-          <button
-            type="button"
-            className={`${styles.orderedSortButton} ${orderedSortDirection === 'desc' ? styles.orderedSortButtonActive : ''}`}
-            title="新しい投稿を左上から（降順）"
-            aria-pressed={orderedSortDirection === 'desc'}
-            onClick={() => setOrderedSortDirection('desc')}
-          >
-            降順
-          </button>
-          <button
-            type="button"
-            className={`${styles.orderedSortButton} ${orderedSortDirection === 'asc' ? styles.orderedSortButtonActive : ''}`}
-            title="古い投稿を左上から（昇順）"
-            aria-pressed={orderedSortDirection === 'asc'}
-            onClick={() => setOrderedSortDirection('asc')}
-          >
-            昇順
-          </button>
+      {/* 右上: 投稿数バッジ / 投稿順ツールバー */}
+      {(showPostCountBadge || (layoutMode === 'ordered' && viewMode !== 'slideshow')) && (
+        <div className={styles.spaceTopRightCluster}>
+          {showPostCountBadge && (
+            <div
+              className={styles.postCountBadge}
+              aria-live="polite"
+              title="現在の期間・件数・表示モードで画面に出ている投稿数"
+            >
+              <span className={styles.postCountBadgeValue}>{displayHossiis.length}</span>
+              <span className={styles.postCountBadgeUnit}>件</span>
+            </div>
+          )}
+          {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
+            <div className={styles.orderedSortToolbar} role="group" aria-label="投稿順の整列方向">
+              <button
+                type="button"
+                className={`${styles.orderedSortButton} ${orderedSortDirection === 'desc' ? styles.orderedSortButtonActive : ''}`}
+                title="新しい投稿を左上から（降順）"
+                aria-pressed={orderedSortDirection === 'desc'}
+                onClick={() => setOrderedSortDirection('desc')}
+              >
+                降順
+              </button>
+              <button
+                type="button"
+                className={`${styles.orderedSortButton} ${orderedSortDirection === 'asc' ? styles.orderedSortButtonActive : ''}`}
+                title="古い投稿を左上から（昇順）"
+                aria-pressed={orderedSortDirection === 'asc'}
+                onClick={() => setOrderedSortDirection('asc')}
+              >
+                昇順
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1014,6 +1037,8 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
             isVisiting={isVisiting}
             qrPanelVisible={qrPanelVisible}
             onQrToggle={() => setQrPanelVisible((v) => !v)}
+            showPostCountBadge={showPostCountBadge}
+            onShowPostCountBadgeToggle={handleShowPostCountBadgeToggle}
           />
           {!isMobile && (
             <SpacePanelCubeDock
