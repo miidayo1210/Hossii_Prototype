@@ -17,10 +17,14 @@ import { DrawingModal } from '../DrawingModal/DrawingModal';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { EmotionKey, ToastState } from '../../core/types';
-import { loadContinuousPost, saveContinuousPost } from '../../core/utils/displayPrefsStorage';
+import {
+  loadContinuousPost,
+  loadPostBubbleColorDraft,
+  saveContinuousPost,
+  savePostBubbleColorDraft,
+} from '../../core/utils/displayPrefsStorage';
 import {
   BUBBLE_COLOR_PALETTES,
-  DEFAULT_BUBBLE_PALETTE_ID,
   getBubblePalette,
   type BubblePaletteId,
 } from '../../core/utils/bubbleColorPalettes';
@@ -122,9 +126,11 @@ export const PostScreen = ({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [greeting, setGreeting] = useState('');
 
-  // F01: 吹き出し色（テーマ + スウォッチ）
-  const [selectedPaletteId, setSelectedPaletteId] = useState<BubblePaletteId>(DEFAULT_BUBBLE_PALETTE_ID);
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  // F01: 吹き出し色（テーマ + スウォッチ）。前回投稿の選択をローカルから復元
+  const [selectedPaletteId, setSelectedPaletteId] = useState<BubblePaletteId>(
+    () => loadPostBubbleColorDraft().paletteId
+  );
+  const [selectedColor, setSelectedColor] = useState<string | null>(() => loadPostBubbleColorDraft().color);
   const activeColors = useMemo(() => getBubblePalette(selectedPaletteId).colors, [selectedPaletteId]);
 
   const selectPalette = (id: BubblePaletteId) => {
@@ -157,6 +163,9 @@ export const PostScreen = ({
 
   // 連続投稿モード
   const [continuousPost, setContinuousPost] = useState(() => loadContinuousPost());
+  // await 後も最新のチェック状態で閉じる／遷移を判定する（画像アップロード待ち中に ON にした場合など）
+  const continuousPostRef = useRef(continuousPost);
+  continuousPostRef.current = continuousPost;
 
   // 位置選択グリッド（null = 未選択 = ランダム配置）
   const [selectedArea, setSelectedArea] = useState<number | null>(null);
@@ -390,6 +399,8 @@ export const PostScreen = ({
             ? areaToPosition(selectedArea)
             : null;
 
+      savePostBubbleColorDraft(selectedPaletteId, selectedColor);
+
       addHossii({
         message: message.trim(),
         emotion: selectedEmotion ?? undefined,
@@ -414,21 +425,21 @@ export const PostScreen = ({
         if (isNewCard) {
           setToast({ message: '🎉 スタンプカードが完成したよ！', type: 'success' });
         } else {
-          const suffix = continuousPost ? ' 続けてどうぞ ⭐ スタンプ+1' : '〜！⭐ スタンプ+1';
+          const on = continuousPostRef.current;
+          const suffix = on ? ' 続けてどうぞ ⭐ スタンプ+1' : '〜！⭐ スタンプ+1';
           let toastMsg = `置いたよ${suffix}`;
           if (selectedEmotion) {
             const emoji = EMOJI_BY_EMOTION[selectedEmotion];
             const label = EMOTION_LABELS[selectedEmotion];
-            toastMsg = `${emoji} ${label} を置いたよ！${continuousPost ? '続けてどうぞ ' : ''}⭐ スタンプ+1`;
+            toastMsg = `${emoji} ${label} を置いたよ！${on ? '続けてどうぞ ' : ''}⭐ スタンプ+1`;
           }
           setToast({ message: toastMsg, type: 'success' });
         }
       }
 
-      // クリア
+      // クリア（吹き出し色は前回どおり維持 — savePostBubbleColorDraft 済み）
       setSelectedEmotion(null);
       setMessage('');
-      setSelectedColor(null);
       setSelectedShape(null);
       setHashtags([]);
       setHashtagInput('');
@@ -439,13 +450,13 @@ export const PostScreen = ({
       shuffleGreeting();
 
       if (panelMode) {
-        if (!continuousPost) {
+        if (!continuousPostRef.current) {
           // Toast を見せてから閉じる（即時クローズだと Toast が表示されない）
           setTimeout(() => onClose?.(), 700);
         } else if (spaceSettings?.features.commentPost !== false) {
           requestAnimationFrame(() => messageTextareaRef.current?.focus());
         }
-      } else if (!continuousPost) {
+      } else if (!continuousPostRef.current) {
         setTimeout(() => {
           navigate('screen');
         }, 800);
@@ -886,8 +897,10 @@ export const PostScreen = ({
               type="checkbox"
               checked={continuousPost}
               onChange={(e) => {
-                setContinuousPost(e.target.checked);
-                saveContinuousPost(e.target.checked);
+                const v = e.target.checked;
+                continuousPostRef.current = v;
+                setContinuousPost(v);
+                saveContinuousPost(v);
               }}
               className={styles.continuousPostCheckbox}
             />

@@ -3,6 +3,12 @@
  * Manages display period filter, display limit, view mode, and bubble layout mode settings.
  */
 
+import {
+  DEFAULT_BUBBLE_PALETTE_ID,
+  getBubblePalette,
+  type BubblePaletteId,
+} from './bubbleColorPalettes';
+
 // ---- DisplayPeriod ----
 
 export type DisplayPeriod = '1d' | '1w' | '1m' | 'all';
@@ -170,6 +176,51 @@ export function loadContinuousPost(): boolean {
 export function saveContinuousPost(value: boolean): void {
   try {
     localStorage.setItem(CONTINUOUS_POST_KEY, String(value));
+  } catch {
+    // ignore
+  }
+}
+
+// ---- Last post bubble color（テーマ + スウォッチ、端末ローカルのみ） ----
+
+const LAST_BUBBLE_COLOR_PREFS_KEY = 'hossii.lastPostBubbleColorPrefs';
+
+const VALID_BUBBLE_PALETTE_IDS: BubblePaletteId[] = ['mono', 'lavender', 'vivid', 'pastel'];
+
+export type PostBubbleColorDraft = {
+  paletteId: BubblePaletteId;
+  /** null = デフォルト（未指定） */
+  color: string | null;
+};
+
+/** 投稿画面の吹き出し色の初期値（無効な保存値はフォールバック） */
+export function loadPostBubbleColorDraft(): PostBubbleColorDraft {
+  try {
+    const raw = localStorage.getItem(LAST_BUBBLE_COLOR_PREFS_KEY);
+    if (!raw) {
+      return { paletteId: DEFAULT_BUBBLE_PALETTE_ID, color: null };
+    }
+    const parsed = JSON.parse(raw) as { paletteId?: unknown; color?: unknown };
+    const paletteId =
+      typeof parsed.paletteId === 'string' && VALID_BUBBLE_PALETTE_IDS.includes(parsed.paletteId as BubblePaletteId)
+        ? (parsed.paletteId as BubblePaletteId)
+        : DEFAULT_BUBBLE_PALETTE_ID;
+    const colors = getBubblePalette(paletteId).colors;
+    let color: string | null = null;
+    if (parsed.color === null || parsed.color === undefined) {
+      color = null;
+    } else if (typeof parsed.color === 'string' && colors.includes(parsed.color)) {
+      color = parsed.color;
+    }
+    return { paletteId, color };
+  } catch {
+    return { paletteId: DEFAULT_BUBBLE_PALETTE_ID, color: null };
+  }
+}
+
+export function savePostBubbleColorDraft(paletteId: BubblePaletteId, color: string | null): void {
+  try {
+    localStorage.setItem(LAST_BUBBLE_COLOR_PREFS_KEY, JSON.stringify({ paletteId, color }));
   } catch {
     // ignore
   }
