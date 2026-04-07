@@ -44,6 +44,8 @@ export const StarView = ({
 
   return (
     <button
+      type="button"
+      data-hossii-bubble
       className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''} ${isRecentHighlight ? styles.starRecentGlow : ''}`}
       style={{
         left: `${x}%`,

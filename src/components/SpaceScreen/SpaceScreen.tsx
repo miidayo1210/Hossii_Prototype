@@ -331,6 +331,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
   const [showListenConsent, setShowListenConsent] = useState(false);
 
   const handleContainerClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[data-hossii-bubble]')) return;
     if (isMobile) return;
     if (e.detail !== 3) return;
     if (pendingQuickPostOpenRef.current) {
@@ -341,6 +342,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
   }, [isMobile]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[data-hossii-bubble]')) return;
     // 訪問モードは閲覧専用（仕様 44）。クイック投稿は自 activeSpace へ投稿されるためここでは開かない
     if (isVisiting) return;
     if (quickPostPos) {
@@ -669,11 +671,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
       : activeSpace?.presetTags ?? [];
 
   return (
-    <div
-      className={styles.container}
-      onClick={handleContainerClick}
-      onDoubleClick={handleDoubleClick}
-    >
+    <div className={styles.container}>
       <ScaledContent
         className={`${styles.scaledCanvas} ${backgroundClass}`}
         style={backgroundStyle}
@@ -765,10 +763,13 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
         />
       )}
 
-      {/* バブルエリア（背景クリックでデセレクト） */}
+      {/* バブルエリア（背景クリックでデセレクト。仕様 63: クイック投稿/ログのダブル・トリプルもこの全面ヒット領域のみ） */}
       <div
         className={styles.bubbleArea}
         data-bubble-area
+        data-space-background
+        onClick={handleContainerClick}
+        onDoubleClick={handleDoubleClick}
         onPointerDown={(e) => {
           const target = e.target as HTMLElement;
           if (!target.closest('[data-hossii-bubble]')) {
