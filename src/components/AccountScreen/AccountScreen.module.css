@@ -122,11 +122,30 @@
   line-height: 1.5;
 }
 
+.comingSoonHint {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin: 0.25rem 0 0 0;
+  line-height: 1.5;
+}
+
 .guestActions {
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
   margin-top: 0.875rem;
+}
+
+.guestAuthLocked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.guestAuthLocked.signUpButton {
+  background: #d1d5db;
+  color: #6b7280;
+  box-shadow: none;
+  transform: none;
 }
 
 .loginButton {

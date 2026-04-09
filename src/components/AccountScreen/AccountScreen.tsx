@@ -3,6 +3,7 @@ import { LogOut, User, Mail } from 'lucide-react';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -41,6 +42,8 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     setSavedSpace(true);
     setTimeout(() => setSavedSpace(false), 2000);
   };
+
+  const guestAuthLocked = !currentUser && ACCOUNT_AUTH_COMING_SOON;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -101,17 +104,24 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               <p className={styles.guestDesc}>
                 アカウントを作成すると、複数の端末で同じ情報を使えます。
               </p>
+              {guestAuthLocked && (
+                <p className={styles.comingSoonHint} role="status">
+                  ログイン・新規会員登録は Coming soon です。
+                </p>
+              )}
               <div className={styles.guestActions}>
                 <button
                   type="button"
-                  className={styles.loginButton}
+                  className={`${styles.loginButton} ${guestAuthLocked ? styles.guestAuthLocked : ''}`}
+                  disabled={guestAuthLocked}
                   onClick={onLoginRequested}
                 >
                   アカウントでログイン
                 </button>
                 <button
                   type="button"
-                  className={styles.signUpButton}
+                  className={`${styles.signUpButton} ${guestAuthLocked ? styles.guestAuthLocked : ''}`}
+                  disabled={guestAuthLocked}
                   onClick={onSignUpRequested}
                 >
                   新規会員登録

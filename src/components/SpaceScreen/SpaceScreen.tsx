@@ -46,11 +46,6 @@ import {
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
-type SpaceScreenProps = {
-  /** BottomNavBar の「ログ」からクイックログを開閉するコールバックを登録 */
-  registerQuickLogForBottomNav?: (toggle: (() => void) | null) => void;
-};
-
 /** カケラ粒子の型 */
 type Particle = {
   id: string;
@@ -66,7 +61,7 @@ type ReactionTrigger = {
   emotion?: EmotionKey;
 };
 
-export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps = {}) => {
+export const SpaceScreen = () => {
   const {
     state,
     hossiiLoadedFromSupabase,
@@ -180,11 +175,6 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
     setQuickLogOpen((v) => !v);
   }, []);
 
-  useEffect(() => {
-    registerQuickLogForBottomNav?.(handleQuickLogToggle);
-    return () => registerQuickLogForBottomNav?.(null);
-  }, [registerQuickLogForBottomNav, handleQuickLogToggle]);
-
   /** 右側キューブから音声パネルを開く／閉じる（閉じるときは全文リセット） */
   const handleSpeechDockToggle = useCallback(() => {
     if (isVisiting) return;
@@ -285,7 +275,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
     visitingSpaceInfo,
     bottlePayload,
     setBottlePayload,
-    handleWarp,
+    handleIslandClick,
     removeVisitingHossii,
   } = useNeighborSpace({
     activeSpaceId,
@@ -310,6 +300,9 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
     }
   }, []);
 
+  /** アプリ内「大画面」— 見た目の最大化（Fullscreen API は補助） */
+  const [immersiveLayout, setImmersiveLayout] = useState(false);
+
   // PC版コントロールバーの状態管理
   const [controlState, setControlState] = useState<ControlState>({
     isFullscreen: false,
@@ -326,6 +319,31 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
   useEffect(() => {
     setControlState((prev) => ({ ...prev, micEnabled: listenMode }));
   }, [listenMode]);
+
+  useEffect(() => {
+    setControlState((prev) => ({ ...prev, isFullscreen: immersiveLayout }));
+  }, [immersiveLayout]);
+
+  // 没入モードに合わせてブラウザ全画面を試みる / 終了
+  useEffect(() => {
+    if (immersiveLayout) {
+      document.documentElement.requestFullscreen().catch(() => {
+        /* モバイル等では未対応のことがある — レイアウトのみで継続 */
+      });
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, [immersiveLayout]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setImmersiveLayout(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
 
   // 同意モーダル表示フラグ
   const [showListenConsent, setShowListenConsent] = useState(false);
@@ -398,15 +416,7 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
   }, [listenMode, hasConsentedToListen, setListenMode]);
 
   const handleFullscreenToggle = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error('Fullscreen request failed:', err);
-      });
-      setControlState((prev) => ({ ...prev, isFullscreen: true }));
-    } else {
-      document.exitFullscreen();
-      setControlState((prev) => ({ ...prev, isFullscreen: false }));
-    }
+    setImmersiveLayout((v) => !v);
   }, []);
 
   // DisplayScale を循環させる（75% → 100% → 125% → 150% → 75%...）
@@ -671,9 +681,11 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
       : activeSpace?.presetTags ?? [];
 
   return (
-    <div className={styles.container}>
+    <div
+      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''}`}
+    >
       <ScaledContent
-        className={`${styles.scaledCanvas} ${backgroundClass}`}
+        className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${backgroundClass}`}
         style={backgroundStyle}
       >
       {/* 訪問モードバナー */}
@@ -1034,12 +1046,16 @@ export const SpaceScreen = ({ registerQuickLogForBottomNav }: SpaceScreenProps =
             layoutMode={layoutMode}
             onLayoutModeChange={setLayoutMode}
             neighbors={neighbors}
-            onWarp={handleWarp}
+            onWarp={handleIslandClick}
             isVisiting={isVisiting}
             qrPanelVisible={qrPanelVisible}
-            onQrToggle={() => setQrPanelVisible((v) => !v)}
+            onQrToggle={
+              isMobile ? undefined : () => setQrPanelVisible((v) => !v)
+            }
             showPostCountBadge={showPostCountBadge}
-            onShowPostCountBadgeToggle={handleShowPostCountBadgeToggle}
+            onShowPostCountBadgeToggle={
+              isMobile ? undefined : handleShowPostCountBadgeToggle
+            }
           />
           {!isMobile && (
             <SpacePanelCubeDock

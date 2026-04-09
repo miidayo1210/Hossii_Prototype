@@ -16,12 +16,7 @@ const USER_NAV: NavItem[] = [
   { label: 'アカウント', screen: 'account', icon: User },
 ];
 
-type Props = {
-  /** スペース表示中に「ログ」を押したとき — クイックログパネルを開閉（画面遷移しない） */
-  onQuickLogFromSpace?: () => void;
-};
-
-export const BottomNavBar = ({ onQuickLogFromSpace }: Props) => {
+export const BottomNavBar = () => {
   const { screen: currentScreen, navigate } = useRouter();
 
   const navItems = USER_NAV;
@@ -40,14 +35,6 @@ export const BottomNavBar = ({ onQuickLogFromSpace }: Props) => {
             key={item.screen}
             className={`${styles.navButton} ${isActive ? styles.active : ''}`}
             onClick={() => {
-              if (
-                item.screen === 'comments' &&
-                currentScreen === 'screen' &&
-                onQuickLogFromSpace
-              ) {
-                onQuickLogFromSpace();
-                return;
-              }
               navigate(item.screen);
             }}
             aria-label={item.label}

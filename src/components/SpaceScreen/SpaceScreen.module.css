@@ -21,6 +21,37 @@
   }
 }
 
+/* アプリ内「大画面」: 表示領域を最大化し、安全域を確保 */
+.containerImmersive {
+  min-height: 100dvh;
+  min-height: 100svh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.scaledCanvasImmersive {
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+/* モバイル横持ち: PC に近い上部余白（TopBar 相当）でクラスタ位置を寄せる */
+@media (max-width: 768px) and (orientation: landscape) {
+  .containerImmersive {
+    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .containerImmersive .spaceTitle {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    left: max(12px, env(safe-area-inset-left, 0px));
+  }
+
+  .containerImmersive .spaceTopRightCluster {
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+  }
+}
+
 /* スペースタイトル（左上・情報レイヤー） */
 .spaceTitle {
   position: fixed;

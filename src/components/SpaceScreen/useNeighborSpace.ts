@@ -79,12 +79,16 @@ export function useNeighborSpace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSpaceId, neighbors.length, spaceSettings?.bottleFrequency]);
 
-  // ランダムな隣人スペースへワープ
-  const handleWarp = useCallback(() => {
+  /** 島ボタン: 自スペースでは隣人へワープ、訪問中は自スペースに戻る */
+  const handleIslandClick = useCallback(() => {
+    if (isVisiting) {
+      setVisitingSpace(null);
+      return;
+    }
     if (neighbors.length === 0) return;
     const target = pickRandomNeighbor(neighbors);
     setVisitingSpace(target.id);
-  }, [neighbors, setVisitingSpace]);
+  }, [isVisiting, neighbors, setVisitingSpace]);
 
   /** 管理者がログ一覧から非表示にしたあと、訪問先リストを即座に更新する */
   const removeVisitingHossii = useCallback((id: string) => {
@@ -97,7 +101,7 @@ export function useNeighborSpace({
     visitingSpaceInfo,
     bottlePayload,
     setBottlePayload,
-    handleWarp,
+    handleIslandClick,
     removeVisitingHossii,
   };
 }

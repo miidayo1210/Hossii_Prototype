@@ -170,13 +170,14 @@ export const LeftControlBar = ({
         </button>
       )}
 
-      {/* --- 隣のスペースワープボタン --- */}
-      {neighbors.length > 0 && !isVisiting && (
+      {/* --- 隣のスペース: 自スペースでワープ / 訪問中は自スペースに戻る --- */}
+      {neighbors.length > 0 && (
         <button
+          type="button"
           className={`${styles.controlButton} ${styles.mobileVisible}`}
           onClick={onWarp}
-          aria-label="隣のスペースにワープ"
-          title="隣のスペースにワープ"
+          aria-label={isVisiting ? '自スペースに戻る' : '隣のスペースにワープ'}
+          title={isVisiting ? '自スペースに戻る' : '隣のスペースにワープ'}
         >
           🏝
         </button>

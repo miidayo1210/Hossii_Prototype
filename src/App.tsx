@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from './core/hooks/useRouter';
 import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
@@ -47,11 +47,6 @@ const AppContent = () => {
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
   // 初回 URL スラッグ解決済みフラグ（スペース設定変更後に再トリガーされるのを防ぐ）
   const initialSlugHandledRef = useRef(false);
-  /** スペース画面のクイックログ開閉（BottomNavBar「ログ」から呼ぶ） */
-  const spaceQuickLogToggleRef = useRef<(() => void) | null>(null);
-  const registerSpaceQuickLogForBottomNav = useCallback((fn: (() => void) | null) => {
-    spaceQuickLogToggleRef.current = fn;
-  }, []);
 
   // /s/[slug] パスかどうかを初回レンダー時に同期的に検出（フラッシュ防止）
   const isOnSlugPath = useMemo(
@@ -483,9 +478,7 @@ const AppContent = () => {
       case 'post':
         return <PostScreen />;
       case 'screen':
-        return (
-          <SpaceScreen registerQuickLogForBottomNav={registerSpaceQuickLogForBottomNav} />
-        );
+        return <SpaceScreen />;
       case 'comments':
         return <CommentsScreen />;
       case 'spaces':
@@ -512,9 +505,7 @@ const AppContent = () => {
       case 'neighbors':
         return <NeighborsScreen />;
       default:
-        return (
-          <SpaceScreen registerQuickLogForBottomNav={registerSpaceQuickLogForBottomNav} />
-        );
+        return <SpaceScreen />;
     }
   };
 
@@ -531,9 +522,7 @@ const AppContent = () => {
           onClose={handleNicknameModalClose}
         />
       )}
-      <BottomNavBar
-        onQuickLogFromSpace={() => spaceQuickLogToggleRef.current?.()}
-      />
+      <BottomNavBar />
       {showTutorial && userProfile && (
         <TutorialOverlay
           userId={userProfile.userId}
