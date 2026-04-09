@@ -1,0 +1,12 @@
+背景スライドショー用の画像は、このフォルダ（public/auth-entry-bg/）に置いてください。
+
+例: 01.webp, 02.webp, …
+
+置いたあと、次のファイルを開き、AUTH_ENTRY_BG_IMAGES の配列に
+  '/auth-entry-bg/01.webp'
+のようにパスを列挙してください。
+
+  src/components/Auth/authEntryBg.config.ts
+
+詳しい枚数・解像度・形式は同じフォルダの README.md、または
+docs/仕様書/現在の仕様/65_トップページ.md を参照してください。

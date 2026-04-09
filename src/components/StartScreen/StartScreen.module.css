@@ -1,160 +1,45 @@
-/* Container with space background */
-.container {
-  min-height: 100vh;
+/* Top page copy + Coming soon (shell + form live in authEntryShell / LoginScreen.module.css) */
+
+.lead {
+  margin: 0 0 1.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.62);
+  text-align: center;
+}
+
+.comingSoonBlock {
+  margin-top: 0.25rem;
+}
+
+.createSpaceSoon {
+  width: 100%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
-  overflow: hidden;
-  position: relative;
-  padding: 2rem;
-}
-
-/* Animated stars (same as LoginScreen) */
-.stars,
-.stars2,
-.stars3 {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.stars {
-  background: transparent url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAE0lEQVQIW2P8////fwYGBgYGBgYAHhIGAf8nM9wAAAAASUVORK5CYII=') repeat top center;
-  z-index: 0;
-  animation: starsMove 50s linear infinite;
-}
-
-.stars2 {
-  background: transparent url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVQIW2P8//8/AwMDAwMDAwMDAAP+Av7czFnnAAAAAElFTkSuQmCC') repeat top center;
-  z-index: 1;
-  animation: starsMove 100s linear infinite;
-}
-
-.stars3 {
-  background: transparent url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFklEQVQIW2P8//8/AzMzMwMzMzMDMzMAAPkC/QHPBXZ1AAAAAElFTkSuQmCC') repeat top center;
-  z-index: 2;
-  animation: starsMove 150s linear infinite;
-}
-
-@keyframes starsMove {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-2000px);
-  }
-}
-
-/* Background Hossii (ambient decoration) */
-.hossiiBackground {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-/* Main content */
-.content {
-  position: relative;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4rem;
-  text-align: center;
-  max-width: 600px;
-  width: 100%;
-}
-
-/* Header */
-.header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  animation: fadeInUp 1s ease-out;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.logo {
-  font-size: 5rem;
-  margin: 0;
-  animation: float 3s ease-in-out infinite;
-  filter: drop-shadow(0 4px 16px rgba(167, 139, 250, 0.6));
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-20px);
-  }
-}
-
-.title {
-  font-size: 3rem;
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
-  text-shadow: 0 4px 16px rgba(167, 139, 250, 0.5);
-  letter-spacing: 0.05em;
-}
-
-.subtitle {
-  font-size: 1.125rem;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0;
-  line-height: 1.6;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-/* Hint text shown instead of start button */
-.hint {
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.42);
   font-size: 0.9375rem;
-  color: rgba(255, 255, 255, 0.45);
-  margin: 0;
-  animation: fadeInUp 1s ease-out 0.3s both;
+  font-weight: 500;
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
-/* Mobile adjustments */
-@media (max-width: 768px) {
-  .content {
-    gap: 3rem;
-    padding: 0 1rem;
-  }
-
-  .logo {
-    font-size: 4rem;
-  }
-
-  .title {
-    font-size: 2rem;
-  }
-
-  .subtitle {
-    font-size: 1rem;
-  }
-
-  .startButton {
-    padding: 1rem 2.5rem;
-    font-size: 1.125rem;
-  }
+.comingSoonBadge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  line-height: 1.4;
+  white-space: nowrap;
 }

@@ -1,8 +1,20 @@
-.notice {
-  margin-top: 1.5rem;
-  text-align: center;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
+/* メインフォーム: トップページに近いコンパクトさ */
+.adminFormCard {
+  padding: 1.5rem;
+}
+
+.adminCompactHeader {
+  margin-bottom: 1.25rem;
+}
+
+.adminCompactTabs {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .adminFormCard {
+    padding: 1.25rem;
+  }
 }
 
 /* 登録申請タブの注意書き */

@@ -1,70 +1,4 @@
-/* Container with space background */
-.container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
-  overflow: hidden;
-  position: relative;
-  padding: 1rem;
-}
-
-/* Animated stars */
-.stars,
-.stars2,
-.stars3 {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.stars {
-  background: transparent url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAE0lEQVQIW2P8////fwYGBgYGBgYAHhIGAf8nM9wAAAAASUVORK5CYII=') repeat top center;
-  z-index: 0;
-  animation: starsMove 50s linear infinite;
-}
-
-.stars2 {
-  background: transparent url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVQIW2P8//8/AwMDAwMDAwMDAAP+Av7czFnnAAAAAElFTkSuQmCC') repeat top center;
-  z-index: 1;
-  animation: starsMove 100s linear infinite;
-}
-
-.stars3 {
-  background: transparent url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFklEQVQIW2P8//8/AzMzMwMzMzMDMzMAAPkC/QHPBXZ1AAAAAElFTkSuQmCC') repeat top center;
-  z-index: 2;
-  animation: starsMove 150s linear infinite;
-}
-
-@keyframes starsMove {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-2000px);
-  }
-}
-
-/* Glass card */
-.card {
-  position: relative;
-  z-index: 10;
-  max-width: 420px;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 2rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
+/* Layout shell + glass card: authEntryShell.module.css */
 
 /* Close button */
 .closeButton {
@@ -263,6 +197,13 @@
   box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .submitButton:hover:not(:disabled),
+  .socialButton:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
 .submitButton:active:not(:disabled) {
   transform: translateY(0);
 }
@@ -355,12 +296,28 @@
   box-shadow: 0 4px 12px rgba(24, 119, 242, 0.2);
 }
 
+/* Tab panel crossfade (keyed remount) */
+.tabPanel {
+  animation: tabPanelFade 0.22s ease-out both;
+}
+
+@keyframes tabPanelFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabPanel {
+    animation: none;
+  }
+}
+
 /* Mobile adjustments */
 @media (max-width: 768px) {
-  .card {
-    padding: 1.5rem;
-  }
-
   .title {
     font-size: 1.75rem;
   }

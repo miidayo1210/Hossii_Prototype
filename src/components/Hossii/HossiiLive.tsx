@@ -30,6 +30,10 @@ type Props = {
   readingEnabled?: boolean;
   /** いいね時のリアクショントリガー（値が変化するたびに反応） */
   onLikeTrigger?: string | null;
+  /** 認証トップ等: 泳ぎ・自発セリフ・タップ反応を止め、レイアウト内に固定表示 */
+  decorative?: boolean;
+  /** decorative 時: 待機デフォルトの代わりに表示する画像 URL（未指定は idle_base） */
+  decorativeImageSrc?: string | null;
 };
 
 /** Hossii のサイズ (CSS の width/height と一致させる) */
@@ -180,6 +184,8 @@ export function HossiiLive({
   hossiis = [],
   readingEnabled = false,
   onLikeTrigger,
+  decorative = false,
+  decorativeImageSrc,
 }: Props) {
   // === State ===
   const [position, setPosition] = useState(getInitialPosition);
@@ -199,7 +205,7 @@ export function HossiiLive({
 
   // いいねトリガーへの反応（喜び系表情 + スピン）
   useEffect(() => {
-    if (!onLikeTrigger) return;
+    if (decorative || !onLikeTrigger) return;
     const joyFaces = ['joy', 'fun', 'laugh'] as EmotionKey[];
     const face = getHossiiFace(joyFaces[Math.floor(Math.random() * joyFaces.length)]);
     queueMicrotask(() => {
@@ -212,16 +218,17 @@ export function HossiiLive({
       clearTimeout(spinTimer);
       clearTimeout(faceTimer);
     };
-  }, [onLikeTrigger]);
+  }, [onLikeTrigger, decorative]);
 
   // 表示する顔を優先順位で決定
-  // interaction > reaction > listening > idle
+  // decorative 上書き > interaction > reaction > listening > idle
   const displayFace = useMemo(() => {
+    if (decorative && decorativeImageSrc) return decorativeImageSrc;
     if (interactionFace) return interactionFace;
     if (reactionFace) return reactionFace;
     if (isListening) return getListeningFace();
     return getDefaultIdle();
-  }, [interactionFace, reactionFace, isListening]);
+  }, [decorative, decorativeImageSrc, interactionFace, reactionFace, isListening]);
 
   // === Refs ===
   const prevTriggerIdRef = useRef<string | undefined>(undefined);
@@ -263,6 +270,8 @@ export function HossiiLive({
   // Layer A: BaseMotion - viewport全体を泳ぐ
   // ============================================
   useEffect(() => {
+    if (decorative) return;
+
     // 初回描画後に transition を有効化 (ワープ防止)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -295,24 +304,27 @@ export function HossiiLive({
         clearTimeout(moveTimerRef.current);
       }
     };
-  }, []);
+  }, [decorative]);
 
   // ============================================
   // 画面リサイズ時に位置を clamp
   // ============================================
   useEffect(() => {
+    if (decorative) return;
+
     function handleResize() {
       setPosition((prev) => clampPosition(prev));
     }
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [decorative]);
 
   // ============================================
   // Layer B: ReactionMotion - 投稿時の反応
   // ============================================
   useEffect(() => {
+    if (decorative) return;
     if (!lastTriggerId || lastTriggerId === prevTriggerIdRef.current) {
       return;
     }
@@ -381,12 +393,14 @@ export function HossiiLive({
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [lastTriggerId, onParticle]);
+  }, [lastTriggerId, onParticle, decorative]);
 
   // ============================================
   // F02/F03: アイドル表情ランダム切り替え（8〜15s）
   // ============================================
   useEffect(() => {
+    if (decorative) return;
+
     function scheduleIdleFace() {
       // Lv0/1: 8〜15s, Lv2: 6〜10s, Lv3: 4〜7s
       const baseDelay = energyLevelRef.current >= 3 ? 4000
@@ -410,12 +424,14 @@ export function HossiiLive({
     return () => {
       if (idleFaceTimerRef.current) clearTimeout(idleFaceTimerRef.current);
     };
-  }, []);
+  }, [decorative]);
 
   // ============================================
   // 自発セリフ（アイドル時）
   // ============================================
   useEffect(() => {
+    if (decorative) return;
+
     function speakText(text: string) {
       if (typeof window === 'undefined' || !window.speechSynthesis) return;
       const forSpeech = stripEmojisForSpeech(text);
@@ -476,7 +492,7 @@ export function HossiiLive({
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [decorative]);
 
   // 投稿やタップ時に自発セリフをクリア
   useEffect(() => {
@@ -497,6 +513,8 @@ export function HossiiLive({
   // Layer C: TapMotion - タップ時の反応
   // ============================================
   const handleTap = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (decorative) return;
+
     const rect = e.currentTarget.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -567,7 +585,7 @@ export function HossiiLive({
     interactionTimerRef.current = setTimeout(() => {
       setInteractionFace(null);
     }, interactionDuration);
-  }, [onParticle]);
+  }, [onParticle, decorative]);
 
   // クリーンアップ
   useEffect(() => {
@@ -607,17 +625,22 @@ export function HossiiLive({
 
   // コンテナのクラス名
   const containerClasses = [
-    styles.container,
-    isSwimming ? styles.swimming : '',
+    decorative ? styles.containerDecorative : styles.container,
+    !decorative && isSwimming ? styles.swimming : '',
     isReacting ? styles.reacting : '',
     tapTransform ? styles.tapped : '',
   ].filter(Boolean).join(' ');
 
   // BaseMotion の transform + TapMotion の追加transform
-  const baseTransform = `translate3d(${position.x}px, ${position.y}px, 0)`;
-  const finalTransform = tapTransform
-    ? `${baseTransform} ${tapTransform}`
-    : baseTransform;
+  const baseTransform = decorative
+    ? undefined
+    : `translate3d(${position.x}px, ${position.y}px, 0)`;
+  const finalTransform =
+    decorative && !tapTransform
+      ? undefined
+      : tapTransform
+        ? `${baseTransform ?? ''} ${tapTransform}`.trim()
+        : baseTransform;
 
   // Hossiiカラーのfilter適用
   const hueRotate = getHueRotation(hossiiColor);
@@ -630,12 +653,19 @@ export function HossiiLive({
         className={containerClasses}
         style={{
           transform: finalTransform,
-          transitionDuration: isSwimming && !tapTransform ? `${transitionDuration}ms` : undefined,
+          transitionDuration:
+            !decorative && isSwimming && !tapTransform ? `${transitionDuration}ms` : undefined,
         }}
-        onClick={handleTap}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && handleTap(e as unknown as React.MouseEvent<HTMLDivElement>)}
+        onClick={decorative ? undefined : handleTap}
+        role={decorative ? undefined : 'button'}
+        tabIndex={decorative ? undefined : 0}
+        onKeyDown={
+          decorative
+            ? undefined
+            : (e) =>
+                e.key === 'Enter' &&
+                handleTap(e as unknown as React.MouseEvent<HTMLDivElement>)
+        }
       >
         <div
           className={[

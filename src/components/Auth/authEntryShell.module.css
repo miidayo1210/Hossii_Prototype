@@ -1,0 +1,152 @@
+/* Calm auth/top entry background (no scrolling star parallax).
+   スライド画像が無いときはこのグラデが全面に見える。 */
+.shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 100%, rgba(55, 65, 95, 0.45) 0%, transparent 55%),
+    radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+  overflow: hidden;
+  position: relative;
+  padding: 1rem;
+}
+
+/* 全画面スライド（.shell 直下、z-index 0） */
+.slideLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.slideImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.slideImageVisible {
+  opacity: 1;
+}
+
+.slideImageHidden {
+  opacity: 0;
+}
+
+.slideCrossfade {
+  transition: opacity 1s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slideCrossfade {
+    transition: none;
+  }
+}
+
+/* 画像の上：可読性用スクリム */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(9, 10, 15, 0.25) 0%,
+      rgba(9, 10, 15, 0.45) 45%,
+      rgba(9, 10, 15, 0.55) 100%
+    );
+}
+
+/* Hossii 装飾（カードより奥） */
+.hossiiLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: min(10vh, 5rem);
+}
+
+.hossiiFloatInner {
+  animation: authHossiiFloat 16s ease-in-out infinite;
+}
+
+@keyframes authHossiiFloat {
+  0%,
+  100% {
+    transform: rotate(-4deg) translateY(0);
+  }
+  50% {
+    transform: rotate(4deg) translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hossiiFloatInner {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* ガラスカード等（スライドより手前） */
+.content {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glassCard {
+  position: relative;
+  z-index: 10;
+  max-width: 420px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.cardEnter {
+  animation: authCardEnter 0.55s ease-out both;
+}
+
+@keyframes authCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardEnter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .glassCard {
+    padding: 1.5rem;
+  }
+}

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Mail, Lock, LogIn, UserPlus, X, Eye, EyeOff, User } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
+import { AuthEntryShell } from './AuthEntryShell';
+import shell from './authEntryShell.module.css';
 import styles from './LoginScreen.module.css';
 
 type AuthMode = 'login' | 'signup';
@@ -106,13 +108,8 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
   };
 
   return (
-    <div className={styles.container}>
-      {/* Background stars */}
-      <div className={styles.stars}></div>
-      <div className={styles.stars2}></div>
-      <div className={styles.stars3}></div>
-
-      <div className={styles.card}>
+    <AuthEntryShell>
+      <div className={`${shell.glassCard} ${shell.cardEnter}`}>
         {/* Close button (only show if onClose is provided) */}
         {onClose && (
           <button
@@ -152,15 +149,16 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
           </button>
         </div>
 
-        {/* Error message */}
-        {error && (
-          <div className={styles.error}>
-            {error}
-          </div>
-        )}
+        <div key={mode} className={styles.tabPanel}>
+          {/* Error message */}
+          {error && (
+            <div className={styles.error}>
+              {error}
+            </div>
+          )}
 
-        {/* Email/Password form */}
-        <form onSubmit={handleEmailAuth} className={styles.form}>
+          {/* Email/Password form */}
+          <form onSubmit={handleEmailAuth} className={styles.form}>
           {mode === 'signup' && (
             <div className={styles.inputGroup}>
               <User size={18} className={styles.inputIcon} />
@@ -284,7 +282,8 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
             <span>Facebookでログイン</span>
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </AuthEntryShell>
   );
 };

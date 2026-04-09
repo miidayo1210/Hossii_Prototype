@@ -7,6 +7,16 @@
    Hossii本体コンテナ
    左上基準 + transform で泳ぐ
    ============================================ */
+/* 認証エントリー等: 親レイアウト内に収める（fixed にしない） */
+.containerDecorative {
+  position: relative;
+  z-index: 1;
+  width: 140px;
+  height: 140px;
+  cursor: default;
+  will-change: auto;
+}
+
 .container {
   position: fixed;
   top: 0;
