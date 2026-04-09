@@ -24,12 +24,13 @@ export const parseSpaceSlugFromInput = (raw: string): string => {
   if (!trimmed) return '';
 
   const extractFromPath = (pathname: string): string | null => {
-    // App.tsx の pathname 判定と揃える
-    const communityMatch = pathname.match(
+    // 末尾スラッシュを除き、空なら / 扱い（App.tsx の pathname 判定と揃えたうえで入力ゆれを吸収）
+    const normalized = pathname.replace(/\/+$/, '') || '/';
+    const communityMatch = normalized.match(
       /^\/c\/[a-z0-9][a-z0-9-]*\/s\/([a-z0-9][a-z0-9-]*)$/
     );
     if (communityMatch) return communityMatch[1];
-    const legacyMatch = pathname.match(
+    const legacyMatch = normalized.match(
       /^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/
     );
     if (legacyMatch) return legacyMatch[1];

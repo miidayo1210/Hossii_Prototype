@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import shell from './authEntryShell.module.css';
 import { AUTH_ENTRY_BG_IMAGES } from './authEntryBg.config';
@@ -38,29 +38,69 @@ export function AuthEntryShell({ children }: Props) {
   const [topOpaque, setTopOpaque] = useState(false);
   const [entryHossiiSrc, setEntryHossiiSrc] = useState<string | null>(null);
 
+  const bottomIdxRef = useRef(0);
+
   const showSlides = urls.length > 0;
   const displayIdx = reduceMotion ? 0 : bottomIdx;
 
   useEffect(() => {
     if (urls.length < 2 || reduceMotion) return;
+
+    let cancelled = false;
+    let fadeTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let rafOuter = 0;
+    let rafInner = 0;
+
+    const clearPendingAnimations = () => {
+      if (fadeTimeoutId !== undefined) {
+        clearTimeout(fadeTimeoutId);
+        fadeTimeoutId = undefined;
+      }
+      if (rafOuter) {
+        cancelAnimationFrame(rafOuter);
+        rafOuter = 0;
+      }
+      if (rafInner) {
+        cancelAnimationFrame(rafInner);
+        rafInner = 0;
+      }
+    };
+
     const id = window.setInterval(() => {
-      setBottomIdx((b) => {
-        const next = (b + 1) % urls.length;
-        setTopIdx(next);
-        setTopOpaque(false);
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setTopOpaque(true));
+      if (cancelled) return;
+
+      clearPendingAnimations();
+
+      const b = bottomIdxRef.current;
+      const next = (b + 1) % urls.length;
+
+      setTopIdx(next);
+      setTopOpaque(false);
+
+      rafOuter = requestAnimationFrame(() => {
+        if (cancelled) return;
+        rafInner = requestAnimationFrame(() => {
+          if (cancelled) return;
+          setTopOpaque(true);
         });
-        window.setTimeout(() => {
-          setBottomIdx(next);
-          setTopIdx(null);
-          setTopOpaque(false);
-          setEntryHossiiSrc(pickAuthEntryHossiiDecorUrl());
-        }, FADE_MS);
-        return b;
       });
+
+      fadeTimeoutId = window.setTimeout(() => {
+        if (cancelled) return;
+        fadeTimeoutId = undefined;
+        bottomIdxRef.current = next;
+        setBottomIdx(next);
+        setTopIdx(null);
+        setTopOpaque(false);
+        setEntryHossiiSrc(pickAuthEntryHossiiDecorUrl());
+      }, FADE_MS);
     }, SLIDE_INTERVAL_MS);
-    return () => clearInterval(id);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      clearPendingAnimations();
+    };
   }, [urls.length, reduceMotion]);
 
   useEffect(() => {
