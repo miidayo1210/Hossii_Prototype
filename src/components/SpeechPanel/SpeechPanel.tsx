@@ -21,6 +21,8 @@ type Props = {
   onDismissCandidate: (text: string) => void;
   dismissedCandidates: string[];
   onClose: () => void;
+  /** クイック投稿のフリー編集へ候補を送る（定義時のみボタン表示） */
+  onSendCandidateToFreePost?: (text: string) => void;
 };
 
 type PanelLevel = 'short' | 'long';
@@ -56,6 +58,7 @@ function SpeechPanelInner({
   onDismissCandidate,
   dismissedCandidates,
   onClose,
+  onSendCandidateToFreePost,
 }: Props) {
   const [panelLevel, setPanelLevel] = useState<PanelLevel>('short');
   const textAreaRef = useRef<HTMLDivElement>(null);
@@ -153,6 +156,16 @@ function SpeechPanelInner({
                   >
                     スペースに置く
                   </button>
+                  {onSendCandidateToFreePost && (
+                    <button
+                      type="button"
+                      className={styles.candidateActionBtn}
+                      onClick={() => onSendCandidateToFreePost(candidate)}
+                      title="クイック投稿のフリータブへ"
+                    >
+                      フリーに入れる
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`${styles.candidateActionBtn} ${styles.candidateActionDismiss}`}

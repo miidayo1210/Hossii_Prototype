@@ -153,6 +153,8 @@ export const SpaceScreen = () => {
 
   // クイック投稿パネル（setQuickPostPos を下のコールバックより先に宣言）
   const [quickPostPos, setQuickPostPos] = useState<{ x: number; y: number } | null>(null);
+  /** PostScreen のフリー編集へ音声候補を渡す（`PostScreen` が登録） */
+  const speechToFreePosterRef = useRef<((text: string) => void) | undefined>(undefined);
   /** ダブルクリック→クイック投稿オープンを遅延させ、トリプルクリックでログパネルに譲る */
   const pendingQuickPostOpenRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -1143,6 +1145,11 @@ export const SpaceScreen = () => {
             onEditCandidate={openSpeechCandidateEditor}
             onDismissCandidate={dismissSpeechCandidate}
             dismissedCandidates={dismissedSpeechCandidates}
+            onSendCandidateToFreePost={
+              quickPostPos
+                ? (text) => speechToFreePosterRef.current?.(text)
+                : undefined
+            }
             onClose={() => {
               setSpeechPanelOpen(false);
               setPanelConfirmedText('');
@@ -1239,6 +1246,7 @@ export const SpaceScreen = () => {
             speechEditOriginal={speechEditOriginal}
             onSaveSpeechDraft={handleSaveSpeechDraft}
             onClose={handleQuickPostClose}
+            speechToFreePosterRef={speechToFreePosterRef}
           />
         </FloatingPanelShell>
       )}

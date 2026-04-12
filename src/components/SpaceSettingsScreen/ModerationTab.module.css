@@ -163,6 +163,32 @@
   white-space: nowrap;
 }
 
+.tdThumb {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+  width: 72px;
+}
+
+.thumbLink {
+  display: block;
+  line-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.thumbImg {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbEmpty {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.875rem;
+}
+
 .tdMessage {
   padding: 0.75rem 1rem;
   color: rgba(255, 255, 255, 0.85);

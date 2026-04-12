@@ -152,3 +152,35 @@ export async function uploadHossiiImage(
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
+
+/** キャンバス投稿用（Phase 1: 最大 5MB、PNG/WebP Blob をそのまま） */
+const CANVAS_MAX_BYTES = 5 * 1024 * 1024;
+
+export async function uploadCanvasPostImage(
+  spaceId: string,
+  hossiiId: string,
+  blob: Blob,
+): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+
+  if (blob.size > CANVAS_MAX_BYTES) {
+    console.error('[imageStorageApi] uploadCanvasPostImage: blob exceeds 5MB');
+    return null;
+  }
+
+  const mime = blob.type || 'image/png';
+  const ext = mime.includes('webp') ? 'webp' : 'png';
+  const path = `canvas/${spaceId}/${hossiiId}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, blob, { contentType: mime || 'image/png', upsert: true });
+
+  if (error) {
+    console.error('[imageStorageApi] uploadCanvasPostImage error:', error.message);
+    return null;
+  }
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}

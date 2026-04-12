@@ -273,6 +273,7 @@ export const Bubble = ({
 
   const displayText = renderHossiiText(hossii);
   const isLaughter = hossii.autoType === 'laughter';
+  const isCanvasPost = hossii.postKind === 'canvas' && !!hossii.imageUrl;
 
   const emoji = isLaughter
     ? '😂'
@@ -313,11 +314,11 @@ export const Bubble = ({
   if (orderedStackZ != null) {
     bubbleStyle['--bubble-stack'] = orderedStackZ;
   }
-  if (hossii.bubbleColor) {
+  if (!isCanvasPost && hossii.bubbleColor) {
     bubbleStyle.backgroundColor = hossii.bubbleColor;
     bubbleStyle.borderColor = hossii.bubbleColor;
   }
-  if (bubbleShapePng) {
+  if (!isCanvasPost && bubbleShapePng) {
     // PNG はオーバーレイ <img> で描画するため mask-image は使わない。
     // 背景色をフィルとして残し、border/backdrop-filter のみリセットする。
     if (!hossii.bubbleColor) {
@@ -334,12 +335,24 @@ export const Bubble = ({
 
   const classNames = [
     styles.bubble,
-    bubbleShapePng ? styles.bubbleCustomShape : '',
+    isCanvasPost ? styles.bubbleCanvas : '',
+    !isCanvasPost && bubbleShapePng ? styles.bubbleCustomShape : '',
     layoutAlignTopLeft ? styles.bubbleLayoutGrid : '',
     isActive && !isSelected ? styles.bubbleActive : '',
-    isSelected ? (bubbleShapePng ? styles.bubbleSelectedShape : styles.bubbleSelected) : '',
+    isSelected
+      ? isCanvasPost
+        ? styles.bubbleSelected
+        : bubbleShapePng
+          ? styles.bubbleSelectedShape
+          : styles.bubbleSelected
+      : '',
     dragPos ? styles.bubbleDragging : '',
-    isRecentHighlight && (bubbleShapePng ? styles.bubbleRecentGlowShape : styles.bubbleRecentGlow),
+    isRecentHighlight &&
+      (isCanvasPost
+        ? styles.bubbleRecentGlow
+        : bubbleShapePng
+          ? styles.bubbleRecentGlowShape
+          : styles.bubbleRecentGlow),
   ]
     .filter(Boolean)
     .join(' ');
@@ -351,6 +364,7 @@ export const Bubble = ({
       className={classNames}
       style={bubbleStyle}
       data-hossii-bubble
+      data-hossii-post-kind={isCanvasPost ? 'canvas' : 'bubble'}
       onClick={() => {
         if (!dragStateRef.current?.moved) {
           if (!isSelected) onSelect?.(hossii.id);
@@ -362,7 +376,7 @@ export const Bubble = ({
       }}
     >
       {/* B02: 形状 PNG をフレームとしてオーバーレイ表示 */}
-      {bubbleShapePng && (
+      {!isCanvasPost && bubbleShapePng && (
         <img
           src={bubbleShapePng}
           className={styles.bubbleShapeOverlay}
@@ -371,9 +385,75 @@ export const Bubble = ({
         />
       )}
 
-      <div className={`${styles.bubbleInner} ${bubbleShapePng ? styles.bubbleInnerShaped : ''}`}>
-        {/* --- viewMode: image → 画像のみ --- */}
-        {viewMode === 'image' ? (
+      <div
+        className={`${styles.bubbleInner} ${!isCanvasPost && bubbleShapePng ? styles.bubbleInnerShaped : ''} ${isCanvasPost ? styles.bubbleInnerCanvas : ''}`}
+      >
+        {isCanvasPost ? (
+          viewMode === 'image' ? (
+            <div className={styles.bubbleCanvasImageWrap}>
+              <img
+                src={hossii.imageUrl}
+                alt={hossii.message?.trim() ? hossii.message : 'フリー投稿'}
+                className={styles.bubbleCanvasImage}
+                loading="lazy"
+                title="ダブルクリックで拡大表示"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxSrc(hossii.imageUrl!);
+                }}
+              />
+              {isSelected && (
+                <button
+                  type="button"
+                  className={styles.canvasExpandBtn}
+                  aria-label="拡大表示"
+                  title="拡大表示"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxSrc(hossii.imageUrl!);
+                  }}
+                >
+                  🔍
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className={styles.bubbleCanvasImageWrap}>
+                <img
+                  src={hossii.imageUrl}
+                  alt={hossii.message?.trim() ? hossii.message : 'フリー投稿'}
+                  className={styles.bubbleCanvasImage}
+                  loading="lazy"
+                  title="ダブルクリックで拡大表示"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxSrc(hossii.imageUrl!);
+                  }}
+                />
+                {isSelected && (
+                  <button
+                    type="button"
+                    className={styles.canvasExpandBtn}
+                    aria-label="拡大表示"
+                    title="拡大表示"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxSrc(hossii.imageUrl!);
+                    }}
+                  >
+                    🔍
+                  </button>
+                )}
+              </div>
+              <div className={styles.bubbleCanvasMeta}>
+                <span className={styles.bubbleMetaText}>{metaText}</span>
+              </div>
+            </>
+          )
+        ) : viewMode === 'image' ? (
           hossii.imageUrl ? (
             <img
               src={hossii.imageUrl}
@@ -477,33 +557,34 @@ export const Bubble = ({
           <div className={`${styles.resizeHandle} ${styles.resizeHandleBL}`} data-resize-handle="BL" />
           <div className={`${styles.resizeHandle} ${styles.resizeHandleBR}`} data-resize-handle="BR" />
 
-          {/* カラーパレット */}
-          <div
-            className={styles.bubbleColorPalette}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {BUBBLE_COLORS.map((color) => (
-              <button
-                key={color}
-                className={`${styles.bubbleColorSwatch} ${hossii.bubbleColor === color ? styles.bubbleColorSwatchActive : ''}`}
-                style={{ backgroundColor: color }}
-                title={color}
-                onClick={() => {
-                  onColorSaveRef.current?.(hossii.id, color);
-                }}
-              />
-            ))}
-            <button
-              className={`${styles.bubbleColorSwatch} ${styles.bubbleColorSwatchClear} ${!hossii.bubbleColor ? styles.bubbleColorSwatchActive : ''}`}
-              title="デフォルト"
-              onClick={() => {
-                onColorSaveRef.current?.(hossii.id, null);
-              }}
+          {!isCanvasPost && (
+            <div
+              className={styles.bubbleColorPalette}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              ✕
-            </button>
-          </div>
+              {BUBBLE_COLORS.map((color) => (
+                <button
+                  key={color}
+                  className={`${styles.bubbleColorSwatch} ${hossii.bubbleColor === color ? styles.bubbleColorSwatchActive : ''}`}
+                  style={{ backgroundColor: color }}
+                  title={color}
+                  onClick={() => {
+                    onColorSaveRef.current?.(hossii.id, color);
+                  }}
+                />
+              ))}
+              <button
+                className={`${styles.bubbleColorSwatch} ${styles.bubbleColorSwatchClear} ${!hossii.bubbleColor ? styles.bubbleColorSwatchActive : ''}`}
+                title="デフォルト"
+                onClick={() => {
+                  onColorSaveRef.current?.(hossii.id, null);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

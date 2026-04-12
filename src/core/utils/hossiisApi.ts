@@ -37,6 +37,8 @@ export type HossiiRow = {
   number_value: number | null;
   // いいね
   like_count: number;
+  /** マイグレーション前の行では欠ける場合あり（bubble 扱い） */
+  post_kind?: string | null;
 };
 
 /**
@@ -81,6 +83,7 @@ export function rowToHossii(row: HossiiRow): Hossii {
     hiddenBy: row.hidden_by ?? undefined,
     numberValue: row.number_value ?? undefined,
     likeCount: row.like_count ?? 0,
+    postKind: row.post_kind === 'canvas' ? 'canvas' : 'bubble',
   };
 }
 
@@ -112,6 +115,7 @@ function hossiiToRow(hossii: Hossii): Omit<HossiiRow, 'created_at'> & { created_
     hidden_by: hossii.hiddenBy ?? null,
     number_value: hossii.numberValue ?? null,
     like_count: hossii.likeCount ?? 0,
+    post_kind: hossii.postKind === 'canvas' ? 'canvas' : 'bubble',
   };
 }
 

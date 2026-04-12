@@ -88,6 +88,11 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
     isPositionFixed: typeof raw.isPositionFixed === 'boolean' ? raw.isPositionFixed : false,
     scale: typeof raw.scale === 'number' ? raw.scale : 1.0,
     isHidden: coerceIsHidden(raw.isHidden),
+    postKind: raw.postKind === 'canvas' ? 'canvas' : 'bubble',
+    tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : undefined,
+    bubbleShapePng: typeof raw.bubbleShapePng === 'string' ? raw.bubbleShapePng : undefined,
+    numberValue: typeof raw.numberValue === 'number' ? raw.numberValue : undefined,
+    likeCount: typeof raw.likeCount === 'number' ? raw.likeCount : undefined,
   };
 };
 
@@ -826,7 +831,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const isLaughter = input.autoType === 'laughter';
     const hasImage = !!input.imageUrl;
     const hasNumber = input.numberValue != null;
-    if (!input.emotion && !msg && !isLaughter && !hasImage && !hasNumber) return;
+    const isCanvas = input.postKind === 'canvas';
+    if (isCanvas) {
+      if (!input.imageUrl) return;
+    } else if (!input.emotion && !msg && !isLaughter && !hasImage && !hasNumber) {
+      return;
+    }
 
     const currentState = stateRef.current;
 
@@ -851,30 +861,50 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       (h) => h.spaceId === activeSpaceIdRef.current
     ).length;
     const initialPos = createBubblePosition(spaceHossiiCount);
+    const defaultCanvasScale = 1.2;
 
-    const newHossii: Hossii = {
-      id: generateId(),
-      message: msg,
-      emotion: input.emotion,
-      spaceId: activeSpaceIdRef.current,
-      authorId: input.authorNameOverride ? undefined : profile.id,
-      authorName,
-      createdAt: new Date(),
-      logType: input.logType,
-      speechLevel: input.speechLevel,
-      origin: input.origin,
-      autoType: input.autoType,
-      language: input.language,
-      bubbleColor: input.bubbleColor,
-      bubbleShapePng: input.bubbleShapePng,
-      hashtags: input.hashtags,
-      tags: input.tags,
-      imageUrl: input.imageUrl,
-      numberValue: input.numberValue,
-      positionX: input.positionX ?? initialPos.x,
-      positionY: input.positionY ?? initialPos.y,
-      isPositionFixed: input.isPositionFixed ?? false,
-    };
+    const newHossii: Hossii = isCanvas
+      ? {
+          id: generateId(),
+          message: msg,
+          spaceId: activeSpaceIdRef.current,
+          authorId: input.authorNameOverride ? undefined : profile.id,
+          authorName,
+          createdAt: new Date(),
+          origin: input.origin ?? 'manual',
+          imageUrl: input.imageUrl,
+          postKind: 'canvas',
+          positionX: input.positionX ?? initialPos.x,
+          positionY: input.positionY ?? initialPos.y,
+          isPositionFixed: input.isPositionFixed ?? true,
+          scale: input.scale ?? defaultCanvasScale,
+          hashtags: input.hashtags,
+          tags: input.tags,
+        }
+      : {
+          id: generateId(),
+          message: msg,
+          emotion: input.emotion,
+          spaceId: activeSpaceIdRef.current,
+          authorId: input.authorNameOverride ? undefined : profile.id,
+          authorName,
+          createdAt: new Date(),
+          logType: input.logType,
+          speechLevel: input.speechLevel,
+          origin: input.origin,
+          autoType: input.autoType,
+          language: input.language,
+          bubbleColor: input.bubbleColor,
+          bubbleShapePng: input.bubbleShapePng,
+          hashtags: input.hashtags,
+          tags: input.tags,
+          imageUrl: input.imageUrl,
+          numberValue: input.numberValue,
+          positionX: input.positionX ?? initialPos.x,
+          positionY: input.positionY ?? initialPos.y,
+          isPositionFixed: input.isPositionFixed ?? false,
+          postKind: 'bubble',
+        };
 
     // 楽観的更新（即時 UI 反映）
     dispatch({ type: 'ADD_HOSSII_FULL', payload: newHossii });

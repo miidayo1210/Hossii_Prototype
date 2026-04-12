@@ -1,4 +1,13 @@
-import { useState, useEffect, useMemo, useRef, useId } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useId,
+  useCallback,
+  type MutableRefObject,
+} from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { useRouter } from '../../core/hooks/useRouter';
@@ -29,6 +38,7 @@ import {
   type BubblePaletteId,
 } from '../../core/utils/bubbleColorPalettes';
 import styles from './PostScreen.module.css';
+import { CanvasPostEditor, type CanvasPostEditorHandle } from './CanvasPostEditor';
 
 // B02: 吹き出し形状プリセット（14種）
 type BubbleShapePreset = { path: string; label: string };
@@ -108,6 +118,8 @@ type Props = {
   speechEditOriginal?: string;
   /** 保存: 候補テキストのみ更新（投稿しない） */
   onSaveSpeechDraft?: (originalCandidate: string, editedMessage: string) => void;
+  /** 音声パネルからフリー編集へ候補を送る（クイック投稿＋フリータブ用） */
+  speechToFreePosterRef?: MutableRefObject<((text: string) => void) | undefined>;
 };
 
 export const PostScreen = ({
@@ -118,6 +130,7 @@ export const PostScreen = ({
   speechEditMode,
   speechEditOriginal,
   onSaveSpeechDraft,
+  speechToFreePosterRef,
 }: Props) => {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
@@ -170,6 +183,38 @@ export const PostScreen = ({
   // 位置選択グリッド（null = 未選択 = ランダム配置）
   const [selectedArea, setSelectedArea] = useState<number | null>(null);
 
+  /** 吹き出し / フリー（post_kind canvas） */
+  const [postTab, setPostTab] = useState<'bubble' | 'canvas'>('bubble');
+  const canvasEditorRef = useRef<CanvasPostEditorHandle>(null);
+  const pendingSpeechToFreeRef = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    if (postTab !== 'canvas') return;
+    const pending = pendingSpeechToFreeRef.current;
+    if (!pending) return;
+    pendingSpeechToFreeRef.current = null;
+    canvasEditorRef.current?.appendSpeechText(pending);
+  }, [postTab]);
+
+  useEffect(() => {
+    if (!speechToFreePosterRef) return;
+    speechToFreePosterRef.current = (text: string) => {
+      const t = text.trim();
+      if (!t) return;
+      setPostTab((cur) => {
+        if (cur !== 'canvas') {
+          pendingSpeechToFreeRef.current = text;
+          return 'canvas';
+        }
+        queueMicrotask(() => canvasEditorRef.current?.appendSpeechText(text));
+        return cur;
+      });
+    };
+    return () => {
+      speechToFreePosterRef.current = undefined;
+    };
+  }, [speechToFreePosterRef]);
+
   const { state, addHossii, getActiveSpace } = useHossiiStore();
   const { prefs: { showHossii } } = useDisplayPrefs();
   const { navigate } = useRouter();
@@ -184,6 +229,10 @@ export const PostScreen = ({
       setSelectedArea(null);
     }
   }, [featureFlags.position_selector]);
+
+  useEffect(() => {
+    if (speechEditMode) setPostTab('bubble');
+  }, [speechEditMode]);
 
   useEffect(() => {
     setSelectedArea(null);
@@ -219,6 +268,23 @@ export const PostScreen = ({
 
   // activeSpace からプリセットタグを取得（state から直接読み取り）
   const presetTags = state.spaces.find((s) => s.id === state.activeSpaceId)?.presetTags ?? [];
+
+  const canvasPosition = useMemo(() => {
+    if (panelMode && initialPosition) return initialPosition;
+    const positionGridActive = !panelMode && featureFlags.position_selector;
+    if (positionGridActive && selectedArea !== null) return areaToPosition(selectedArea);
+    return null;
+  }, [panelMode, initialPosition, featureFlags.position_selector, selectedArea]);
+
+  /** 音声候補の編集モードでは吹き出しのみ（タブ非表示） */
+  const showPostModeTabs = !speechEditMode;
+
+  const setToastStable = useCallback(
+    (t: ToastState) => {
+      setToast(t);
+    },
+    [],
+  );
 
   // quickEmotions からボタンデータを生成
   const emotionButtons = useMemo(() => {
@@ -258,6 +324,11 @@ export const PostScreen = ({
     return () => cancelAnimationFrame(id);
   }, [spaceSettings?.features.commentPost]);
 
+  const requestClosePanel = useCallback(() => {
+    if (!onClose) return;
+    onClose();
+  }, [onClose]);
+
   // パネル: Esc で閉じる（お絵描きモーダル優先）
   useEffect(() => {
     if (!panelMode || !onClose) return;
@@ -265,11 +336,11 @@ export const PostScreen = ({
       if (e.key !== 'Escape') return;
       if (showDrawingModal) return;
       e.preventDefault();
-      onClose();
+      requestClosePanel();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [panelMode, onClose, showDrawingModal]);
+  }, [panelMode, onClose, showDrawingModal, requestClosePanel]);
 
   const shuffleGreeting = () => {
     const index = Math.floor(Math.random() * GREETING_POOL.length);
@@ -522,7 +593,7 @@ export const PostScreen = ({
         <div className={styles.panelCloseBar}>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClosePanel}
             className={styles.panelCloseButton}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -548,17 +619,83 @@ export const PostScreen = ({
       <main className={panelMode ? styles.panelMain : styles.main}>
         <h2 className={styles.title}>気持ちを置く 🌸</h2>
 
-        {/* 全ての機能が無効の場合の警告 */}
+        {showPostModeTabs && (
+          <div className={styles.postModeTabs} role="tablist" aria-label="吹き出しかフリー投稿か">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={postTab === 'bubble'}
+              className={`${styles.postModeTab} ${postTab === 'bubble' ? styles.postModeTabActive : ''}`}
+              onClick={() => setPostTab('bubble')}
+            >
+              吹き出し
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={postTab === 'canvas'}
+              className={`${styles.postModeTab} ${postTab === 'canvas' ? styles.postModeTabActive : ''}`}
+              onClick={() => setPostTab('canvas')}
+            >
+              フリー
+            </button>
+          </div>
+        )}
+
+        {/* 全ての機能が無効の場合の警告（フリータブでは非表示） */}
         {spaceSettings &&
          !spaceSettings.features.commentPost &&
          !spaceSettings.features.emotionPost &&
-         !spaceSettings.features.photoPost && (
+         !spaceSettings.features.photoPost &&
+         postTab === 'bubble' && (
           <div className={styles.disabledNotice}>
             このスペースでは投稿機能が無効になっています。
             スペース管理画面で設定を変更してください。
           </div>
         )}
 
+        {/* 位置選択グリッド（吹き出し・フリー共通） */}
+        {!panelMode && featureFlags.position_selector && (
+          <div className={styles.section}>
+            <div className={styles.label}>置く場所（任意）</div>
+            <div className={styles.areaGrid}>
+              {AREA_LABELS.map((label, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedArea(selectedArea === idx ? null : idx)}
+                  className={`${styles.areaCell} ${selectedArea === idx ? styles.areaCellSelected : ''}`}
+                  aria-label={label}
+                  title={label}
+                >
+                  <span className={styles.areaCellLabel}>{label}</span>
+                </button>
+              ))}
+            </div>
+            <div className={styles.areaHint}>
+              {selectedArea !== null
+                ? `選択中: ${AREA_LABELS[selectedArea]}`
+                : 'スペース全体にランダム配置'}
+            </div>
+          </div>
+        )}
+
+        {postTab === 'canvas' && showPostModeTabs ? (
+          <div className={panelMode ? styles.panelSection : styles.section}>
+            <CanvasPostEditor
+              ref={canvasEditorRef}
+              spaceId={getActiveSpace()?.id ?? 'default'}
+              addHossii={addHossii}
+              panelMode={!!panelMode}
+              onClose={onClose}
+              onGoToSpace={() => navigate('screen')}
+              position={canvasPosition}
+              onToast={setToastStable}
+              continuousPost={continuousPost}
+            />
+          </div>
+        ) : (
+          <>
         {/* メッセージ入力 - commentPost が有効の場合のみ */}
         {spaceSettings?.features.commentPost !== false && (
           <div className={panelMode ? styles.panelSection : styles.section}>
@@ -805,32 +942,6 @@ export const PostScreen = ({
           </div>
         )}
 
-        {/* 位置選択グリッド（position_selector が ON かつフル画面時のみ。パネルはダブルクリック座標） */}
-        {!panelMode && featureFlags.position_selector && (
-          <div className={styles.section}>
-            <div className={styles.label}>置く場所（任意）</div>
-            <div className={styles.areaGrid}>
-              {AREA_LABELS.map((label, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setSelectedArea(selectedArea === idx ? null : idx)}
-                  className={`${styles.areaCell} ${selectedArea === idx ? styles.areaCellSelected : ''}`}
-                  aria-label={label}
-                  title={label}
-                >
-                  <span className={styles.areaCellLabel}>{label}</span>
-                </button>
-              ))}
-            </div>
-            <div className={styles.areaHint}>
-              {selectedArea !== null
-                ? `選択中: ${AREA_LABELS[selectedArea]}`
-                : 'スペース全体にランダム配置'}
-            </div>
-          </div>
-        )}
-
         {/* 送信ボタン（音声候補編集時は 保存 + 気持ちを置く） */}
         {speechEditMode && panelMode ? (
           <div className={styles.speechEditActions}>
@@ -888,6 +999,8 @@ export const PostScreen = ({
               </span>
             )}
           </button>
+        )}
+          </>
         )}
 
         {/* 連続投稿チェックボックス（音声候補編集時は非表示） */}

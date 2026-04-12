@@ -221,6 +221,7 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
               <tr>
                 <th className={styles.th}>投稿日時</th>
                 <th className={styles.th}>投稿者</th>
+                <th className={styles.th}>画像</th>
                 <th className={styles.th}>メッセージ</th>
                 <th className={styles.th}>状態</th>
                 <th className={styles.th}>操作</th>
@@ -237,6 +238,25 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
                     <span className={styles.authorName}>
                       {hossii.authorName ?? '匿名'}
                     </span>
+                  </td>
+                  <td className={styles.tdThumb}>
+                    {hossii.imageUrl ? (
+                      <a
+                        href={hossii.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.thumbLink}
+                        title="画像を開く"
+                      >
+                        <img
+                          src={hossii.imageUrl}
+                          alt=""
+                          className={styles.thumbImg}
+                        />
+                      </a>
+                    ) : (
+                      <span className={styles.thumbEmpty}>—</span>
+                    )}
                   </td>
                   <td className={styles.tdMessage}>
                     <span

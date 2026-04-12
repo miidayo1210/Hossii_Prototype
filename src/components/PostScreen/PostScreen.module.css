@@ -77,6 +77,38 @@
   white-space: nowrap;
 }
 
+/* 吹き出し / 自由編集タブ */
+.postModeTabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.postModeTab {
+  flex: 1;
+  min-width: 7rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #e9d5ff;
+  background: rgba(255, 255, 255, 0.65);
+  font-size: 0.875rem;
+  color: #6b21a8;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.postModeTab:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.postModeTabActive {
+  background: linear-gradient(135deg, #ddd6fe, #e9d5ff);
+  border-color: #a78bfa;
+  font-weight: 600;
+  color: #5b21b6;
+}
+
 /* メインコンテンツ */
 .main {
   flex: 1;

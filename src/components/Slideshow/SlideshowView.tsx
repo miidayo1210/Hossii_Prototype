@@ -104,12 +104,13 @@ export const SlideshowView = ({ hossiis, onExit }: Props) => {
   }
 
   const current = shuffled[currentIndex];
+  const isCanvasSlide = current.postKind === 'canvas' && !!current.imageUrl;
 
   return (
     <div className={styles.overlay} onPointerDown={handleTap}>
       {/* スライドカード */}
       <div className={`${styles.slide} ${visible ? styles.visible : styles.hidden}`}>
-        {current.emotion && (
+        {!isCanvasSlide && current.emotion && (
           <div className={styles.emotion}>
             {EMOJI_BY_EMOTION[current.emotion]}
           </div>
@@ -117,12 +118,12 @@ export const SlideshowView = ({ hossiis, onExit }: Props) => {
         {current.imageUrl && (
           <img
             src={current.imageUrl}
-            alt=""
-            className={styles.image}
+            alt={current.message?.trim() ? current.message : ''}
+            className={isCanvasSlide ? styles.slideImageCanvas : styles.image}
             loading="lazy"
           />
         )}
-        {current.message && (
+        {!isCanvasSlide && current.message && (
           <p className={styles.message}>{current.message}</p>
         )}
         {current.authorName && (

@@ -24,6 +24,9 @@ export type SpeechLevel = 'word' | 'short' | 'long';
 // 言語コード
 export type LanguageCode = 'ja' | 'en' | 'unknown';
 
+/** 投稿の表示種別（吹き出し / キャンバス画像） */
+export type HossiiPostKind = 'bubble' | 'canvas';
+
 // 投稿データ
 export type Hossii = {
   id: string;
@@ -66,6 +69,8 @@ export type Hossii = {
   // いいね機能（likes_enabled Feature Flag が ON の場合のみ使用）
   likeCount?: number;
   likedByMe?: boolean; // クライアント側ローカル状態（Supabase には保存しない）
+  /** 未設定・bubble = 従来の吹き出し。canvas = フリー投稿（可変比率のラスタ PNG） */
+  postKind?: HossiiPostKind;
 };
 
 // addHossii の入力型（message は空もあり得るが、最終的に空投稿は弾く）
@@ -87,6 +92,9 @@ export type AddHossiiInput = {
   positionX?: number; // 0〜1 の相対座標
   positionY?: number; // 0〜1 の相対座標
   isPositionFixed?: boolean; // true のとき上記座標で固定配置
+  postKind?: HossiiPostKind;
+  /** canvas 投稿時の初期スケール（省略時はストア側デフォルト） */
+  scale?: number;
 };
 
 export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities' | 'reflection' | 'neighbors';
