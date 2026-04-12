@@ -17,6 +17,15 @@ import { createBubblePosition, createOrderedBubblePosition } from '../../core/ut
 import { incrementLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { getPeriodCutoff, loadShowPostCountBadge, saveShowPostCountBadge } from '../../core/utils/displayPrefsStorage';
+import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
+import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
+import { buildSpaceExportFilename } from '../../core/utils/spaceExportFilename';
+import {
+  exportSpaceCanvasWithFrame,
+  downloadSpaceExportBlob,
+  SpaceExportError,
+  SPACE_EXPORT_MAX_BUBBLES,
+} from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
 import { VisitBanner } from './VisitBanner';
@@ -73,6 +82,7 @@ export const SpaceScreen = () => {
     updateHossiiPositionAction,
     updateHossiiScaleAction,
     hideHossii,
+    communitySlug,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
   const {
@@ -551,6 +561,117 @@ export const SpaceScreen = () => {
     return sorted.slice(0, limit);
   }, [hossiis, displayPeriod, displayLimit, viewMode]);
 
+  const { flags } = useFeatureFlags(activeSpace?.id);
+  const canSpaceExportByPermission =
+    isAdmin || flags.space_canvas_export_enabled;
+
+  const spaceExportRootRef = useRef<HTMLDivElement>(null);
+  const spaceExportAbortRef = useRef<AbortController | null>(null);
+  const [spaceExportBusy, setSpaceExportBusy] = useState(false);
+
+  const spaceExportBlockedUI = useMemo(
+    () =>
+      !!(
+        selectedPostId ||
+        showListenConsent ||
+        quickPostPos ||
+        quickLogOpen ||
+        speechPanelOpen ||
+        selectedDecorationId
+      ),
+    [
+      selectedPostId,
+      showListenConsent,
+      quickPostPos,
+      quickLogOpen,
+      speechPanelOpen,
+      selectedDecorationId,
+    ],
+  );
+
+  const showSpaceExportButton =
+    canSpaceExportByPermission &&
+    !isVisiting &&
+    viewMode !== 'slideshow' &&
+    hossiiLoadedFromSupabase;
+
+  const spaceExportButtonTitle = useMemo(() => {
+    if (spaceExportBusy) return '書き出し処理中です';
+    if (spaceExportBlockedUI) {
+      return 'パネルやモーダルを閉じてから書き出せます';
+    }
+    if (displayHossiis.length > SPACE_EXPORT_MAX_BUBBLES) {
+      return `表示中の投稿が多すぎます（上限 ${SPACE_EXPORT_MAX_BUBBLES} 件）`;
+    }
+    return 'スペースを画像（PNG）で書き出し';
+  }, [spaceExportBusy, spaceExportBlockedUI, displayHossiis.length]);
+
+  const handleSpaceExportCancel = useCallback(() => {
+    spaceExportAbortRef.current?.abort();
+  }, []);
+
+  const handleSpaceExport = useCallback(async () => {
+    if (!showSpaceExportButton || spaceExportBlockedUI) return;
+    const root = spaceExportRootRef.current;
+    const space = activeSpace;
+    if (!root || !space) return;
+
+    spaceExportAbortRef.current?.abort();
+    const ac = new AbortController();
+    spaceExportAbortRef.current = ac;
+
+    setSelectedBubbleId(null);
+    setSpaceExportBusy(true);
+    try {
+      const shareUrl = buildSpaceShareUrl({
+        origin: window.location.origin,
+        communitySlug,
+        spaceURL: space.spaceURL,
+        activeSpaceId: space.id,
+      });
+      const spaceTitle = spaceSettings?.spaceName ?? space.name;
+      const blob = await exportSpaceCanvasWithFrame({
+        element: root,
+        signal: ac.signal,
+        bubbleCount: displayHossiis.length,
+        shareUrl,
+        spaceTitle,
+        exportedAt: new Date(),
+      });
+      if (ac.signal.aborted) return;
+      const slug = space.spaceURL ?? space.id;
+      const datePart = new Intl.DateTimeFormat('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .format(new Date())
+        .replace(/\//g, '-');
+      const filename = buildSpaceExportFilename(
+        [spaceTitle, datePart, slug],
+        'png',
+      );
+      downloadSpaceExportBlob(blob, filename);
+    } catch (e) {
+      if (e instanceof SpaceExportError && e.code === 'aborted') return;
+      const msg =
+        e instanceof SpaceExportError ? e.message : '書き出しに失敗しました';
+      window.alert(msg);
+    } finally {
+      if (spaceExportAbortRef.current === ac) {
+        spaceExportAbortRef.current = null;
+      }
+      setSpaceExportBusy(false);
+    }
+  }, [
+    showSpaceExportButton,
+    spaceExportBlockedUI,
+    activeSpace,
+    communitySlug,
+    spaceSettings?.spaceName,
+    displayHossiis.length,
+  ]);
+
   // 画面上の一覧は新しい順なので、先頭 N 件を「直近投稿」として視覚的に強調する
   const RECENT_HIGHLIGHT_COUNT = 5;
   const recentHighlightIds = useMemo(
@@ -685,95 +806,24 @@ export const SpaceScreen = () => {
       className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''}`}
     >
       <ScaledContent
-        className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${backgroundClass}`}
-        style={backgroundStyle}
+        className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''}`}
       >
-      {/* 訪問モードバナー */}
-      {isVisiting && visitingSpaceInfo && (
-        <VisitBanner
-          spaceName={visitingSpaceInfo.name}
-          spaceURL={visitingSpaceInfo.spaceURL}
-          onBack={() => setVisitingSpace(null)}
-        />
-      )}
-
-      {/* Supabase から hossiis をロード中のオーバーレイ */}
-      {!hossiiLoadedFromSupabase && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.18)',
-          backdropFilter: 'blur(2px)',
-        }}>
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            border: '4px solid rgba(255,255,255,0.3)',
-            borderTopColor: '#fff',
-            animation: 'spin 0.8s linear infinite',
-          }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      )}
-
-      {/* 星レイヤー（Hossii OFF時のみ表示） */}
-      <StarLayer />
-
-      {/* スペースタイトル（情報レイヤー） */}
-      <div className={styles.spaceTitle}>
-        🌳 {spaceForVisual?.name ?? 'My Space'}
-      </div>
-
-      {/* 右上: 投稿数バッジ / 投稿順ツールバー */}
-      {(showPostCountBadge || (layoutMode === 'ordered' && viewMode !== 'slideshow')) && (
-        <div className={styles.spaceTopRightCluster}>
-          {showPostCountBadge && (
-            <div
-              className={styles.postCountBadge}
-              aria-live="polite"
-              title="現在の期間・件数・表示モードで画面に出ている投稿数"
-            >
-              <span className={styles.postCountBadgeValue}>{displayHossiis.length}</span>
-              <span className={styles.postCountBadgeUnit}>件</span>
-            </div>
-          )}
-          {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
-            <div className={styles.orderedSortToolbar} role="group" aria-label="投稿順の整列方向">
-              <button
-                type="button"
-                className={`${styles.orderedSortButton} ${orderedSortDirection === 'desc' ? styles.orderedSortButtonActive : ''}`}
-                title="新しい投稿を左上から（降順）"
-                aria-pressed={orderedSortDirection === 'desc'}
-                onClick={() => setOrderedSortDirection('desc')}
-              >
-                降順
-              </button>
-              <button
-                type="button"
-                className={`${styles.orderedSortButton} ${orderedSortDirection === 'asc' ? styles.orderedSortButtonActive : ''}`}
-                title="古い投稿を左上から（昇順）"
-                aria-pressed={orderedSortDirection === 'asc'}
-                onClick={() => setOrderedSortDirection('asc')}
-              >
-                昇順
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* スライドショーモード */}
+      {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
         <SlideshowView
           hossiis={displayHossiis}
           onExit={() => setViewMode('full')}
         />
       )}
+
+      {/* 書き出しキャプチャ範囲: 壁紙・星・バブル・粒子・キャラ・装飾のみ */}
+      <div
+        ref={spaceExportRootRef}
+        className={`${styles.spaceExportRoot} ${backgroundClass}`}
+        style={backgroundStyle}
+      >
+      {/* 星レイヤー（Hossii OFF時のみ表示） */}
+      <StarLayer />
 
       {/* バブルエリア（背景クリックでデセレクト。仕様 63: クイック投稿/ログのダブル・トリプルもこの全面ヒット領域のみ） */}
       <div
@@ -894,45 +944,6 @@ export const SpaceScreen = () => {
         />
       )}
 
-      {/* Listening インジケーター（タップで音声パネル開閉） */}
-      {listenMode && (
-        <div
-          className={styles.listeningIndicator}
-          onClick={() => setSpeechPanelOpen(prev => !prev)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSpeechPanelOpen(prev => !prev); }}
-        >
-          <span className={styles.listeningIcon}>🎙</span>
-          <span className={styles.listeningText}>Listening</span>
-        </div>
-      )}
-
-      {/* F14: 選択時ツールバー（中央ドラッグで移動・コーナーハンドルでリサイズ） */}
-      {selectedBubbleId && (
-        <div className={styles.editToolbar}>
-          <span className={styles.editToolbarHint}>
-            ドラッグで移動 · 角ハンドルでリサイズ
-          </span>
-          {isAdmin && (
-            <button
-              type="button"
-              className={`${styles.editToolbarBtn} ${styles.editToolbarBtnHide}`}
-              onClick={handleHideBubble}
-            >
-              🚫 非表示
-            </button>
-          )}
-          <button
-            type="button"
-            className={`${styles.editToolbarBtn} ${styles.editToolbarBtnCancel}`}
-            onClick={handleBubbleDeselect}
-          >
-            ✕ 選択解除
-          </button>
-        </div>
-      )}
-
       {/* A02: スペース装飾オーバーレイ */}
       {(spaceForVisual?.decorations ?? []).map((decoration: SpaceDecoration) => {
         const isOpen = selectedDecorationId === decoration.id;
@@ -968,8 +979,145 @@ export const SpaceScreen = () => {
           </div>
         );
       })}
+      </div>
 
-      {/* 漂着メッセージボトル */}
+      {/* 訪問モードバナー（書き出し対象外） */}
+      {isVisiting && visitingSpaceInfo && (
+        <VisitBanner
+          spaceName={visitingSpaceInfo.name}
+          spaceURL={visitingSpaceInfo.spaceURL}
+          onBack={() => setVisitingSpace(null)}
+        />
+      )}
+
+      {/* Supabase から hossiis をロード中のオーバーレイ */}
+      {!hossiiLoadedFromSupabase && (
+        <div
+          data-space-export="exclude"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.18)',
+            backdropFilter: 'blur(2px)',
+          }}
+        >
+          <div style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: '4px solid rgba(255,255,255,0.3)',
+            borderTopColor: '#fff',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
+      {/* スペースタイトル（情報レイヤー・書き出し対象外） */}
+      <div className={styles.spaceTitle} data-space-export="exclude">
+        🌳 {spaceForVisual?.name ?? 'My Space'}
+      </div>
+
+      {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー */}
+      {(showPostCountBadge ||
+        (layoutMode === 'ordered' && viewMode !== 'slideshow') ||
+        showSpaceExportButton) && (
+        <div className={styles.spaceTopRightCluster}>
+          {showSpaceExportButton && (
+            <button
+              type="button"
+              className={styles.spaceExportButton}
+              title={spaceExportButtonTitle}
+              disabled={
+                spaceExportBusy ||
+                spaceExportBlockedUI ||
+                displayHossiis.length > SPACE_EXPORT_MAX_BUBBLES
+              }
+              onClick={() => void handleSpaceExport()}
+            >
+              書き出し
+            </button>
+          )}
+          {showPostCountBadge && (
+            <div
+              className={styles.postCountBadge}
+              aria-live="polite"
+              title="現在の期間・件数・表示モードで画面に出ている投稿数"
+            >
+              <span className={styles.postCountBadgeValue}>{displayHossiis.length}</span>
+              <span className={styles.postCountBadgeUnit}>件</span>
+            </div>
+          )}
+          {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
+            <div className={styles.orderedSortToolbar} role="group" aria-label="投稿順の整列方向">
+              <button
+                type="button"
+                className={`${styles.orderedSortButton} ${orderedSortDirection === 'desc' ? styles.orderedSortButtonActive : ''}`}
+                title="新しい投稿を左上から（降順）"
+                aria-pressed={orderedSortDirection === 'desc'}
+                onClick={() => setOrderedSortDirection('desc')}
+              >
+                降順
+              </button>
+              <button
+                type="button"
+                className={`${styles.orderedSortButton} ${orderedSortDirection === 'asc' ? styles.orderedSortButtonActive : ''}`}
+                title="古い投稿を左上から（昇順）"
+                aria-pressed={orderedSortDirection === 'asc'}
+                onClick={() => setOrderedSortDirection('asc')}
+              >
+                昇順
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Listening インジケーター（タップで音声パネル開閉・書き出し対象外） */}
+      {listenMode && (
+        <div
+          className={styles.listeningIndicator}
+          data-space-export="exclude"
+          onClick={() => setSpeechPanelOpen(prev => !prev)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSpeechPanelOpen(prev => !prev); }}
+        >
+          <span className={styles.listeningIcon}>🎙</span>
+          <span className={styles.listeningText}>Listening</span>
+        </div>
+      )}
+
+      {/* F14: 選択時ツールバー（書き出し対象外） */}
+      {selectedBubbleId && (
+        <div className={styles.editToolbar} data-space-export="exclude">
+          <span className={styles.editToolbarHint}>
+            ドラッグで移動 · 角ハンドルでリサイズ
+          </span>
+          {isAdmin && (
+            <button
+              type="button"
+              className={`${styles.editToolbarBtn} ${styles.editToolbarBtnHide}`}
+              onClick={handleHideBubble}
+            >
+              🚫 非表示
+            </button>
+          )}
+          <button
+            type="button"
+            className={`${styles.editToolbarBtn} ${styles.editToolbarBtnCancel}`}
+            onClick={handleBubbleDeselect}
+          >
+            ✕ 選択解除
+          </button>
+        </div>
+      )}
+
+      {/* 漂着メッセージボトル（書き出し対象外） */}
       {bottlePayload && !isVisiting && (
         <MessageBottle
           payload={bottlePayload}
@@ -1115,6 +1263,31 @@ export const SpaceScreen = () => {
         </FloatingPanelShell>
       )}
       {viewMode !== 'slideshow' && qrPanelVisible && <QRCodePanel />}
+
+      {spaceExportBusy && (
+        <div className={styles.spaceExportModalBackdrop}>
+          <div
+            className={styles.spaceExportModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="space-export-modal-title"
+          >
+            <p id="space-export-modal-title" className={styles.spaceExportModalTitle}>
+              書き出し中…
+            </p>
+            <p className={styles.spaceExportModalHint}>
+              しばらくお待ちください。投稿や背景によっては時間がかかることがあります。
+            </p>
+            <button
+              type="button"
+              className={styles.spaceExportModalCancel}
+              onClick={handleSpaceExportCancel}
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -175,6 +175,86 @@
   background: rgba(167, 139, 250, 0.55);
 }
 
+.spaceExportButton {
+  pointer-events: auto;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.spaceExportButton:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.spaceExportButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.spaceExportModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.spaceExportModal {
+  min-width: 280px;
+  max-width: 90vw;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: rgba(30, 27, 75, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.spaceExportModalTitle {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.spaceExportModalHint {
+  margin: 0 0 16px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.5;
+}
+
+.spaceExportModalCancel {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.spaceExportModalCancel:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 書き出し対象のルート（壁紙・バブル・キャラ・装飾）。操作系オーバーレイは外に出す */
+.spaceExportRoot {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 /* バブルエリア */
 .bubbleArea {
   position: absolute;

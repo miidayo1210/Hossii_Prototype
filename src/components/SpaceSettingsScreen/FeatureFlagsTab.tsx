@@ -36,6 +36,11 @@ const FLAG_LIST: FlagMeta[] = [
     description: '月次の振り返りレポートをPDFで出力します（実装予定）。',
   },
   {
+    key: 'space_canvas_export_enabled',
+    label: 'スペース書き出し',
+    description: 'スペース画面を画像（PNG）として書き出せるようにします。コミュニティ管理者以外はこのフラグが必要です。',
+  },
+  {
     key: 'bubble_shapes_extended',
     label: '吹き出し形状カスタマイズ',
     description: '投稿ごとに吹き出しの形を選択できるようにします。',

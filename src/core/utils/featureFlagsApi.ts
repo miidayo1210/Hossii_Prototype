@@ -10,6 +10,7 @@ export type FeatureFlagKey =
   | 'random_recall_enabled'
   | 'public_board_mode'
   | 'zine_export_enabled'
+  | 'space_canvas_export_enabled'
   | 'bubble_shapes_extended'
   | 'position_selector';
 
@@ -174,6 +175,7 @@ function buildDefaults(): FeatureFlags {
     random_recall_enabled: false,
     public_board_mode: false,
     zine_export_enabled: false,
+    space_canvas_export_enabled: false,
     bubble_shapes_extended: false,
     position_selector: false,
   };
@@ -186,6 +188,7 @@ function buildAllFalse(): FeatureFlags {
     random_recall_enabled: false,
     public_board_mode: false,
     zine_export_enabled: false,
+    space_canvas_export_enabled: false,
     bubble_shapes_extended: false,
     position_selector: false,
   };
@@ -198,6 +201,7 @@ function castToFeatureFlags(raw: Record<string, boolean>): FeatureFlags {
     random_recall_enabled: raw['random_recall_enabled'] ?? false,
     public_board_mode: raw['public_board_mode'] ?? false,
     zine_export_enabled: raw['zine_export_enabled'] ?? false,
+    space_canvas_export_enabled: raw['space_canvas_export_enabled'] ?? false,
     bubble_shapes_extended: raw['bubble_shapes_extended'] ?? false,
     position_selector: raw['position_selector'] ?? false,
   };
