@@ -454,9 +454,11 @@ export const CanvasPostEditor = forwardRef<CanvasPostEditorHandle, CanvasPostEdi
     };
 
     const stageBgStyle: React.CSSProperties = {
-      backgroundColor: bgImage ? 'transparent' : bgTransparent ? 'transparent' : bgColor,
+      backgroundColor: bgTransparent ? 'transparent' : bgColor,
       backgroundImage: bgImage ? `url(${bgImage})` : undefined,
     };
+
+    const useBlurredFill = Boolean(bgImage && !bgTransparent);
 
     return (
       <div className={styles.wrap}>
@@ -470,7 +472,20 @@ export const CanvasPostEditor = forwardRef<CanvasPostEditorHandle, CanvasPostEdi
                 if (!editingTextId) setSelectedId(null);
               }}
             >
-              <div className={styles.stageBg} style={stageBgStyle} />
+              {useBlurredFill ? (
+                <div className={styles.stageBgStack} style={{ backgroundColor: bgColor }}>
+                  <div
+                    className={styles.stageBgBlur}
+                    style={{ backgroundImage: `url(${bgImage})` }}
+                  />
+                  <div
+                    className={styles.stageBgSharp}
+                    style={{ backgroundImage: `url(${bgImage})` }}
+                  />
+                </div>
+              ) : (
+                <div className={styles.stageBg} style={stageBgStyle} />
+              )}
               {texts.map((t) => {
                 const isSel = selectedId === t.id;
                 const isEditing = editingTextId === t.id;

@@ -94,9 +94,29 @@
   background-size: 100% 100%;
 }
 
-/* Image background support */
-.bgImage {
+/* 画像壁紙: 下層＝拡大＋ぼかし、上層＝contain でシャープ（余白は色味がつながる） */
+.bgImageStack {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bgImageBlurFill {
+  position: absolute;
+  inset: -12%;
   background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform: scale(1.06);
+  filter: blur(28px);
+}
+
+.bgImageSharp {
+  position: absolute;
+  inset: 0;
+  background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
 }

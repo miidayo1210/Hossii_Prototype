@@ -55,6 +55,9 @@ import {
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
+/** 画像壁紙を contain にしたときのレターボックス色（仕様 70・永続化は後続） */
+const SPACE_IMAGE_LETTERBOX_COLOR = '#0f172a';
+
 /** カケラ粒子の型 */
 type Particle = {
   id: string;
@@ -751,13 +754,14 @@ export const SpaceScreen = () => {
   }, [broadcastedReaction, latestHossii]);
 
   // 背景スタイルを生成（訪問中は visitingSpaceInfo の background を使用）
-  const { backgroundClass, backgroundStyle } = useMemo(() => {
+  const { backgroundClass, backgroundStyle, imageWallpaperUrl } = useMemo(() => {
     const bg = spaceForVisual?.background;
     if (!bg) {
       // デフォルト背景（パターン: mist）
       return {
         backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
         backgroundStyle: {},
+        imageWallpaperUrl: null as string | null,
       };
     }
 
@@ -765,6 +769,7 @@ export const SpaceScreen = () => {
       return {
         backgroundClass: bgStyles.bgBase,
         backgroundStyle: { backgroundColor: bg.value },
+        imageWallpaperUrl: null as string | null,
       };
     }
 
@@ -773,13 +778,17 @@ export const SpaceScreen = () => {
       return {
         backgroundClass: `${bgStyles.bgBase} ${patternClass}`,
         backgroundStyle: {},
+        imageWallpaperUrl: null as string | null,
       };
     }
 
     if (bg.kind === 'image') {
       return {
-        backgroundClass: `${bgStyles.bgBase} ${bgStyles.bgImage}`,
-        backgroundStyle: { backgroundImage: `url(${bg.value})` },
+        backgroundClass: `${bgStyles.bgBase}`,
+        backgroundStyle: {
+          backgroundColor: SPACE_IMAGE_LETTERBOX_COLOR,
+        },
+        imageWallpaperUrl: bg.value,
       };
     }
 
@@ -787,6 +796,7 @@ export const SpaceScreen = () => {
     return {
       backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
       backgroundStyle: {},
+      imageWallpaperUrl: null as string | null,
     };
   }, [spaceForVisual]);
 
@@ -824,6 +834,18 @@ export const SpaceScreen = () => {
         className={`${styles.spaceExportRoot} ${backgroundClass}`}
         style={backgroundStyle}
       >
+      {imageWallpaperUrl != null && (
+        <div className={bgStyles.bgImageStack} aria-hidden>
+          <div
+            className={bgStyles.bgImageBlurFill}
+            style={{ backgroundImage: `url(${imageWallpaperUrl})` }}
+          />
+          <div
+            className={bgStyles.bgImageSharp}
+            style={{ backgroundImage: `url(${imageWallpaperUrl})` }}
+          />
+        </div>
+      )}
       {/* 星レイヤー（Hossii OFF時のみ表示） */}
       <StarLayer />
 
