@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from './core/hooks/useRouter';
 import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
@@ -48,11 +48,11 @@ const AppContent = () => {
   // 初回 URL スラッグ解決済みフラグ（スペース設定変更後に再トリガーされるのを防ぐ）
   const initialSlugHandledRef = useRef(false);
 
-  // /s/[slug] パスかどうかを初回レンダー時に同期的に検出（フラッシュ防止）
-  const isOnSlugPath = useMemo(
-    () => /^\/s\/[a-z0-9]/.test(window.location.pathname),
-    []
-  );
+  // スペース直リンクの pathname か。replaceState で / に戻ったあとに古い true のまま残さないよう毎レンダーで評価（下の effect と同じ判定）
+  const p = window.location.pathname;
+  const isOnSlugPath =
+    /^\/c\/[a-z0-9][a-z0-9-]*\/s\/[a-z0-9][a-z0-9-]*$/.test(p) ||
+    /^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/.test(p);
 
   // /s/[slug] ゲスト入室フロー用 state
   // guestSpaceId: 未ログインで /s/[slug] にアクセスしたときのスペースID

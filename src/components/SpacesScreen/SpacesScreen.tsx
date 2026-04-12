@@ -29,7 +29,8 @@ const getBgStyle = (background: SpaceBackground | undefined): React.CSSPropertie
 };
 
 export const SpacesScreen = () => {
-  const { state, addSpace, updateSpace, removeSpace, setActiveSpace, communitySlug } = useHossiiStore();
+  const { state, addSpace, updateSpace, removeSpace, setActiveSpace, communitySlug, spacesLoadedFromSupabase } =
+    useHossiiStore();
   const { navigate, screenParam } = useRouter();
   const { currentUser, logout, refreshCommunitySlug } = useAuth();
   const { overrideCommunityId, overrideCommunityName, clearOverrideCommunity, setOverrideCommunity } = useAdminNavigation();
@@ -445,15 +446,29 @@ export const SpacesScreen = () => {
       {/* スペースグリッド */}
       <main className={styles.main}>
         <div className={styles.spaceGrid}>
-          {spaces.length === 0 && (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyStateIcon}>🌌</div>
-              <p className={styles.emptyStateText}>まだスペースがありません</p>
-              <p className={styles.emptyStateSubtext}>
-                右上の「新しいスペースを作成」から始めましょう
-              </p>
-            </div>
-          )}
+          {spaces.length === 0 &&
+            currentUser?.isSuperAdmin &&
+            overrideCommunityId &&
+            !spacesLoadedFromSupabase && (
+              <div className={styles.emptyState}>
+                <p className={styles.emptyStateText}>スペース一覧を読み込み中です…</p>
+              </div>
+            )}
+
+          {spaces.length === 0 &&
+            !(
+              currentUser?.isSuperAdmin &&
+              overrideCommunityId &&
+              !spacesLoadedFromSupabase
+            ) && (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyStateIcon}>🌌</div>
+                <p className={styles.emptyStateText}>まだスペースがありません</p>
+                <p className={styles.emptyStateSubtext}>
+                  右上の「新しいスペースを作成」から始めましょう
+                </p>
+              </div>
+            )}
 
           {spaces.map((space) => (
             <div key={space.id} className={styles.spaceCard}>

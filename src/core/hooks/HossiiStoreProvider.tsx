@@ -591,6 +591,8 @@ type HossiiProviderProps = {
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
   const { currentUser, isResolvingAuth } = useAuth();
   const { overrideCommunityId, overrideCommunitySlug } = useAdminNavigation();
+  /** 直近で成功した fetchSpaces のコミュニティ ID（スーパー管理者のスコープ切替検知用） */
+  const lastScopedCommunityFetchKeyRef = useRef<string | undefined>(undefined);
   const communityId = overrideCommunityId ?? currentUser?.communityId;
   const communitySlug = overrideCommunitySlug ?? currentUser?.communitySlug;
 
@@ -649,25 +651,86 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // isResolvingAuth が true の間は発火しない。
   // これにより管理者ユーザーで communityId が undefined → 確定値と2回 fetchSpaces が
   // 走る二重リクエストを排除し、1回で正しい communityId のスペースを取得できる。
+  //
+  // スーパー管理者で override / 自コミュニティ ID が無いときは fetchSpaces(undefined) による
+  // 全件取得を行わない（仕様 67）。
+  // スコープ付き fetch が一度成功したあと communityId が変わるときは、旧一覧を先に空にしてから取得する。
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     if (isResolvingAuth) return;
 
-    // snapshot: fetch 開始時点の pending IDs を保存
+    const skipAllTenantFetch =
+      currentUser?.isSuperAdmin === true &&
+      !overrideCommunityId &&
+      !currentUser?.communityId;
+
+    if (skipAllTenantFetch) {
+      // 仕様 67 案1: 一覧にいる間も ref を維持する。ここで undefined に戻すと A→一覧→B のとき
+      // prevKey が空のままになり fetch 前クリアが効かず、直前コミュニティの spaces が残る。
+      queueMicrotask(() => setSpacesLoadedFromSupabase(true));
+      return;
+    }
+
+    const effectiveId = communityId;
+    if (effectiveId == null || effectiveId === '') {
+      lastScopedCommunityFetchKeyRef.current = undefined;
+      queueMicrotask(() => setSpacesLoadedFromSupabase(true));
+      return;
+    }
+
+    const prevKey = lastScopedCommunityFetchKeyRef.current;
+    const shouldClearBeforeFetch =
+      prevKey !== undefined && prevKey !== effectiveId;
+
     const preserveIds = new Set(pendingSpaceIds.current);
 
-    fetchSpaces(communityId).then((supabaseSpaces) => {
+    const applySpaces = (supabaseSpaces: Space[] | null) => {
       if (supabaseSpaces !== null) {
-        // null はエラーを意味するため、その場合は既存データを保持する
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces, preserveIds });
+        lastScopedCommunityFetchKeyRef.current = effectiveId;
+        const st = stateRef.current;
+        if (
+          supabaseSpaces.length > 0 &&
+          !supabaseSpaces.some((s) => s.id === st.activeSpaceId)
+        ) {
+          dispatch({ type: 'SET_ACTIVE_SPACE', payload: supabaseSpaces[0].id });
+        }
       }
       setSpacesLoadedFromSupabase(true);
-    });
-  }, [communityId, isResolvingAuth]);
+    };
+
+    /* eslint-disable react-hooks/set-state-in-effect -- fetch 直前に spacesLoaded を false に固定（queue だと完了後の true より遅れる） */
+    if (shouldClearBeforeFetch) {
+      setSpacesLoadedFromSupabase(false);
+      dispatch({ type: 'SET_SPACES', payload: [], preserveIds: new Set() });
+      dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
+      fetchSpaces(effectiveId).then(applySpaces);
+    } else {
+      setSpacesLoadedFromSupabase(false);
+      fetchSpaces(effectiveId).then(applySpaces);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [
+    communityId,
+    isResolvingAuth,
+    overrideCommunityId,
+    currentUser?.isSuperAdmin,
+    currentUser?.communityId,
+  ]);
 
   // ===== Supabase: アクティブスペースの hossiis を同期 =====
   useEffect(() => {
     if (!isSupabaseConfigured) return;
+
+    const { spaces: spList, activeSpaceId: aid } = stateRef.current;
+    if (!spList.some((s) => s.id === aid)) {
+      queueMicrotask(() => {
+        setHossiiLoadedFromSupabase(false);
+        dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
+        setHossiiLoadedFromSupabase(true);
+      });
+      return;
+    }
 
     // ローディング開始と同時に古いデータを即クリア（フラッシュ防止）
     queueMicrotask(() => {
@@ -679,7 +742,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       dispatch({ type: 'SYNC_HOSSIIS', payload: supabaseHossiis });
       setHossiiLoadedFromSupabase(true);
     });
-  }, [state.activeSpaceId]);
+  }, [state.activeSpaceId, state.spaces]);
 
   // ===== Supabase Realtime: hossiis の INSERT/UPDATE/DELETE を購読 =====
   useEffect(() => {
