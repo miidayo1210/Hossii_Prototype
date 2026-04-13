@@ -13,3 +13,11 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* Fullscreen API 時のフォールバック（html/#root 単体全画面で無地に見えるのを防ぐ、仕様71） */
+html:fullscreen,
+html:-webkit-full-screen,
+#root:fullscreen,
+#root:-webkit-full-screen {
+  background: linear-gradient(to bottom, #f0f4f8, #e8f0f8);
+}

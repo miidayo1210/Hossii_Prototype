@@ -34,6 +34,8 @@ type Props = {
   /** スペース右上に現在の表示条件での投稿数を出す */
   showPostCountBadge?: boolean;
   onShowPostCountBadgeToggle?: () => void;
+  /** 大画面トグルの説明文をスマホ向けに変える（仕様71） */
+  isMobile?: boolean;
 };
 
 const PERIOD_OPTIONS: { value: DisplayPeriod; label: string }[] = [
@@ -83,6 +85,7 @@ export const LeftControlBar = ({
   onQrToggle,
   showPostCountBadge = false,
   onShowPostCountBadgeToggle,
+  isMobile = false,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
 
@@ -101,8 +104,20 @@ export const LeftControlBar = ({
       <button
         className={`${styles.controlButton} ${styles.mobileVisible} ${controls.isFullscreen ? styles.active : ''}`}
         onClick={onFullscreenToggle}
-        aria-label="画面サイズ調整"
-        title="画面サイズ調整"
+        aria-label={
+          isMobile
+            ? controls.isFullscreen
+              ? '大画面表示を終了'
+              : '大画面表示（表示領域を広げます。ブラウザの全画面にならない場合があります）'
+            : '画面サイズ調整'
+        }
+        title={
+          isMobile
+            ? controls.isFullscreen
+              ? '大画面表示を終了'
+              : '大画面表示: スペースの表示領域を端まで広げます。ブラウザの全画面にならない場合があります。'
+            : '画面サイズ調整'
+        }
       >
         {controls.isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
       </button>

@@ -652,6 +652,15 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // Supabase からの hossiis 読み込みが完了したかどうか
   const [hossiiLoadedFromSupabase, setHossiiLoadedFromSupabase] = useState(!isSupabaseConfigured);
 
+  // スペース「一覧にどの ID が載るか」が変わったときだけ hossii を再取得する。
+  // state.spaces の参照だけ変わる更新（名前・背景・presetTags 等）のたびに SYNC_HOSSIIS([]) すると、
+  // 進行中の INSERT と競合し楽観投稿が消えたり、Realtime が自己 INSERT をスキップして復帰しないことがある。
+  const spaceIdsSignature = useMemo(() => {
+    const ids = state.spaces.map((s) => s.id);
+    ids.sort();
+    return ids.join('\0');
+  }, [state.spaces]);
+
   // ===== Supabase: スペースをマウント時に同期 =====
   // isResolvingAuth が true の間は発火しない。
   // これにより管理者ユーザーで communityId が undefined → 確定値と2回 fetchSpaces が
@@ -747,7 +756,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       dispatch({ type: 'SYNC_HOSSIIS', payload: supabaseHossiis });
       setHossiiLoadedFromSupabase(true);
     });
-  }, [state.activeSpaceId, state.spaces]);
+  }, [state.activeSpaceId, spaceIdsSignature]);
 
   // ===== Supabase Realtime: hossiis の INSERT/UPDATE/DELETE を購読 =====
   useEffect(() => {
@@ -768,6 +777,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           // 自分が INSERT した場合はスキップ（楽観的更新で既に追加済み）
           if (insertedHossiiIdsRef.current.has(row.id)) {
             insertedHossiiIdsRef.current.delete(row.id);
+            // 直前の fetch 同期で楽観投稿が SYNC により消えていると、ここで return すると永遠に復帰しない
+            if (!stateRef.current.hossiis.some((h) => h.id === row.id)) {
+              dispatch({ type: 'ADD_HOSSII_FULL', payload: rowToHossii(row) });
+            }
             return;
           }
           dispatch({ type: 'ADD_HOSSII_FULL', payload: rowToHossii(row) });
@@ -915,11 +928,20 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     if (isSupabaseConfigured) {
       insertedHossiiIdsRef.current.add(newHossii.id);
       const spacePending = pendingSpacePromises.current.get(newHossii.spaceId);
-      if (spacePending) {
-        spacePending.then(() => insertHossii(newHossii));
-      } else {
-        insertHossii(newHossii);
-      }
+      const insertPromise = spacePending
+        ? spacePending.then(() => insertHossii(newHossii))
+        : insertHossii(newHossii);
+      insertPromise
+        .then((ok) => {
+          if (ok === false) {
+            insertedHossiiIdsRef.current.delete(newHossii.id);
+            dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
+          }
+        })
+        .catch(() => {
+          insertedHossiiIdsRef.current.delete(newHossii.id);
+          dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
+        });
     }
   }, [activeSpaceIdRef]);
 

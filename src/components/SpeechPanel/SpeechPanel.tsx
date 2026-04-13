@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { SpeechLevelSettings } from '../../core/utils/listenStorage';
-import { getDefaultSpeechRect } from '../../core/utils/floatingPanelStorage';
+import {
+  getDefaultSpeechRect,
+  type FloatingRect,
+} from '../../core/utils/floatingPanelStorage';
 import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import styles from './SpeechPanel.module.css';
 
@@ -23,6 +26,11 @@ type Props = {
   onClose: () => void;
   /** クイック投稿のフリー編集へ候補を送る（定義時のみボタン表示） */
   onSendCandidateToFreePost?: (text: string) => void;
+  /** FloatingPanelShell（モバイルは別ストレージキー・既定矩形、仕様71） */
+  panelStorageKey?: string;
+  panelDefaultRect?: FloatingRect;
+  panelMinW?: number;
+  panelMinH?: number;
 };
 
 type PanelLevel = 'short' | 'long';
@@ -207,18 +215,29 @@ function SpeechPanelInner({
 }
 
 export function SpeechPanel(props: Props) {
-  const defaultRect = useMemo(() => getDefaultSpeechRect(), []);
+  const {
+    panelStorageKey = 'speech',
+    panelDefaultRect,
+    panelMinW = 280,
+    panelMinH = 180,
+    ...innerProps
+  } = props;
+
+  const defaultRect = useMemo(
+    () => panelDefaultRect ?? getDefaultSpeechRect(),
+    [panelDefaultRect]
+  );
 
   return (
     <FloatingPanelShell
-      storageKey="speech"
+      storageKey={panelStorageKey}
       defaultRect={defaultRect}
-      minW={280}
-      minH={180}
+      minW={panelMinW}
+      minH={panelMinH}
       zIndex={300}
       className={styles.floatingChrome}
     >
-      <SpeechPanelInner {...props} />
+      <SpeechPanelInner {...innerProps} />
     </FloatingPanelShell>
   );
 }

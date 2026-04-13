@@ -406,6 +406,7 @@ export const Bubble = ({
                 <button
                   type="button"
                   className={styles.canvasExpandBtn}
+                  data-space-export="exclude"
                   aria-label="拡大表示"
                   title="拡大表示"
                   onPointerDown={(e) => e.stopPropagation()}
@@ -436,6 +437,7 @@ export const Bubble = ({
                   <button
                     type="button"
                     className={styles.canvasExpandBtn}
+                    data-space-export="exclude"
                     aria-label="拡大表示"
                     title="拡大表示"
                     onPointerDown={(e) => e.stopPropagation()}
@@ -560,6 +562,7 @@ export const Bubble = ({
           {!isCanvasPost && (
             <div
               className={styles.bubbleColorPalette}
+              data-space-export="exclude"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >

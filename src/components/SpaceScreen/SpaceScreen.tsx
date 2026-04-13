@@ -51,12 +51,27 @@ import {
   getDefaultQuickLogSideRect,
   getDefaultQuickPostBottomRect,
   getDefaultQuickPostSideRect,
+  getDefaultSpeechRect,
+  getDefaultSpeechRectMobileMic,
 } from '../../core/utils/floatingPanelStorage';
+import {
+  loadLandscapeHintDismissed,
+  saveLandscapeHintDismissed,
+} from '../../core/utils/landscapeHintStorage';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
 /** 画像壁紙を contain にしたときのレターボックス色（仕様 70・永続化は後続） */
 const SPACE_IMAGE_LETTERBOX_COLOR = '#0f172a';
+
+/** React のコミット後に描画まで待つ（仕様 68: 選択解除した編集 UI が PNG に残らないようにする） */
+function waitForDoubleRaf(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
 
 /** カケラ粒子の型 */
 type Particle = {
@@ -119,12 +134,31 @@ export const SpaceScreen = () => {
   const prevLatestIdRef = useRef<string | null>(null);
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const isPortrait = useMediaQuery('(orientation: portrait)');
+  const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(loadLandscapeHintDismissed);
   const quickPostDefaultRect = useMemo(
     () => (isMobile ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
     [isMobile]
   );
   const quickLogDefaultRect = useMemo(
     () => (isMobile ? getDefaultQuickLogBottomRect() : getDefaultQuickLogSideRect()),
+    [isMobile]
+  );
+  const speechPanelFloating = useMemo(
+    () =>
+      isMobile
+        ? {
+            panelStorageKey: 'speech.mobile' as const,
+            panelDefaultRect: getDefaultSpeechRectMobileMic(),
+            panelMinW: 200,
+            panelMinH: 200,
+          }
+        : {
+            panelStorageKey: 'speech' as const,
+            panelDefaultRect: getDefaultSpeechRect(),
+            panelMinW: 280,
+            panelMinH: 180,
+          },
     [isMobile]
   );
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -317,6 +351,8 @@ export const SpaceScreen = () => {
 
   /** アプリ内「大画面」— 見た目の最大化（Fullscreen API は補助） */
   const [immersiveLayout, setImmersiveLayout] = useState(false);
+  /** ブラウザ全画面の対象（documentElement ではなくスペースコンテナ、仕様71） */
+  const spaceImmersiveRootRef = useRef<HTMLDivElement>(null);
 
   // PC版コントロールバーの状態管理
   const [controlState, setControlState] = useState<ControlState>({
@@ -339,16 +375,24 @@ export const SpaceScreen = () => {
     setControlState((prev) => ({ ...prev, isFullscreen: immersiveLayout }));
   }, [immersiveLayout]);
 
-  // 没入モードに合わせてブラウザ全画面を試みる / 終了
+  // 没入モードに合わせてブラウザ全画面を試みる / 終了（モバイルは CSS のみ、仕様71）
   useEffect(() => {
-    if (immersiveLayout) {
-      document.documentElement.requestFullscreen().catch(() => {
-        /* モバイル等では未対応のことがある — レイアウトのみで継続 */
-      });
-    } else if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+    if (!immersiveLayout) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      return;
     }
-  }, [immersiveLayout]);
+    if (isMobile) {
+      return;
+    }
+    const el = spaceImmersiveRootRef.current;
+    if (!el) return;
+    if (document.fullscreenElement === el) return;
+    el.requestFullscreen().catch(() => {
+      /* 未対応・拒否 — レイアウトのみで継続 */
+    });
+  }, [immersiveLayout, isMobile]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -432,6 +476,11 @@ export const SpaceScreen = () => {
 
   const handleFullscreenToggle = useCallback(() => {
     setImmersiveLayout((v) => !v);
+  }, []);
+
+  const dismissLandscapeHint = useCallback(() => {
+    saveLandscapeHintDismissed();
+    setLandscapeHintDismissed(true);
   }, []);
 
   // DisplayScale を循環させる（75% → 100% → 125% → 150% → 75%...）
@@ -628,6 +677,9 @@ export const SpaceScreen = () => {
     setSelectedBubbleId(null);
     setSpaceExportBusy(true);
     try {
+      await waitForDoubleRaf();
+      if (ac.signal.aborted) return;
+
       const shareUrl = buildSpaceShareUrl({
         origin: window.location.origin,
         communitySlug,
@@ -813,10 +865,34 @@ export const SpaceScreen = () => {
       ? visitingSpaceInfo.presetTags ?? []
       : activeSpace?.presetTags ?? [];
 
+  const showLandscapeHint =
+    isMobile &&
+    isPortrait &&
+    !landscapeHintDismissed &&
+    !isVisiting &&
+    viewMode !== 'slideshow' &&
+    (listenMode || speechPanelOpen);
+
   return (
     <div
+      ref={spaceImmersiveRootRef}
       className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''}`}
     >
+      {showLandscapeHint && (
+        <div className={styles.landscapeHintBanner} role="status">
+          <span className={styles.landscapeHintText}>
+            横持ちにするとスペースと文字が見やすいです
+          </span>
+          <button
+            type="button"
+            className={styles.landscapeHintClose}
+            onClick={dismissLandscapeHint}
+            aria-label="案内を閉じる"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <ScaledContent
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''}`}
       >
@@ -1157,6 +1233,7 @@ export const SpaceScreen = () => {
       {speechPanelOpen &&
         createPortal(
           <SpeechPanel
+            {...speechPanelFloating}
             listenMode={listenMode}
             onListenToggle={handleSpeechPanelListenToggle}
             confirmedText={panelConfirmedText}
@@ -1212,6 +1289,7 @@ export const SpaceScreen = () => {
             controls={controlState}
             onToggle={handleControlToggle}
             onFullscreenToggle={handleFullscreenToggle}
+            isMobile={isMobile}
             displayScale={displayScale}
             onDisplayScaleCycle={handleDisplayScaleCycle}
             displayPeriod={displayPeriod}

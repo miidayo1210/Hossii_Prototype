@@ -75,6 +75,20 @@ export function getDefaultSpeechRect(): FloatingRect {
   return { x, y, w, h };
 }
 
+/** モバイル縦持ちの Listen／音声パネル向け（下寄せ・やや高め、仕様71） */
+export function getDefaultSpeechRectMobileMic(): FloatingRect {
+  if (typeof window === 'undefined') return { x: 0, y: 280, w: 400, h: 440 };
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const reserve = getFloatingPanelBottomInsetPx();
+  const margin = 8;
+  const h = Math.floor(vh * 0.55);
+  const w = Math.max(200, vw - margin * 2);
+  const x = Math.max(0, (vw - w) / 2);
+  const y = vh - h - reserve;
+  return { x, y, w, h };
+}
+
 export function getDefaultQuickPostSideRect(): FloatingRect {
   if (typeof window === 'undefined') return { x: 800, y: 64, w: 320, h: 600 };
   const vw = window.innerWidth;

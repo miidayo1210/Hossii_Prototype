@@ -6,6 +6,7 @@ import {
   useImperativeHandle,
   forwardRef,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { toPng } from 'html-to-image';
 import type { AddHossiiInput } from '../../core/types';
 import { generateId } from '../../core/utils';
@@ -375,8 +376,26 @@ export const CanvasPostEditor = forwardRef<CanvasPostEditorHandle, CanvasPostEdi
       const el = stageRef.current;
       if (!el || submitting) return;
 
+      let textsSnapshot = texts;
+      if (editingTextId) {
+        const editEl = editingContentRef.current;
+        if (editEl) {
+          const next =
+            editEl.innerText.replace(/\r/g, '').slice(0, MAX_TEXT_LEN) || 'テキスト';
+          textsSnapshot = texts.map((t) =>
+            t.id === editingTextId ? { ...t, text: next } : t,
+          );
+        }
+      }
+
       setSubmitting(true);
       try {
+        flushSync(() => {
+          setTexts(textsSnapshot);
+          setEditingTextId(null);
+          setSelectedId(null);
+        });
+
         const dataUrl = await toPng(el, {
           cacheBust: true,
           pixelRatio: Math.min(
@@ -409,7 +428,7 @@ export const CanvasPostEditor = forwardRef<CanvasPostEditorHandle, CanvasPostEdi
         addHossii({
           postKind: 'canvas',
           imageUrl,
-          message: joinTextBlocksForMessage(texts),
+          message: joinTextBlocksForMessage(textsSnapshot),
           ...(position
             ? { positionX: position.x, positionY: position.y, isPositionFixed: true }
             : {}),

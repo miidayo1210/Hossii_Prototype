@@ -1148,3 +1148,47 @@
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 24px rgba(14, 165, 233, 0.12);
 }
+
+/* 仕様71: 縦持ち時の横持ちソフト案内 */
+.landscapeHintBanner {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: 8px;
+  right: 8px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.88);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
+.landscapeHintText {
+  flex: 1;
+  min-width: 0;
+}
+
+.landscapeHintClose {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.landscapeHintClose:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

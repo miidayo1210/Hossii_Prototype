@@ -101,6 +101,7 @@ export function loadHossiis(): unknown[] {
  */
 export function saveHossiis(hossiis: Hossii[]): void {
   try {
+    // normalizeHossii() が復元するフィールドと揃える（省略するとリロード後に欠落する）
     const toSave = hossiis.map((h) => ({
       id: h.id,
       message: h.message,
@@ -113,11 +114,28 @@ export function saveHossiis(hossiis: Hossii[]): void {
       speechLevel: h.speechLevel,
       origin: h.origin,
       autoType: h.autoType,
-      language: h.language, // undefined preserved for old logs
+      language: h.language,
+      bubbleColor: h.bubbleColor,
+      bubbleShapePng: h.bubbleShapePng,
+      hashtags: h.hashtags,
+      tags: h.tags,
+      imageUrl: h.imageUrl,
+      positionX: h.positionX,
+      positionY: h.positionY,
+      isPositionFixed: h.isPositionFixed,
+      scale: h.scale,
+      isHidden: h.isHidden,
+      numberValue: h.numberValue,
+      likeCount: h.likeCount,
+      postKind: h.postKind,
     }));
     localStorage.setItem(HOSSIIS_KEY, JSON.stringify(toSave));
-  } catch {
-    // ignore
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn(
+        '[storage] saveHossiis: localStorage quota exceeded (フリー投稿の data URL が大きすぎる可能性があります)',
+      );
+    }
   }
 }
 
