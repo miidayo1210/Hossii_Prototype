@@ -352,7 +352,13 @@ export const SpaceScreen = () => {
   /** アプリ内「大画面」— 見た目の最大化（Fullscreen API は補助） */
   const [immersiveLayout, setImmersiveLayout] = useState(false);
   /** ブラウザ全画面の対象（documentElement ではなくスペースコンテナ、仕様71） */
-  const spaceImmersiveRootRef = useRef<HTMLDivElement>(null);
+  const spaceImmersiveRootRef = useRef<HTMLDivElement | null>(null);
+  /** 音声パネル用ポータル先（スペースルート＝Fullscreen API の舞台と一致させる） */
+  const [speechPanelPortalEl, setSpeechPanelPortalEl] = useState<HTMLElement | null>(null);
+  const attachSpaceRoot = useCallback((node: HTMLDivElement | null) => {
+    spaceImmersiveRootRef.current = node;
+    setSpeechPanelPortalEl(node);
+  }, []);
 
   // PC版コントロールバーの状態管理
   const [controlState, setControlState] = useState<ControlState>({
@@ -873,10 +879,12 @@ export const SpaceScreen = () => {
     viewMode !== 'slideshow' &&
     (listenMode || speechPanelOpen);
 
+  const scaledUp = displayScale > 1;
+
   return (
     <div
-      ref={spaceImmersiveRootRef}
-      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''}`}
+      ref={attachSpaceRoot}
+      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''}`}
     >
       {showLandscapeHint && (
         <div className={styles.landscapeHintBanner} role="status">
@@ -1229,7 +1237,7 @@ export const SpaceScreen = () => {
       )}
       </ScaledContent>
 
-      {/* 音声パネル（body に portal — 表示倍率の zoom 対象外） */}
+      {/* 音声パネル（スペースルートへ portal — zoom 対象の ScaledContent の外かつ Fullscreen API 内） */}
       {speechPanelOpen &&
         createPortal(
           <SpeechPanel
@@ -1255,7 +1263,7 @@ export const SpaceScreen = () => {
               setDismissedSpeechCandidates([]);
             }}
           />,
-          document.body
+          speechPanelPortalEl ?? document.body
         )}
 
       {/* モバイル: 詳細モーダル */}

@@ -35,6 +35,16 @@ import styles from './App.module.css';
 import { ScaledContent } from './components/ScaledContent/ScaledContent';
 import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
 
+// /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
+const URL_PATH_SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
+const RE_PATH_COMMUNITY_AND_SPACE = new RegExp(
+  `^\\/c\\/(${URL_PATH_SLUG})\\/s\\/(${URL_PATH_SLUG})$`
+);
+const RE_PATH_LEGACY_SPACE = new RegExp(`^\\/s\\/(${URL_PATH_SLUG})$`);
+const RE_IS_SLUG_URL_PATH = new RegExp(
+  `^\\/c\\/${URL_PATH_SLUG}\\/s\\/${URL_PATH_SLUG}$|^\\/s\\/${URL_PATH_SLUG}$`
+);
+
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
   const { screen, navigate } = useRouter();
@@ -50,9 +60,7 @@ const AppContent = () => {
 
   // スペース直リンクの pathname か。replaceState で / に戻ったあとに古い true のまま残さないよう毎レンダーで評価（下の effect と同じ判定）
   const p = window.location.pathname;
-  const isOnSlugPath =
-    /^\/c\/[a-z0-9][a-z0-9-]*\/s\/[a-z0-9][a-z0-9-]*$/.test(p) ||
-    /^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/.test(p);
+  const isOnSlugPath = RE_IS_SLUG_URL_PATH.test(p);
 
   // /s/[slug] ゲスト入室フロー用 state
   // guestSpaceId: 未ログインで /s/[slug] にアクセスしたときのスペースID
@@ -117,9 +125,7 @@ const AppContent = () => {
       setPendingLoginSlug(null);
       setPendingAuthMode('login');
       // 現在のパスが /c/*/s/* 形式ならそのまま維持、そうでなければ /s/[slug] にリダイレクト
-      const isCommunityPath = window.location.pathname.match(
-        /^\/c\/([a-z0-9][a-z0-9-]*)\/s\/([a-z0-9][a-z0-9-]*)$/
-      );
+      const isCommunityPath = window.location.pathname.match(RE_PATH_COMMUNITY_AND_SPACE);
       window.location.href = isCommunityPath
         ? window.location.pathname
         : `/s/${slug}`;
@@ -142,12 +148,8 @@ const AppContent = () => {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
-    const communitySpaceMatch = window.location.pathname.match(
-      /^\/c\/([a-z0-9][a-z0-9-]*)\/s\/([a-z0-9][a-z0-9-]*)$/
-    );
-    const legacyMatch = window.location.pathname.match(
-      /^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/
-    );
+    const communitySpaceMatch = window.location.pathname.match(RE_PATH_COMMUNITY_AND_SPACE);
+    const legacyMatch = window.location.pathname.match(RE_PATH_LEGACY_SPACE);
     const slug = communitySpaceMatch ? communitySpaceMatch[2] : legacyMatch?.[1];
     if (!slug) return;
 
@@ -166,12 +168,8 @@ const AppContent = () => {
 
   // /c/[community-slug]/s/[space-slug] または /s/[slug] パスでスペースに直接アクセス
   useEffect(() => {
-    const communitySpaceMatch = window.location.pathname.match(
-      /^\/c\/([a-z0-9][a-z0-9-]*)\/s\/([a-z0-9][a-z0-9-]*)$/
-    );
-    const legacyMatch = window.location.pathname.match(
-      /^\/s\/([a-z0-9][a-z0-9-]*[a-z0-9]?[a-z0-9]*)$/
-    );
+    const communitySpaceMatch = window.location.pathname.match(RE_PATH_COMMUNITY_AND_SPACE);
+    const legacyMatch = window.location.pathname.match(RE_PATH_LEGACY_SPACE);
 
     const slug = communitySpaceMatch ? communitySpaceMatch[2] : legacyMatch?.[1];
     if (!slug) return;

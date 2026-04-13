@@ -6,6 +6,11 @@
   overflow: hidden;
 }
 
+/* 表示倍率 >100% で ScaledContent の zoom によりはみ出した領域をスクロールで辿れるようにする */
+.containerScaledScroll {
+  overflow: auto;
+}
+
 /* 星・バブル・背景など表示倍率の対象領域（ツールバー・フローティング UI は外） */
 .scaledCanvas {
   min-height: 100vh;

@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type MutableRefObject,
   type ReactNode,
 } from 'react';
 import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
@@ -95,6 +96,39 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
     likeCount: typeof raw.likeCount === 'number' ? raw.likeCount : undefined,
   };
 };
+
+/**
+ * fetch の応答が INSERT / Realtime より先に届くと楽観投稿が一覧に無い — その行を消さないようマージする。
+ * サーバー一覧に載った ID は pending から外す。state が一瞬空でも backup から復元する。
+ */
+function mergeFetchedHossiisWithPendingInserts(
+  serverList: Hossii[],
+  activeSpaceId: string,
+  currentHossiis: Hossii[],
+  pendingInsertIdsRef: MutableRefObject<Set<string>>,
+  pendingOptimisticByIdRef: MutableRefObject<Map<string, Hossii>>,
+): Hossii[] {
+  const pending = pendingInsertIdsRef.current;
+  const backup = pendingOptimisticByIdRef.current;
+  for (const h of serverList) {
+    pending.delete(h.id);
+    backup.delete(h.id);
+  }
+  if (pending.size === 0) return serverList;
+  const serverIds = new Set(serverList.map((h) => h.id));
+  const extras: Hossii[] = [];
+  for (const id of pending) {
+    if (serverIds.has(id)) continue;
+    const fromState = currentHossiis.find((h) => h.id === id);
+    if (fromState) {
+      extras.push(fromState);
+      continue;
+    }
+    const b = backup.get(id);
+    if (b && b.spaceId === activeSpaceId) extras.push(b);
+  }
+  return extras.length === 0 ? serverList : [...serverList, ...extras];
+}
 
 // 有効な CardType かどうかをチェック
 const isValidCardType = (value: unknown): value is CardType => {
@@ -627,8 +661,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     visitingSpaceId: null,
   });
 
-  // 自分が Supabase に INSERT した ID を追跡（Realtime 重複回避）
+  // 自分が Supabase に INSERT した ID を追跡（fetch マージで掃除するまで保持）
   const insertedHossiiIdsRef = useRef<Set<string>>(new Set());
+  /** SYNC で state から消えてもマージで戻せるよう楽観行を保持 */
+  const pendingOptimisticHossiiRef = useRef<Map<string, Hossii>>(new Map());
 
   // ADD_SPACE 後の insertSpace が完了していないスペース ID を追跡
   // SET_SPACES が走ってもこれらを失わないように保持する
@@ -660,6 +696,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     ids.sort();
     return ids.join('\0');
   }, [state.spaces]);
+
+  /** hossii 同期 effect が「同じスペースの再 fetch」か「スペース切替」かを判別する */
+  const prevHossiiSyncSpaceIdRef = useRef<string | null>(null);
 
   // ===== Supabase: スペースをマウント時に同期 =====
   // isResolvingAuth が true の間は発火しない。
@@ -715,6 +754,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
     /* eslint-disable react-hooks/set-state-in-effect -- fetch 直前に spacesLoaded を false に固定（queue だと完了後の true より遅れる） */
     if (shouldClearBeforeFetch) {
+      insertedHossiiIdsRef.current.clear();
+      pendingOptimisticHossiiRef.current.clear();
       setSpacesLoadedFromSupabase(false);
       dispatch({ type: 'SET_SPACES', payload: [], preserveIds: new Set() });
       dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
@@ -738,22 +779,43 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
     const { spaces: spList, activeSpaceId: aid } = stateRef.current;
     if (!spList.some((s) => s.id === aid)) {
+      insertedHossiiIdsRef.current.clear();
+      pendingOptimisticHossiiRef.current.clear();
       queueMicrotask(() => {
         setHossiiLoadedFromSupabase(false);
         dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
         setHossiiLoadedFromSupabase(true);
       });
+      prevHossiiSyncSpaceIdRef.current = aid;
       return;
     }
 
-    // ローディング開始と同時に古いデータを即クリア（フラッシュ防止）
-    queueMicrotask(() => {
-      setHossiiLoadedFromSupabase(false);
-      dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
-    });
+    const activeSpaceId = state.activeSpaceId;
+    const spaceChanged = prevHossiiSyncSpaceIdRef.current !== activeSpaceId;
+    prevHossiiSyncSpaceIdRef.current = activeSpaceId;
 
-    fetchHossiis(state.activeSpaceId).then((supabaseHossiis) => {
-      dispatch({ type: 'SYNC_HOSSIIS', payload: supabaseHossiis });
+    setHossiiLoadedFromSupabase(false);
+    // スペース切替時のみ一覧を空にする。同一スペースで spaceIdsSignature だけ変わった再 fetch では
+    // SYNC_HOSSIIS([]) すると楽観投稿が一瞬消え、fetch が古い応答だと戻らない。
+    if (spaceChanged) {
+      insertedHossiiIdsRef.current.clear();
+      pendingOptimisticHossiiRef.current.clear();
+      queueMicrotask(() => {
+        dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
+      });
+    }
+
+    fetchHossiis(activeSpaceId).then((supabaseHossiis) => {
+      if (stateRef.current.activeSpaceId !== activeSpaceId) return;
+
+      const merged = mergeFetchedHossiisWithPendingInserts(
+        supabaseHossiis,
+        activeSpaceId,
+        stateRef.current.hossiis,
+        insertedHossiiIdsRef,
+        pendingOptimisticHossiiRef,
+      );
+      dispatch({ type: 'SYNC_HOSSIIS', payload: merged });
       setHossiiLoadedFromSupabase(true);
     });
   }, [state.activeSpaceId, spaceIdsSignature]);
@@ -774,10 +836,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         (payload) => {
           const row = payload.new as HossiiRow;
           if (row.space_id !== activeSpaceId) return;
-          // 自分が INSERT した場合はスキップ（楽観的更新で既に追加済み）
+          // 自分が INSERT した場合は重複 ADD のみ避ける。insertedHossiiIdsRef は fetch マージで掃除する
+          // （ここで delete すると、遅れて届く古い fetch が楽観行をマージせず消す）。
           if (insertedHossiiIdsRef.current.has(row.id)) {
-            insertedHossiiIdsRef.current.delete(row.id);
-            // 直前の fetch 同期で楽観投稿が SYNC により消えていると、ここで return すると永遠に復帰しない
             if (!stateRef.current.hossiis.some((h) => h.id === row.id)) {
               dispatch({ type: 'ADD_HOSSII_FULL', payload: rowToHossii(row) });
             }
@@ -927,6 +988,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     // 完了していない場合は待機してから実行する
     if (isSupabaseConfigured) {
       insertedHossiiIdsRef.current.add(newHossii.id);
+      pendingOptimisticHossiiRef.current.set(newHossii.id, newHossii);
       const spacePending = pendingSpacePromises.current.get(newHossii.spaceId);
       const insertPromise = spacePending
         ? spacePending.then(() => insertHossii(newHossii))
@@ -935,11 +997,13 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         .then((ok) => {
           if (ok === false) {
             insertedHossiiIdsRef.current.delete(newHossii.id);
+            pendingOptimisticHossiiRef.current.delete(newHossii.id);
             dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
           }
         })
         .catch(() => {
           insertedHossiiIdsRef.current.delete(newHossii.id);
+          pendingOptimisticHossiiRef.current.delete(newHossii.id);
           dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
         });
     }

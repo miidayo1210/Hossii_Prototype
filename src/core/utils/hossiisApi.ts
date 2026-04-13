@@ -45,6 +45,15 @@ export type HossiiRow = {
  * is_hidden を厳密に boolean へ（PostgREST / 型ゆれで string や数値が来る場合がある）
  * 文字列 "false" は truthy なので、素の `!h.isHidden` だと一覧から全件消えることがある。
  */
+/** DB に post_kind 列が無い環境向け: キャンバス画像のストレージパスで推定 */
+function inferPostKindFromRow(row: HossiiRow): Hossii['postKind'] {
+  if (row.post_kind === 'canvas') return 'canvas';
+  if (row.post_kind === 'bubble') return 'bubble';
+  const url = row.image_url ?? '';
+  if (url.includes('/canvas/') || url.includes('canvas%2F')) return 'canvas';
+  return 'bubble';
+}
+
 export function coerceIsHidden(value: unknown): boolean {
   if (value === true || value === 1) return true;
   if (value === false || value === 0 || value == null) return false;
@@ -83,12 +92,13 @@ export function rowToHossii(row: HossiiRow): Hossii {
     hiddenBy: row.hidden_by ?? undefined,
     numberValue: row.number_value ?? undefined,
     likeCount: row.like_count ?? 0,
-    postKind: row.post_kind === 'canvas' ? 'canvas' : 'bubble',
+    postKind: inferPostKindFromRow(row),
   };
 }
 
 // Hossii（camelCase）→ INSERT 用オブジェクト（snake_case）
-function hossiiToRow(hossii: Hossii): Omit<HossiiRow, 'created_at'> & { created_at: string } {
+// post_kind は未マイグレーションの DB に列が無いと 400 になるため送らない（キャンバスは image_url パスで復元）
+function hossiiToInsertRow(hossii: Hossii): Omit<HossiiRow, 'created_at' | 'post_kind'> & { created_at: string } {
   return {
     id: hossii.id,
     message: hossii.message,
@@ -115,7 +125,6 @@ function hossiiToRow(hossii: Hossii): Omit<HossiiRow, 'created_at'> & { created_
     hidden_by: hossii.hiddenBy ?? null,
     number_value: hossii.numberValue ?? null,
     like_count: hossii.likeCount ?? 0,
-    post_kind: hossii.postKind === 'canvas' ? 'canvas' : 'bubble',
   };
 }
 
@@ -159,7 +168,7 @@ export async function fetchAllHossiisForModeration(spaceId: string): Promise<Hos
 export async function insertHossii(hossii: Hossii): Promise<boolean> {
   if (!isSupabaseConfigured) return false;
 
-  const { error } = await supabase.from('hossiis').insert(hossiiToRow(hossii));
+  const { error } = await supabase.from('hossiis').insert(hossiiToInsertRow(hossii));
   if (error) {
     console.error('[hossiisApi] insertHossii error:', error.message);
     return false;
