@@ -632,6 +632,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const { overrideCommunityId, overrideCommunitySlug } = useAdminNavigation();
   /** 直近で成功した fetchSpaces のコミュニティ ID（スーパー管理者のスコープ切替検知用） */
   const lastScopedCommunityFetchKeyRef = useRef<string | undefined>(undefined);
+  /** 直近で fetchSpaces を開始したコミュニティ ID（仕様 67 案2: ref 未定義でも fetch 前クリアを判定） */
+  const lastSpacesFetchTargetRef = useRef<string | undefined>(undefined);
+  /** fetchSpaces の世代（仕様 67 案 E: 古い応答を state に適用しない） */
+  const spacesFetchRequestIdRef = useRef(0);
   const communityId = overrideCommunityId ?? currentUser?.communityId;
   const communitySlug = overrideCommunitySlug ?? currentUser?.communitySlug;
 
@@ -708,6 +712,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // スーパー管理者で override / 自コミュニティ ID が無いときは fetchSpaces(undefined) による
   // 全件取得を行わない（仕様 67）。
   // スコープ付き fetch が一度成功したあと communityId が変わるときは、旧一覧を先に空にしてから取得する。
+  // 案2: 開始済みターゲットと effectiveId の比較で fetch 前クリア。案 E: 世代で古い応答を破棄。
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     if (isResolvingAuth) return;
@@ -720,6 +725,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     if (skipAllTenantFetch) {
       // 仕様 67 案1: 一覧にいる間も ref を維持する。ここで undefined に戻すと A→一覧→B のとき
       // prevKey が空のままになり fetch 前クリアが効かず、直前コミュニティの spaces が残る。
+      // 案 E: 進行中の fetch の完了で state を汚さないよう世代を進める。
+      spacesFetchRequestIdRef.current += 1;
       queueMicrotask(() => setSpacesLoadedFromSupabase(true));
       return;
     }
@@ -727,17 +734,22 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const effectiveId = communityId;
     if (effectiveId == null || effectiveId === '') {
       lastScopedCommunityFetchKeyRef.current = undefined;
+      lastSpacesFetchTargetRef.current = undefined;
+      spacesFetchRequestIdRef.current += 1;
       queueMicrotask(() => setSpacesLoadedFromSupabase(true));
       return;
     }
 
-    const prevKey = lastScopedCommunityFetchKeyRef.current;
-    const shouldClearBeforeFetch =
-      prevKey !== undefined && prevKey !== effectiveId;
+    const prevTarget = lastSpacesFetchTargetRef.current;
+    const shouldClearBeforeFetch = prevTarget !== effectiveId;
 
     const preserveIds = new Set(pendingSpaceIds.current);
+    const requestId = ++spacesFetchRequestIdRef.current;
+    lastSpacesFetchTargetRef.current = effectiveId;
 
     const applySpaces = (supabaseSpaces: Space[] | null) => {
+      if (requestId !== spacesFetchRequestIdRef.current) return;
+
       if (supabaseSpaces !== null) {
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces, preserveIds });
         lastScopedCommunityFetchKeyRef.current = effectiveId;
@@ -794,6 +806,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const spaceChanged = prevHossiiSyncSpaceIdRef.current !== activeSpaceId;
     prevHossiiSyncSpaceIdRef.current = activeSpaceId;
 
+    /* eslint-disable-next-line react-hooks/set-state-in-effect -- fetch 開始と同時にローディング表示（Promise 完了で true に戻す） */
     setHossiiLoadedFromSupabase(false);
     // スペース切替時のみ一覧を空にする。同一スペースで spaceIdsSignature だけ変わった再 fetch では
     // SYNC_HOSSIIS([]) すると楽観投稿が一瞬消え、fetch が古い応答だと戻らない。
