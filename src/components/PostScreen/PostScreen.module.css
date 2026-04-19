@@ -127,6 +127,51 @@
   margin: 0 0 1.5rem 0;
 }
 
+/* Web Serial（Arduino）テスト接続行 */
+.serialTestRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+  margin: -0.75rem 0 1.25rem 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(233, 213, 255, 0.6);
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  color: #5b21b6;
+}
+
+.serialTestLabel {
+  font-weight: 500;
+}
+
+.serialButton {
+  border: 1px solid #c4b5fd;
+  background: #faf5ff;
+  color: #5b21b6;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.serialButton:hover:not(:disabled) {
+  background: #f3e8ff;
+}
+
+.serialButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.serialStatus {
+  color: #7c3aed;
+  font-size: 0.8125rem;
+}
+
 .section {
   margin-bottom: 1.5rem;
 }

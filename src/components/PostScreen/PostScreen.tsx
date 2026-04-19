@@ -25,7 +25,7 @@ import { HossiiMini } from '../Hossii/HossiiMini';
 import { DrawingModal } from '../DrawingModal/DrawingModal';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
-import type { EmotionKey, ToastState } from '../../core/types';
+import type { AddHossiiInput, EmotionKey, ToastState } from '../../core/types';
 import {
   loadContinuousPost,
   loadPostBubbleColorDraft,
@@ -39,6 +39,12 @@ import {
 } from '../../core/utils/bubbleColorPalettes';
 import styles from './PostScreen.module.css';
 import { CanvasPostEditor, type CanvasPostEditorHandle } from './CanvasPostEditor';
+import {
+  isWebSerialSupported,
+  messageForSerialLine,
+  readSerialLinesFromPort,
+  requestAndOpenSerialPort,
+} from '../../core/utils/webSerialArduino';
 
 // B02: 吹き出し形状プリセット（14種）
 type BubbleShapePreset = { path: string; label: string };
@@ -135,6 +141,8 @@ export const PostScreen = ({
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(sending);
+  sendingRef.current = sending;
   const [poyonActive, setPoyonActive] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [greeting, setGreeting] = useState('');
@@ -179,6 +187,12 @@ export const PostScreen = ({
   // await 後も最新のチェック状態で閉じる／遷移を判定する（画像アップロード待ち中に ON にした場合など）
   const continuousPostRef = useRef(continuousPost);
   continuousPostRef.current = continuousPost;
+
+  /** Web Serial（Arduino テスト）接続 UI */
+  const [serialUi, setSerialUi] = useState<'idle' | 'connecting' | 'connected'>('idle');
+  const serialAbortRef = useRef<AbortController | null>(null);
+  const serialPostLockRef = useRef(false);
+  const submitFromArduinoRef = useRef<() => void>(() => {});
 
   // 位置選択グリッド（null = 未選択 = ランダム配置）
   const [selectedArea, setSelectedArea] = useState<number | null>(null);
@@ -425,6 +439,112 @@ export const PostScreen = ({
     );
   };
 
+  /** 吹き出し投稿: 下書き色の保存 → addHossii → スタンプ・トースト（「気持ちを置く」と同じ核） */
+  const submitBubbleHossii = useCallback(
+    (input: AddHossiiInput) => {
+      savePostBubbleColorDraft(selectedPaletteId, selectedColor);
+      addHossii(input);
+
+      if (!currentUser) return;
+
+      const newStampCount = addStamp(currentUser.uid);
+      upsertStampCount(currentUser.uid, newStampCount);
+      const isNewCard = newStampCount % 20 === 0;
+
+      if (isNewCard) {
+        setToast({ message: '🎉 スタンプカードが完成したよ！', type: 'success' });
+      } else {
+        const on = continuousPostRef.current;
+        const suffix = on ? ' 続けてどうぞ ⭐ スタンプ+1' : '〜！⭐ スタンプ+1';
+        let toastMsg = `置いたよ${suffix}`;
+        if (input.emotion) {
+          const emoji = EMOJI_BY_EMOTION[input.emotion];
+          const label = EMOTION_LABELS[input.emotion];
+          toastMsg = `${emoji} ${label} を置いたよ！${on ? '続けてどうぞ ' : ''}⭐ スタンプ+1`;
+        }
+        setToast({ message: toastMsg, type: 'success' });
+      }
+    },
+    [selectedPaletteId, selectedColor, addHossii, currentUser],
+  );
+
+  useEffect(() => {
+    submitFromArduinoRef.current = () => {
+      if (sendingRef.current) return;
+      setSending(true);
+      try {
+        const parsedTags = parseHashtags('こんにちは');
+        submitBubbleHossii({
+          message: 'こんにちは',
+          emotion: undefined,
+          bubbleColor: selectedColor ?? undefined,
+          bubbleShapePng: selectedShape ?? undefined,
+          hashtags: parsedTags.length > 0 ? parsedTags : undefined,
+          tags: undefined,
+          imageUrl: undefined,
+          numberValue: undefined,
+          positionX: canvasPosition?.x,
+          positionY: canvasPosition?.y,
+          isPositionFixed: !!canvasPosition,
+        });
+      } finally {
+        setSending(false);
+      }
+    };
+  }, [submitBubbleHossii, selectedColor, selectedShape, canvasPosition]);
+
+  const handleSerialConnect = useCallback(async () => {
+    if (!isWebSerialSupported()) return;
+    setSerialUi('connecting');
+    try {
+      const port = await requestAndOpenSerialPort({ baudRate: 9600 });
+      const ac = new AbortController();
+      serialAbortRef.current = ac;
+      setSerialUi('connected');
+
+      const onLine = (line: string) => {
+        if (messageForSerialLine(line) == null) return;
+        if (serialPostLockRef.current || sendingRef.current) return;
+        serialPostLockRef.current = true;
+        try {
+          submitFromArduinoRef.current();
+        } finally {
+          serialPostLockRef.current = false;
+        }
+      };
+
+      void (async () => {
+        try {
+          await readSerialLinesFromPort(port, ac.signal, onLine);
+        } catch (err) {
+          console.error(err);
+        } finally {
+          try {
+            await port.close();
+          } catch {
+            // ignore
+          }
+          serialAbortRef.current = null;
+          setSerialUi('idle');
+        }
+      })();
+    } catch (e) {
+      console.error(e);
+      serialAbortRef.current = null;
+      setSerialUi('idle');
+    }
+  }, []);
+
+  const handleSerialDisconnect = useCallback(() => {
+    serialAbortRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      serialAbortRef.current?.abort();
+    };
+  }, []);
+
   const handleSubmit = async () => {
     if (sending) return;
 
@@ -470,9 +590,7 @@ export const PostScreen = ({
             ? areaToPosition(selectedArea)
             : null;
 
-      savePostBubbleColorDraft(selectedPaletteId, selectedColor);
-
-      addHossii({
+      submitBubbleHossii({
         message: message.trim(),
         emotion: selectedEmotion ?? undefined,
         bubbleColor: selectedColor ?? undefined,
@@ -486,29 +604,7 @@ export const PostScreen = ({
         isPositionFixed: !!areaPos,
       });
 
-      // スタンプを獲得
-      if (currentUser) {
-        const newStampCount = addStamp(currentUser.uid);
-        // ログイン済みユーザーのみ Supabase にも保存（非同期・fire-and-forget）
-        upsertStampCount(currentUser.uid, newStampCount);
-        const isNewCard = newStampCount % 20 === 0;
-
-        if (isNewCard) {
-          setToast({ message: '🎉 スタンプカードが完成したよ！', type: 'success' });
-        } else {
-          const on = continuousPostRef.current;
-          const suffix = on ? ' 続けてどうぞ ⭐ スタンプ+1' : '〜！⭐ スタンプ+1';
-          let toastMsg = `置いたよ${suffix}`;
-          if (selectedEmotion) {
-            const emoji = EMOJI_BY_EMOTION[selectedEmotion];
-            const label = EMOTION_LABELS[selectedEmotion];
-            toastMsg = `${emoji} ${label} を置いたよ！${on ? '続けてどうぞ ' : ''}⭐ スタンプ+1`;
-          }
-          setToast({ message: toastMsg, type: 'success' });
-        }
-      }
-
-      // クリア（吹き出し色は前回どおり維持 — savePostBubbleColorDraft 済み）
+      // クリア（吹き出し色は前回どおり維持 — submitBubbleHossii 内で savePostBubbleColorDraft 済み）
       setSelectedEmotion(null);
       setMessage('');
       setSelectedShape(null);
@@ -618,6 +714,35 @@ export const PostScreen = ({
       {/* メインコンテンツ */}
       <main className={panelMode ? styles.panelMain : styles.main}>
         <h2 className={styles.title}>気持ちを置く 🌸</h2>
+
+        {isWebSerialSupported() && (
+          <div className={styles.serialTestRow}>
+            <span className={styles.serialTestLabel}>Arduino（テスト）</span>
+            {serialUi === 'connected' ? (
+              <button
+                type="button"
+                className={styles.serialButton}
+                onClick={handleSerialDisconnect}
+              >
+                切断
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.serialButton}
+                onClick={() => void handleSerialConnect()}
+                disabled={serialUi === 'connecting'}
+              >
+                接続
+              </button>
+            )}
+            <span className={styles.serialStatus} aria-live="polite">
+              {serialUi === 'idle' && '未接続'}
+              {serialUi === 'connecting' && '接続中'}
+              {serialUi === 'connected' && '接続済み'}
+            </span>
+          </div>
+        )}
 
         {showPostModeTabs && (
           <div className={styles.postModeTabs} role="tablist" aria-label="吹き出しかフリー投稿か">
