@@ -59,7 +59,6 @@ import {
 } from '../../core/utils/floatingPanelStorage';
 import {
   loadLandscapeHintDismissed,
-  saveLandscapeHintDismissed,
 } from '../../core/utils/landscapeHintStorage';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
@@ -157,7 +156,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const useStarView = isMobile && isPortrait;
   /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
   const useMobileBottomSheet = isMobile && isPortrait;
-  const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(loadLandscapeHintDismissed);
+  // バナー削除済み。状態は残しておく（将来の案内機能で再利用可）
+  const [landscapeHintDismissed] = useState(loadLandscapeHintDismissed);
+  void landscapeHintDismissed;
   const quickPostDefaultRect = useMemo(
     () => (useMobileBottomSheet ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
     [useMobileBottomSheet]
@@ -586,10 +587,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setImmersiveLayout((v) => !v);
   }, []);
 
-  const dismissLandscapeHint = useCallback(() => {
-    saveLandscapeHintDismissed();
-    setLandscapeHintDismissed(true);
-  }, []);
+  // landscapeHint はバナー削除済み。storage は将来用に保持（未使用）
 
   // DisplayScale を循環させる（75% → 100% → 125% → 150% → 75%...）
   const handleDisplayScaleCycle = useCallback(() => {
@@ -944,10 +942,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       ? visitingSpaceInfo.presetTags ?? []
       : activeSpace?.presetTags ?? [];
 
-  const showLandscapeHint =
+  // ダブルタップ投稿ヒント: スマホ縦でパネルが閉じている間だけ表示
+  const showDoubleTapHint =
     isMobile &&
     isPortrait &&
-    !landscapeHintDismissed &&
+    !isVisiting &&
+    quickPostPos == null &&
     viewMode !== 'slideshow';
 
   const scaledUp = displayScale > 1;
@@ -975,20 +975,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       ref={attachSpaceRoot}
       className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''}`}
     >
-      {showLandscapeHint && (
-        <div className={styles.landscapeHintBanner} role="status">
-          <span className={styles.landscapeHintEmoji} aria-hidden="true">📱</span>
-          <span className={styles.landscapeHintText}>
-            横向きにするともっと見やすいよ！
-          </span>
-          <button
-            type="button"
-            className={styles.landscapeHintClose}
-            onClick={dismissLandscapeHint}
-            aria-label="案内を閉じる"
-          >
-            ✕
-          </button>
+      {showDoubleTapHint && (
+        <div className={styles.doubleTapHint} aria-hidden="true">
+          ダブルタップで投稿できるよ
         </div>
       )}
       <ScaledContent

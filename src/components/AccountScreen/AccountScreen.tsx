@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LogOut, User, Mail } from 'lucide-react';
+import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
@@ -147,6 +148,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               placeholder={profile?.defaultNickname || 'ニックネームを入力'}
               value={spaceNicknameInput}
               onChange={(e) => setSpaceNicknameInput(e.target.value)}
+              {...nicknameInputAntiAutofillProps}
             />
             <button
               type="button"
@@ -175,6 +177,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               placeholder="ニックネームを入力"
               value={defaultNicknameInput}
               onChange={(e) => setDefaultNicknameInput(e.target.value)}
+              {...nicknameInputAntiAutofillProps}
             />
             <button
               type="button"

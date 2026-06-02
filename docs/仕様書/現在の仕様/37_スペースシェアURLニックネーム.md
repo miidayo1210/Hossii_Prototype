@@ -30,23 +30,38 @@
 
 ---
 
-## 問題1: オートコンプリートにカード番号などが表示される
+## 問題1: オートコンプリートにカード番号などが表示される ✅ 修正済み
 
 ### 原因
 
-両コンポーネントの `<input>` に `autoComplete` 属性が未設定。  
-ブラウザがローカルに保存した過去の入力値（カード番号・住所等）を候補として表示してしまう。
+ニックネーム入力欄にブラウザ向けの属性が不十分だった。  
+PC の Chrome / Edge などが、氏名・カード名義などの保存済み入力を候補として表示してしまう。
 
-- `GuestEntryScreen.tsx` L70: `<input type="text" className={styles.nicknameInput} ...>`
-- `NicknameModal.tsx` L31: `<input type="text" className={styles.input} ...>`
+### 対応（実装済み）
 
-### 対応
+`src/core/utils/nicknameInputProps.ts` に共通属性 `nicknameInputAntiAutofillProps` を定義し、  
+ニックネーム入力のある全画面の `<input>` にスプレッドで適用する。
 
-両 `<input>` に以下を追加する：
+| 属性 | 値 | 目的 |
+|------|-----|------|
+| `autoComplete` | `off` | ブラウザの自動入力を無効化 |
+| `name` | `hossii-nickname` | `name` / `nickname` など標準名で氏名・カード欄と誤認されないよう非標準名にする |
+| `autoCorrect` | `off` | 入力補正の提案を抑制 |
+| `spellCheck` | `false` | スペルチェックの提案を抑制 |
+| `data-form-type` | `other` | フォーム種別の誤検知を抑制 |
+| `data-lpignore` | `true` | パスワードマネージャー等の誤検知を抑制 |
 
-```tsx
-autoComplete="off"
-```
+**適用コンポーネント:**
+
+| コンポーネント | 用途 |
+|----------------|------|
+| `GuestEntryScreen` | ゲスト入室時のニックネーム入力 |
+| `NicknameModal` | ログイン済み・ニックネーム未設定時 |
+| `OnboardingModal` | 一般ユーザー初回登録（`<form autoComplete="off">` も付与） |
+| `ProfileScreen` | デフォルト / スペース別ニックネーム編集 |
+| `AccountScreen` | デフォルト / スペース別ニックネーム編集 |
+
+> `autoComplete="new-password"` のハックは廃止。上記の組み合わせで PC のカード・氏名提案を抑止する。
 
 ---
 
@@ -122,8 +137,12 @@ welcomeMessage が未設定
 
 | ファイル | 変更内容 |
 |---|---|
-| `src/components/Auth/GuestEntryScreen.tsx` | `autoComplete="off"` 追加・Hossiiキャラ吹き出しUI追加・`welcomeMessage` 表示 |
-| `src/components/NicknameModal/NicknameModal.tsx` | `autoComplete="off"` 追加・Hossiiキャラ吹き出しUI追加・`welcomeMessage` 表示 |
+| `src/core/utils/nicknameInputProps.ts` | ニックネーム入力の自動入力抑止属性（共通） |
+| `src/components/Auth/GuestEntryScreen.tsx` | `nicknameInputAntiAutofillProps` 適用・Hossiiキャラ吹き出しUI・`welcomeMessage` 表示 |
+| `src/components/NicknameModal/NicknameModal.tsx` | 同上 |
+| `src/components/Auth/OnboardingModal.tsx` | 同上（フォームに `autoComplete="off"`） |
+| `src/components/ProfileScreen/ProfileScreen.tsx` | 同上 |
+| `src/components/AccountScreen/AccountScreen.tsx` | 同上 |
 | `src/core/types/space.ts` | `welcomeMessage?: string` を `Space` 型に追加 |
 | `src/components/SpaceSettingsScreen/GeneralTab.tsx` | ウェルカムメッセージ入力欄を追加 |
 | `src/core/utils/spacesApi.ts` | `welcome_message` カラムの読み書き対応 |

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { User, AtSign } from 'lucide-react';
+import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import styles from './OnboardingModal.module.css';
 
 type Props = {
@@ -66,7 +67,7 @@ export const OnboardingModal = ({ onComplete }: Props) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className={styles.form}>
+        <form onSubmit={handleSubmit} className={styles.form} autoComplete="off">
           <div className={styles.inputGroup}>
             <label className={styles.label}>
               <AtSign size={16} className={styles.labelIcon} />
@@ -101,6 +102,7 @@ export const OnboardingModal = ({ onComplete }: Props) => {
               required
               disabled={loading}
               maxLength={30}
+              {...nicknameInputAntiAutofillProps}
             />
             <p className={styles.hint}>
               スペースに表示される名前です（後で変更可能）

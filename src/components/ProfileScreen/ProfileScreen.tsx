@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import styles from './ProfileScreen.module.css';
 
@@ -62,6 +63,7 @@ export const ProfileScreen = () => {
               placeholder="ニックネームを入力"
               value={defaultNicknameInput}
               onChange={(e) => setDefaultNicknameInput(e.target.value)}
+              {...nicknameInputAntiAutofillProps}
             />
             <button
               type="button"
@@ -102,6 +104,7 @@ export const ProfileScreen = () => {
               placeholder={profile?.defaultNickname || 'ニックネームを入力'}
               value={spaceNicknameInput}
               onChange={(e) => setSpaceNicknameInput(e.target.value)}
+              {...nicknameInputAntiAutofillProps}
             />
             <button
               type="button"

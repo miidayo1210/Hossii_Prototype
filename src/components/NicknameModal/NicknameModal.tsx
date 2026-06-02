@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { HOSSII_IDLE } from '../../core/assets/hossiiIdle';
 import styles from './NicknameModal.module.css';
 
@@ -49,7 +50,7 @@ export const NicknameModal = ({ spaceId, onClose }: Props) => {
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
           autoFocus
-          autoComplete="new-password"
+          {...nicknameInputAntiAutofillProps}
         />
         <button
           type="button"

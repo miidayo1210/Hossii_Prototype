@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { HOSSII_IDLE } from '../../core/assets/hossiiIdle';
 import styles from './GuestEntryScreen.module.css';
@@ -92,7 +93,7 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest }: Props) => {
               onChange={(e) => setNickname(e.target.value)}
               maxLength={30}
               autoFocus
-              autoComplete="new-password"
+              {...nicknameInputAntiAutofillProps}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleGuestEnter();
               }}

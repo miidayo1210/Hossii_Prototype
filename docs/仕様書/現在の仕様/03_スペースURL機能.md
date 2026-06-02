@@ -3,7 +3,7 @@
 > **分類:** `[Core]` URL設計・スペースアクセスフロー
 > **関連:** [core-concepts.md](../../core/core-concepts.md) §2（Space）
 
-> 最終更新: 2026-04-06（フェーズ 4 の QR 項目に 56 への参照を追加）
+> 最終更新: 2026-06-03（初回アクセス時の not-found 誤表示防止を追記）
 
 ---
 
@@ -121,6 +121,9 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 ```
 /s/[space-id] にアクセス
   │
+  ├─ スペース解決中（fetchSpaceByUrl 実行中）
+  │    → 「スペースが見つかりません」は表示しない（通常画面のまま待機）
+  │
   ├─ スペースが存在する
   │    │
   │    ├─ 未ログイン → ゲスト入室画面（ニックネーム入力）
@@ -128,8 +131,26 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
   │    │
   │    └─ ログイン済み → そのままスペース画面へ遷移
   │
-  └─ スペースが存在しない → 「スペースが見つかりません」エラー画面
+  └─ 解決完了後もスペースが見つからない
+       → 「スペースが見つかりません」エラー画面
 ```
+
+### 初回アクセス時の not-found 誤表示防止
+
+QR からゲストで初回入室するとき、一瞬だけ「スペースが見つかりません」が出てから正常表示される問題があった。
+
+**原因:** ゲストは `communityId` がないため `spacesLoadedFromSupabase` が先に `true` になる一方、  
+`fetchSpaceByUrl`（スラッグ単体取得）は非同期のまま。  
+`state.spaces` が空のタイミングで not-found 判定が走っていた。
+
+**対応（`App.tsx`）:**
+
+| 項目 | 内容 |
+|------|------|
+| `isFetchingSpaceFromSlug` | slug パス初回アクセス時は `true` で開始。`fetchSpaceByUrl` 完了・キャッシュヒット・slug なしで `false` |
+| not-found 条件 | `spacesLoadedFromSupabase && !isFetchingSpaceFromSlug` のときのみ `spaceURLNotFound = true` |
+
+これにより、単体フェッチ完了まではエラー画面を出さず、取得後にゲスト入室画面またはスペース画面へ遷移する。
 
 ---
 
@@ -146,3 +167,4 @@ URL はコミュニティ ID とスペース ID の 2 階層で構成する。
 | `/c/[community-id]/s/[space-id]/` URL への移行 | ✅ フェーズ 3 完了（2026-03-06） |
 | `community-id` のインライン編集 | ⬜ フェーズ 4（未実装） |
 | 旧 URL `/s/[slug]` のリダイレクト | ⬜ フェーズ 4（未実装） |
+| 初回 QR アクセス時の not-found 一瞬表示 | ✅ `isFetchingSpaceFromSlug` で防止（2026-06-03） |

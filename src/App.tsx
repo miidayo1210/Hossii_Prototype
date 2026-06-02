@@ -61,6 +61,12 @@ const AppContent = () => {
   const spaceScreenRef = useRef<SpaceScreenHandle>(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
+  // slug パスへの初回アクセス時に fetchSpaceByUrl が完了するまで true を保持する。
+  // spacesLoadedFromSupabase が先に true になっても not-found 判定をブロックするためのフラグ。
+  const [isFetchingSpaceFromSlug, setIsFetchingSpaceFromSlug] = useState(() => {
+    const p = window.location.pathname;
+    return isSupabaseConfigured && RE_IS_SLUG_URL_PATH.test(p);
+  });
   // 初回 URL スラッグ解決済みフラグ（スペース設定変更後に再トリガーされるのを防ぐ）
   const initialSlugHandledRef = useRef(false);
 
@@ -152,18 +158,28 @@ const AppContent = () => {
   // fetchSpaces（全件取得）の完了を待たずに、スラッグで1件だけ直接取得して state に注入する。
   // これにより管理者の二重 fetch や auth 解決待ちによる遅延を回避し、初回アクセスを高速化する。
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      setIsFetchingSpaceFromSlug(false);
+      return;
+    }
 
     const communitySpaceMatch = window.location.pathname.match(RE_PATH_COMMUNITY_AND_SPACE);
     const legacyMatch = window.location.pathname.match(RE_PATH_LEGACY_SPACE);
     const slug = communitySpaceMatch ? communitySpaceMatch[2] : legacyMatch?.[1];
-    if (!slug) return;
+    if (!slug) {
+      setIsFetchingSpaceFromSlug(false);
+      return;
+    }
 
-    // すでにローカル state にキャッシュ済みなら何もしない（fetchSpaces の完了前でも）
+    // すでにローカル state にキャッシュ済みなら fetch 不要
     const cached = state.spaces.find((s) => s.spaceURL === slug);
-    if (cached) return;
+    if (cached) {
+      setIsFetchingSpaceFromSlug(false);
+      return;
+    }
 
     fetchSpaceByUrl(slug).then((space) => {
+      setIsFetchingSpaceFromSlug(false);
       // ナビゲーション済み or 別のパスで解決済みの場合はスキップ
       if (!space || initialSlugHandledRef.current) return;
       addSpaceLocal(space);
@@ -219,12 +235,13 @@ const AppContent = () => {
           }
         }
       }
-    } else if (spacesLoadedFromSupabase) {
-      // Supabase からのスペース読み込みが完了した上で見つからない場合のみ "not found" にする
+    } else if (spacesLoadedFromSupabase && !isFetchingSpaceFromSlug) {
+      // Supabase からのスペース読み込みが完了し、かつ slug 単体フェッチも終わった上で
+      // 見つからない場合のみ "not found" にする（フェッチ中は空振り判定しない）
       setSpaceURLNotFound(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.spaces, currentUser, spacesLoadedFromSupabase]);
+  }, [state.spaces, currentUser, spacesLoadedFromSupabase, isFetchingSpaceFromSlug]);
 
   // ?space=xxx でスペースを切り替え（招待リンク対応）
   useEffect(() => {
