@@ -155,6 +155,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const useStarView = isMobile && isPortrait;
   /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
   const useMobileBottomSheet = isMobile && isPortrait;
+  const isMobileLandscape = isMobile && !isPortrait;
   const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(loadLandscapeHintDismissed);
   const quickPostDefaultRect = useMemo(
     () => (useMobileBottomSheet ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
@@ -951,11 +952,29 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     (listenMode || speechPanelOpen);
 
   const scaledUp = displayScale > 1;
+  /** スマホ縦: 16:9 スペース上 + 固定投稿ドック下 */
+  const mobilePostSplit = useMobileBottomSheet && quickPostPos != null;
+  /** スマホ横: 左スペース + 右固定投稿ドック */
+  const mobilePostLandscapeSplit = isMobileLandscape && quickPostPos != null;
+
+  const quickPostPanel = (
+    <PostScreen
+      key={postScreenKey}
+      panelMode={mobilePostSplit ? 'bottom' : 'side'}
+      initialPosition={quickPostPos!}
+      initialMessage={speechPostInitialMessage}
+      speechEditMode={!!speechEditOriginal}
+      speechEditOriginal={speechEditOriginal}
+      onSaveSpeechDraft={handleSaveSpeechDraft}
+      onClose={handleQuickPostClose}
+      speechToFreePosterRef={speechToFreePosterRef}
+    />
+  );
 
   return (
     <div
       ref={attachSpaceRoot}
-      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''}`}
+      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostSplit ? styles.containerMobilePostSplit : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''}`}
     >
       {showLandscapeHint && (
         <div className={styles.landscapeHintBanner} role="status">
@@ -973,7 +992,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         </div>
       )}
       <ScaledContent
-        className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''}`}
+        className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostSplit ? styles.scaledCanvasMobilePostSplit : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
       >
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
@@ -1395,37 +1414,26 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         </>
       )}
 
-      {/* クイック投稿パネル */}
-      {quickPostPos && (
-        <FloatingPanelShell
-          storageKey={
-            useMobileBottomSheet
-              ? 'quickPost.mobile'
-              : isMobile
-                ? 'quickPost.mobileLandscape'
-                : 'quickPost.desktop'
-          }
-          defaultRect={quickPostDefaultRect}
-          minW={isMobile ? 200 : 280}
-          minH={isMobile ? 240 : 320}
-          zIndex={310}
-          className={
-            useMobileBottomSheet ? styles.quickPostBottomChrome : styles.quickPostSideChrome
-          }
-        >
-          <PostScreen
-            key={postScreenKey}
-            panelMode={useMobileBottomSheet ? 'bottom' : 'side'}
-            initialPosition={quickPostPos}
-            initialMessage={speechPostInitialMessage}
-            speechEditMode={!!speechEditOriginal}
-            speechEditOriginal={speechEditOriginal}
-            onSaveSpeechDraft={handleSaveSpeechDraft}
-            onClose={handleQuickPostClose}
-            speechToFreePosterRef={speechToFreePosterRef}
-          />
-        </FloatingPanelShell>
-      )}
+      {/* クイック投稿パネル（スマホは固定ドック、PC のみ FloatingPanelShell） */}
+      {quickPostPos &&
+        (mobilePostSplit ? (
+          <div className={styles.mobilePostDock}>{quickPostPanel}</div>
+        ) : mobilePostLandscapeSplit ? (
+          <div className={`${styles.mobilePostSideDock} ${styles.quickPostSideChrome}`}>
+            {quickPostPanel}
+          </div>
+        ) : (
+          <FloatingPanelShell
+            storageKey="quickPost.desktop"
+            defaultRect={quickPostDefaultRect}
+            minW={280}
+            minH={320}
+            zIndex={310}
+            className={styles.quickPostSideChrome}
+          >
+            {quickPostPanel}
+          </FloatingPanelShell>
+        ))}
 
       {quickLogOpen && (
         <FloatingPanelShell
@@ -1454,7 +1462,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           />
         </FloatingPanelShell>
       )}
-      {viewMode !== 'slideshow' && qrPanelVisible && <QRCodePanel />}
+      {viewMode !== 'slideshow' && qrPanelVisible && !isMobileLandscape && <QRCodePanel />}
 
       {/* 書き出し前置き設定モーダル */}
       {spaceExportModalOpen && !spaceExportBusy && (

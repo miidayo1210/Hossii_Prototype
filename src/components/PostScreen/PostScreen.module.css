@@ -836,6 +836,62 @@
   }
 }
 
+/* スマホ横: クイック投稿パネル内の文字・ボタンをコンパクトに */
+@media (max-width: 768px) and (orientation: landscape) {
+  .panelContainer .panelMain {
+    padding: 0.5rem 0.625rem;
+  }
+
+  .panelContainer .title {
+    font-size: 0.9375rem;
+    margin-bottom: 0.625rem;
+  }
+
+  .panelContainer .postModeTabs {
+    margin-bottom: 0.625rem;
+    gap: 0.35rem;
+  }
+
+  .panelContainer .postModeTab {
+    min-width: 5.5rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .panelContainer .panelSection {
+    margin-bottom: 0.5rem;
+  }
+
+  .panelContainer .label {
+    font-size: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .panelContainer .textarea {
+    height: 4.5rem;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.875rem;
+  }
+
+  .panelContainer .emotionChip {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .panelContainer .submitButton {
+    padding: 0.625rem;
+    font-size: 0.875rem;
+  }
+
+  .panelContainer .panelCloseBar {
+    padding: 0.35rem 0.625rem 0;
+  }
+
+  .panelContainer .panelCloseButton {
+    font-size: 0.75rem;
+  }
+}
+
 /* 位置選択グリッド */
 .areaGrid {
   display: grid;

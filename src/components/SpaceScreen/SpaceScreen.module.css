@@ -1376,6 +1376,91 @@
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
 }
 
+/* スマホ縦: 投稿オープン時 — 上 16:9 スペース + 下固定投稿ドック */
+@media (max-width: 768px) and (orientation: portrait) {
+  .containerMobilePostSplit {
+    --mobile-post-min: 200px;
+    --mobile-bottom-nav: 72px;
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--mobile-bottom-nav) - env(safe-area-inset-bottom, 0px));
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .containerMobilePostSplit.containerScaledScroll {
+    overflow: hidden;
+  }
+
+  .scaledCanvasMobilePostSplit {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 0;
+    height: min(calc(100vw * 9 / 16), calc(100% - var(--mobile-post-min)));
+    max-height: min(calc(100vw * 9 / 16), calc(100% - var(--mobile-post-min)));
+    overflow: hidden;
+  }
+
+  .scaledCanvasMobilePostSplit.scaledCanvasImmersive {
+    min-height: 0;
+  }
+
+  .mobilePostDock {
+    flex: 1 1 auto;
+    min-height: var(--mobile-post-min);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: white;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+    z-index: 310;
+  }
+}
+
+/* スマホ横: 投稿オープン時 — 左スペース + 右固定投稿ドック */
+@media (max-width: 768px) and (orientation: landscape) {
+  .containerMobilePostLandscapeSplit {
+    --mobile-bottom-nav: 72px;
+    --mobile-post-side-width: clamp(240px, 36vw, 320px);
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    height: calc(100dvh - var(--mobile-bottom-nav) - env(safe-area-inset-bottom, 0px));
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .containerMobilePostLandscapeSplit.containerScaledScroll {
+    overflow: hidden;
+  }
+
+  .scaledCanvasMobilePostLandscapeSplit {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    width: auto;
+    overflow: hidden;
+  }
+
+  .scaledCanvasMobilePostLandscapeSplit.scaledCanvasImmersive {
+    min-height: 0;
+  }
+
+  .mobilePostSideDock {
+    flex: 0 0 var(--mobile-post-side-width);
+    width: var(--mobile-post-side-width);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0;
+    z-index: 310;
+  }
+}
+
 /* クイックログ（#57）— 水色〜シアン系で投稿パネルと区別 */
 .quickLogSideChrome {
   background: linear-gradient(160deg, #f0fdff 0%, #e0f7fa 100%);

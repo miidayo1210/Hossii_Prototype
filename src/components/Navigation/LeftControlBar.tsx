@@ -168,15 +168,17 @@ export const LeftControlBar = ({
   return (
     <aside className={styles.controlBar}>
       {/* --- 既存トグルボタン群 --- */}
-      <Tooltip text={isMobile ? (controls.isFullscreen ? '大画面を終了' : '大画面表示') : (controls.isFullscreen ? '画面を元に戻す' : '表示領域を広げる')}>
-        <button
-          className={`${styles.controlButton} ${styles.mobileVisible} ${controls.isFullscreen ? styles.active : ''}`}
-          onClick={onFullscreenToggle}
-          aria-label={controls.isFullscreen ? '大画面表示を終了' : '大画面表示'}
-        >
-          {controls.isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-        </button>
-      </Tooltip>
+      {!isMobile && (
+        <Tooltip text={controls.isFullscreen ? '画面を元に戻す' : '表示領域を広げる'}>
+          <button
+            className={`${styles.controlButton} ${controls.isFullscreen ? styles.active : ''}`}
+            onClick={onFullscreenToggle}
+            aria-label={controls.isFullscreen ? '大画面表示を終了' : '大画面表示'}
+          >
+            {controls.isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+        </Tooltip>
+      )}
 
       <Tooltip text={controls.hossiiVisible ? 'Hossii を隠す' : 'Hossii を表示'}>
         <button
