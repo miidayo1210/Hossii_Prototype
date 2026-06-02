@@ -4,6 +4,7 @@ import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import type { ViewMode } from '../../core/utils/displayPrefsStorage';
 import { BUBBLE_INLINE_EDIT_COLORS } from '../../core/utils/bubbleColorPalettes';
+import { withBubbleAlpha, BUBBLE_BG_ALPHA, BUBBLE_BG_ALPHA_HOVER } from '../../core/utils/bubbleColorAlpha';
 import styles from './SpaceScreen.module.css';
 
 const BUBBLE_COLORS = BUBBLE_INLINE_EDIT_COLORS;
@@ -22,7 +23,7 @@ function getRelativeTime(date: Date): string {
   return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
 }
 
-const MAX_BUBBLE_TEXT_LENGTH = 40;
+const MAX_BUBBLE_TEXT_LENGTH = 120;
 function truncateText(text: string): string {
   if (text.length <= MAX_BUBBLE_TEXT_LENGTH) return text;
   return text.slice(0, MAX_BUBBLE_TEXT_LENGTH) + '…';
@@ -101,6 +102,8 @@ export const Bubble = ({
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isBouncing, setIsBouncing] = useState(false);
+  // 案A: 吹き出しホバー中フラグ（0件時はホバーでのみいいねバッジを表示）
+  const [isBubbleHovered, setIsBubbleHovered] = useState(false);
 
   type LikeParticle = { id: string; emoji: string; tx: number };
   const [likeParticles, setLikeParticles] = useState<LikeParticle[]>([]);
@@ -292,19 +295,23 @@ export const Bubble = ({
 
   const relativeTime = getRelativeTime(hossii.createdAt);
   const authorName = hossii.authorName;
-  const metaText = authorName ? `${authorName} · ${relativeTime}` : relativeTime;
 
   const animationDelay = `${(index % 8) * 0.5}s`;
   const animationDuration = `${4 + (index % 3)}s`;
 
-  // フッター帯の表示制御
+  // フッターメタの表示制御（bubble モードでは非表示）
   const hashtags = hossii.hashtags ?? [];
-  const MAX_VISIBLE_TAGS = 3;
+  const MAX_VISIBLE_TAGS = 2;
   const visibleTags = hashtags.slice(0, MAX_VISIBLE_TAGS);
   const extraTagCount = hashtags.length - MAX_VISIBLE_TAGS;
-  const showFooter = viewMode === 'full' && (hashtags.length > 0 || likesEnabled);
+  const showFooterMeta = viewMode !== 'bubble' && !isCanvasPost;
 
-  const bubbleStyle: React.CSSProperties & { '--bubble-stack'?: number } = {
+  const bubbleStyle: React.CSSProperties & {
+    '--bubble-stack'?: number;
+    '--bubble-bg'?: string;
+    '--bubble-bg-hover'?: string;
+    '--bubble-border'?: string;
+  } = {
     left: `${displayPos.x}%`,
     top: `${displayPos.y}%`,
     animationDelay: isDragging ? '0s' : animationDelay,
@@ -314,19 +321,18 @@ export const Bubble = ({
   if (orderedStackZ != null) {
     bubbleStyle['--bubble-stack'] = orderedStackZ;
   }
-  if (!isCanvasPost && hossii.bubbleColor) {
-    bubbleStyle.backgroundColor = hossii.bubbleColor;
-    bubbleStyle.borderColor = hossii.bubbleColor;
+  if (!isCanvasPost) {
+    const fillColor = hossii.bubbleColor ?? '#fffbeb';
+    bubbleStyle['--bubble-bg'] = withBubbleAlpha(fillColor, BUBBLE_BG_ALPHA);
+    bubbleStyle['--bubble-bg-hover'] = withBubbleAlpha(fillColor, BUBBLE_BG_ALPHA_HOVER);
+    if (hossii.bubbleColor) {
+      bubbleStyle['--bubble-border'] = withBubbleAlpha(hossii.bubbleColor, BUBBLE_BG_ALPHA_HOVER);
+    }
   }
   if (!isCanvasPost && bubbleShapePng) {
-    // PNG はオーバーレイ <img> で描画するため mask-image は使わない。
-    // 背景色をフィルとして残し、border/backdrop-filter のみリセットする。
-    if (!hossii.bubbleColor) {
-      bubbleStyle.backgroundColor = 'rgba(255, 251, 235, 0.95)';
-    }
+    // PNG はオーバーレイ <img> で描画。背景色は CSS 変数で半透明フィルとして残す。
     bubbleStyle.borderRadius = '0';
     bubbleStyle.border = 'none';
-    bubbleStyle.backdropFilter = 'none';
     bubbleStyle.boxShadow = 'none';
   }
   if (displayScale !== 1.0) {
@@ -373,7 +379,9 @@ export const Bubble = ({
       }}
       onMouseEnter={() => {
         if (!isSelected) onActivate();
+        setIsBubbleHovered(true);
       }}
+      onMouseLeave={() => setIsBubbleHovered(false)}
     >
       {/* B02: 形状 PNG をフレームとしてオーバーレイ表示 */}
       {!isCanvasPost && bubbleShapePng && (
@@ -386,7 +394,12 @@ export const Bubble = ({
       )}
 
       <div
-        className={`${styles.bubbleInner} ${!isCanvasPost && bubbleShapePng ? styles.bubbleInnerShaped : ''} ${isCanvasPost ? styles.bubbleInnerCanvas : ''}`}
+        className={[
+          styles.bubbleInner,
+          !isCanvasPost && bubbleShapePng ? styles.bubbleInnerShaped : '',
+          isCanvasPost ? styles.bubbleInnerCanvas : '',
+          !isCanvasPost ? styles.bubbleInnerV2 : '',
+        ].filter(Boolean).join(' ')}
       >
         {isCanvasPost ? (
           viewMode === 'image' ? (
@@ -451,7 +464,7 @@ export const Bubble = ({
                 )}
               </div>
               <div className={styles.bubbleCanvasMeta}>
-                <span className={styles.bubbleMetaText}>{metaText}</span>
+                <span className={styles.bubbleMetaText}>{authorName ? `${authorName} · ${relativeTime}` : relativeTime}</span>
               </div>
             </>
           )
@@ -468,86 +481,94 @@ export const Bubble = ({
           ) : null
         ) : (
           <>
-            <span className={styles.bubbleEmoji}>{emoji}</span>
-            <div className={styles.bubbleContent}>
-              {/* bubble モードでは meta（投稿者名/時間）のみ、full では全要素 */}
-              <div className={styles.bubbleMeta}>
-                <span className={styles.bubbleMetaText}>{metaText}</span>
-              </div>
-              {viewMode === 'full' && bubbleText && (
-                <p className={styles.bubbleText}>{bubbleText}</p>
-              )}
-              {viewMode === 'full' && hossii.imageUrl && (
-                <img
-                  src={hossii.imageUrl}
-                  alt="投稿画像"
-                  className={styles.bubbleImage}
-                  loading="lazy"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); setLightboxSrc(hossii.imageUrl!); }}
-                />
-              )}
-              {viewMode === 'full' && hossii.numberValue != null && (
-                <p className={styles.bubbleNumber}>📊 {hossii.numberValue}</p>
+            {/* v2 ヘッダー行: 絵文字 + ニックネーム */}
+            <div className={styles.bubbleHeader}>
+              <span className={styles.bubbleEmoji}>{emoji}</span>
+              {authorName && (
+                <span className={styles.bubbleNickname}>{authorName}</span>
               )}
             </div>
+            {/* コメント本文 */}
+            {bubbleText && (
+              <p className={`${styles.bubbleText} ${viewMode === 'bubble' ? styles.bubbleTextClamp2 : styles.bubbleTextClamp3}`}>
+                {bubbleText}
+              </p>
+            )}
+            {viewMode === 'full' && hossii.imageUrl && (
+              <img
+                src={hossii.imageUrl}
+                alt="投稿画像"
+                className={styles.bubbleImage}
+                loading="lazy"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setLightboxSrc(hossii.imageUrl!); }}
+              />
+            )}
+            {viewMode === 'full' && hossii.numberValue != null && (
+              <p className={styles.bubbleNumber}>📊 {hossii.numberValue}</p>
+            )}
           </>
         )}
       </div>
 
-      {/* フッター帯: タグ・いいね（full モードかつ該当要素がある場合のみ） */}
-      {showFooter && (
-        <div className={styles.bubbleFooter}>
-          <div className={styles.bubbleHashtags}>
-            {visibleTags.map((tag) => (
-              <span key={tag} className={styles.bubbleHashtag}>#{tag}</span>
-            ))}
-            {extraTagCount > 0 && (
-              <span className={styles.bubbleHashtagMore}>+{extraTagCount}</span>
-            )}
-          </div>
-          {likesEnabled && (
-            <div style={{ position: 'relative' }}>
-              {likeParticles.map((p) => (
-                <span
-                  key={p.id}
-                  className={styles.likeParticle}
-                  style={{ '--tx': `${p.tx}px` } as React.CSSProperties}
-                >
-                  {p.emoji}
-                </span>
-              ))}
-              <button
-                className={[
-                  styles.likeButton,
-                  isLiked ? styles.likeButtonActive : '',
-                  isBouncing ? styles.likeButtonBouncing : '',
-                ].filter(Boolean).join(' ')}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isBouncing) return;
-                  setLocalLikeCount((c) => c + 1);
-                  setIsLiked(true);
-                  setIsBouncing(true);
-                  setTimeout(() => setIsBouncing(false), 450);
-                  const LIKE_EMOJIS = ['❤️', '💛', '⭐', '✨'];
-                  const count = 3 + Math.floor(Math.random() * 3);
-                  const particles: LikeParticle[] = Array.from({ length: count }, (_, i) => ({
-                    id: `${Date.now()}-${i}`,
-                    emoji: LIKE_EMOJIS[Math.floor(Math.random() * LIKE_EMOJIS.length)],
-                    tx: Math.round((Math.random() - 0.5) * 40),
-                  }));
-                  setLikeParticles(particles);
-                  setTimeout(() => setLikeParticles([]), 750);
-                  onLike?.(hossii.id);
-                }}
-                aria-label="いいね"
-              >
-                ❤️ {localLikeCount > 0 && <span>{localLikeCount}</span>}
-              </button>
-            </div>
+      {/* フッターメタ行: 時刻 + タグ（bubble モード以外） */}
+      {showFooterMeta && (
+        <div className={styles.bubbleFooterMeta}>
+          <span className={styles.bubbleTimeText}>{relativeTime}</span>
+          {visibleTags.map((tag) => (
+            <span key={tag} className={styles.bubbleHashtag}>#{tag}</span>
+          ))}
+          {extraTagCount > 0 && (
+            <span className={styles.bubbleHashtagMore}>+{extraTagCount}</span>
           )}
+        </div>
+      )}
+
+      {/* フローティングいいねバッジ（吹き出し外側右下）
+          0件: ホバー時のみ表示（案A）、1件以上: 常時表示 */}
+      {likesEnabled && (localLikeCount > 0 || isBubbleHovered) && (
+        <div
+          className={[
+            styles.likeFloatingBadge,
+            isLiked ? styles.likeFloatingBadgeActive : '',
+            isBouncing ? styles.likeFloatingBadgeBouncing : '',
+            localLikeCount === 0 ? styles.likeFloatingBadgeGhost : '',
+          ].filter(Boolean).join(' ')}
+        >
+          {likeParticles.map((p) => (
+            <span
+              key={p.id}
+              className={styles.likeParticle}
+              style={{ '--tx': `${p.tx}px` } as React.CSSProperties}
+            >
+              {p.emoji}
+            </span>
+          ))}
+          <button
+            className={styles.likeFloatingBtn}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isBouncing) return;
+              setLocalLikeCount((c) => c + 1);
+              setIsLiked(true);
+              setIsBouncing(true);
+              setTimeout(() => setIsBouncing(false), 450);
+              const LIKE_EMOJIS = ['❤️', '💛', '⭐', '✨'];
+              const count = 3 + Math.floor(Math.random() * 3);
+              const particles: LikeParticle[] = Array.from({ length: count }, (_, i) => ({
+                id: `${Date.now()}-${i}`,
+                emoji: LIKE_EMOJIS[Math.floor(Math.random() * LIKE_EMOJIS.length)],
+                tx: Math.round((Math.random() - 0.5) * 40),
+              }));
+              setLikeParticles(particles);
+              setTimeout(() => setLikeParticles([]), 750);
+              onLike?.(hossii.id);
+            }}
+            aria-label="いいね"
+          >
+            {isLiked ? '❤️' : '🤍'}{localLikeCount > 0 && <span>{localLikeCount}</span>}
+          </button>
         </div>
       )}
 
@@ -570,7 +591,7 @@ export const Bubble = ({
                 <button
                   key={color}
                   className={`${styles.bubbleColorSwatch} ${hossii.bubbleColor === color ? styles.bubbleColorSwatchActive : ''}`}
-                  style={{ backgroundColor: color }}
+                  style={{ backgroundColor: withBubbleAlpha(color) }}
                   title={color}
                   onClick={() => {
                     onColorSaveRef.current?.(hossii.id, color);

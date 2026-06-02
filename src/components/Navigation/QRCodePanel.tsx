@@ -1,6 +1,5 @@
 import {
   useMemo,
-  useLayoutEffect,
   useRef,
   useState,
   useCallback,
@@ -14,6 +13,9 @@ import { getDefaultQrRect } from '../../core/utils/floatingPanelStorage';
 import { svgQrToPngBlob } from '../../core/utils/qrSvgToPng';
 import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import styles from './QRCodePanel.module.css';
+
+/** SVG 内部解像度（CSS でスケールするため大きめに描画） */
+const QR_RENDER_SIZE = 512;
 
 async function copySvgQrAsPngToClipboard(svg: SVGElement): Promise<void> {
   const pngBlob = await svgQrToPngBlob(svg);
@@ -44,9 +46,7 @@ function qrDownloadFilename(spaceURL: string | undefined): string {
 function QRCodePanelInner() {
   const { state, getActiveSpace, communitySlug } = useHossiiStore();
   const activeSpace = getActiveSpace();
-  const sizeBoxRef = useRef<HTMLDivElement>(null);
   const qrContainerRef = useRef<HTMLDivElement>(null);
-  const [qrSize, setQrSize] = useState(120);
   const [linkCopied, setLinkCopied] = useState(false);
   const [qrImageCopied, setQrImageCopied] = useState(false);
   const [qrImageSaved, setQrImageSaved] = useState(false);
@@ -58,23 +58,6 @@ function QRCodePanelInner() {
     : state.activeSpaceId
       ? `${window.location.origin}?space=${state.activeSpaceId}`
       : window.location.origin;
-
-  useLayoutEffect(() => {
-    const el = sizeBoxRef.current;
-    if (!el) return;
-
-    const measure = () => {
-      const { width, height } = el.getBoundingClientRect();
-      const pad = 20;
-      const s = Math.floor(Math.min(width, height) - pad);
-      setQrSize(Math.max(64, Math.min(400, s)));
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(spaceUrl).then(() => {
@@ -147,13 +130,14 @@ function QRCodePanelInner() {
 
   return (
     <div className={styles.qrBody}>
-      <div ref={sizeBoxRef} className={styles.qrSizeBox}>
+      <p className={styles.qrHeading}>📲 参加する</p>
+      <div className={styles.qrSizeBox}>
         <div className={styles.qrWrap}>
           <div className={styles.qrHoverZone} data-no-drag>
             <div ref={qrContainerRef} className={styles.qrCodeInner}>
               <QRCode
                 value={spaceUrl}
-                size={qrSize}
+                size={QR_RENDER_SIZE}
                 level="M"
                 fgColor="#1f2937"
                 bgColor="#ffffff"
@@ -182,16 +166,15 @@ function QRCodePanelInner() {
               </button>
             </div>
           </div>
-          {(qrImageCopied || qrImageSaved) && (
-            <p className={styles.qrImageCopyFeedback} role="status">
-              {qrImageCopied ? 'QR画像をコピーしました' : 'QR画像を保存しました'}
-            </p>
-          )}
         </div>
+        {(qrImageCopied || qrImageSaved) && (
+          <p className={styles.qrImageCopyFeedback} role="status">
+            {qrImageCopied ? 'QR画像をコピーしました' : 'QR画像を保存しました'}
+          </p>
+        )}
       </div>
       <div className={styles.qrLabel} data-no-drag>
-        <span className={styles.labelIcon}>📱</span>
-        <span className={styles.labelText}>スマホで参加</span>
+        <span className={styles.labelText}>QR コードをスキャン</span>
       </div>
       <button
         type="button"

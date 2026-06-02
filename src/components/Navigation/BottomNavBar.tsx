@@ -16,7 +16,12 @@ const USER_NAV: NavItem[] = [
   { label: 'アカウント', screen: 'account', icon: User },
 ];
 
-export const BottomNavBar = () => {
+type Props = {
+  isMobile?: boolean;
+  onMobilePostPress?: () => void;
+};
+
+export const BottomNavBar = ({ isMobile = false, onMobilePostPress }: Props) => {
   const { screen: currentScreen, navigate } = useRouter();
 
   const navItems = USER_NAV;
@@ -28,13 +33,19 @@ export const BottomNavBar = () => {
         const isActive =
           item.screen === 'comments' && currentScreen === 'screen'
             ? false
-            : currentScreen === item.screen;
+            : item.screen === 'post' && isMobile
+              ? false
+              : currentScreen === item.screen;
 
         return (
           <button
             key={item.screen}
             className={`${styles.navButton} ${isActive ? styles.active : ''}`}
             onClick={() => {
+              if (item.screen === 'post' && isMobile && onMobilePostPress) {
+                onMobilePostPress();
+                return;
+              }
               navigate(item.screen);
             }}
             aria-label={item.label}

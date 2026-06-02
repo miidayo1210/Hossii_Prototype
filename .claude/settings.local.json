@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm run build:*)",
       "Bash(ls:*)",
-      "Bash(find \"/Users/miiuchino/Github/Hossii_Prototype/株式会社Social & Cultural\" | sort | sed \"s|/Users/miiuchino/Github/Hossii_Prototype/||\")"
+      "Bash(find \"/Users/miiuchino/Github/Hossii_Prototype/株式会社Social & Cultural\" | sort | sed \"s|/Users/miiuchino/Github/Hossii_Prototype/||\")",
+      "Bash(npm run dev 2>&1)",
+      "Bash(npx supabase --version 2>&1)"
     ]
   }
 }

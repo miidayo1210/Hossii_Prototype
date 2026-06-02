@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Hash, ImageDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
@@ -13,7 +14,9 @@ import { useNeighborSpace } from './useNeighborSpace';
 import type { EmotionKey } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
-import { createBubblePosition, createOrderedBubblePosition } from '../../core/utils/bubblePosition';
+import { createBubblePosition, createOrderedBubblePosition, createBubblePositionInSharp, createOrderedBubblePositionInSharp } from '../../core/utils/bubblePosition';
+import { mapLogicalToContainerPercent } from '../../core/utils/sharpContentRect';
+import { useSharpContentRect } from '../../core/hooks/useSharpContentRect';
 import { incrementLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { getPeriodCutoff, loadShowPostCountBadge, saveShowPostCountBadge } from '../../core/utils/displayPrefsStorage';
@@ -44,8 +47,8 @@ import { recordBottleDelivery } from '../../core/utils/neighborsApi';
 import { SpeechPanel } from '../SpeechPanel/SpeechPanel';
 import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import { LogListBody } from '../CommentsScreen/LogListBody';
-import { SpacePanelCubeDock } from './SpacePanelCubeDock';
 import { ScaledContent } from '../ScaledContent/ScaledContent';
+import { HossiiToast } from '../../core/ui/HossiiToast';
 import {
   getDefaultQuickLogBottomRect,
   getDefaultQuickLogSideRect,
@@ -88,7 +91,21 @@ type ReactionTrigger = {
   emotion?: EmotionKey;
 };
 
-export const SpaceScreen = () => {
+export type SpaceScreenHandle = {
+  toggleQuickPost: () => void;
+  openQuickPost: () => void;
+  closeQuickPost: () => void;
+};
+
+type SpaceScreenProps = {
+  pendingQuickPostOpen?: boolean;
+  onPendingQuickPostConsumed?: () => void;
+};
+
+export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(function SpaceScreen(
+  { pendingQuickPostOpen = false, onPendingQuickPostConsumed },
+  ref
+) {
   const {
     state,
     hossiiLoadedFromSupabase,
@@ -135,14 +152,17 @@ export const SpaceScreen = () => {
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isPortrait = useMediaQuery('(orientation: portrait)');
+  const useStarView = isMobile && isPortrait;
+  /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
+  const useMobileBottomSheet = isMobile && isPortrait;
   const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(loadLandscapeHintDismissed);
   const quickPostDefaultRect = useMemo(
-    () => (isMobile ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
-    [isMobile]
+    () => (useMobileBottomSheet ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
+    [useMobileBottomSheet]
   );
   const quickLogDefaultRect = useMemo(
-    () => (isMobile ? getDefaultQuickLogBottomRect() : getDefaultQuickLogSideRect()),
-    [isMobile]
+    () => (useMobileBottomSheet ? getDefaultQuickLogBottomRect() : getDefaultQuickLogSideRect()),
+    [useMobileBottomSheet]
   );
   const speechPanelFloating = useMemo(
     () =>
@@ -197,6 +217,7 @@ export const SpaceScreen = () => {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [qrPanelVisible, setQrPanelVisible] = useState(true);
   const [showPostCountBadge, setShowPostCountBadge] = useState(loadShowPostCountBadge);
+  const [visitingToastVisible, setVisitingToastVisible] = useState(false);
 
   const handleShowPostCountBadgeToggle = useCallback(() => {
     setShowPostCountBadge((v) => {
@@ -224,7 +245,7 @@ export const SpaceScreen = () => {
     setQuickLogOpen((v) => !v);
   }, []);
 
-  /** 右側キューブから音声パネルを開く／閉じる（閉じるときは全文リセット） */
+  /** 音声パネルを開く／閉じる（閉じるときは全文リセット） */
   const handleSpeechDockToggle = useCallback(() => {
     if (isVisiting) return;
     setSpeechPanelOpen((wasOpen) => {
@@ -237,16 +258,48 @@ export const SpaceScreen = () => {
   }, [isVisiting]);
 
   /** 右側キューブから投稿パネルを開く（中央付きの既定位置）／閉じる */
+  const openQuickPost = useCallback(() => {
+    if (isVisiting) return;
+    if (quickPostPos) return;
+    resetQuickPostSpeechState();
+    setPostScreenKey((k) => k + 1);
+    setQuickPostPos({ x: 50, y: 50 });
+  }, [isVisiting, quickPostPos, resetQuickPostSpeechState]);
+
   const handleQuickPostDockToggle = useCallback(() => {
     if (isVisiting) return;
     if (quickPostPos) {
       handleQuickPostClose();
       return;
     }
-    resetQuickPostSpeechState();
-    setPostScreenKey((k) => k + 1);
-    setQuickPostPos({ x: 50, y: 50 });
-  }, [isVisiting, quickPostPos, handleQuickPostClose, resetQuickPostSpeechState]);
+    openQuickPost();
+  }, [isVisiting, quickPostPos, handleQuickPostClose, openQuickPost]);
+
+  const handleTopRightPostClick = useCallback(() => {
+    if (isVisiting) {
+      setVisitingToastVisible(true);
+      return;
+    }
+    handleQuickPostDockToggle();
+  }, [isVisiting, handleQuickPostDockToggle]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      toggleQuickPost: handleQuickPostDockToggle,
+      openQuickPost,
+      closeQuickPost: handleQuickPostClose,
+    }),
+    [handleQuickPostDockToggle, openQuickPost, handleQuickPostClose]
+  );
+
+  useEffect(() => {
+    if (!pendingQuickPostOpen) return;
+    if (!isVisiting) {
+      openQuickPost();
+    }
+    onPendingQuickPostConsumed?.();
+  }, [pendingQuickPostOpen, isVisiting, openQuickPost, onPendingQuickPostConsumed]);
 
   /**
    * クイック投稿パネル（ドックと同じトグル）
@@ -337,6 +390,53 @@ export const SpaceScreen = () => {
   // 訪問中は背景・タイトル・装飾を訪問先に合わせる（投稿 0 件でも自スペースの見た目が残らないようにする）
   const spaceForVisual =
     isVisiting && visitingSpaceInfo ? visitingSpaceInfo : activeSpace;
+
+  // 背景スタイルを生成（訪問中は visitingSpaceInfo の background を使用）
+  const { backgroundClass, backgroundStyle, imageWallpaperUrl } = useMemo(() => {
+    const bg = spaceForVisual?.background;
+    if (!bg) {
+      return {
+        backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
+        backgroundStyle: {},
+        imageWallpaperUrl: null as string | null,
+      };
+    }
+
+    if (bg.kind === 'color') {
+      return {
+        backgroundClass: bgStyles.bgBase,
+        backgroundStyle: { backgroundColor: bg.value },
+        imageWallpaperUrl: null as string | null,
+      };
+    }
+
+    if (bg.kind === 'pattern') {
+      const patternClass = bgStyles[`pattern_${bg.value}`] || bgStyles.pattern_mist;
+      return {
+        backgroundClass: `${bgStyles.bgBase} ${patternClass}`,
+        backgroundStyle: {},
+        imageWallpaperUrl: null as string | null,
+      };
+    }
+
+    if (bg.kind === 'image') {
+      return {
+        backgroundClass: `${bgStyles.bgBase}`,
+        backgroundStyle: {
+          backgroundColor: SPACE_IMAGE_LETTERBOX_COLOR,
+        },
+        imageWallpaperUrl: bg.value,
+      };
+    }
+
+    return {
+      backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
+      backgroundStyle: {},
+      imageWallpaperUrl: null as string | null,
+    };
+  }, [spaceForVisual]);
+
+  const shouldMapToSharp = isMobile && imageWallpaperUrl != null;
 
   const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
 
@@ -626,8 +726,22 @@ export const SpaceScreen = () => {
     isAdmin || flags.space_canvas_export_enabled;
 
   const spaceExportRootRef = useRef<HTMLDivElement>(null);
+  const { containerW, containerH, observeRef: observeBubbleArea } = useSharpContentRect();
+
+  const mapDisplayPos = useCallback(
+    (pos: { x: number; y: number }) => {
+      if (shouldMapToSharp && containerW > 0 && containerH > 0) {
+        return mapLogicalToContainerPercent(pos.x, pos.y, containerW, containerH);
+      }
+      return pos;
+    },
+    [shouldMapToSharp, containerW, containerH],
+  );
+
   const spaceExportAbortRef = useRef<AbortController | null>(null);
   const [spaceExportBusy, setSpaceExportBusy] = useState(false);
+  /** 書き出し前設定モーダルの表示フラグ */
+  const [spaceExportModalOpen, setSpaceExportModalOpen] = useState(false);
 
   const spaceExportBlockedUI = useMemo(
     () =>
@@ -744,17 +858,21 @@ export const SpaceScreen = () => {
 
   // 各バブルの位置を事前計算（メモ化）
   const bubblePositions = useMemo(() => {
+    const createRandom = shouldMapToSharp ? createBubblePositionInSharp : createBubblePosition;
+    const createOrdered = shouldMapToSharp
+      ? createOrderedBubblePositionInSharp
+      : createOrderedBubblePosition;
     if (layoutMode === 'ordered') {
       return displayHossiis.map((_, i) =>
-        createOrderedBubblePosition(i, displayHossiis.length)
+        createOrdered(i, displayHossiis.length)
       );
     }
-    return displayHossiis.map((_, i) => createBubblePosition(i));
-  }, [displayHossiis, layoutMode]);
+    return displayHossiis.map((_, i) => createRandom(i));
+  }, [displayHossiis, layoutMode, shouldMapToSharp]);
 
-  // モバイル: コンテンツ（テキストor画像）を持つ投稿をランダムで3件プレビュー表示（8秒ローテーション）
+  // モバイル縦: コンテンツを持つ投稿をランダムで3件プレビュー表示（6秒ローテーション）
   useEffect(() => {
-    if (!isMobile) return;
+    if (!useStarView) return;
     const postsWithContent = displayHossiis.filter((h) => h.message || h.imageUrl);
     if (postsWithContent.length === 0) {
       setPreviewHossiiIds(new Set());
@@ -769,7 +887,7 @@ export const SpaceScreen = () => {
     const interval = setInterval(pick, 6000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile, displayHossiis.length]);
+  }, [useStarView, displayHossiis.length]);
 
   // 最新の投稿（HossiiLive用）
   const latestHossii = displayHossiis[0] ?? null;
@@ -810,53 +928,6 @@ export const SpaceScreen = () => {
     }
     return null;
   }, [broadcastedReaction, latestHossii]);
-
-  // 背景スタイルを生成（訪問中は visitingSpaceInfo の background を使用）
-  const { backgroundClass, backgroundStyle, imageWallpaperUrl } = useMemo(() => {
-    const bg = spaceForVisual?.background;
-    if (!bg) {
-      // デフォルト背景（パターン: mist）
-      return {
-        backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
-        backgroundStyle: {},
-        imageWallpaperUrl: null as string | null,
-      };
-    }
-
-    if (bg.kind === 'color') {
-      return {
-        backgroundClass: bgStyles.bgBase,
-        backgroundStyle: { backgroundColor: bg.value },
-        imageWallpaperUrl: null as string | null,
-      };
-    }
-
-    if (bg.kind === 'pattern') {
-      const patternClass = bgStyles[`pattern_${bg.value}`] || bgStyles.pattern_mist;
-      return {
-        backgroundClass: `${bgStyles.bgBase} ${patternClass}`,
-        backgroundStyle: {},
-        imageWallpaperUrl: null as string | null,
-      };
-    }
-
-    if (bg.kind === 'image') {
-      return {
-        backgroundClass: `${bgStyles.bgBase}`,
-        backgroundStyle: {
-          backgroundColor: SPACE_IMAGE_LETTERBOX_COLOR,
-        },
-        imageWallpaperUrl: bg.value,
-      };
-    }
-
-    // フォールバック
-    return {
-      backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
-      backgroundStyle: {},
-      imageWallpaperUrl: null as string | null,
-    };
-  }, [spaceForVisual]);
 
   // モバイルモーダル用の選択された投稿
   const selectedPost = selectedPostId
@@ -935,6 +1006,7 @@ export const SpaceScreen = () => {
 
       {/* バブルエリア（背景クリックでデセレクト。仕様 63: クイック投稿/ログのダブル・トリプルもこの全面ヒット領域のみ） */}
       <div
+        ref={observeBubbleArea}
         className={styles.bubbleArea}
         data-bubble-area
         data-space-background
@@ -947,13 +1019,7 @@ export const SpaceScreen = () => {
           }
         }}
       >
-        {displayHossiis.length === 0 ? (
-          <div className={styles.empty}>
-            <span className={styles.emptyIcon}>🌸</span>
-            <p className={styles.emptyText}>まだ気持ちがありません</p>
-          </div>
-        ) : (
-          displayHossiis.map((hossii, index) => {
+        {displayHossiis.map((hossii, index) => {
             const n = displayHossiis.length;
             // 投稿順: 降順＝新しいほど左上（index 一致）、昇順＝古いほど左上（セル index を反転）
             const orderedGridIndex =
@@ -971,19 +1037,21 @@ export const SpaceScreen = () => {
                   ? bubblePositions[orderedGridIndex]
                   : bubblePositions[index];
 
+            const displayPos = mapDisplayPos(pos);
+
             const isThisSelected = selectedBubbleId === hossii.id;
 
-            // モバイル: スターを表示
+            // モバイル: 縦は StarView+プレビュー、横は StarView のみ（プレビュー OFF）
             if (isMobile) {
               return (
                 <StarView
                   key={hossii.id}
                   hossii={hossii}
-                  x={pos.x}
-                  y={pos.y}
+                  x={displayPos.x}
+                  y={displayPos.y}
                   anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
                   onClick={() => setSelectedPostId(hossii.id)}
-                  showPreview={previewHossiiIds.has(hossii.id)}
+                  showPreview={useStarView && previewHossiiIds.has(hossii.id)}
                   isRecentHighlight={recentHighlightIds.has(hossii.id)}
                   orderedStackZ={
                     layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
@@ -1021,8 +1089,7 @@ export const SpaceScreen = () => {
                 isRecentHighlight={recentHighlightIds.has(hossii.id)}
               />
             );
-          })
-        )}
+          })}
       </div>
 
       {/* カケラ粒子（Hossii表示時のみ） */}
@@ -1125,9 +1192,10 @@ export const SpaceScreen = () => {
         </div>
       )}
 
-      {/* スペースタイトル（情報レイヤー・書き出し対象外） */}
+      {/* スペースタイトル pill バッジ（モバイル専用・書き出し対象外） */}
       <div className={styles.spaceTitle} data-space-export="exclude">
-        🌳 {spaceForVisual?.name ?? 'My Space'}
+        <span className={styles.spaceTitleDot} />
+        <span className={styles.spaceTitleText}>{spaceForVisual?.name ?? 'My Space'}</span>
       </div>
 
       {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー */}
@@ -1145,8 +1213,9 @@ export const SpaceScreen = () => {
                 spaceExportBlockedUI ||
                 displayHossiis.length > SPACE_EXPORT_MAX_BUBBLES
               }
-              onClick={() => void handleSpaceExport()}
+              onClick={() => setSpaceExportModalOpen(true)}
             >
+              <ImageDown size={14} />
               書き出し
             </button>
           )}
@@ -1156,6 +1225,7 @@ export const SpaceScreen = () => {
               aria-live="polite"
               title="現在の期間・件数・表示モードで画面に出ている投稿数"
             >
+              <Hash size={11} />
               <span className={styles.postCountBadgeValue}>{displayHossiis.length}</span>
               <span className={styles.postCountBadgeUnit}>件</span>
             </div>
@@ -1292,7 +1362,7 @@ export const SpaceScreen = () => {
       {viewMode !== 'slideshow' && (
         <>
           <TopBar />
-          <TopRightMenu />
+          <TopRightMenu onPostClick={handleTopRightPostClick} />
           <LeftControlBar
             controls={controlState}
             onToggle={handleControlToggle}
@@ -1319,35 +1389,33 @@ export const SpaceScreen = () => {
             onShowPostCountBadgeToggle={
               isMobile ? undefined : handleShowPostCountBadgeToggle
             }
+            onQuickLogToggle={handleQuickLogToggle}
+            onSpeechPanelToggle={handleSpeechDockToggle}
           />
-          {!isMobile && (
-            <SpacePanelCubeDock
-              quickPostOpen={!!quickPostPos}
-              quickLogOpen={quickLogOpen}
-              speechPanelOpen={speechPanelOpen}
-              onQuickPostToggle={handleQuickPostDockToggle}
-              onQuickLogToggle={handleQuickLogToggle}
-              onSpeechPanelToggle={handleSpeechDockToggle}
-              postDisabled={isVisiting}
-              speechDisabled={isVisiting}
-            />
-          )}
         </>
       )}
 
       {/* クイック投稿パネル */}
       {quickPostPos && (
         <FloatingPanelShell
-          storageKey={isMobile ? 'quickPost.mobile' : 'quickPost.desktop'}
+          storageKey={
+            useMobileBottomSheet
+              ? 'quickPost.mobile'
+              : isMobile
+                ? 'quickPost.mobileLandscape'
+                : 'quickPost.desktop'
+          }
           defaultRect={quickPostDefaultRect}
           minW={isMobile ? 200 : 280}
           minH={isMobile ? 240 : 320}
           zIndex={310}
-          className={isMobile ? styles.quickPostBottomChrome : styles.quickPostSideChrome}
+          className={
+            useMobileBottomSheet ? styles.quickPostBottomChrome : styles.quickPostSideChrome
+          }
         >
           <PostScreen
             key={postScreenKey}
-            panelMode={isMobile ? 'bottom' : 'side'}
+            panelMode={useMobileBottomSheet ? 'bottom' : 'side'}
             initialPosition={quickPostPos}
             initialMessage={speechPostInitialMessage}
             speechEditMode={!!speechEditOriginal}
@@ -1361,12 +1429,20 @@ export const SpaceScreen = () => {
 
       {quickLogOpen && (
         <FloatingPanelShell
-          storageKey={isMobile ? 'logList.mobile' : 'logList.desktop'}
+          storageKey={
+            useMobileBottomSheet
+              ? 'logList.mobile'
+              : isMobile
+                ? 'logList.mobileLandscape'
+                : 'logList.desktop'
+          }
           defaultRect={quickLogDefaultRect}
           minW={isMobile ? 200 : 280}
           minH={isMobile ? 240 : 320}
           zIndex={320}
-          className={isMobile ? styles.quickLogBottomChrome : styles.quickLogSideChrome}
+          className={
+            useMobileBottomSheet ? styles.quickLogBottomChrome : styles.quickLogSideChrome
+          }
         >
           <LogListBody
             hossiis={logListHossiis}
@@ -1380,6 +1456,62 @@ export const SpaceScreen = () => {
       )}
       {viewMode !== 'slideshow' && qrPanelVisible && <QRCodePanel />}
 
+      {/* 書き出し前置き設定モーダル */}
+      {spaceExportModalOpen && !spaceExportBusy && (
+        <div
+          className={styles.spaceExportModalBackdrop}
+          onClick={(e) => { if (e.target === e.currentTarget) setSpaceExportModalOpen(false); }}
+        >
+          <div
+            className={styles.spaceExportModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="space-export-pre-title"
+          >
+            <p id="space-export-pre-title" className={styles.spaceExportModalTitle}>
+              📸 書き出し
+            </p>
+            <p className={styles.spaceExportModalHint}>
+              スペースを PNG 画像として保存します。
+            </p>
+            <div className={styles.spaceExportFormatRow}>
+              <div className={`${styles.spaceExportFormatCard} ${styles.spaceExportFormatCardActive}`}>
+                <span className={styles.spaceExportFormatCardIcon}>🖼</span>
+                <span className={styles.spaceExportFormatCardLabel}>PNG</span>
+              </div>
+              <div className={`${styles.spaceExportFormatCard} ${styles.spaceExportFormatCardDisabled}`}>
+                <span className={styles.spaceExportFormatCardIcon}>📷</span>
+                <span className={styles.spaceExportFormatCardLabel}>JPEG</span>
+                <span className={styles.spaceExportFormatCardSoon}>準備中</span>
+              </div>
+              <div className={`${styles.spaceExportFormatCard} ${styles.spaceExportFormatCardDisabled}`}>
+                <span className={styles.spaceExportFormatCardIcon}>📄</span>
+                <span className={styles.spaceExportFormatCardLabel}>PDF</span>
+                <span className={styles.spaceExportFormatCardSoon}>準備中</span>
+              </div>
+            </div>
+            <div className={styles.spaceExportActions}>
+              <button
+                type="button"
+                className={styles.spaceExportConfirmButton}
+                onClick={() => { setSpaceExportModalOpen(false); void handleSpaceExport(); }}
+              >
+                <ImageDown size={14} />
+                書き出す
+              </button>
+              <button
+                type="button"
+                className={styles.spaceExportModalCancel}
+                onClick={() => setSpaceExportModalOpen(false)}
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 書き出し進行モーダル */}
       {spaceExportBusy && (
         <div className={styles.spaceExportModalBackdrop}>
           <div
@@ -1404,6 +1536,15 @@ export const SpaceScreen = () => {
           </div>
         </div>
       )}
+
+      {/* 訪問中に投稿しようとしたときのフィードバック */}
+      <HossiiToast
+        show={visitingToastVisible}
+        message="訪問中のスペースには投稿できません"
+        type="info"
+        duration={2000}
+        onClose={() => setVisitingToastVisible(false)}
+      />
     </div>
   );
-};
+});

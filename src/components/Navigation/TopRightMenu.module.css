@@ -168,19 +168,3 @@
     display: none;
   }
 }
-
-/* スマホ対応 */
-@media (max-width: 480px) {
-  .nav {
-    top: 0.5rem;
-    right: 0.5rem;
-    left: 0.5rem;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .navButton {
-    padding: 0.5rem 0.625rem;
-    font-size: 0.75rem;
-  }
-}

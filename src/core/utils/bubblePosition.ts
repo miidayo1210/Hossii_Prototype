@@ -32,3 +32,38 @@ export function createOrderedBubblePosition(index: number, total: number): { x: 
   const y = 12 + row * cellH;
   return { x, y };
 }
+
+const SHARP_INNER_MIN = 5;
+const SHARP_INNER_MAX = 95;
+const SHARP_INNER_SPAN = SHARP_INNER_MAX - SHARP_INNER_MIN;
+
+/** モバイル壁紙向け: 論理座標をシャープ矩形内側（5–95%）に生成 */
+export function createBubblePositionInSharp(index: number): { x: number; y: number } {
+  const seed = (index * 7919 + 1) % 1000;
+  const seed2 = (index * 6271 + 3) % 1000;
+
+  const r1 = seed / 1000;
+  const r2 = seed2 / 1000;
+
+  const x = SHARP_INNER_MIN + ((r1 + r2) / 2) * SHARP_INNER_SPAN;
+  const y = SHARP_INNER_MIN + ((r2 + (1 - r1)) / 2) * SHARP_INNER_SPAN;
+
+  return { x, y };
+}
+
+/** 投稿順格子をシャープ矩形内側（5–95%）に配置 */
+export function createOrderedBubblePositionInSharp(
+  index: number,
+  total: number,
+): { x: number; y: number } {
+  if (total <= 0) return { x: 50, y: 50 };
+  const cols = Math.max(1, Math.ceil(Math.sqrt(total)));
+  const rows = Math.ceil(total / cols);
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+  const cellW = SHARP_INNER_SPAN / cols;
+  const cellH = SHARP_INNER_SPAN / Math.max(rows, 1);
+  const x = SHARP_INNER_MIN + col * cellW;
+  const y = SHARP_INNER_MIN + row * cellH;
+  return { x, y };
+}

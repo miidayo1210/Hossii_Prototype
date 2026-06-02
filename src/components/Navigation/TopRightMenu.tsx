@@ -14,7 +14,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'アカウント', screen: 'account' },
 ];
 
-export const TopRightMenu = () => {
+type Props = {
+  /** 「投稿する」ボタン専用コールバック。指定時は navigate('post') の代わりに呼ぶ */
+  onPostClick?: () => void;
+};
+
+export const TopRightMenu = ({ onPostClick }: Props) => {
   const { screen: currentScreen, navigate } = useRouter();
 
   return (
@@ -26,7 +31,13 @@ export const TopRightMenu = () => {
           className={`${styles.navButton} ${
             currentScreen === item.screen ? styles.navButtonActive : ''
           }`}
-          onClick={() => navigate(item.screen)}
+          onClick={() => {
+            if (item.screen === 'post' && onPostClick) {
+              onPostClick();
+              return;
+            }
+            navigate(item.screen);
+          }}
         >
           {item.label}
         </button>

@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from './core/hooks/useRouter';
+import { useMediaQuery } from './core/hooks/useMediaQuery';
 import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
@@ -9,7 +10,7 @@ import { useAuth } from './core/contexts/useAuth';
 import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
 import { DisplayPrefsProvider } from './core/contexts/DisplayPrefsContext';
 import { PostScreen } from './components/PostScreen/PostScreen';
-import { SpaceScreen } from './components/SpaceScreen/SpaceScreen';
+import { SpaceScreen, type SpaceScreenHandle } from './components/SpaceScreen/SpaceScreen';
 import { CommentsScreen } from './components/CommentsScreen/CommentsScreen';
 import { SpacesScreen } from './components/SpacesScreen/SpacesScreen';
 import { CommunitiesScreen } from './components/CommunitiesScreen/CommunitiesScreen';
@@ -34,6 +35,7 @@ import { mockHossiis } from './demo/mockData';
 import styles from './App.module.css';
 import { ScaledContent } from './components/ScaledContent/ScaledContent';
 import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
+import { HossiiToast } from './core/ui/HossiiToast';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
 const URL_PATH_SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
@@ -52,8 +54,12 @@ const AppContent = () => {
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [visitingToast, setVisitingToast] = useState(false);
   const [userProfile, setUserProfile] = useState<{ userId: string; nickname: string } | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [pendingQuickPostOpen, setPendingQuickPostOpen] = useState(false);
+  const spaceScreenRef = useRef<SpaceScreenHandle>(null);
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
   // 初回 URL スラッグ解決済みフラグ（スペース設定変更後に再トリガーされるのを防ぐ）
   const initialSlugHandledRef = useRef(false);
@@ -273,6 +279,31 @@ const AppContent = () => {
     localStorage.setItem(`profile_${currentUser.uid}`, JSON.stringify(profile));
   };
 
+  const handlePendingQuickPostConsumed = useCallback(() => {
+    setPendingQuickPostOpen(false);
+  }, []);
+
+  const handleMobilePostNav = useCallback(() => {
+    if (state.visitingSpaceId !== null) {
+      setVisitingToast(true);
+      return;
+    }
+    if (screen === 'screen') {
+      spaceScreenRef.current?.toggleQuickPost();
+      return;
+    }
+    setPendingQuickPostOpen(true);
+    navigate('screen');
+  }, [screen, navigate, state.visitingSpaceId]);
+
+  const renderSpaceScreen = () => (
+    <SpaceScreen
+      ref={spaceScreenRef}
+      pendingQuickPostOpen={pendingQuickPostOpen}
+      onPendingQuickPostConsumed={handlePendingQuickPostConsumed}
+    />
+  );
+
   // /s/[slug] にアクセスしたがスペースが見つからない場合
   if (spaceURLNotFound) {
     return (
@@ -476,7 +507,7 @@ const AppContent = () => {
       case 'post':
         return <PostScreen />;
       case 'screen':
-        return <SpaceScreen />;
+        return renderSpaceScreen();
       case 'comments':
         return <CommentsScreen />;
       case 'spaces':
@@ -503,7 +534,7 @@ const AppContent = () => {
       case 'neighbors':
         return <NeighborsScreen />;
       default:
-        return <SpaceScreen />;
+        return renderSpaceScreen();
     }
   };
 
@@ -520,7 +551,14 @@ const AppContent = () => {
           onClose={handleNicknameModalClose}
         />
       )}
-      <BottomNavBar />
+      <BottomNavBar isMobile={isMobile} onMobilePostPress={handleMobilePostNav} />
+      <HossiiToast
+        show={visitingToast}
+        message="訪問中のスペースには投稿できません"
+        type="info"
+        duration={2000}
+        onClose={() => setVisitingToast(false)}
+      />
       {showTutorial && userProfile && (
         <TutorialOverlay
           userId={userProfile.userId}
