@@ -119,7 +119,7 @@
 }
 
 /* Mobile: 指定要素のみ表示（Tooltip の display:contents ラッパーは直接子のため、子孫セレクタで制御） */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
   .controlBar {
     display: flex;
     padding: 0.5rem 0.4rem;
@@ -136,7 +136,7 @@
 }
 
 /* スマホ: 左上横長バー（縦・横共通。縦のみタイトル pill 分だけ下げる） */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
   .controlBar {
     top: max(8px, env(safe-area-inset-top, 0px));
     left: max(8px, env(safe-area-inset-left, 0px));
@@ -199,8 +199,8 @@
   }
 }
 
-/* Desktop: 全体表示 */
-@media (min-width: 769px) {
+/* Desktop: 全体表示（横持ちスマホは除外） */
+@media (min-width: 769px) and (min-height: 601px) {
   .controlBar {
     display: flex;
   }

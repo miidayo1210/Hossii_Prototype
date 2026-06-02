@@ -152,10 +152,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isPortrait = useMediaQuery('(orientation: portrait)');
+  /** スマホ横持ち: 幅ではなく高さで判定（iPhone 14 横は幅 ~844px で 768px を超えるため） */
+  const isMobileLandscape = useMediaQuery('(max-height: 600px) and (orientation: landscape)');
   const useStarView = isMobile && isPortrait;
   /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
   const useMobileBottomSheet = isMobile && isPortrait;
-  const isMobileLandscape = isMobile && !isPortrait;
   const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(loadLandscapeHintDismissed);
   const quickPostDefaultRect = useMemo(
     () => (useMobileBottomSheet ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
@@ -947,9 +948,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     isMobile &&
     isPortrait &&
     !landscapeHintDismissed &&
-    !isVisiting &&
-    viewMode !== 'slideshow' &&
-    (listenMode || speechPanelOpen);
+    viewMode !== 'slideshow';
 
   const scaledUp = displayScale > 1;
   /** スマホ縦: 16:9 スペース上 + 固定投稿ドック下 */
@@ -974,12 +973,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   return (
     <div
       ref={attachSpaceRoot}
-      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostSplit ? styles.containerMobilePostSplit : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''}`}
+      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''}`}
     >
       {showLandscapeHint && (
         <div className={styles.landscapeHintBanner} role="status">
+          <span className={styles.landscapeHintEmoji} aria-hidden="true">📱</span>
           <span className={styles.landscapeHintText}>
-            横持ちにするとスペースと文字が見やすいです
+            横向きにするともっと見やすいよ！
           </span>
           <button
             type="button"
@@ -992,7 +992,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         </div>
       )}
       <ScaledContent
-        className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostSplit ? styles.scaledCanvasMobilePostSplit : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
+        className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
       >
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
@@ -1414,10 +1414,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         </>
       )}
 
-      {/* クイック投稿パネル（スマホは固定ドック、PC のみ FloatingPanelShell） */}
+      {/* クイック投稿パネル（スマホ縦=固定ボトムシート、横=右固定ドック、PC のみ FloatingPanelShell） */}
       {quickPostPos &&
         (mobilePostSplit ? (
-          <div className={styles.mobilePostDock}>{quickPostPanel}</div>
+          <div className={styles.mobilePostSheet}>{quickPostPanel}</div>
         ) : mobilePostLandscapeSplit ? (
           <div className={`${styles.mobilePostSideDock} ${styles.quickPostSideChrome}`}>
             {quickPostPanel}

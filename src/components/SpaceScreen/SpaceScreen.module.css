@@ -39,7 +39,7 @@
 }
 
 /* モバイル横持ち: PC に近い上部余白（TopBar 相当）でクラスタ位置を寄せる */
-@media (max-width: 768px) and (orientation: landscape) {
+@media (max-height: 600px) and (orientation: landscape) {
   .containerImmersive {
     padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
     padding-left: env(safe-area-inset-left, 0px);
@@ -1376,50 +1376,40 @@
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
 }
 
-/* スマホ縦: 投稿オープン時 — 上 16:9 スペース + 下固定投稿ドック */
+/* スマホ縦: 投稿オープン時 — スペースに重なる固定ボトムシート */
 @media (max-width: 768px) and (orientation: portrait) {
-  .containerMobilePostSplit {
-    --mobile-post-min: 200px;
-    --mobile-bottom-nav: 72px;
-    display: flex;
-    flex-direction: column;
-    height: calc(100dvh - var(--mobile-bottom-nav) - env(safe-area-inset-bottom, 0px));
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .containerMobilePostSplit.containerScaledScroll {
-    overflow: hidden;
-  }
-
-  .scaledCanvasMobilePostSplit {
-    flex: 0 0 auto;
-    width: 100%;
-    min-height: 0;
-    height: min(calc(100vw * 9 / 16), calc(100% - var(--mobile-post-min)));
-    max-height: min(calc(100vw * 9 / 16), calc(100% - var(--mobile-post-min)));
-    overflow: hidden;
-  }
-
-  .scaledCanvasMobilePostSplit.scaledCanvasImmersive {
-    min-height: 0;
-  }
-
-  .mobilePostDock {
-    flex: 1 1 auto;
-    min-height: var(--mobile-post-min);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: white;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+  .mobilePostSheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    height: 58vh;
+    min-height: 280px;
+    max-height: calc(100dvh - 72px - env(safe-area-inset-bottom, 0px) - 80px);
     z-index: 310;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: linear-gradient(160deg, #fff 0%, #fdf6ff 100%);
+    border-radius: 20px 20px 0 0;
+    box-shadow:
+      0 -4px 32px rgba(139, 92, 246, 0.18),
+      0 -1px 0 rgba(0, 0, 0, 0.06);
+    animation: mobilePostSheetUp 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  @keyframes mobilePostSheetUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
 }
 
 /* スマホ横: 投稿オープン時 — 左スペース + 右固定投稿ドック */
-@media (max-width: 768px) and (orientation: landscape) {
+@media (max-height: 600px) and (orientation: landscape) {
   .containerMobilePostLandscapeSplit {
     --mobile-bottom-nav: 72px;
     --mobile-post-side-width: clamp(240px, 36vw, 320px);
@@ -1481,42 +1471,69 @@
 .landscapeHintBanner {
   position: fixed;
   top: max(10px, env(safe-area-inset-top, 0px));
-  left: 8px;
-  right: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 24px);
   z-index: 120;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.88);
-  color: rgba(255, 255, 255, 0.95);
+  gap: 6px;
+  padding: 7px 10px 7px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.93) 0%, rgba(236, 72, 153, 0.93) 100%);
+  backdrop-filter: blur(10px);
+  color: #fff;
   font-size: 0.8125rem;
-  line-height: 1.35;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  font-weight: 500;
+  line-height: 1;
+  box-shadow:
+    0 4px 16px rgba(168, 85, 247, 0.35),
+    0 1px 4px rgba(0, 0, 0, 0.12);
   pointer-events: auto;
+  animation: landscapeHintIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes landscapeHintIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.landscapeHintEmoji {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .landscapeHintText {
-  flex: 1;
-  min-width: 0;
+  white-space: nowrap;
 }
 
 .landscapeHintClose {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 1rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.75rem;
   line-height: 1;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  transition: background 0.15s;
 }
 
 .landscapeHintClose:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.38);
 }

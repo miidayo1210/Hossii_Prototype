@@ -350,7 +350,7 @@
   }
 }
 
-@media (max-width: 768px) and (orientation: landscape) {
+@media (max-height: 600px) and (orientation: landscape) {
   .previewBubble {
     display: none;
   }

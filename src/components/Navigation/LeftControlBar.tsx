@@ -98,7 +98,7 @@ export const LeftControlBar = ({
   onSpeechPanelToggle,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
-  const isMobileLayout = useMediaQuery('(max-width: 768px)');
+  const isMobileLayout = useMediaQuery('(max-width: 768px), (max-height: 600px) and (orientation: landscape)');
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement>(null);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);

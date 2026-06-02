@@ -366,7 +366,7 @@
   }
 }
 
-@media (max-width: 768px) and (orientation: landscape) {
+@media (max-height: 600px) and (orientation: landscape) {
   .container {
     width: 72px;
     height: 72px;
