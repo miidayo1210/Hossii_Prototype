@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import type { CSSProperties } from 'react';
 import { Hash, ImageDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
@@ -57,9 +58,6 @@ import {
   getDefaultSpeechRect,
   getDefaultSpeechRectMobileMic,
 } from '../../core/utils/floatingPanelStorage';
-import {
-  loadLandscapeHintDismissed,
-} from '../../core/utils/landscapeHintStorage';
 import styles from './SpaceScreen.module.css';
 import bgStyles from '../../styles/spaceBackgrounds.module.css';
 
@@ -151,14 +149,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   // モバイル判定とモーダル用の状態
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isPortrait = useMediaQuery('(orientation: portrait)');
+  const isMobilePortrait = useMediaQuery('(max-width: 768px) and (orientation: portrait)');
   /** スマホ横持ち: 幅ではなく高さで判定（iPhone 14 横は幅 ~844px で 768px を超えるため） */
   const isMobileLandscape = useMediaQuery('(max-height: 600px) and (orientation: landscape)');
   const useStarView = isMobile && isPortrait;
   /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
   const useMobileBottomSheet = isMobile && isPortrait;
-  // バナー削除済み。状態は残しておく（将来の案内機能で再利用可）
-  const [landscapeHintDismissed] = useState(loadLandscapeHintDismissed);
-  void landscapeHintDismissed;
   const quickPostDefaultRect = useMemo(
     () => (useMobileBottomSheet ? getDefaultQuickPostBottomRect() : getDefaultQuickPostSideRect()),
     [useMobileBottomSheet]
@@ -587,8 +583,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setImmersiveLayout((v) => !v);
   }, []);
 
-  // landscapeHint はバナー削除済み。storage は将来用に保持（未使用）
-
   // DisplayScale を循環させる（75% → 100% → 125% → 150% → 75%...）
   const handleDisplayScaleCycle = useCallback(() => {
     const scales = DISPLAY_SCALE_VALUES;
@@ -726,7 +720,15 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     isAdmin || flags.space_canvas_export_enabled;
 
   const spaceExportRootRef = useRef<HTMLDivElement>(null);
-  const { containerW, containerH, observeRef: observeBubbleArea } = useSharpContentRect();
+  const bubbleAreaRef = useRef<HTMLDivElement | null>(null);
+  const { containerW, containerH, sharpRect, observeRef: observeBubbleArea } = useSharpContentRect();
+  const mergeBubbleAreaRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      bubbleAreaRef.current = node;
+      observeBubbleArea(node);
+    },
+    [observeBubbleArea],
+  );
 
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
@@ -944,11 +946,57 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // ダブルタップ投稿ヒント: スマホ縦でパネルが閉じている間だけ表示
   const showDoubleTapHint =
-    isMobile &&
-    isPortrait &&
+    isMobilePortrait &&
     !isVisiting &&
     quickPostPos == null &&
     viewMode !== 'slideshow';
+
+  const [doubleTapHintCoords, setDoubleTapHintCoords] = useState<{ top: number; right: number } | null>(
+    null,
+  );
+
+  useLayoutEffect(() => {
+    if (!showDoubleTapHint) {
+      setDoubleTapHintCoords(null);
+      return;
+    }
+
+    const update = () => {
+      const el = bubbleAreaRef.current;
+      if (!el) {
+        setDoubleTapHintCoords({ top: 52, right: 12 });
+        return;
+      }
+      const area = el.getBoundingClientRect();
+      if (shouldMapToSharp && sharpRect.width > 0 && sharpRect.height > 0) {
+        setDoubleTapHintCoords({
+          top: area.top + sharpRect.y + 8,
+          right: Math.max(12, window.innerWidth - (area.left + sharpRect.x + sharpRect.width) + 8),
+        });
+      } else {
+        setDoubleTapHintCoords({
+          top: Math.max(area.top + 8, 52),
+          right: Math.max(12, window.innerWidth - area.right + 8),
+        });
+      }
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    const ro = new ResizeObserver(update);
+    if (bubbleAreaRef.current) ro.observe(bubbleAreaRef.current);
+    return () => {
+      window.removeEventListener('resize', update);
+      ro.disconnect();
+    };
+  }, [showDoubleTapHint, sharpRect, shouldMapToSharp, containerW, containerH]);
+
+  const doubleTapHintStyle: CSSProperties | undefined = doubleTapHintCoords
+    ? {
+        top: doubleTapHintCoords.top,
+        right: doubleTapHintCoords.right,
+      }
+    : undefined;
 
   const scaledUp = displayScale > 1;
   /** スマホ縦: 16:9 スペース上 + 固定投稿ドック下 */
@@ -975,11 +1023,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       ref={attachSpaceRoot}
       className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''}`}
     >
-      {showDoubleTapHint && (
-        <div className={styles.doubleTapHint} aria-hidden="true">
-          ダブルタップで投稿できるよ
-        </div>
-      )}
       <ScaledContent
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
       >
@@ -1014,7 +1057,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
       {/* バブルエリア（背景クリックでデセレクト。仕様 63: クイック投稿/ログのダブル・トリプルもこの全面ヒット領域のみ） */}
       <div
-        ref={observeBubbleArea}
+        ref={mergeBubbleAreaRef}
         className={styles.bubbleArea}
         data-bubble-area
         data-space-background
@@ -1314,6 +1357,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         />
       )}
       </ScaledContent>
+
+      {showDoubleTapHint &&
+        doubleTapHintCoords &&
+        createPortal(
+          <div
+            className={styles.doubleTapHint}
+            style={doubleTapHintStyle}
+            role="status"
+          >
+            ダブルタップしたところに投稿できるよ
+          </div>,
+          speechPanelPortalEl ?? document.body,
+        )}
 
       {/* 音声パネル（スペースルートへ portal — zoom 対象の ScaledContent の外かつ Fullscreen API 内） */}
       {speechPanelOpen &&

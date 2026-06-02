@@ -1470,27 +1470,25 @@
   box-shadow: 0 -4px 24px rgba(14, 165, 233, 0.12);
 }
 
-/* ダブルタップ投稿ヒント: スペース右端・タイトル/ボタン非重複 */
+/* ダブルタップ投稿ヒント: 16:9 領域右上付近（座標は TS で portal + inline 指定） */
 .doubleTapHint {
   position: fixed;
-  /* タイトル pill (top ~8px, height ~28px) と右上クラスタを避けて中段右寄せ */
-  top: max(52px, calc(env(safe-area-inset-top, 0px) + 44px));
-  right: max(12px, env(safe-area-inset-right, 0px));
-  z-index: 115;
+  z-index: 400;
   pointer-events: none;
+  max-width: min(220px, calc(100vw - 24px));
 
-  padding: 5px 10px;
+  padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(139, 92, 246, 0.55);
+  background: rgba(139, 92, 246, 0.72);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 0.7rem;
-  font-weight: 500;
-  line-height: 1.4;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.45;
   text-align: right;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25);
+  white-space: normal;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.35);
 
   animation: doubleTapHintIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
