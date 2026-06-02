@@ -712,7 +712,10 @@ export const PostScreen = ({
       )}
 
       {/* メインコンテンツ */}
-      <main className={panelMode ? styles.panelMain : styles.main}>
+      <main
+        className={panelMode ? styles.panelMain : styles.main}
+        data-panel-scroll={panelMode ? true : undefined}
+      >
         <h2 className={styles.title}>気持ちを置く 🌸</h2>
 
         {isWebSerialSupported() && (

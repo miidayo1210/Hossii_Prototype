@@ -8,22 +8,28 @@
 
 /* パネルモード: min-height を上書き */
 .panelContainer {
-  min-height: unset;
+  min-height: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
 }
 
-/* パネルモード: コンパクトなメインエリア */
+/* パネルモード: コンパクトなメインエリア（ここだけ縦スクロール） */
 .panelMain {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  /* 縦スクロールのみ許可。横スワイプ誤動作防止 */
   touch-action: pan-y;
   max-width: 42rem;
   width: 100%;
   margin: 0 auto;
   padding: 0.75rem 0.75rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
 }
 
 /* パネルモード: セクション間マージンを縮小 */
@@ -31,11 +37,12 @@
   margin-bottom: 0.75rem;
 }
 
-/* パネルモード: 閉じるボタンバー */
+/* パネルモード: 閉じるボタンバー（スクロール外に固定） */
 .panelCloseBar {
   display: flex;
   justify-content: flex-end;
   padding: 0.5rem 0.75rem 0;
+  flex: 0 0 auto;
   flex-shrink: 0;
 }
 
@@ -833,9 +840,9 @@
   accent-color: #7c3aed;
 }
 
-/* Mobile: Bottom nav padding */
+/* Mobile: 全画面投稿ページのみ下ナビ分の余白（ボトムシート内パネルには不要） */
 @media (max-width: 768px) {
-  .container {
+  .container:not(.panelContainer) {
     padding-bottom: 5rem;
   }
 }

@@ -951,9 +951,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     quickPostPos == null &&
     viewMode !== 'slideshow';
 
-  const [doubleTapHintCoords, setDoubleTapHintCoords] = useState<{ top: number; right: number } | null>(
-    null,
-  );
+  const [doubleTapHintCoords, setDoubleTapHintCoords] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   useLayoutEffect(() => {
     if (!showDoubleTapHint) {
@@ -961,24 +962,49 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       return;
     }
 
+    const margin = 12;
+    const hintH = 40;
+    const belowTitleTop = 48;
+
     const update = () => {
       const el = bubbleAreaRef.current;
       if (!el) {
-        setDoubleTapHintCoords({ top: 52, right: 12 });
+        setDoubleTapHintCoords({ top: belowTitleTop, left: margin });
         return;
       }
       const area = el.getBoundingClientRect();
+
       if (shouldMapToSharp && sharpRect.width > 0 && sharpRect.height > 0) {
-        setDoubleTapHintCoords({
-          top: area.top + sharpRect.y + 8,
-          right: Math.max(12, window.innerWidth - (area.left + sharpRect.x + sharpRect.width) + 8),
-        });
-      } else {
-        setDoubleTapHintCoords({
-          top: Math.max(area.top + 8, 52),
-          right: Math.max(12, window.innerWidth - area.right + 8),
-        });
+        const letterboxTop = sharpRect.y;
+        const letterboxBottom = containerH - sharpRect.y - sharpRect.height;
+
+        // 16:9 画像の上ではなく、上下レターボックス内に置き Hossii 丸と被らないようにする
+        if (letterboxTop >= hintH + 8) {
+          setDoubleTapHintCoords({
+            top: area.top + letterboxTop / 2 - hintH / 2,
+            left: area.left + sharpRect.x + margin,
+          });
+          return;
+        }
+        if (letterboxBottom >= hintH + 8) {
+          setDoubleTapHintCoords({
+            top:
+              area.top +
+              sharpRect.y +
+              sharpRect.height +
+              letterboxBottom / 2 -
+              hintH / 2,
+            left: area.left + sharpRect.x + margin,
+          });
+          return;
+        }
       }
+
+      // 壁紙なし・レターボックスが狭いときはタイトル直下の左
+      setDoubleTapHintCoords({
+        top: Math.max(area.top + 8, belowTitleTop),
+        left: area.left + margin,
+      });
     };
 
     update();
@@ -994,13 +1020,24 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const doubleTapHintStyle: CSSProperties | undefined = doubleTapHintCoords
     ? {
         top: doubleTapHintCoords.top,
-        right: doubleTapHintCoords.right,
+        left: doubleTapHintCoords.left,
+        right: 'auto',
       }
     : undefined;
 
   const scaledUp = displayScale > 1;
   /** スマホ縦: 16:9 スペース上 + 固定投稿ドック下 */
   const mobilePostSplit = useMobileBottomSheet && quickPostPos != null;
+
+  // ボトムシート表示中は背面の縦スクロールを止める（iOS でパネル外に抜けるのを防ぐ）
+  useEffect(() => {
+    if (!mobilePostSplit) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobilePostSplit]);
   /** スマホ横: 左スペース + 右固定投稿ドック */
   const mobilePostLandscapeSplit = isMobileLandscape && quickPostPos != null;
 
@@ -1021,7 +1058,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   return (
     <div
       ref={attachSpaceRoot}
-      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''}`}
+      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''} ${mobilePostSplit ? styles.containerMobilePostSheetOpen : ''}`}
     >
       <ScaledContent
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}

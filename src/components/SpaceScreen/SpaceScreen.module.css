@@ -1389,9 +1389,8 @@
     z-index: 310;
     display: flex;
     flex-direction: column;
-    /* シート全体でタッチを完全に消費しスペース背景へ抜けさせない */
+    min-height: 0;
     overflow: hidden;
-    touch-action: pan-y;
     overscroll-behavior: contain;
     background: linear-gradient(160deg, #fff 0%, #fdf6ff 100%);
     border-radius: 20px 20px 0 0;
@@ -1399,6 +1398,26 @@
       0 -4px 32px rgba(139, 92, 246, 0.18),
       0 -1px 0 rgba(0, 0, 0, 0.06);
     animation: mobilePostSheetUp 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* PostScreen の panelContainer がシート高さいっぱいに収まり、panelMain だけスクロールする */
+  .mobilePostSheet > * {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+  }
+
+  /* 投稿シート表示中は背面スペースをスクロールさせない */
+  .containerMobilePostSheetOpen {
+    overflow: hidden !important;
+    height: 100dvh;
+    max-height: 100dvh;
+    touch-action: none;
+  }
+
+  .containerMobilePostSheetOpen .scaledCanvas {
+    overflow: hidden !important;
+    touch-action: none;
   }
 
   @keyframes mobilePostSheetUp {
@@ -1470,25 +1489,25 @@
   box-shadow: 0 -4px 24px rgba(14, 165, 233, 0.12);
 }
 
-/* ダブルタップ投稿ヒント: 16:9 領域右上付近（座標は TS で portal + inline 指定） */
+/* ダブルタップ投稿ヒント: レターボックス帯など画像外（座標は TS で portal + inline 指定） */
 .doubleTapHint {
   position: fixed;
   z-index: 400;
   pointer-events: none;
-  max-width: min(220px, calc(100vw - 24px));
+  max-width: min(240px, calc(100vw - 24px));
 
   padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(139, 92, 246, 0.72);
+  background: rgba(30, 27, 75, 0.78);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #fff;
+  color: #f5f3ff;
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.45;
-  text-align: right;
+  text-align: left;
   white-space: normal;
-  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.35);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 
   animation: doubleTapHintIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
