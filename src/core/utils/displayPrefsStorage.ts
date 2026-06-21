@@ -105,12 +105,12 @@ export function saveViewMode(mode: ViewMode): void {
 
 // ---- LayoutMode ----
 
-export type LayoutMode = 'random' | 'ordered';
+export type LayoutMode = 'random' | 'ordered' | 'byAuthor';
 
 const LAYOUT_MODE_KEY = 'hossii.layoutMode';
 const DEFAULT_LAYOUT_MODE: LayoutMode = 'random';
 
-const VALID_LAYOUT_MODES: LayoutMode[] = ['random', 'ordered'];
+const VALID_LAYOUT_MODES: LayoutMode[] = ['random', 'ordered', 'byAuthor'];
 
 export function loadLayoutMode(): LayoutMode {
   try {
@@ -153,6 +153,34 @@ export function loadOrderedSortDirection(): OrderedSortDirection {
 export function saveOrderedSortDirection(direction: OrderedSortDirection): void {
   try {
     localStorage.setItem(ORDERED_SORT_KEY, direction);
+  } catch {
+    // ignore
+  }
+}
+
+// ---- AuthorGroupSort（投稿者まとめモードの並び） ----
+
+/** `firstPostAsc`: 初投稿が早い順（左→右）。`latestDesc`: 最新投稿が新しい順。`postCountDesc`: 投稿数が多い順 */
+export type AuthorGroupSort = 'firstPostAsc' | 'latestDesc' | 'postCountDesc';
+
+const AUTHOR_GROUP_SORT_KEY = 'hossii.authorGroupSort';
+const DEFAULT_AUTHOR_GROUP_SORT: AuthorGroupSort = 'firstPostAsc';
+
+const VALID_AUTHOR_GROUP_SORT: AuthorGroupSort[] = ['firstPostAsc', 'latestDesc', 'postCountDesc'];
+
+export function loadAuthorGroupSort(): AuthorGroupSort {
+  try {
+    const raw = localStorage.getItem(AUTHOR_GROUP_SORT_KEY);
+    if (raw && (VALID_AUTHOR_GROUP_SORT as string[]).includes(raw)) return raw as AuthorGroupSort;
+    return DEFAULT_AUTHOR_GROUP_SORT;
+  } catch {
+    return DEFAULT_AUTHOR_GROUP_SORT;
+  }
+}
+
+export function saveAuthorGroupSort(sort: AuthorGroupSort): void {
+  try {
+    localStorage.setItem(AUTHOR_GROUP_SORT_KEY, sort);
   } catch {
     // ignore
   }

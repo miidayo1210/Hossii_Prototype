@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Maximize2, Minimize2, Eye, EyeOff, Hash, Mic, MicOff, MoreHorizontal, QrCode, Volume2, VolumeX, ZoomIn } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, EyeOff, Hash, Mic, MicOff, MoreHorizontal, QrCode, Users, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import type { DisplayPeriod, DisplayLimit, ViewMode, LayoutMode } from '../../core/utils/displayPrefsStorage';
 import type { Space } from '../../core/types/space';
@@ -67,9 +67,10 @@ const VIEW_MODE_OPTIONS: { value: ViewMode; label: string; title: string }[] = [
   { value: 'slideshow', label: '🎞', title: 'スライドショー' },
 ];
 
-const LAYOUT_MODE_OPTIONS: { value: LayoutMode; label: string; title: string }[] = [
+const LAYOUT_MODE_OPTIONS: { value: LayoutMode; label: React.ReactNode; title: string }[] = [
   { value: 'random', label: '🔀', title: 'ランダム配置' },
   { value: 'ordered', label: '↔️', title: '投稿順に整列' },
+  { value: 'byAuthor', label: <Users size={14} />, title: '同じ人の投稿を1つにまとめて表示' },
 ];
 
 export const LeftControlBar = ({

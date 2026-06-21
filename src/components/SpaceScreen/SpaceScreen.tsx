@@ -15,7 +15,7 @@ import { useNeighborSpace } from './useNeighborSpace';
 import type { EmotionKey } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
-import { createBubblePosition, createOrderedBubblePosition, createBubblePositionInSharp, createOrderedBubblePositionInSharp } from '../../core/utils/bubblePosition';
+import { createBubblePosition, createOrderedBubblePosition, createBubblePositionInSharp, createOrderedBubblePositionInSharp, createAuthorRowPosition, createAuthorRowPositionInSharp } from '../../core/utils/bubblePosition';
 import { mapLogicalToContainerPercent } from '../../core/utils/sharpContentRect';
 import { useSharpContentRect } from '../../core/hooks/useSharpContentRect';
 import { incrementLike } from '../../core/utils/likesApi';
@@ -32,6 +32,10 @@ import {
 } from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
+import { AuthorClusterBubble } from './AuthorClusterBubble';
+import { AuthorTimelineModal } from './AuthorTimelineModal';
+import { groupHossiisByAuthor, sortAuthorGroups } from '../../core/utils/groupHossiisByAuthor';
+import type { AuthorPostGroup } from '../../core/utils/authorPostGroup';
 import { VisitBanner } from './VisitBanner';
 import { MessageBottle } from '../MessageBottle/MessageBottle';
 import { PostDetailModal } from '../PostDetailModal/PostDetailModal';
@@ -41,6 +45,7 @@ import { LeftControlBar, type ControlState } from '../Navigation/LeftControlBar'
 import { QRCodePanel } from '../Navigation/QRCodePanel';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
+import { VoiceConsentModal } from '../VoiceConsentModal/VoiceConsentModal';
 import { StarLayer } from '../StarLayer/StarLayer';
 import { SlideshowView } from '../Slideshow/SlideshowView';
 import { PostScreen } from '../PostScreen/PostScreen';
@@ -120,18 +125,22 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const {
     prefs: {
       showHossii, listenMode, hasConsentedToListen,
+      voiceEnabled, hasConsentedToVoice,
       speechLevels, displayScale, displayPeriod, displayLimit, viewMode, layoutMode,
-      orderedSortDirection,
+      orderedSortDirection, authorGroupSort,
     },
     setShowHossii,
     setListenMode,
     setListenConsent,
+    setVoiceEnabled,
+    setVoiceConsent,
     setDisplayScale,
     setDisplayPeriod,
     setDisplayLimit,
     setViewMode,
     setLayoutMode,
     setOrderedSortDirection,
+    setAuthorGroupSort,
     setSpeechLevels,
   } = useDisplayPrefs();
   const activeSpace = getActiveSpace();
@@ -181,6 +190,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     [isMobile]
   );
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedAuthorGroup, setSelectedAuthorGroup] = useState<AuthorPostGroup | null>(null);
+  const [expandedClusterKeys, setExpandedClusterKeys] = useState<Set<string>>(new Set());
   // 音声パネルの開閉と蓄積テキスト
   const [panelConfirmedText, setPanelConfirmedText] = useState('');
   /** listenMode と連動。マイク ON で自動表示（Listening の再タップは折りたたみ用） */
@@ -357,8 +368,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const dismissSpeechCandidate = useCallback((text: string) => {
     setDismissedSpeechCandidates((prev) => [...prev, text]);
   }, []);
-  // モバイル: プレビュー表示するHossiiのID（8秒ごとにローテーション、最大3件）
+  // モバイル: プレビュー表示するHossiiのID（6秒ごとにローテーション、最大3件）
   const [previewHossiiIds, setPreviewHossiiIds] = useState<Set<string>>(new Set());
+  /** スマホ縦: 背景タップで壁紙を見やすくするモード */
+  const [backgroundPeekMode, setBackgroundPeekMode] = useState(false);
+  const backgroundPeekTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
@@ -464,7 +478,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     isFullscreen: false,
     hossiiVisible: showHossii,
     micEnabled: listenMode,
-    voiceEnabled: true,
+    voiceEnabled,
   });
 
   // ストアの showHossii / listenMode が変わったら controlState に同期
@@ -475,6 +489,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   useEffect(() => {
     setControlState((prev) => ({ ...prev, micEnabled: listenMode }));
   }, [listenMode]);
+
+  useEffect(() => {
+    setControlState((prev) => ({ ...prev, voiceEnabled }));
+  }, [voiceEnabled]);
 
   useEffect(() => {
     setControlState((prev) => ({ ...prev, isFullscreen: immersiveLayout }));
@@ -511,9 +529,23 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // 同意モーダル表示フラグ
   const [showListenConsent, setShowListenConsent] = useState(false);
+  const [showVoiceConsent, setShowVoiceConsent] = useState(false);
 
   const handleContainerClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('[data-hossii-bubble]')) return;
+
+    // スマホ縦: 背景シングルタップで壁紙ピークモード（ダブルタップ投稿と競合しないよう遅延）
+    if (isMobile && isPortrait && e.detail === 1) {
+      if (backgroundPeekTapTimerRef.current) {
+        clearTimeout(backgroundPeekTapTimerRef.current);
+      }
+      backgroundPeekTapTimerRef.current = setTimeout(() => {
+        backgroundPeekTapTimerRef.current = null;
+        setBackgroundPeekMode((v) => !v);
+      }, 300);
+      return;
+    }
+
     if (isMobile) return;
     if (e.detail !== 3) return;
     if (pendingQuickPostOpenRef.current) {
@@ -521,10 +553,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       pendingQuickPostOpenRef.current = null;
     }
     setQuickLogOpen((v) => !v);
-  }, [isMobile]);
+  }, [isMobile, isPortrait]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('[data-hossii-bubble]')) return;
+    if (backgroundPeekTapTimerRef.current) {
+      clearTimeout(backgroundPeekTapTimerRef.current);
+      backgroundPeekTapTimerRef.current = null;
+    }
     // 訪問モードは閲覧専用（仕様 44）。クイック投稿は自 activeSpace へ投稿されるためここでは開かない
     if (isVisiting) return;
     if (quickPostPos) {
@@ -562,11 +598,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       } else {
         setShowListenConsent(true);
       }
+    } else if (key === 'voiceEnabled') {
+      if (voiceEnabled) {
+        setVoiceEnabled(false);
+      } else if (hasConsentedToVoice) {
+        setVoiceEnabled(true);
+      } else {
+        setShowVoiceConsent(true);
+      }
     } else {
-      // voiceEnabled / isFullscreen はローカル state のみ管理
+      // isFullscreen はローカル state のみ管理
       setControlState((prev) => ({ ...prev, [key]: !prev[key] }));
     }
-  }, [showHossii, listenMode, hasConsentedToListen, setShowHossii, setListenMode]);
+  }, [showHossii, listenMode, hasConsentedToListen, voiceEnabled, hasConsentedToVoice, setShowHossii, setListenMode, setVoiceEnabled]);
 
   /** 音声パネル内の Listen ON/OFF（左バーと同じ同意フロー） */
   const handleSpeechPanelListenToggle = useCallback(() => {
@@ -671,7 +715,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // Hossii AI Brain（音声トグルONの時のみ有効）
   const { currentMessage: brainMessage, reactToPost } = useHossiiBrain({
-    enabled: controlState.voiceEnabled,
+    enabled: voiceEnabled,
   });
 
   // 訪問モード中は訪問先 hossiis を使用、それ以外は自スペース
@@ -749,7 +793,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     () =>
       !!(
         selectedPostId ||
+        selectedAuthorGroup ||
         showListenConsent ||
+        showVoiceConsent ||
         quickPostPos ||
         quickLogOpen ||
         speechPanelOpen ||
@@ -757,7 +803,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       ),
     [
       selectedPostId,
+      selectedAuthorGroup,
       showListenConsent,
+      showVoiceConsent,
       quickPostPos,
       quickLogOpen,
       speechPanelOpen,
@@ -859,37 +907,85 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   // 各バブルの位置を事前計算（メモ化）
+  const authorGroups = useMemo(() => {
+    if (layoutMode !== 'byAuthor') return [];
+    return sortAuthorGroups(groupHossiisByAuthor(displayHossiis), authorGroupSort);
+  }, [displayHossiis, layoutMode, authorGroupSort]);
+
   const bubblePositions = useMemo(() => {
     const createRandom = shouldMapToSharp ? createBubblePositionInSharp : createBubblePosition;
     const createOrdered = shouldMapToSharp
       ? createOrderedBubblePositionInSharp
       : createOrderedBubblePosition;
+    const createAuthorRow = shouldMapToSharp
+      ? createAuthorRowPositionInSharp
+      : createAuthorRowPosition;
+    if (layoutMode === 'byAuthor') {
+      return authorGroups.map((_, i) => createAuthorRow(i, authorGroups.length));
+    }
     if (layoutMode === 'ordered') {
-      return displayHossiis.map((_, i) =>
-        createOrdered(i, displayHossiis.length)
-      );
+      return displayHossiis.map((_, i) => createOrdered(i, displayHossiis.length));
     }
     return displayHossiis.map((_, i) => createRandom(i));
-  }, [displayHossiis, layoutMode, shouldMapToSharp]);
+  }, [displayHossiis, layoutMode, shouldMapToSharp, authorGroups]);
 
-  // モバイル縦: コンテンツを持つ投稿をランダムで3件プレビュー表示（6秒ローテーション）
+  const toggleClusterExpand = useCallback((groupKey: string) => {
+    setExpandedClusterKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
-    if (!useStarView) return;
-    const postsWithContent = displayHossiis.filter((h) => h.message || h.imageUrl);
-    if (postsWithContent.length === 0) {
+    if (layoutMode !== 'byAuthor') {
+      setExpandedClusterKeys(new Set());
+      setSelectedAuthorGroup(null);
+    }
+  }, [layoutMode]);
+
+  const mobilePostsWithContentCount = useMemo(
+    () => displayHossiis.filter((h) => h.message || h.imageUrl).length,
+    [displayHossiis],
+  );
+  /** スマホ縦: 1〜3件は1件ローテ、4件以上は最大3件ローテ（byAuthor 時は無効） */
+  const mobilePreviewSlotCount = useMemo(() => {
+    if (layoutMode === 'byAuthor') return 0;
+    if (!useStarView || mobilePostsWithContentCount === 0) return 0;
+    if (mobilePostsWithContentCount <= 3) return 1;
+    return Math.min(3, mobilePostsWithContentCount);
+  }, [layoutMode, useStarView, mobilePostsWithContentCount]);
+
+  // モバイル縦: プレビュー吹き出しをランダムローテ（6秒ごと）
+  useEffect(() => {
+    if (mobilePreviewSlotCount === 0) {
       setPreviewHossiiIds(new Set());
       return;
     }
+    const postsWithContent = displayHossiis.filter((h) => h.message || h.imageUrl);
     const pick = () => {
       const shuffled = [...postsWithContent].sort(() => Math.random() - 0.5);
-      const picked = shuffled.slice(0, Math.min(3, shuffled.length)).map((h) => h.id);
+      const picked = shuffled.slice(0, mobilePreviewSlotCount).map((h) => h.id);
       setPreviewHossiiIds(new Set(picked));
     };
     pick();
     const interval = setInterval(pick, 6000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useStarView, displayHossiis.length]);
+  }, [mobilePreviewSlotCount, displayHossiis.length]);
+
+  useEffect(() => {
+    if (!isMobilePortrait) setBackgroundPeekMode(false);
+  }, [isMobilePortrait]);
+
+  useEffect(() => {
+    return () => {
+      if (backgroundPeekTapTimerRef.current) {
+        clearTimeout(backgroundPeekTapTimerRef.current);
+      }
+    };
+  }, []);
 
   // 最新の投稿（HossiiLive用）
   const latestHossii = displayHossiis[0] ?? null;
@@ -1095,7 +1191,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {/* バブルエリア（背景クリックでデセレクト。仕様 63: クイック投稿/ログのダブル・トリプルもこの全面ヒット領域のみ） */}
       <div
         ref={mergeBubbleAreaRef}
-        className={styles.bubbleArea}
+        className={`${styles.bubbleArea} ${backgroundPeekMode && isMobilePortrait ? styles.bubbleAreaBackgroundPeek : ''}`}
         data-bubble-area
         data-space-background
         onClick={handleContainerClick}
@@ -1107,7 +1203,28 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           }
         }}
       >
-        {displayHossiis.map((hossii, index) => {
+        {layoutMode === 'byAuthor'
+          ? authorGroups.map((group, index) => {
+              // 投稿順モードと同様、並び替え可能な横一列配置を常に使う（random の固定座標は無視）
+              const pos = bubblePositions[index] ?? { x: 8, y: 22 };
+              const clusterPos = isMobile ? mapDisplayPos(pos) : pos;
+
+              return (
+                <AuthorClusterBubble
+                  key={group.groupKey}
+                  group={group}
+                  position={clusterPos}
+                  viewMode={viewMode}
+                  expanded={expandedClusterKeys.has(group.groupKey)}
+                  onToggleExpand={() => toggleClusterExpand(group.groupKey)}
+                  onOpenTimeline={() => setSelectedAuthorGroup(group)}
+                  canEdit={false}
+                  orderedStackZ={index + 1}
+                  isMobilePortrait={isMobilePortrait}
+                />
+              );
+            })
+          : displayHossiis.map((hossii, index) => {
             const n = displayHossiis.length;
             // 投稿順: 降順＝新しいほど左上（index 一致）、昇順＝古いほど左上（セル index を反転）
             const orderedGridIndex =
@@ -1139,7 +1256,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                   y={displayPos.y}
                   anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
                   onClick={() => setSelectedPostId(hossii.id)}
-                  showPreview={useStarView && previewHossiiIds.has(hossii.id)}
+                  showPreview={
+                    useStarView &&
+                    !backgroundPeekMode &&
+                    previewHossiiIds.has(hossii.id)
+                  }
                   isRecentHighlight={recentHighlightIds.has(hossii.id)}
                   orderedStackZ={
                     layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
@@ -1178,6 +1299,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               />
             );
           })}
+        {backgroundPeekMode && isMobilePortrait && (
+          <div className={styles.backgroundPeekHint} data-space-export="exclude" aria-live="polite">
+            背景を表示中 — もう一度タップで戻る
+          </div>
+        )}
       </div>
 
       {/* カケラ粒子（Hossii表示時のみ） */}
@@ -1202,7 +1328,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           hossiiColor={spaceSettings?.hossiiColor}
           brainMessage={brainMessage?.text ?? null}
           hossiis={displayHossiis}
-          readingEnabled={controlState.voiceEnabled}
+          readingEnabled={voiceEnabled}
           onLikeTrigger={likeReactionTrigger?.id}
         />
       )}
@@ -1289,6 +1415,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー */}
       {(showPostCountBadge ||
         (layoutMode === 'ordered' && viewMode !== 'slideshow') ||
+        (layoutMode === 'byAuthor' && viewMode !== 'slideshow') ||
         showSpaceExportButton) && (
         <div className={styles.spaceTopRightCluster}>
           {showSpaceExportButton && (
@@ -1337,6 +1464,37 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onClick={() => setOrderedSortDirection('asc')}
               >
                 昇順
+              </button>
+            </div>
+          )}
+          {layoutMode === 'byAuthor' && viewMode !== 'slideshow' && (
+            <div className={styles.orderedSortToolbar} role="group" aria-label="投稿者まとめの並び">
+              <button
+                type="button"
+                className={`${styles.orderedSortButton} ${authorGroupSort === 'firstPostAsc' ? styles.orderedSortButtonActive : ''}`}
+                title="初投稿が早い順（左から）"
+                aria-pressed={authorGroupSort === 'firstPostAsc'}
+                onClick={() => setAuthorGroupSort('firstPostAsc')}
+              >
+                初投稿順
+              </button>
+              <button
+                type="button"
+                className={`${styles.orderedSortButton} ${authorGroupSort === 'latestDesc' ? styles.orderedSortButtonActive : ''}`}
+                title="最新投稿が新しい順（左から）"
+                aria-pressed={authorGroupSort === 'latestDesc'}
+                onClick={() => setAuthorGroupSort('latestDesc')}
+              >
+                最新順
+              </button>
+              <button
+                type="button"
+                className={`${styles.orderedSortButton} ${authorGroupSort === 'postCountDesc' ? styles.orderedSortButtonActive : ''}`}
+                title="投稿数が多い順（左から）"
+                aria-pressed={authorGroupSort === 'postCountDesc'}
+                onClick={() => setAuthorGroupSort('postCountDesc')}
+              >
+                投稿数順
               </button>
             </div>
           )}
@@ -1447,6 +1605,17 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         />
       )}
 
+      {selectedAuthorGroup && (
+        <AuthorTimelineModal
+          group={selectedAuthorGroup}
+          onClose={() => setSelectedAuthorGroup(null)}
+          onSelectPost={(id) => setSelectedPostId(id)}
+          likesEnabled={spaceSettings?.features.likesEnabled ?? false}
+          onLike={handleLike}
+          isMobilePortrait={isMobilePortrait}
+        />
+      )}
+
       {/* Listen 同意モーダル（左バーのマイクボタン用） */}
       {showListenConsent && (
         <ListenConsentModal
@@ -1456,6 +1625,17 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             setShowListenConsent(false);
           }}
           onCancel={() => setShowListenConsent(false)}
+        />
+      )}
+
+      {showVoiceConsent && (
+        <VoiceConsentModal
+          onConsent={() => {
+            setVoiceConsent(true);
+            setVoiceEnabled(true);
+            setShowVoiceConsent(false);
+          }}
+          onCancel={() => setShowVoiceConsent(false)}
         />
       )}
 

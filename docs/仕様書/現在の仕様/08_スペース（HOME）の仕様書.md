@@ -13,6 +13,7 @@
 - 表示スケール: 100% / 125% / 150% の3段階（LeftControlBar）
 - 表示期間フィルタ: 1日/1週/1月/全期間（LeftControlBar、デフォルト1週間）
 - 表示モード: フル / バブル / 画像のみ の3種類（LeftControlBar）
+- 並びモード: ランダム / 投稿順 / **投稿者まとめ**（`byAuthor`、[81](./81_投稿者別まとめ表示モード.md)）
 - 吹き出し絵文字: バブル上部の大アイコンとして表示（コメント内には重複しない）
 
 ---
@@ -424,25 +425,78 @@ ALTER TABLE hossiis ADD COLUMN image_url text DEFAULT NULL;
 
 ### F07 Hossii（キャラ）：投稿をランダムに拾って読み上げ
 
-> **✅ 実装済み**
+> **✅ 実装済み**（読み上げ同意フロー・デフォルト OFF 含む — §F07.2）
 
 **概要**: Hossii キャラクターが一定間隔でランダムに投稿を拾い、吹き出し表示 + 音声で読み上げる。
 
 **対象**: スペース表示（ユーザー）
 
-**動作フロー**:
-1. 30〜60秒のランダム間隔で idle speech タイマーが発火（既存ロジック）
+#### F07.1 読み上げの動作（ON 時）
+
+1. 30〜60秒のランダム間隔で idle speech タイマーが発動（既存ロジック）
 2. 40% の確率で発動する
 3. 発動時: `readingEnabled=true` かつ表示中投稿が存在する場合、50% の確率で投稿読み上げを選択
    - 候補: `displayHossiis` の中からテキストが空でない投稿（直前に読んだ ID は除外）
    - ランダム1件を選び、吹き出しに `「テキスト」` 形式で表示（最大40文字 + 省略記号）
    - Web Speech API (`SpeechSynthesis`) で音声読み上げ（言語: `ja-JP`、speed: 1.0、pitch: 1.1）
-4. 残り 50% は従来通りハードコード `HOSSII_IDLE_LINES` から発話
+4. 残り 50% は従来通りハードコード `HOSSII_IDLE_LINES` から発話（**テキスト吹き出しのみ。音声は読み上げ ON 時のみ**）
 
-**ON/OFF**: LeftControlBar の 🔊 ボタン（`voiceEnabled`）で兼用。OFF 時は `speechSynthesis.cancel()` を即時実行。
+**OFF 時**: `speechSynthesis.cancel()` を即時実行。idle セリフは吹き出し表示のみ（無音）。
 
-**実装ファイル**: `src/components/Hossii/HossiiLive.tsx`（`hossiis` / `readingEnabled` props 追加）・`SpaceScreen.tsx`
+**実装ファイル**: `src/components/Hossii/HossiiLive.tsx`（`readingEnabled` props）・`SpaceScreen.tsx`
 
-**将来の拡張**:
+#### F07.2 デフォルト OFF と初回同意
+
+**方針:** マイク（Listen）と同様、**ユーザーが明示的に ON にしない限り読み上げは開始しない**。初回 ON 時は **周囲への配慮** を促す同意モーダルを表示する。
+
+| 項目 | 仕様 |
+|------|------|
+| 初期状態 | `voiceEnabled = false`（**既定は常に OFF**） |
+| 永続化 | `localStorage['hossii.voiceEnabled']` — ユーザーが ON にした場合のみ `true` を保存。未設定・初回は `false` |
+| 同意状態 | `localStorage['hossii.voiceConsent']` — 同意済みなら `true`（Listen の `hossii.listenConsent` と同系） |
+| トリガー | LeftControlBar の 🔊（Volume2 / VolumeX）タップ。`HossiiToggle` 等から読み上げ ON にする導線が将来増えた場合も同フロー |
+| 未同意で ON 試行 | `VoiceConsentModal` を表示。同意するまで `voiceEnabled` は `false` のまま |
+| 同意済みで ON | `voiceEnabled = true` を保存し、読み上げ開始 |
+| OFF | 同意状態は維持。次回 ON 時はモーダルなし（Listen と同じ） |
+| 再訪問・別端末 | 同意・ON 状態は端末の localStorage に依存（Listen と同じ） |
+
+**同意モーダル（`VoiceConsentModal`）— `ListenConsentModal` と同型 UI**
+
+| 要素 | 内容 |
+|------|------|
+| アイコン | 🔊 |
+| タイトル | **周囲に音が出てもよいですか？** |
+| 本文 | Hossii の読み上げを ON にすると、**スピーカーから投稿内容などが音声で再生**されます。**周囲の人にも聞こえる**場合があります。静かな場所や公共の場ではご注意ください。 |
+| 補足リスト | ・いつでも OFF にできます / ・ブラウザの音声合成（Speech Synthesis）を使用 / ・マイクは使用しません（Listen とは別機能） |
+| ボタン | **キャンセル**（モーダルを閉じ、`voiceEnabled` は OFF のまま） / **許可して ON**（`voiceConsent=true` 保存 → `voiceEnabled=true`） |
+| オーバーレイ | 背景タップでキャンセルと同じ |
+
+**左バー 🔊 ボタンのツールチップ（[79](./79_ツールチップ.md)）**
+
+| 状態 | 文言 |
+|------|------|
+| OFF | Hossii の読み上げをオンにする |
+| ON | Hossii の読み上げ ON（タップで OFF） |
+
+**Listen（マイク）との関係**
+
+| 機能 | 同意キー | モーダル | 独立 |
+|------|---------|---------|------|
+| Listen / 音声入力 | `hossii.listenConsent` | `ListenConsentModal` | ○ |
+| 読み上げ / 音声出力 | `hossii.voiceConsent` | `VoiceConsentModal` | ○ |
+
+マイク同意と読み上げ同意は **別管理**。片方だけ許可した状態があり得る。
+
+**実装ファイル**
+
+| ファイル | 内容 |
+|----------|------|
+| `src/core/utils/voiceStorage.ts` | `loadVoiceEnabled` / `saveVoiceEnabled` / `loadVoiceConsent` / `saveVoiceConsent` |
+| `src/components/VoiceConsentModal/` | 同意 UI（`ListenConsentModal` のスタイル流用） |
+| `src/core/contexts/DisplayPrefsContext.tsx` | `voiceEnabled` / `hasConsentedToVoice` |
+| `src/components/SpaceScreen/SpaceScreen.tsx` | 同意フロー・`VoiceConsentModal` 表示 |
+
+**将来の拡張**
 - NGワード辞書との照合
 - 読み上げ間隔・音量のカスタマイズ設定
+- イヤホン推奨の文言（モバイル向け）

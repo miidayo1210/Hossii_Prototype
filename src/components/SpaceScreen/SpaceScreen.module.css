@@ -432,6 +432,31 @@
   z-index: 1;
 }
 
+/* スマホ縦: 壁紙ピークモード — 星を薄くしプレビューを隠す */
+@media (max-width: 768px) and (orientation: portrait) {
+  .bubbleAreaBackgroundPeek [data-hossii-bubble] {
+    opacity: 0.35;
+    transition: opacity 0.25s ease;
+  }
+
+  .backgroundPeekHint {
+    position: absolute;
+    left: 50%;
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 12;
+    pointer-events: none;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #f8fafc;
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+}
+
 /* 個別バブル */
 .bubble {
   position: absolute;

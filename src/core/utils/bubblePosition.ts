@@ -51,6 +51,49 @@ export function createBubblePositionInSharp(index: number): { x: number; y: numb
   return { x, y };
 }
 
+/** 投稿者グループ: 左→右に並べ、行末で折り返し（上→下）。画面内に収める */
+export function createAuthorRowPosition(index: number, total: number): { x: number; y: number } {
+  const startX = 8;
+  const startY = 16;
+  const spanX = 84;
+  const spanY = 62;
+  const minCellW = 20;
+  return createAuthorWrapGrid(index, total, { startX, startY, spanX, spanY, minCellW });
+}
+
+/** モバイル壁紙向け: 投稿者まとめの折り返し格子（シャープ矩形内） */
+export function createAuthorRowPositionInSharp(
+  index: number,
+  total: number,
+): { x: number; y: number } {
+  const minCellW = 22;
+  return createAuthorWrapGrid(index, total, {
+    startX: SHARP_INNER_MIN,
+    startY: SHARP_INNER_MIN + 4,
+    spanX: SHARP_INNER_SPAN,
+    spanY: SHARP_INNER_SPAN - 8,
+    minCellW,
+  });
+}
+
+function createAuthorWrapGrid(
+  index: number,
+  total: number,
+  bounds: { startX: number; startY: number; spanX: number; spanY: number; minCellW: number },
+): { x: number; y: number } {
+  if (total <= 0) return { x: bounds.startX, y: bounds.startY };
+  const cols = Math.max(1, Math.min(total, Math.floor(bounds.spanX / bounds.minCellW)));
+  const rows = Math.ceil(total / cols);
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+  const cellW = bounds.spanX / cols;
+  const cellH = bounds.spanY / Math.max(rows, 1);
+  return {
+    x: bounds.startX + col * cellW,
+    y: bounds.startY + row * cellH,
+  };
+}
+
 /** 投稿順格子をシャープ矩形内側（5–95%）に配置 */
 export function createOrderedBubblePositionInSharp(
   index: number,
