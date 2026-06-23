@@ -271,6 +271,7 @@ type ExtendedHossiiAction =
   | { type: 'SET_ACTIVE_SPACE'; payload: SpaceId }
   | { type: 'SET_SPACES'; payload: Space[]; preserveIds?: Set<string> }
   | { type: 'ADD_SPACE'; payload: Space }
+  | { type: 'MERGE_SPACE'; payload: Space }
   | { type: 'UPDATE_SPACE'; payload: { id: SpaceId; patch: Partial<Space> } }
   | { type: 'REMOVE_SPACE'; payload: SpaceId }
   | { type: 'SYNC_HOSSIIS'; payload: Hossii[] }
@@ -421,6 +422,20 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
 
       case 'ADD_SPACE': {
         const newSpaces = [...state.spaces, normalizeSpace(action.payload)];
+        saveSpaces(newSpaces);
+        return {
+          ...state,
+          spaces: newSpaces,
+        };
+      }
+
+      case 'MERGE_SPACE': {
+        const incoming = normalizeSpace(action.payload);
+        const idx = state.spaces.findIndex((s) => s.id === incoming.id);
+        const newSpaces =
+          idx >= 0
+            ? state.spaces.map((s, i) => (i === idx ? { ...s, ...incoming } : s))
+            : [...state.spaces, incoming];
         saveSpaces(newSpaces);
         return {
           ...state,
@@ -1062,7 +1077,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // Supabase から取得済みのスペースをローカル state に追加する（DB insert は行わない）
   // URL スラッグ直アクセス時のファストパス用
   const addSpaceLocal = useCallback((space: Space) => {
-    dispatch({ type: 'ADD_SPACE', payload: space });
+    dispatch({ type: 'MERGE_SPACE', payload: space });
   }, []);
 
   const updateSpace = useCallback((id: SpaceId, patch: Partial<Space>) => {

@@ -51,21 +51,29 @@ type Hossii = {
 
 ### 入力フィールド
 
-| フィールド | 必須 | 上限 | 制御フラグ |
-|-----------|------|------|-----------|
-| メッセージ（textarea） | 任意 | 200文字 | `spaceSettings.features.commentPost` |
-| 感情選択（クイック感情バー） | 任意 | 1つ（トグル） | `spaceSettings.features.emotionPost` |
-| 写真添付 | 任意 | — | `spaceSettings.features.photoPost` |
-| 数値入力 | 任意 | — | `spaceSettings.features.numberPost` |
+| フィールド | 必須 | 上限 | 制御 |
+|-----------|------|------|------|
+| メッセージ（textarea） | スペース設定で任意/必須 | 200文字 | `postFields.message`（`enabled` / `required`） |
+| 感情選択（クイック感情バー） | スペース設定で任意/必須 | 1つ（トグル） | `postFields.emotion` |
+| タグ（プリセット + ハッシュタグ） | スペース設定で任意/必須 | — | `postFields.tags` |
+| 吹き出し色 | スペース設定で任意/必須 | — | `postFields.bubbleColor` |
+| 吹き出し形状 | スペース設定で任意/必須 | — | `postFields.bubbleShape` + `bubble_shapes_extended` Feature Flag |
+| 写真添付 | スペース設定で任意/必須 | — | `postFields.photo` |
+| 数値入力 | スペース設定で任意/必須 | — | `postFields.numberPost` |
+
+> PostScreen は `resolvePostFields(spaceSettings)` の結果のみ参照する。`postFields` が未設定の旧データは `features.*` から表示 ON/OFF を導出（必須はすべて OFF）。詳細は [86_投稿フォーム項目設定](./86_投稿フォーム項目設定.md)。
 
 ### 送信可否条件
 
 ```
-emotion が選択されている OR message.trim() が1文字以上 OR 画像が添付されている OR 数値が入力されている
+allRequiredSatisfied（各 enabled かつ required の項目が充足）
+AND hasAnyInput（enabled な項目のいずれかに入力がある）
 → 送信ボタン有効
 ```
 
-いずれも満たさない場合: `「気持ち・メッセージ・写真・数値のいずれかを入力してね！」` エラートーストを表示。
+必須未充足で投稿ボタン押下時: 対象フィールドに赤枠 + エラーメッセージ（入力中は赤くならない）。
+
+いずれも満たさない場合（入力なし）: `「気持ち・メッセージ・写真・数値のいずれかを入力してね！」` エラートーストを表示。
 
 ### 送信処理フロー
 
@@ -114,16 +122,18 @@ undefined（名前なしで投稿）
 
 ## スペース機能フラグ（SpaceFeatures）
 
-スペースごとに投稿フォームの各セクションを有効/無効にできる。
+> **投稿パネルの表示制御:** PostScreen は [86_投稿フォーム項目設定](./86_投稿フォーム項目設定.md) の `postFields` を優先する。以下の `features.*` は GeneralTab に残存し、`postFields` 未設定時のフォールバックにのみ使用される。
 
-| フラグ | デフォルト | 制御対象 |
-|--------|-----------|---------|
+スペースごとに投稿フォームの各セクションを有効/無効にできる（レガシー）。
+
+| フラグ | デフォルト | 制御対象（フォールバック） |
+|--------|-----------|---------------------------|
 | `commentPost` | `true` | メッセージ入力欄 |
 | `emotionPost` | `true` | クイック感情バー |
 | `photoPost` | `true` | 写真添付エリア |
 | `numberPost` | `false` | 数値入力（数値投稿） |
 
-全てのフラグが `false` の場合、「このスペースでは投稿機能が無効になっています」と警告表示。
+`postFields` 設定時は全 7 項目の enabled が OFF の場合、「このスペースでは投稿機能が無効になっています」と警告表示。
 
 ---
 
@@ -150,12 +160,16 @@ PostScreen
 │   └── greeting（ランダムセリフ）
 └── main
     ├── h2「気持ちを置く 🌸」
-    ├── 投稿無効通知（全フラグOFFのとき）
-    ├── メッセージ入力（commentPost=true のとき）
-    ├── クイック感情バー（emotionPost=true のとき）
+    ├── 投稿無効通知（postFields 全項目 OFF のとき）
+    ├── メッセージ入力（postFields.message.enabled）
+    ├── クイック感情バー（postFields.emotion.enabled）
     │   └── 選択中の感情ヒント表示
-    ├── 写真添付（photoPost=true のとき）
-    └── 送信ボタン「気持ちを置く」
+    ├── 吹き出し色（postFields.bubbleColor.enabled）
+    ├── 吹き出し形状（postFields.bubbleShape.enabled + bubble_shapes_extended）
+    ├── タグ（postFields.tags.enabled）
+    ├── 数値入力（postFields.numberPost.enabled）
+    ├── 写真添付（postFields.photo.enabled）
+    └── 送信ボタン「気持ちを置く」（必須充足 + 入力あり）
         └── sending中は「送信中...」・disabled
 ```
 
@@ -187,3 +201,4 @@ PostScreen
 - 写真添付: Supabase Storage へのアップロード・保存 → ✅ 実装済み（`imageStorageApi.ts`）
 - `numberPost`: 数値投稿（数値入力 UI + Hossii.numberValue フィールド）→ ✅ 実装済み
 - F08 お絵描き投稿: DrawingModal（canvas + ツールバー + undo）→ ✅ 実装済み
+- 投稿フォーム項目設定（`postFields`）: 表示/必須制御 → ✅ 実装済み（[86](./86_投稿フォーム項目設定.md)）

@@ -190,7 +190,43 @@
 .label {
   font-size: 0.875rem;
   color: #7c3aed; /* purple-600 */
+  margin-bottom: 0;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.requiredBadge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #ef4444;
+  background: #fee2e2;
+  border-radius: 4px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+.fieldError {
+  border: 1.5px solid #ef4444;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
+}
+
+.fieldErrorText {
+  font-size: 0.8125rem;
+  color: #ef4444;
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+.submitButtonInactive {
+  opacity: 0.65;
 }
 
 /* クイック感情バー（Slack風、横並び） */

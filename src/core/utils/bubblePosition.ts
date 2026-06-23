@@ -6,14 +6,12 @@ export function createBubblePosition(index: number): { x: number; y: number } {
   const seed = (index * 7919 + 1) % 1000;
   const seed2 = (index * 6271 + 3) % 1000;
 
-  // 2つの乱数の平均で中央寄せ
   const r1 = seed / 1000;
   const r2 = seed2 / 1000;
 
-  // 画面の 8% 〜 92% の範囲（端を避ける）
-  const x = 8 + ((r1 + r2) / 2) * 84;
-  // 縦は 12% 〜 78%（上下ナビを避ける）
-  const y = 12 + ((r2 + (1 - r1)) / 2) * 66;
+  // 画面の 8% 〜 92% の範囲（端を避ける、一様分布）
+  const x = 8 + r1 * 84;
+  const y = 8 + r2 * 84;
 
   return { x, y };
 }
@@ -45,8 +43,8 @@ export function createBubblePositionInSharp(index: number): { x: number; y: numb
   const r1 = seed / 1000;
   const r2 = seed2 / 1000;
 
-  const x = SHARP_INNER_MIN + ((r1 + r2) / 2) * SHARP_INNER_SPAN;
-  const y = SHARP_INNER_MIN + ((r2 + (1 - r1)) / 2) * SHARP_INNER_SPAN;
+  const x = SHARP_INNER_MIN + r1 * SHARP_INNER_SPAN;
+  const y = SHARP_INNER_MIN + r2 * SHARP_INNER_SPAN;
 
   return { x, y };
 }

@@ -16,11 +16,21 @@ import type { EmotionKey } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { createBubblePosition, createOrderedBubblePosition, createBubblePositionInSharp, createOrderedBubblePositionInSharp, createAuthorRowPosition, createAuthorRowPositionInSharp } from '../../core/utils/bubblePosition';
-import { mapLogicalToContainerPercent } from '../../core/utils/sharpContentRect';
+import { mapLogicalToContainerPercent, mapContainerPercentToLogical } from '../../core/utils/sharpContentRect';
 import { useSharpContentRect } from '../../core/hooks/useSharpContentRect';
 import { incrementLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { getPeriodCutoff, loadShowPostCountBadge, saveShowPostCountBadge } from '../../core/utils/displayPrefsStorage';
+import {
+  loadPresentationMode,
+  savePresentationMode,
+  type PresentationMode,
+} from '../../core/utils/presentationModeStorage';
+import {
+  loadSpaceTagFilter,
+  saveSpaceTagFilter,
+} from '../../core/utils/spaceTagFilterStorage';
+import { computePreviewSlotCount } from '../../core/utils/previewSlotCount';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
 import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
 import { buildSpaceExportFilename } from '../../core/utils/spaceExportFilename';
@@ -32,6 +42,8 @@ import {
 } from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
 import { StarView } from './StarView';
+import { StarHoverPreview } from './StarHoverPreview';
+import { TagFilterPopover } from './TagFilterPopover';
 import { AuthorClusterBubble } from './AuthorClusterBubble';
 import { AuthorTimelineModal } from './AuthorTimelineModal';
 import { groupHossiisByAuthor, sortAuthorGroups } from '../../core/utils/groupHossiisByAuthor';
@@ -161,7 +173,29 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const isMobilePortrait = useMediaQuery('(max-width: 768px) and (orientation: portrait)');
   /** スマホ横持ち: 幅ではなく高さで判定（iPhone 14 横は幅 ~844px で 768px を超えるため） */
   const isMobileLandscape = useMediaQuery('(max-height: 600px) and (orientation: landscape)');
-  const useStarView = isMobile && isPortrait;
+  const [presentationMode, setPresentationMode] = useState<PresentationMode>(() =>
+    loadPresentationMode(),
+  );
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(() =>
+    activeSpace ? loadSpaceTagFilter(activeSpace.id) : null,
+  );
+  const [tagPanelOpen, setTagPanelOpen] = useState(false);
+  const [modeTransitionPhase, setModeTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle');
+  const [tagFilterPhase, setTagFilterPhase] = useState<'idle' | 'out' | 'in'>('idle');
+  const [hoveredHossiiId, setHoveredHossiiId] = useState<string | null>(null);
+  const [hoverAnchorRect, setHoverAnchorRect] = useState<DOMRect | null>(null);
+  const tagFilterButtonRef = useRef<HTMLButtonElement>(null);
+  const hoverEnterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modeTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tagFilterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const useStarView =
+    (isMobile && isPortrait) ||
+    (!isMobile && presentationMode === 'stars');
+  const showStarToggle = !isMobile && viewMode !== 'slideshow';
+  const renderAsStar = isMobile || presentationMode === 'stars';
+  const showPcStarHover = !isMobile && presentationMode === 'stars';
   /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
   const useMobileBottomSheet = isMobile && isPortrait;
   const quickPostDefaultRect = useMemo(
@@ -555,30 +589,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setQuickLogOpen((v) => !v);
   }, [isMobile, isPortrait]);
 
-  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('[data-hossii-bubble]')) return;
-    if (backgroundPeekTapTimerRef.current) {
-      clearTimeout(backgroundPeekTapTimerRef.current);
-      backgroundPeekTapTimerRef.current = null;
-    }
-    // 訪問モードは閲覧専用（仕様 44）。クイック投稿は自 activeSpace へ投稿されるためここでは開かない
-    if (isVisiting) return;
-    if (quickPostPos) {
-      setQuickPostPos(null);
-      resetQuickPostSpeechState();
-      return;
-    }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    resetQuickPostSpeechState();
-    setPostScreenKey((k) => k + 1);
-    pendingQuickPostOpenRef.current = setTimeout(() => {
-      pendingQuickPostOpenRef.current = null;
-      setQuickPostPos({ x, y });
-    }, 320);
-  }, [isVisiting, quickPostPos, resetQuickPostSpeechState]);
-
   useEffect(() => {
     if (isVisiting && quickPostPos) {
       setQuickPostPos(null);
@@ -659,11 +669,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     hideHossii(selectedBubbleId);
     setSelectedBubbleId(null);
   }, [selectedBubbleId, hideHossii]);
-
-  // F04: PointerUp で即座に位置保存
-  const handlePositionSave = useCallback((id: string, x: number, y: number) => {
-    updateHossiiPositionAction(id, x, y);
-  }, [updateHossiiPositionAction]);
 
   // F05: PointerUp で即座にスケール保存
   const handleScaleSave = useCallback((id: string, scale: number) => {
@@ -759,6 +764,115 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return sorted.slice(0, limit);
   }, [hossiis, displayPeriod, displayLimit, viewMode]);
 
+  useEffect(() => {
+    if (!activeSpace?.id) return;
+    setActiveTagFilter(loadSpaceTagFilter(activeSpace.id));
+  }, [activeSpace?.id]);
+
+  const filteredHossiis = useMemo(() => {
+    if (!activeTagFilter) return displayHossiis;
+    return displayHossiis.filter((h) => {
+      const combined = [...(h.tags ?? []), ...(h.hashtags ?? [])];
+      return combined.includes(activeTagFilter);
+    });
+  }, [displayHossiis, activeTagFilter]);
+
+  const tagCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const h of displayHossiis) {
+      for (const t of [...(h.tags ?? []), ...(h.hashtags ?? [])]) {
+        map.set(t, (map.get(t) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [displayHossiis]);
+
+  const tagCandidates = useMemo(() => {
+    const fromPosts = [...tagCounts.keys()];
+    const presetOrder = activeSpace?.presetTags ?? [];
+    const presetInPosts = presetOrder.filter((t) => fromPosts.includes(t));
+    const rest = fromPosts
+      .filter((t) => !presetOrder.includes(t))
+      .sort((a, b) => (tagCounts.get(b) ?? 0) - (tagCounts.get(a) ?? 0));
+    return [...presetInPosts, ...rest];
+  }, [activeSpace?.presetTags, tagCounts]);
+
+  const showTagControls = viewMode !== 'slideshow' && (tagCandidates.length > 0 || activeTagFilter != null);
+
+  const applyTagFilter = useCallback(
+    (tag: string | null) => {
+      const runFilter = () => {
+        setActiveTagFilter(tag);
+        if (activeSpace?.id) saveSpaceTagFilter(activeSpace.id, tag);
+        setTagPanelOpen(false);
+      };
+      if (prefersReducedMotion) {
+        runFilter();
+        return;
+      }
+      setTagFilterPhase('out');
+      if (tagFilterTimerRef.current) clearTimeout(tagFilterTimerRef.current);
+      tagFilterTimerRef.current = setTimeout(() => {
+        runFilter();
+        setTagFilterPhase('in');
+        tagFilterTimerRef.current = setTimeout(() => setTagFilterPhase('idle'), 250);
+      }, 200);
+    },
+    [activeSpace?.id, prefersReducedMotion],
+  );
+
+  const handleStarToggle = useCallback(() => {
+    const next: PresentationMode = presentationMode === 'stars' ? 'bubbles' : 'stars';
+    const commit = () => {
+      setPresentationMode(next);
+      savePresentationMode(next);
+      setHoveredHossiiId(null);
+      setHoverAnchorRect(null);
+    };
+    if (prefersReducedMotion) {
+      commit();
+      return;
+    }
+    setModeTransitionPhase('out');
+    if (modeTransitionTimerRef.current) clearTimeout(modeTransitionTimerRef.current);
+    modeTransitionTimerRef.current = setTimeout(() => {
+      commit();
+      setModeTransitionPhase('in');
+      modeTransitionTimerRef.current = setTimeout(() => setModeTransitionPhase('idle'), 250);
+    }, 200);
+  }, [presentationMode, prefersReducedMotion]);
+
+  const handleStarMouseEnter = useCallback(
+    (hossiiId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!showPcStarHover) return;
+      if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
+      if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
+      hoverEnterTimerRef.current = setTimeout(() => {
+        setHoveredHossiiId(hossiiId);
+        setHoverAnchorRect(e.currentTarget.getBoundingClientRect());
+      }, 50);
+    },
+    [showPcStarHover],
+  );
+
+  const handleStarMouseLeave = useCallback(() => {
+    if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
+    if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
+    hoverLeaveTimerRef.current = setTimeout(() => {
+      setHoveredHossiiId(null);
+      setHoverAnchorRect(null);
+    }, 100);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
+      if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
+      if (modeTransitionTimerRef.current) clearTimeout(modeTransitionTimerRef.current);
+      if (tagFilterTimerRef.current) clearTimeout(tagFilterTimerRef.current);
+    };
+  }, []);
+
   const { flags } = useFeatureFlags(activeSpace?.id);
   const canSpaceExportByPermission =
     isAdmin || flags.space_canvas_export_enabled;
@@ -782,6 +896,51 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       return pos;
     },
     [shouldMapToSharp, containerW, containerH],
+  );
+
+  const toStoragePos = useCallback(
+    (display: { x: number; y: number }) => {
+      if (shouldMapToSharp && containerW > 0 && containerH > 0) {
+        return mapContainerPercentToLogical(display.x, display.y, containerW, containerH);
+      }
+      return display;
+    },
+    [shouldMapToSharp, containerW, containerH],
+  );
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[data-hossii-bubble]')) return;
+    if (backgroundPeekTapTimerRef.current) {
+      clearTimeout(backgroundPeekTapTimerRef.current);
+      backgroundPeekTapTimerRef.current = null;
+    }
+    if (isVisiting) return;
+    if (quickPostPos) {
+      setQuickPostPos(null);
+      resetQuickPostSpeechState();
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cx = ((e.clientX - rect.left) / rect.width) * 100;
+    const cy = ((e.clientY - rect.top) / rect.height) * 100;
+    const savedPos =
+      shouldMapToSharp && rect.width > 0 && rect.height > 0
+        ? mapContainerPercentToLogical(cx, cy, rect.width, rect.height)
+        : { x: cx, y: cy };
+    resetQuickPostSpeechState();
+    setPostScreenKey((k) => k + 1);
+    pendingQuickPostOpenRef.current = setTimeout(() => {
+      pendingQuickPostOpenRef.current = null;
+      setQuickPostPos(savedPos);
+    }, 320);
+  }, [isVisiting, quickPostPos, resetQuickPostSpeechState, shouldMapToSharp]);
+
+  const handlePositionSave = useCallback(
+    (id: string, x: number, y: number) => {
+      const saved = toStoragePos({ x, y });
+      updateHossiiPositionAction(id, saved.x, saved.y);
+    },
+    [toStoragePos, updateHossiiPositionAction],
   );
 
   const spaceExportAbortRef = useRef<AbortController | null>(null);
@@ -824,11 +983,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     if (spaceExportBlockedUI) {
       return 'パネルやモーダルを閉じてから書き出せます';
     }
-    if (displayHossiis.length > SPACE_EXPORT_MAX_BUBBLES) {
+    if (filteredHossiis.length > SPACE_EXPORT_MAX_BUBBLES) {
       return `表示中の投稿が多すぎます（上限 ${SPACE_EXPORT_MAX_BUBBLES} 件）`;
     }
     return 'スペースを画像（PNG）で書き出し';
-  }, [spaceExportBusy, spaceExportBlockedUI, displayHossiis.length]);
+  }, [spaceExportBusy, spaceExportBlockedUI, filteredHossiis.length]);
 
   const handleSpaceExportCancel = useCallback(() => {
     spaceExportAbortRef.current?.abort();
@@ -860,7 +1019,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       const blob = await exportSpaceCanvasWithFrame({
         element: root,
         signal: ac.signal,
-        bubbleCount: displayHossiis.length,
+        bubbleCount: filteredHossiis.length,
         shareUrl,
         spaceTitle,
         exportedAt: new Date(),
@@ -896,21 +1055,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     activeSpace,
     communitySlug,
     spaceSettings?.spaceName,
-    displayHossiis.length,
+    filteredHossiis.length,
   ]);
 
   // 画面上の一覧は新しい順なので、先頭 N 件を「直近投稿」として視覚的に強調する
   const RECENT_HIGHLIGHT_COUNT = 5;
   const recentHighlightIds = useMemo(
-    () => new Set(displayHossiis.slice(0, RECENT_HIGHLIGHT_COUNT).map((h) => h.id)),
-    [displayHossiis]
+    () => new Set(filteredHossiis.slice(0, RECENT_HIGHLIGHT_COUNT).map((h) => h.id)),
+    [filteredHossiis]
   );
 
   // 各バブルの位置を事前計算（メモ化）
   const authorGroups = useMemo(() => {
     if (layoutMode !== 'byAuthor') return [];
-    return sortAuthorGroups(groupHossiisByAuthor(displayHossiis), authorGroupSort);
-  }, [displayHossiis, layoutMode, authorGroupSort]);
+    return sortAuthorGroups(groupHossiisByAuthor(filteredHossiis), authorGroupSort);
+  }, [filteredHossiis, layoutMode, authorGroupSort]);
 
   const bubblePositions = useMemo(() => {
     const createRandom = shouldMapToSharp ? createBubblePositionInSharp : createBubblePosition;
@@ -924,10 +1083,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       return authorGroups.map((_, i) => createAuthorRow(i, authorGroups.length));
     }
     if (layoutMode === 'ordered') {
-      return displayHossiis.map((_, i) => createOrdered(i, displayHossiis.length));
+      return filteredHossiis.map((_, i) => createOrdered(i, filteredHossiis.length));
     }
-    return displayHossiis.map((_, i) => createRandom(i));
-  }, [displayHossiis, layoutMode, shouldMapToSharp, authorGroups]);
+    return filteredHossiis.map((_, i) => createRandom(i));
+  }, [filteredHossiis, layoutMode, shouldMapToSharp, authorGroups]);
 
   const toggleClusterExpand = useCallback((groupKey: string) => {
     setExpandedClusterKeys((prev) => {
@@ -945,35 +1104,41 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     }
   }, [layoutMode]);
 
-  const mobilePostsWithContentCount = useMemo(
-    () => displayHossiis.filter((h) => h.message || h.imageUrl).length,
-    [displayHossiis],
+  const postsWithContentCount = useMemo(
+    () => filteredHossiis.filter((h) => h.message || h.imageUrl).length,
+    [filteredHossiis],
   );
-  /** スマホ縦: 1〜3件は1件ローテ、4件以上は最大3件ローテ（byAuthor 時は無効） */
-  const mobilePreviewSlotCount = useMemo(() => {
-    if (layoutMode === 'byAuthor') return 0;
-    if (!useStarView || mobilePostsWithContentCount === 0) return 0;
-    if (mobilePostsWithContentCount <= 3) return 1;
-    return Math.min(3, mobilePostsWithContentCount);
-  }, [layoutMode, useStarView, mobilePostsWithContentCount]);
 
-  // モバイル縦: プレビュー吹き出しをランダムローテ（6秒ごと）
+  const previewSlotCount = useMemo(
+    () =>
+      computePreviewSlotCount({
+        layoutMode,
+        useStarView,
+        postsWithContentCount,
+        isMobile,
+        isPortrait,
+        presentationMode,
+      }),
+    [layoutMode, useStarView, postsWithContentCount, isMobile, isPortrait, presentationMode],
+  );
+
+  // 星プレビュー吹き出しをランダムローテ（6秒ごと）
   useEffect(() => {
-    if (mobilePreviewSlotCount === 0) {
+    if (previewSlotCount === 0) {
       setPreviewHossiiIds(new Set());
       return;
     }
-    const postsWithContent = displayHossiis.filter((h) => h.message || h.imageUrl);
+    const postsWithContent = filteredHossiis.filter((h) => h.message || h.imageUrl);
     const pick = () => {
       const shuffled = [...postsWithContent].sort(() => Math.random() - 0.5);
-      const picked = shuffled.slice(0, mobilePreviewSlotCount).map((h) => h.id);
+      const picked = shuffled.slice(0, previewSlotCount).map((h) => h.id);
       setPreviewHossiiIds(new Set(picked));
     };
     pick();
     const interval = setInterval(pick, 6000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mobilePreviewSlotCount, displayHossiis.length]);
+  }, [previewSlotCount, filteredHossiis.length]);
 
   useEffect(() => {
     if (!isMobilePortrait) setBackgroundPeekMode(false);
@@ -988,7 +1153,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, []);
 
   // 最新の投稿（HossiiLive用）
-  const latestHossii = displayHossiis[0] ?? null;
+  const latestHossii = filteredHossiis[0] ?? null;
 
   // 新しい投稿を検出してブロードキャスト & Brain反応
   useEffect(() => {
@@ -1029,7 +1194,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // モバイルモーダル用の選択された投稿
   const selectedPost = selectedPostId
-    ? displayHossiis.find(h => h.id === selectedPostId)
+    ? filteredHossiis.find(h => h.id === selectedPostId)
     : null;
 
   // クイックログパネル: 画面上のスペース（訪問中は隣人）と一覧を揃える
@@ -1162,7 +1327,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
         <SlideshowView
-          hossiis={displayHossiis}
+          hossiis={filteredHossiis}
           onExit={() => setViewMode('full')}
         />
       )}
@@ -1191,7 +1356,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {/* バブルエリア（背景クリックでデセレクト。仕様 63: クイック投稿/ログのダブル・トリプルもこの全面ヒット領域のみ） */}
       <div
         ref={mergeBubbleAreaRef}
-        className={`${styles.bubbleArea} ${backgroundPeekMode && isMobilePortrait ? styles.bubbleAreaBackgroundPeek : ''}`}
+        className={`${styles.bubbleArea} ${backgroundPeekMode && isMobilePortrait ? styles.bubbleAreaBackgroundPeek : ''} ${modeTransitionPhase === 'out' ? styles.modeTransitionOut : ''} ${modeTransitionPhase === 'in' ? styles.modeTransitionIn : ''}`}
         data-bubble-area
         data-space-background
         onClick={handleContainerClick}
@@ -1203,6 +1368,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           }
         }}
       >
+        {filteredHossiis.length === 0 && activeTagFilter != null && (
+          <div className={styles.tagFilterEmpty} data-space-export="exclude">
+            <span className={styles.tagFilterEmptyIcon} aria-hidden>🏷</span>
+            <p className={styles.tagFilterEmptyText}>
+              「#{activeTagFilter}」の投稿はまだありません
+            </p>
+            <button
+              type="button"
+              className={styles.tagFilterEmptyButton}
+              onClick={() => applyTagFilter(null)}
+            >
+              すべての投稿を表示する
+            </button>
+          </div>
+        )}
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
               // 投稿順モードと同様、並び替え可能な横一列配置を常に使う（random の固定座標は無視）
@@ -1224,8 +1404,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 />
               );
             })
-          : displayHossiis.map((hossii, index) => {
-            const n = displayHossiis.length;
+          : filteredHossiis.map((hossii, index) => {
+            const n = filteredHossiis.length;
+            const postAnimClass =
+              tagFilterPhase === 'out'
+                ? styles.postItemFilterOut
+                : tagFilterPhase === 'in'
+                  ? styles.postItemFilterIn
+                  : '';
             // 投稿順: 降順＝新しいほど左上（index 一致）、昇順＝古いほど左上（セル index を反転）
             const orderedGridIndex =
               layoutMode === 'ordered' && orderedSortDirection === 'asc'
@@ -1246,35 +1432,37 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
             const isThisSelected = selectedBubbleId === hossii.id;
 
-            // モバイル: 縦は StarView+プレビュー、横は StarView のみ（プレビュー OFF）
-            if (isMobile) {
+            if (renderAsStar) {
               return (
-                <StarView
-                  key={hossii.id}
-                  hossii={hossii}
-                  x={displayPos.x}
-                  y={displayPos.y}
-                  anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
-                  onClick={() => setSelectedPostId(hossii.id)}
-                  showPreview={
-                    useStarView &&
-                    !backgroundPeekMode &&
-                    previewHossiiIds.has(hossii.id)
-                  }
-                  isRecentHighlight={recentHighlightIds.has(hossii.id)}
-                  orderedStackZ={
-                    layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
-                  }
-                />
+                <div key={hossii.id} className={postAnimClass} style={{ display: 'contents' }}>
+                  <StarView
+                    hossii={hossii}
+                    x={displayPos.x}
+                    y={displayPos.y}
+                    anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
+                    onClick={() => setSelectedPostId(hossii.id)}
+                    onMouseEnter={(e) => handleStarMouseEnter(hossii.id, e)}
+                    onMouseLeave={handleStarMouseLeave}
+                    showPreview={
+                      useStarView &&
+                      !backgroundPeekMode &&
+                      previewHossiiIds.has(hossii.id)
+                    }
+                    isRecentHighlight={recentHighlightIds.has(hossii.id)}
+                    orderedStackZ={
+                      layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
+                    }
+                  />
+                </div>
               );
             }
 
             return (
+              <div key={hossii.id} className={postAnimClass} style={{ display: 'contents' }}>
               <Bubble
-                key={hossii.id}
                 hossii={hossii}
                 index={index}
-                position={pos}
+                position={displayPos}
                 orderedStackZ={
                   layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
                 }
@@ -1297,6 +1485,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 layoutAlignTopLeft={layoutMode === 'ordered'}
                 isRecentHighlight={recentHighlightIds.has(hossii.id)}
               />
+              </div>
             );
           })}
         {backgroundPeekMode && isMobilePortrait && (
@@ -1304,6 +1493,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             背景を表示中 — もう一度タップで戻る
           </div>
         )}
+        {showPcStarHover && hoveredHossiiId && hoverAnchorRect && (() => {
+          const hovered = filteredHossiis.find((h) => h.id === hoveredHossiiId);
+          if (!hovered) return null;
+          const previewSide = hoverAnchorRect.left / window.innerWidth > 0.6 ? 'left' : 'right';
+          return (
+            <StarHoverPreview
+              hossii={hovered}
+              anchorRect={hoverAnchorRect}
+              previewSide={previewSide}
+            />
+          );
+        })()}
       </div>
 
       {/* カケラ粒子（Hossii表示時のみ） */}
@@ -1327,7 +1528,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           isListening={isRecognizing}
           hossiiColor={spaceSettings?.hossiiColor}
           brainMessage={brainMessage?.text ?? null}
-          hossiis={displayHossiis}
+          hossiis={filteredHossiis}
           readingEnabled={voiceEnabled}
           onLikeTrigger={likeReactionTrigger?.id}
         />
@@ -1412,11 +1613,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         <span className={styles.spaceTitleText}>{spaceForVisual?.name ?? 'My Space'}</span>
       </div>
 
-      {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー */}
+      {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー / タグ・星 */}
       {(showPostCountBadge ||
         (layoutMode === 'ordered' && viewMode !== 'slideshow') ||
         (layoutMode === 'byAuthor' && viewMode !== 'slideshow') ||
-        showSpaceExportButton) && (
+        showSpaceExportButton ||
+        showStarToggle ||
+        showTagControls ||
+        (isMobile && activeTagFilter)) && (
         <div className={styles.spaceTopRightCluster}>
           {showSpaceExportButton && (
             <button
@@ -1426,7 +1630,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               disabled={
                 spaceExportBusy ||
                 spaceExportBlockedUI ||
-                displayHossiis.length > SPACE_EXPORT_MAX_BUBBLES
+                filteredHossiis.length > SPACE_EXPORT_MAX_BUBBLES
               }
               onClick={() => setSpaceExportModalOpen(true)}
             >
@@ -1441,7 +1645,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               title="現在の期間・件数・表示モードで画面に出ている投稿数"
             >
               <Hash size={11} />
-              <span className={styles.postCountBadgeValue}>{displayHossiis.length}</span>
+              <span className={styles.postCountBadgeValue}>{filteredHossiis.length}</span>
               <span className={styles.postCountBadgeUnit}>件</span>
             </div>
           )}
@@ -1496,6 +1700,83 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               >
                 投稿数順
               </button>
+            </div>
+          )}
+          {(showTagControls || showStarToggle || (isMobile && activeTagFilter)) && viewMode !== 'slideshow' && (
+            <div className={styles.topRightRow}>
+              {!isMobile && showTagControls && (
+                <>
+                  <button
+                    ref={tagFilterButtonRef}
+                    type="button"
+                    className={`${styles.clusterPill} ${activeTagFilter ? styles.clusterPillActive : ''}`}
+                    aria-haspopup="listbox"
+                    aria-expanded={tagPanelOpen}
+                    aria-label="タグで絞り込む"
+                    disabled={tagCandidates.length === 0 && !activeTagFilter}
+                    onClick={() => setTagPanelOpen((o) => !o)}
+                  >
+                    {activeTagFilter ? (
+                      <>
+                        <span>🏷</span>
+                        <span className={styles.clusterPillLabel}>#{activeTagFilter}</span>
+                        <span
+                          className={styles.clusterPillClear}
+                          role="button"
+                          tabIndex={0}
+                          aria-label="タグフィルタを解除"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            applyTagFilter(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              applyTagFilter(null);
+                            }
+                          }}
+                        >
+                          ×
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🏷</span>
+                        <span>タグ</span>
+                        <span className={styles.chevron} aria-hidden>▾</span>
+                      </>
+                    )}
+                  </button>
+                  <TagFilterPopover
+                    key={tagPanelOpen ? `open-${activeTagFilter ?? 'all'}` : 'closed'}
+                    open={tagPanelOpen}
+                    anchorRef={tagFilterButtonRef}
+                    activeTag={activeTagFilter}
+                    candidates={tagCandidates}
+                    tagCounts={tagCounts}
+                    onSelect={applyTagFilter}
+                    onClose={() => setTagPanelOpen(false)}
+                  />
+                </>
+              )}
+              {isMobile && activeTagFilter && (
+                <span className={`${styles.clusterPill} ${styles.clusterPillActive}`}>
+                  #{activeTagFilter}
+                </span>
+              )}
+              {showStarToggle && (
+                <button
+                  type="button"
+                  className={`${styles.clusterPill} ${presentationMode === 'stars' ? styles.clusterPillActive : ''}`}
+                  aria-pressed={presentationMode === 'stars'}
+                  aria-label={`星表示 ${presentationMode === 'stars' ? 'オン' : 'オフ'}`}
+                  title={presentationMode === 'stars' ? '吹き出し表示に切り替え' : '星表示に切り替え'}
+                  onClick={handleStarToggle}
+                >
+                  {presentationMode === 'stars' ? '★' : '☆'} 星
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1672,6 +1953,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             }
             onQuickLogToggle={handleQuickLogToggle}
             onSpeechPanelToggle={handleSpeechDockToggle}
+            tagFilterCandidates={isMobile ? tagCandidates : undefined}
+            activeTagFilter={isMobile ? activeTagFilter : undefined}
+            onTagFilterChange={isMobile ? applyTagFilter : undefined}
           />
         </>
       )}
@@ -1721,6 +2005,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             panelMode
             onClose={handleQuickLogClose}
             onAfterAdminHide={isVisiting ? removeVisitingHossii : undefined}
+            onOpenQuickPost={() => {
+              handleQuickLogClose();
+              openQuickPost();
+            }}
           />
         </FloatingPanelShell>
       )}

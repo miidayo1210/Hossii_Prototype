@@ -546,3 +546,221 @@
     padding-bottom: 5rem;
   }
 }
+
+/* ---- ログスコープ切替 ---- */
+.logScopeTrack {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 2.5rem;
+  background: #f3f4f6;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.logScopeTrackCompact {
+  height: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.logScopeTrackCompact .logScopeTab {
+  font-size: 0.75rem;
+}
+
+.logScopePill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: #7c3aed;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.35);
+  transition: transform 0.22s cubic-bezier(0.34, 1, 0.64, 1);
+  pointer-events: none;
+}
+
+.logScopePillMine {
+  transform: translateX(100%);
+}
+
+.logScopeTab {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.18s ease;
+  z-index: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+.logScopeTab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -3px;
+}
+
+.logScopeTabActive {
+  color: #fff;
+}
+
+.logScopeCount {
+  font-size: 0.6875rem;
+  opacity: 0.75;
+}
+
+/* ---- アイデンティティバナー ---- */
+.identityBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: linear-gradient(135deg, #e9d5ff 0%, #fbcfe8 100%);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  border-radius: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 0.5rem;
+  animation: bannerIn 0.2s ease-out;
+}
+
+.identityBannerCompact {
+  padding: 0.375rem 0.625rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+
+@keyframes bannerIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.headerTitleBlock {
+  animation: titleFade 0.15s ease;
+}
+
+@keyframes titleFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- 私のログ カード差分 ---- */
+.mineCard {
+  border-left: 3px solid #7c3aed;
+}
+
+/* ---- リスト切替アニメーション ---- */
+.listPane {
+  animation: listIn 0.18s ease-out;
+}
+
+@keyframes listIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- 私のログ 空状態 ---- */
+.emptyMine {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.emptyMineIcon {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.emptyMineTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.emptyMineSubtitle {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+
+.emptyMineAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1.25rem;
+  background: linear-gradient(135deg, #e9d5ff 0%, #fbcfe8 100%);
+  color: #7c3aed;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+
+.emptyMineAction:hover {
+  opacity: 0.88;
+}
+
+.scopeHeaderBlock {
+  max-width: 80rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.headerPanel .scopeHeaderBlock {
+  max-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logScopePill {
+    transition: none;
+  }
+
+  .identityBanner {
+    animation: none;
+  }
+
+  .listPane {
+    animation: none;
+  }
+
+  .headerTitleBlock {
+    animation: none;
+  }
+}

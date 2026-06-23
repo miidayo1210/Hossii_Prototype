@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Tag, X } from 'lucide-react';
 import { renderHossiiText } from '../../core/utils/render';
 import { loadFilters, saveFilters, type HossiiFilters } from '../../core/utils/filterStorage';
+import { loadLogScope, saveLogScope, type LogScope } from '../../core/utils/logScopeStorage';
+import { getRelativeTime } from '../../core/utils/relativeTime';
 import type { Hossii } from '../../core/types';
 import { FilterBar } from '../FilterBar/FilterBar';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
@@ -9,6 +11,7 @@ import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
+import { LogScopeSegment } from './LogScopeSegment';
 import styles from './CommentsScreen.module.css';
 
 type LikeButtonProps = {
@@ -69,6 +72,12 @@ export type LogListBodyProps = {
   onClose?: () => void;
   /** 管理者が非表示にした直後（訪問先リストなどストア外データの同期用） */
   onAfterAdminHide?: (id: string) => void;
+  /** テスト・外部からのスコープ初期値注入用 */
+  initialLogScope?: LogScope;
+  /** フル画面の「投稿してみる」 */
+  onNavigateToPost?: () => void;
+  /** クイックログパネルの「投稿してみる」 */
+  onOpenQuickPost?: () => void;
 };
 
 export function LogListBody({
@@ -78,9 +87,13 @@ export function LogListBody({
   panelMode = false,
   onClose,
   onAfterAdminHide,
+  initialLogScope,
+  onNavigateToPost,
+  onOpenQuickPost,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
-  const { hideHossii } = useHossiiStore();
+  const { state, hideHossii, getActiveNickname } = useHossiiStore();
+  const { profile } = state;
   const isAdmin = currentUser?.isAdmin ?? false;
   const { flags } = useFeatureFlags(spaceId ?? undefined);
 
@@ -91,6 +104,12 @@ export function LogListBody({
   const [sortOrder, setSortOrder] = useState<'newest' | 'likes'>('newest');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const [logScope, setLogScope] = useState<LogScope>(() => initialLogScope ?? loadLogScope());
+
+  const handleScopeChange = useCallback((next: LogScope) => {
+    setLogScope(next);
+    saveLogScope(next);
+  }, []);
 
   useEffect(() => {
     if (!lightboxUrl) return;
@@ -118,21 +137,36 @@ export function LogListBody({
     [hossiis]
   );
 
+  const allCount = visibleHossiis.length;
+  const mineCount = useMemo(
+    () =>
+      profile?.id
+        ? visibleHossiis.filter((h) => h.authorId === profile.id).length
+        : 0,
+    [visibleHossiis, profile?.id]
+  );
+
+  const scopedHossiis = useMemo(() => {
+    if (logScope !== 'mine') return visibleHossiis;
+    if (!profile?.id) return [];
+    return visibleHossiis.filter((h) => h.authorId === profile.id);
+  }, [visibleHossiis, logScope, profile?.id]);
+
   const allTagCandidates = useMemo(() => {
     const set = new Set<string>(presetTags);
-    visibleHossiis.forEach((h) => {
+    scopedHossiis.forEach((h) => {
       h.tags?.forEach((t) => set.add(`#${t}`));
       h.hashtags?.forEach((t) => set.add(`#${t}`));
     });
     return Array.from(set).sort();
-  }, [presetTags, visibleHossiis]);
+  }, [presetTags, scopedHossiis]);
 
   useEffect(() => {
-    if (!currentUser || !flags.likes_enabled || visibleHossiis.length === 0) return;
-    const ids = visibleHossiis.map((h) => h.id);
+    if (!currentUser || !flags.likes_enabled || scopedHossiis.length === 0) return;
+    const ids = scopedHossiis.map((h) => h.id);
     fetchLikedIds(currentUser.uid, ids).then(setLikedIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid, flags.likes_enabled, spaceId]);
+  }, [currentUser?.uid, flags.likes_enabled, spaceId, logScope]);
 
   const handleHideFromLog = useCallback(
     (id: string) => {
@@ -162,7 +196,7 @@ export function LogListBody({
   );
 
   const sortedHossiis = useMemo(() => {
-    const sorted = [...visibleHossiis].sort((a, b) =>
+    const sorted = [...scopedHossiis].sort((a, b) =>
       sortOrder === 'likes'
         ? (b.likeCount ?? 0) - (a.likeCount ?? 0)
         : b.createdAt.getTime() - a.createdAt.getTime()
@@ -176,7 +210,19 @@ export function LogListBody({
       });
     }
     return result;
-  }, [visibleHossiis, filters, selectedTags, sortOrder]);
+  }, [scopedHossiis, filters, selectedTags, sortOrder]);
+
+  const isMineScope = logScope === 'mine';
+  const activeNickname = getActiveNickname();
+
+  const handleEmptyPostClick = useCallback(() => {
+    if (panelMode) {
+      onClose?.();
+      onOpenQuickPost?.();
+    } else {
+      onNavigateToPost?.();
+    }
+  }, [panelMode, onClose, onOpenQuickPost, onNavigateToPost]);
 
   const filterBlock = (
     <div className={styles.filterContainer}>
@@ -250,104 +296,152 @@ export function LogListBody({
     </div>
   );
 
+  const renderEmptyState = () => {
+    if (isMineScope) {
+      const hasProfile = !!profile?.id;
+      return (
+        <div className={styles.emptyMine}>
+          <span className={styles.emptyMineIcon} aria-hidden>
+            📭
+          </span>
+          <p className={styles.emptyMineTitle}>
+            {!hasProfile
+              ? 'まだ投稿がありません'
+              : 'このスペースへの投稿はまだありません'}
+          </p>
+          <p className={styles.emptyMineSubtitle}>
+            {!hasProfile
+              ? '気持ちを投稿すると、ここに記録が残ります'
+              : '最初の投稿をして記録を残してみよう！'}
+          </p>
+          <button type="button" className={styles.emptyMineAction} onClick={handleEmptyPostClick}>
+            💬 投稿してみる
+          </button>
+        </div>
+      );
+    }
+    return <div className={styles.empty}>まだ反応がありません</div>;
+  };
+
   const listSection = (
-    <div className={styles.list}>
-      {sortedHossiis.length === 0 ? (
-        <div className={styles.empty}>まだ反応がありません</div>
-      ) : (
-        sortedHossiis.map((hossii) => {
-          const timestamp = hossii.createdAt.toLocaleString('ja-JP', {
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          });
+    <div
+      key={logScope}
+      id="log-scope-panel"
+      role="tabpanel"
+      aria-labelledby={isMineScope ? 'log-scope-tab-mine' : 'log-scope-tab-all'}
+      className={styles.listPane}
+    >
+      <div className={styles.list}>
+        {sortedHossiis.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          sortedHossiis.map((hossii) => {
+            const timestamp = isMineScope
+              ? getRelativeTime(hossii.createdAt)
+              : hossii.createdAt.toLocaleString('ja-JP', {
+                  month: 'numeric',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
 
-          const isLaughter = hossii.autoType === 'laughter';
-          const isSpeech = hossii.autoType === 'speech' || hossii.logType === 'speech';
-          const icon = isLaughter ? '😂' : isSpeech ? '🎙' : null;
+            const isLaughter = hossii.autoType === 'laughter';
+            const isSpeech = hossii.autoType === 'speech' || hossii.logType === 'speech';
+            const icon = isLaughter ? '😂' : isSpeech ? '🎙' : null;
 
-          return (
-            <div key={hossii.id} className={styles.card}>
-              <div className={styles.cardInner}>
-                <div className={styles.cardContent}>
-                  {hossii.authorName && <div className={styles.authorName}>{hossii.authorName}</div>}
-                  {(!isLaughter && renderHossiiText(hossii)) && (
-                    <div className={styles.message}>
-                      {icon && <span className={styles.logIcon}>{icon}</span>}
-                      {renderHossiiText(hossii)}
-                    </div>
-                  )}
-                  {hossii.imageUrl && flags.comments_thumbnail && (
-                    <button
-                      type="button"
-                      className={styles.imageThumb}
-                      onClick={() => setLightboxUrl(hossii.imageUrl!)}
-                      aria-label="画像を拡大表示"
-                    >
-                      <img
-                        src={hossii.imageUrl}
-                        alt="投稿画像"
-                        className={styles.thumbImg}
-                        loading="lazy"
-                      />
-                      <span className={styles.thumbHint}>タップして拡大</span>
-                    </button>
-                  )}
-                  {hossii.imageUrl && !flags.comments_thumbnail && (
-                    <a
-                      href={hossii.imageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.imageLinkFallback}
-                    >
-                      📎 画像を開く
-                    </a>
-                  )}
-                  {((hossii.tags?.length ?? 0) > 0 || (hossii.hashtags?.length ?? 0) > 0) && (
-                    <div className={styles.cardTags}>
-                      {hossii.tags?.map((tag) => (
-                        <span key={`t-${tag}`} className={`${styles.cardTag} ${styles.cardTagPreset}`}>
-                          #{tag}
-                        </span>
-                      ))}
-                      {hossii.hashtags?.map((tag) => (
-                        <span key={`h-${tag}`} className={`${styles.cardTag} ${styles.cardTagFree}`}>
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className={styles.meta}>
-                    <span className={styles.time}>{timestamp}</span>
-                    <div className={styles.metaEnd}>
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          className={styles.adminHideButton}
-                          onClick={() => handleHideFromLog(hossii.id)}
-                          title="この投稿を非表示にする"
-                        >
-                          非表示
-                        </button>
-                      )}
-                      {flags.likes_enabled ? (
-                        <LikeButton
-                          hossii={hossii}
-                          likedByMe={likedIds.has(hossii.id)}
-                          onLike={handleLike}
+            return (
+              <div
+                key={hossii.id}
+                className={`${styles.card} ${isMineScope ? styles.mineCard : ''}`}
+              >
+                <div className={styles.cardInner}>
+                  <div className={styles.cardContent}>
+                    {!isMineScope && hossii.authorName && (
+                      <div className={styles.authorName}>{hossii.authorName}</div>
+                    )}
+                    {(!isLaughter && renderHossiiText(hossii)) && (
+                      <div className={styles.message}>
+                        {icon && <span className={styles.logIcon}>{icon}</span>}
+                        {renderHossiiText(hossii)}
+                      </div>
+                    )}
+                    {hossii.imageUrl && flags.comments_thumbnail && (
+                      <button
+                        type="button"
+                        className={styles.imageThumb}
+                        onClick={() => setLightboxUrl(hossii.imageUrl!)}
+                        aria-label="画像を拡大表示"
+                      >
+                        <img
+                          src={hossii.imageUrl}
+                          alt="投稿画像"
+                          className={styles.thumbImg}
+                          loading="lazy"
                         />
-                      ) : (
-                        <span className={styles.likeCount}>🤍 {hossii.likeCount ?? 0}</span>
-                      )}
+                        <span className={styles.thumbHint}>タップして拡大</span>
+                      </button>
+                    )}
+                    {hossii.imageUrl && !flags.comments_thumbnail && (
+                      <a
+                        href={hossii.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.imageLinkFallback}
+                      >
+                        📎 画像を開く
+                      </a>
+                    )}
+                    {((hossii.tags?.length ?? 0) > 0 || (hossii.hashtags?.length ?? 0) > 0) && (
+                      <div className={styles.cardTags}>
+                        {hossii.tags?.map((tag) => (
+                          <span
+                            key={`t-${tag}`}
+                            className={`${styles.cardTag} ${styles.cardTagPreset}`}
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                        {hossii.hashtags?.map((tag) => (
+                          <span
+                            key={`h-${tag}`}
+                            className={`${styles.cardTag} ${styles.cardTagFree}`}
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className={styles.meta}>
+                      <span className={styles.time}>{timestamp}</span>
+                      <div className={styles.metaEnd}>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            className={styles.adminHideButton}
+                            onClick={() => handleHideFromLog(hossii.id)}
+                            title="この投稿を非表示にする"
+                          >
+                            非表示
+                          </button>
+                        )}
+                        {flags.likes_enabled ? (
+                          <LikeButton
+                            hossii={hossii}
+                            likedByMe={likedIds.has(hossii.id)}
+                            onLike={handleLike}
+                          />
+                        ) : (
+                          <span className={styles.likeCount}>🤍 {hossii.likeCount ?? 0}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })
-      )}
+            );
+          })
+        )}
+      </div>
     </div>
   );
 
@@ -377,6 +471,44 @@ export function LogListBody({
       </div>
     );
 
+  const title = isMineScope ? '私のログ' : panelMode ? 'ログ一覧' : 'コメント一覧';
+  const subtitle = isMineScope ? 'あなたが残したログ' : panelMode ? undefined : 'みんなの声が流れてくるよ';
+  const countLabel = isMineScope
+    ? `${sortedHossiis.length} 件`
+    : `${sortedHossiis.length} 件の投稿`;
+
+  const scopeHeaderBlock = (
+    <div className={styles.scopeHeaderBlock}>
+      <LogScopeSegment
+        scope={logScope}
+        allCount={allCount}
+        mineCount={mineCount}
+        onChange={handleScopeChange}
+        compact={panelMode}
+      />
+      {isMineScope && activeNickname && (
+        <div
+          className={`${styles.identityBanner} ${panelMode ? styles.identityBannerCompact : ''}`}
+          aria-live="polite"
+        >
+          <span aria-hidden>🙂</span>
+          <span>
+            {activeNickname} として参加中
+          </span>
+        </div>
+      )}
+      {!panelMode && (
+        <div key={logScope} className={styles.headerTitleBlock}>
+          <div className={styles.headerTop}>
+            <h1 className={styles.title}>{title}</h1>
+            {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
+          </div>
+        </div>
+      )}
+      <div className={styles.count}>{countLabel}</div>
+    </div>
+  );
+
   if (panelMode) {
     return (
       <div className={styles.panelRoot}>
@@ -389,7 +521,7 @@ export function LogListBody({
           </div>
         )}
         <header className={styles.headerPanel}>
-          <div className={styles.count}>{sortedHossiis.length} 件</div>
+          {scopeHeaderBlock}
           {filterBlock}
         </header>
         <main className={styles.mainPanel} data-no-drag>
@@ -403,11 +535,7 @@ export function LogListBody({
   return (
     <>
       <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <h1 className={styles.title}>コメント一覧</h1>
-          <p className={styles.subtitle}>みんなの声が流れてくるよ</p>
-        </div>
-        <div className={styles.count}>{sortedHossiis.length} 件の投稿</div>
+        {scopeHeaderBlock}
         {filterBlock}
       </header>
       <main className={styles.main}>{listSection}</main>

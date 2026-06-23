@@ -7,6 +7,7 @@ import {
   useId,
   useCallback,
   type MutableRefObject,
+  type RefObject,
 } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
@@ -14,6 +15,7 @@ import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
+import { allPostFieldsDisabled, resolvePostFields } from '../../core/utils/postFieldSettings';
 import { addStamp } from '../../core/utils/stampStorage';
 import { upsertStampCount } from '../../core/utils/stampsApi';
 import { uploadHossiiImage } from '../../core/utils/imageStorageApi';
@@ -182,6 +184,13 @@ export const PostScreen = ({
   // numberPost: 数値投稿
   const [numberInput, setNumberInput] = useState('');
 
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const messageSectionRef = useRef<HTMLDivElement>(null);
+  const emotionSectionRef = useRef<HTMLDivElement>(null);
+  const tagsSectionRef = useRef<HTMLDivElement>(null);
+  const photoSectionRef = useRef<HTMLDivElement>(null);
+  const numberSectionRef = useRef<HTMLDivElement>(null);
+
   // 連続投稿モード
   const [continuousPost, setContinuousPost] = useState(() => loadContinuousPost());
   // await 後も最新のチェック状態で閉じる／遷移を判定する（画像アップロード待ち中に ON にした場合など）
@@ -237,6 +246,8 @@ export const PostScreen = ({
 
   // スペース設定の読み込み
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
+  const pf = useMemo(() => resolvePostFields(spaceSettings), [spaceSettings]);
+  const showBubbleShape = pf.bubbleShape.enabled && featureFlags.bubble_shapes_extended;
 
   useEffect(() => {
     if (!featureFlags.position_selector) {
@@ -309,6 +320,69 @@ export const PostScreen = ({
     }));
   }, [quickEmotions]);
 
+  const isMessageSatisfied =
+    !pf.message.enabled || !pf.message.required || message.trim() !== '';
+  const isEmotionSatisfied =
+    !pf.emotion.enabled || !pf.emotion.required || selectedEmotion !== null;
+  const isTagsSatisfied =
+    !pf.tags.enabled ||
+    !pf.tags.required ||
+    hashtags.length > 0 ||
+    selectedPresetTags.length > 0;
+  const isPhotoSatisfied =
+    !pf.photo.enabled || !pf.photo.required || imagePreview !== null;
+  const isNumberSatisfied =
+    !pf.numberPost.enabled || !pf.numberPost.required || numberInput.trim() !== '';
+
+  const allRequiredSatisfied =
+    isMessageSatisfied &&
+    isEmotionSatisfied &&
+    isTagsSatisfied &&
+    isPhotoSatisfied &&
+    isNumberSatisfied;
+
+  const hasAnyInput = useMemo(() => {
+    if (pf.emotion.enabled && selectedEmotion) return true;
+    if (pf.message.enabled && message.trim()) return true;
+    if (pf.photo.enabled && imagePreview) return true;
+    if (pf.numberPost.enabled && numberInput.trim()) return true;
+    if (pf.tags.enabled && (hashtags.length > 0 || selectedPresetTags.length > 0)) return true;
+    return false;
+  }, [
+    pf,
+    selectedEmotion,
+    message,
+    imagePreview,
+    numberInput,
+    hashtags,
+    selectedPresetTags,
+  ]);
+
+  const canSubmit = allRequiredSatisfied && hasAnyInput && !sending;
+
+  const scrollToFirstFieldError = useCallback(() => {
+    const checks: [boolean, RefObject<HTMLDivElement | null>][] = [
+      [!isMessageSatisfied && pf.message.enabled, messageSectionRef],
+      [!isEmotionSatisfied && pf.emotion.enabled, emotionSectionRef],
+      [!isTagsSatisfied && pf.tags.enabled, tagsSectionRef],
+      [!isPhotoSatisfied && pf.photo.enabled, photoSectionRef],
+      [!isNumberSatisfied && pf.numberPost.enabled, numberSectionRef],
+    ];
+    for (const [failed, ref] of checks) {
+      if (failed && ref.current) {
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        break;
+      }
+    }
+  }, [
+    isMessageSatisfied,
+    isEmotionSatisfied,
+    isTagsSatisfied,
+    isPhotoSatisfied,
+    isNumberSatisfied,
+    pf,
+  ]);
+
   // 初回マウント時にランダムセリフを設定
   useEffect(() => {
     shuffleGreeting();
@@ -331,12 +405,12 @@ export const PostScreen = ({
 
   // 投稿画面表示時はメッセージ欄にフォーカス（フルスクリーン・パネル共通。コメント無効時は textarea 非表示のためスキップ）
   useEffect(() => {
-    if (spaceSettings?.features.commentPost === false) return;
+    if (!pf.message.enabled) return;
     const id = requestAnimationFrame(() => {
       messageTextareaRef.current?.focus();
     });
     return () => cancelAnimationFrame(id);
-  }, [spaceSettings?.features.commentPost]);
+  }, [pf.message.enabled]);
 
   const requestClosePanel = useCallback(() => {
     if (!onClose) return;
@@ -548,10 +622,12 @@ export const PostScreen = ({
   const handleSubmit = async () => {
     if (sending) return;
 
-    const hasImage = !!imageFile;
-    const parsedNumber = numberInput.trim() !== '' ? parseFloat(numberInput) : null;
-    const hasNumber = parsedNumber != null && !isNaN(parsedNumber);
-    if (!selectedEmotion && !message.trim() && !hasImage && !hasNumber) {
+    if (!allRequiredSatisfied) {
+      setSubmitAttempted(true);
+      return;
+    }
+
+    if (!hasAnyInput) {
       setToast({ message: '気持ち・メッセージ・写真・数値のいずれかを入力してね！', type: 'error' });
       return;
     }
@@ -559,6 +635,9 @@ export const PostScreen = ({
     setSending(true);
 
     try {
+      const parsedNumber = numberInput.trim() !== '' ? parseFloat(numberInput) : null;
+      const hasNumber = parsedNumber != null && !isNaN(parsedNumber);
+
       // F09: メッセージ本文からもハッシュタグを抽出してマージ（自由入力のみ）
       const parsedFromMessage = parseHashtags(message);
       const allHashtags = [...new Set([...hashtags, ...parsedFromMessage])];
@@ -613,6 +692,7 @@ export const PostScreen = ({
       setSelectedPresetTags([]);
       setNumberInput('');
       setSelectedArea(null);
+      setSubmitAttempted(false);
       handleImageRemove();
       shuffleGreeting();
 
@@ -620,7 +700,7 @@ export const PostScreen = ({
         if (!continuousPostRef.current) {
           // Toast を見せてから閉じる（即時クローズだと Toast が表示されない）
           setTimeout(() => onClose?.(), 700);
-        } else if (spaceSettings?.features.commentPost !== false) {
+        } else if (pf.message.enabled) {
           requestAnimationFrame(() => messageTextareaRef.current?.focus());
         }
       } else if (!continuousPostRef.current) {
@@ -633,9 +713,16 @@ export const PostScreen = ({
     }
   };
 
-  const canSubmit = selectedEmotion || message.trim() || imagePreview || numberInput.trim() !== '';
-
   const handleSubmitClick = () => {
+    setSubmitAttempted(true);
+    if (!allRequiredSatisfied) {
+      requestAnimationFrame(() => scrollToFirstFieldError());
+      return;
+    }
+    if (!hasAnyInput) {
+      setToast({ message: '気持ち・メッセージ・写真・数値のいずれかを入力してね！', type: 'error' });
+      return;
+    }
     setPoyonActive(true);
     handleSubmit();
   };
@@ -644,7 +731,7 @@ export const PostScreen = ({
   const handleMessageKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      if (!sending && canSubmit) handleSubmitClick();
+      if (!sending && hasAnyInput) handleSubmitClick();
     }
   };
 
@@ -771,11 +858,7 @@ export const PostScreen = ({
         )}
 
         {/* 全ての機能が無効の場合の警告（フリータブでは非表示） */}
-        {spaceSettings &&
-         !spaceSettings.features.commentPost &&
-         !spaceSettings.features.emotionPost &&
-         !spaceSettings.features.photoPost &&
-         postTab === 'bubble' && (
+        {spaceSettings && allPostFieldsDisabled(pf) && postTab === 'bubble' && (
           <div className={styles.disabledNotice}>
             このスペースでは投稿機能が無効になっています。
             スペース管理画面で設定を変更してください。
@@ -824,10 +907,18 @@ export const PostScreen = ({
           </div>
         ) : (
           <>
-        {/* メッセージ入力 - commentPost が有効の場合のみ */}
-        {spaceSettings?.features.commentPost !== false && (
-          <div className={panelMode ? styles.panelSection : styles.section}>
-            <div className={styles.label}>メッセージ</div>
+        {/* メッセージ入力 */}
+        {pf.message.enabled && (
+          <div
+            ref={messageSectionRef}
+            className={`${panelMode ? styles.panelSection : styles.section}${
+              submitAttempted && !isMessageSatisfied ? ` ${styles.fieldError}` : ''
+            }`}
+          >
+            <div className={styles.labelRow}>
+              <div className={styles.label}>メッセージ</div>
+              {pf.message.required && <span className={styles.requiredBadge}>必須</span>}
+            </div>
             <textarea
               ref={messageTextareaRef}
               value={message}
@@ -838,13 +929,24 @@ export const PostScreen = ({
               maxLength={200}
               title={panelMode ? '⌘+Enter（Windows は Ctrl+Enter）で投稿' : undefined}
             />
+            {submitAttempted && !isMessageSatisfied && (
+              <p className={styles.fieldErrorText}>メッセージを入力してください</p>
+            )}
           </div>
         )}
 
-        {/* クイック感情バー - emotionPost が有効の場合のみ */}
-        {spaceSettings?.features.emotionPost !== false && (
-          <div className={panelMode ? styles.panelSection : styles.section}>
-            <div className={styles.label}>気持ちをつける（任意）</div>
+        {/* クイック感情バー */}
+        {pf.emotion.enabled && (
+          <div
+            ref={emotionSectionRef}
+            className={`${panelMode ? styles.panelSection : styles.section}${
+              submitAttempted && !isEmotionSatisfied ? ` ${styles.fieldError}` : ''
+            }`}
+          >
+            <div className={styles.labelRow}>
+              <div className={styles.label}>気持ちをつける（任意）</div>
+              {pf.emotion.required && <span className={styles.requiredBadge}>必須</span>}
+            </div>
             <div className={styles.emotionBar}>
               {emotionButtons.map((btn) => (
                 <button
@@ -865,13 +967,20 @@ export const PostScreen = ({
                 {EMOJI_BY_EMOTION[selectedEmotion]} {EMOTION_LABELS[selectedEmotion]}
               </div>
             )}
+            {submitAttempted && !isEmotionSatisfied && (
+              <p className={styles.fieldErrorText}>気持ちを選択してください</p>
+            )}
           </div>
         )}
 
         {/* F01: 吹き出し色選択（4テーマ + デフォルト + 各8色）。フォーカス順はテーマ4→デフォルト→8色 */}
+        {pf.bubbleColor.enabled && (
         <div className={panelMode ? styles.panelSection : styles.section}>
-          <div className={styles.label} id={bubbleColorLabelId}>
-            吹き出しの色（任意）
+          <div className={styles.labelRow}>
+            <div className={styles.label} id={bubbleColorLabelId}>
+              吹き出しの色（任意）
+            </div>
+            {pf.bubbleColor.required && <span className={styles.requiredBadge}>必須</span>}
           </div>
           <div
             ref={colorPaletteRef}
@@ -923,11 +1032,15 @@ export const PostScreen = ({
             </div>
           </div>
         </div>
+        )}
 
-        {/* B02: 吹き出し形状選択（bubble_shapes_extended が ON の場合のみ） */}
-        {featureFlags.bubble_shapes_extended && (
+        {/* B02: 吹き出し形状選択 */}
+        {showBubbleShape && (
           <div className={panelMode ? styles.panelSection : styles.section}>
-            <div className={styles.label}>吹き出しの形（任意）</div>
+            <div className={styles.labelRow}>
+              <div className={styles.label}>吹き出しの形（任意）</div>
+              {pf.bubbleShape.required && <span className={styles.requiredBadge}>必須</span>}
+            </div>
             <div className={styles.shapePicker}>
               <button
                 type="button"
@@ -955,8 +1068,17 @@ export const PostScreen = ({
         )}
 
         {/* F09: ハッシュタグ */}
-        <div className={panelMode ? styles.panelSection : styles.section}>
-          <div className={styles.label}>ハッシュタグ（任意）</div>
+        {pf.tags.enabled && (
+        <div
+          ref={tagsSectionRef}
+          className={`${panelMode ? styles.panelSection : styles.section}${
+            submitAttempted && !isTagsSatisfied ? ` ${styles.fieldError}` : ''
+          }`}
+        >
+          <div className={styles.labelRow}>
+            <div className={styles.label}>ハッシュタグ（任意）</div>
+            {pf.tags.required && <span className={styles.requiredBadge}>必須</span>}
+          </div>
 
           {/* プリセットタグ（スペースに登録されている場合のみ表示） */}
           {presetTags.length > 0 && (
@@ -1008,12 +1130,24 @@ export const PostScreen = ({
               ))}
             </div>
           )}
+          {submitAttempted && !isTagsSatisfied && (
+            <p className={styles.fieldErrorText}>タグを1つ以上選択または入力してください</p>
+          )}
         </div>
+        )}
 
-        {/* numberPost: 数値入力 - numberPost が有効の場合のみ */}
-        {spaceSettings?.features.numberPost && (
-          <div className={panelMode ? styles.panelSection : styles.section}>
-            <div className={styles.label}>数値（任意）</div>
+        {/* numberPost: 数値入力 */}
+        {pf.numberPost.enabled && (
+          <div
+            ref={numberSectionRef}
+            className={`${panelMode ? styles.panelSection : styles.section}${
+              submitAttempted && !isNumberSatisfied ? ` ${styles.fieldError}` : ''
+            }`}
+          >
+            <div className={styles.labelRow}>
+              <div className={styles.label}>数値（任意）</div>
+              {pf.numberPost.required && <span className={styles.requiredBadge}>必須</span>}
+            </div>
             <input
               type="number"
               value={numberInput}
@@ -1022,13 +1156,24 @@ export const PostScreen = ({
               className={styles.numberInput}
               step="any"
             />
+            {submitAttempted && !isNumberSatisfied && (
+              <p className={styles.fieldErrorText}>数値を入力してください</p>
+            )}
           </div>
         )}
 
-        {/* F10: 写真添付 / F08: お絵描き - photoPost が有効の場合のみ */}
-        {spaceSettings?.features.photoPost !== false && (
-          <div className={panelMode ? styles.panelSection : styles.section}>
-            <div className={styles.label}>写真 / お絵描き（任意）</div>
+        {/* F10: 写真添付 / F08: お絵描き */}
+        {pf.photo.enabled && (
+          <div
+            ref={photoSectionRef}
+            className={`${panelMode ? styles.panelSection : styles.section}${
+              submitAttempted && !isPhotoSatisfied ? ` ${styles.fieldError}` : ''
+            }`}
+          >
+            <div className={styles.labelRow}>
+              <div className={styles.label}>写真 / お絵描き（任意）</div>
+              {pf.photo.required && <span className={styles.requiredBadge}>必須</span>}
+            </div>
             {imagePreview ? (
               <div className={styles.imagePreviewContainer}>
                 <img
@@ -1067,6 +1212,9 @@ export const PostScreen = ({
                 </button>
               </div>
             )}
+            {submitAttempted && !isPhotoSatisfied && (
+              <p className={styles.fieldErrorText}>写真またはお絵描きを添付してください</p>
+            )}
           </div>
         )}
 
@@ -1085,8 +1233,8 @@ export const PostScreen = ({
               type="button"
               onClick={handleSubmitClick}
               onAnimationEnd={() => setPoyonActive(false)}
-              disabled={sending || !canSubmit}
-              className={`${styles.submitButton} ${styles.submitButtonHalf}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
+              disabled={sending || !hasAnyInput}
+              className={`${styles.submitButton} ${styles.submitButtonHalf}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}${!canSubmit && hasAnyInput ? ` ${styles.submitButtonInactive}` : ''}`}
               title="⌘+Enter（Windows は Ctrl+Enter）でも投稿できます"
             >
               {sending ? (
@@ -1109,8 +1257,8 @@ export const PostScreen = ({
             type="button"
             onClick={handleSubmitClick}
             onAnimationEnd={() => setPoyonActive(false)}
-            disabled={sending || !canSubmit}
-            className={`${styles.submitButton}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}`}
+            disabled={sending || !hasAnyInput}
+            className={`${styles.submitButton}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}${!canSubmit && hasAnyInput ? ` ${styles.submitButtonInactive}` : ''}`}
             title="⌘+Enter（Windows は Ctrl+Enter）でも投稿できます"
           >
             {sending ? (

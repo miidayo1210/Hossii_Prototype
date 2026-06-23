@@ -1,0 +1,203 @@
+.container {
+  padding: 2rem;
+  color: #fff;
+  max-width: 720px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.description {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 1.5rem 0;
+  line-height: 1.5;
+}
+
+.table {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 1fr 100px 100px;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 100px 100px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.fieldInfo {
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  flex-wrap: wrap;
+}
+
+.fieldDesc {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+  line-height: 1.4;
+}
+
+.flagBadge {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.toggleCell {
+  display: flex;
+  justify-content: center;
+}
+
+.toggleCellDisabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.requiredPlaceholder {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+}
+
+.toggleWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggleInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  display: block;
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 0.2s;
+  position: relative;
+}
+
+.toggleSlider::after {
+  content: '';
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.toggleInput:checked + .toggleSlider {
+  background: #6b9cf7;
+}
+
+.toggleInput:checked + .toggleSlider::after {
+  transform: translateX(1.25rem);
+}
+
+.toggleSlider.saving {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.footnote {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 1rem 0 0 0;
+  line-height: 1.5;
+}
+
+.warning {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.warningTitle {
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 999;
+  animation: fadeIn 0.2s ease;
+}
+
+.success {
+  background: #1a7a4a;
+  color: #fff;
+}
+
+.error {
+  background: #8b2020;
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(0.5rem); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .tableHeader,
+  .row {
+    grid-template-columns: 1fr 72px 72px;
+  }
+}

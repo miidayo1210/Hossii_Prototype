@@ -157,8 +157,8 @@ const AppContent = () => {
   }, [currentUser, userProfile, showOnboarding]);
 
   // ===== URL スラッグ ファストパス =====
-  // fetchSpaces（全件取得）の完了を待たずに、スラッグで1件だけ直接取得して state に注入する。
-  // これにより管理者の二重 fetch や auth 解決待ちによる遅延を回避し、初回アクセスを高速化する。
+  // fetchSpaces（全件取得）の完了を待たずに、スラッグで1件だけ直接取得して state にマージする。
+  // キャッシュがあっても常に Revalidate し、Supabase を正とする（82）。
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setSlugFetchOutcome('idle');
@@ -173,21 +173,19 @@ const AppContent = () => {
       return;
     }
 
-    // すでにローカル state にキャッシュ済みなら fetch 不要
+    // Stale-while-revalidate: キャッシュがあっても常に fetchSpaceByUrl で再検証する
     const cached = state.spaces.find((s) => s.spaceURL === slug);
     if (cached) {
       setSlugFetchOutcome('hit');
-      return;
     }
 
     fetchSpaceByUrl(slug).then((space) => {
-      if (initialSlugHandledRef.current) return;
-      if (!space) {
-        setSlugFetchOutcome('miss');
-        return;
+      if (space) {
+        addSpaceLocal(space);
+        setSlugFetchOutcome('hit');
+      } else {
+        setSlugFetchOutcome(cached ? 'hit' : 'miss');
       }
-      addSpaceLocal(space);
-      setSlugFetchOutcome('hit');
     });
   // マウント時に1回だけ実行。state.spaces はマウント時点で localStorage から同期済み。
   // eslint-disable-next-line react-hooks/exhaustive-deps

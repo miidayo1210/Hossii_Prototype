@@ -8,6 +8,8 @@ type Props = {
   /** center: 従来どおり星の中心が (x,y)。topLeft: 格子整列用に星ボタンの左上が (x,y) */
   anchor?: 'center' | 'topLeft';
   onClick: () => void;
+  onMouseEnter?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onMouseLeave?: () => void;
   showPreview?: boolean;
   /** 投稿順モード時: 格子セルに応じた重ね順（大きいほど手前） */
   orderedStackZ?: number;
@@ -23,6 +25,8 @@ export const StarView = ({
   y,
   anchor = 'center',
   onClick,
+  onMouseEnter,
+  onMouseLeave,
   showPreview,
   orderedStackZ,
   isRecentHighlight = false,
@@ -56,6 +60,8 @@ export const StarView = ({
         ...(orderedStackZ != null ? { '--star-stack': orderedStackZ } : {}),
       } as React.CSSProperties}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       aria-label={`${hossii.authorName || 'Post'} from ${hossii.createdAt.toLocaleTimeString()}`}
       data-emotion={emotion}
     >

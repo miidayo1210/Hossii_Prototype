@@ -15,10 +15,11 @@ import { ModerationTab } from './ModerationTab';
 import { DecorationTab } from './DecorationTab';
 import { FeatureFlagsTab } from './FeatureFlagsTab';
 import { TagsTab } from './TagsTab';
+import { PostFormTab } from './PostFormTab';
 import { NeighborsTab } from './NeighborsTab';
 import styles from './SpaceSettingsScreen.module.css';
 
-type Tab = 'general' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration' | 'featureFlags' | 'tags' | 'neighbors';
+type Tab = 'general' | 'postForm' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration' | 'featureFlags' | 'tags' | 'neighbors';
 
 export const SpaceSettingsScreen = () => {
   const { navigate } = useRouter();
@@ -105,6 +106,12 @@ export const SpaceSettingsScreen = () => {
               基本設定
             </button>
             <button
+              className={`${styles.tab} ${activeTab === 'postForm' ? styles.activeTab : ''}`}
+              onClick={() => setActiveTab('postForm')}
+            >
+              投稿フォーム
+            </button>
+            <button
               className={`${styles.tab} ${activeTab === 'hossii' ? styles.activeTab : ''}`}
               onClick={() => setActiveTab('hossii')}
             >
@@ -170,6 +177,13 @@ export const SpaceSettingsScreen = () => {
               onUpdate={setSettings}
               space={activeSpace}
               onUpdateSpace={(patch: Partial<Space>) => updateSpace(activeSpace.id, patch)}
+            />
+          )}
+          {activeTab === 'postForm' && (
+            <PostFormTab
+              settings={settings}
+              onUpdate={setSettings}
+              spaceId={activeSpace.id}
             />
           )}
           {activeTab === 'hossii' && (

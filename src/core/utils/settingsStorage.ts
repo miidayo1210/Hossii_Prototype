@@ -1,5 +1,6 @@
 import type { SpaceSettings } from '../types/settings';
 import { DEFAULT_SPACE_SETTINGS } from '../types/settings';
+import { mergePostFieldSettings } from './postFieldSettings';
 
 const SETTINGS_KEY_PREFIX = 'space_settings_';
 
@@ -13,12 +14,18 @@ export const loadSpaceSettings = (spaceId: string, spaceName: string): SpaceSett
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      return {
+      const merged: SpaceSettings = {
         ...DEFAULT_SPACE_SETTINGS,
         ...parsed,
         spaceId,
         spaceName,
+        features: {
+          ...DEFAULT_SPACE_SETTINGS.features,
+          ...(parsed.features ?? {}),
+        },
+        postFields: mergePostFieldSettings(parsed.postFields),
       };
+      return merged;
     } catch (error) {
       console.error('Failed to parse space settings:', error);
     }

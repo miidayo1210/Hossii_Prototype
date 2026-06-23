@@ -172,11 +172,24 @@
 
 ## スペース設定による制御
 
-スペース管理者は機能ごとに投稿を ON/OFF できる（`SpaceSettingsScreen` > 基本設定）。
+スペース管理者は **スペース設定 > 投稿フォーム** タブ（[86_投稿フォーム項目設定](./86_投稿フォーム項目設定.md)）で、各入力項目の表示 ON/OFF と入力必須 ON/OFF を設定できる。PostScreen は `resolvePostFields(spaceSettings)` の結果を参照する。
 
 | 設定 | 対象 UI |
 |---|---|
-| `features.commentPost = false` | テキスト入力エリアを非表示 |
-| `features.emotionPost = false` | 感情ボタンを非表示 |
-| `features.photoPost = false` | 写真添付エリアを非表示 |
-| すべて false | 「投稿機能が無効」の警告を表示 |
+| `postFields.message.enabled = false` | テキスト入力エリアを非表示 |
+| `postFields.emotion.enabled = false` | 感情ボタンを非表示 |
+| `postFields.tags.enabled = false` | タグ（プリセット + ハッシュタグ）を非表示 |
+| `postFields.bubbleColor.enabled = false` | 吹き出し色パレットを非表示 |
+| `postFields.bubbleShape.enabled = false` | 吹き出し形状選択を非表示（Feature Flag `bubble_shapes_extended` も必要） |
+| `postFields.photo.enabled = false` | 写真添付エリアを非表示 |
+| `postFields.numberPost.enabled = false` | 数値入力を非表示 |
+| 全項目 `enabled = false` | 「投稿機能が無効」の警告を表示 |
+
+### 必須バッジ・バリデーション
+
+| 要素 | 仕様 |
+|---|---|
+| 必須バッジ | `postFields[field].required === true` のラベル横に「必須」pill（`#ef4444` / `#fee2e2`） |
+| 投稿ボタン | `allRequiredSatisfied && hasAnyInput` で活性。入力なし時は disabled |
+| エラー表示 | 投稿ボタン押下後、未充足の必須フィールドに赤枠 + エラーテキスト。先頭エラーへスクロール |
+| 吹き出し色・形状 | デフォルト選択ありのため必須バリデーション対象外 |

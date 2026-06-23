@@ -27,6 +27,10 @@ export function computeSharpContentRect(
   return { x: 0, y: sharpY, width: sharpW, height: sharpH };
 }
 
+function clampPercent(v: number): number {
+  return Math.max(0, Math.min(100, v));
+}
+
 /** 論理座標（シャープ内 0–100%）→ コンテナ基準の表示 % */
 export function mapLogicalToContainerPercent(
   lx: number,
@@ -48,5 +52,33 @@ export function mapLogicalToContainerPercent(
   return {
     x: ((sharpX + (lx / 100) * sharpW) / containerW) * 100,
     y: ((sharpY + (ly / 100) * sharpH) / containerH) * 100,
+  };
+}
+
+/** コンテナ基準 % → シャープ矩形内論理 %（mapLogicalToContainerPercent の逆変換） */
+export function mapContainerPercentToLogical(
+  dx: number,
+  dy: number,
+  containerW: number,
+  containerH: number,
+  aspectRatio = 16 / 9,
+): { x: number; y: number } {
+  if (containerW <= 0 || containerH <= 0) {
+    return { x: dx, y: dy };
+  }
+
+  const { x: sharpX, y: sharpY, width: sharpW, height: sharpH } = computeSharpContentRect(
+    containerW,
+    containerH,
+    aspectRatio,
+  );
+
+  if (sharpW <= 0 || sharpH <= 0) {
+    return { x: dx, y: dy };
+  }
+
+  return {
+    x: clampPercent(((dx / 100) * containerW - sharpX) / sharpW * 100),
+    y: clampPercent(((dy / 100) * containerH - sharpY) / sharpH * 100),
   };
 }

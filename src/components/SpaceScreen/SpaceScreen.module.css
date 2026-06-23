@@ -197,6 +197,147 @@
   opacity: 0.85;
 }
 
+.topRightRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clusterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 5px 12px;
+  border-radius: 1.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(15, 10, 30, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clusterPill:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.clusterPillActive {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
+}
+
+.clusterPillActive:hover:not(:disabled) {
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.65);
+}
+
+.clusterPill:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.clusterPillLabel {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clusterPillClear {
+  padding: 2px 4px;
+  margin-left: 2px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.chevron {
+  font-size: 0.625rem;
+  opacity: 0.7;
+}
+
+.modeTransitionOut {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.modeTransitionIn {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 250ms ease-in, transform 250ms ease-in;
+}
+
+.tagFilterEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.tagFilterEmptyIcon {
+  font-size: 2.5rem;
+}
+
+.tagFilterEmptyText {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  padding: 0 16px;
+}
+
+.tagFilterEmptyButton {
+  pointer-events: auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(15, 10, 30, 0.65);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tagFilterEmptyButton:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.postItemFilterOut {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.postItemFilterIn {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 250ms ease-in, transform 250ms ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeTransitionOut,
+  .modeTransitionIn,
+  .postItemFilterOut,
+  .postItemFilterIn {
+    transition: none;
+  }
+}
+
 @media (min-width: 769px) {
   .postCountBadge {
     background: rgba(30, 27, 46, 0.85);

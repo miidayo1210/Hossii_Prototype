@@ -34,6 +34,8 @@
 
 .clusterExpanded {
   animation-play-state: paused;
+  /* 展開時は他のすべての吹き出しより前面に出す */
+  z-index: calc(var(--cluster-stack, 1) + 1000);
 }
 
 .header {

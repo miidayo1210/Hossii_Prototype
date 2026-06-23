@@ -44,6 +44,10 @@ type Props = {
   onQuickLogToggle?: () => void;
   /** 音声パネルのトグル */
   onSpeechPanelToggle?: () => void;
+  /** スペース画面タグ絞り込み（モバイル ... メニュー） */
+  tagFilterCandidates?: string[];
+  activeTagFilter?: string | null;
+  onTagFilterChange?: (tag: string | null) => void;
 };
 
 const PERIOD_OPTIONS: { value: DisplayPeriod; label: string }[] = [
@@ -97,6 +101,9 @@ export const LeftControlBar = ({
   isMobile = false,
   onQuickLogToggle,
   onSpeechPanelToggle,
+  tagFilterCandidates = [],
+  activeTagFilter = null,
+  onTagFilterChange,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
   const isMobileLayout = useMediaQuery('(max-width: 768px), (max-height: 600px) and (orientation: landscape)');
@@ -123,7 +130,10 @@ export const LeftControlBar = ({
   }, [isMobileLayout, overflowOpen]);
 
   useLayoutEffect(() => {
-    updateOverflowPanelPosition();
+    const frame = requestAnimationFrame(() => {
+      updateOverflowPanelPosition();
+    });
+    return () => cancelAnimationFrame(frame);
   }, [updateOverflowPanelPosition]);
 
   useEffect(() => {
@@ -297,6 +307,9 @@ export const LeftControlBar = ({
               onShowPostCountBadgeToggle,
               onQuickLogToggle,
               onSpeechPanelToggle,
+              tagFilterCandidates,
+              activeTagFilter,
+              onTagFilterChange,
               styles,
             })}
           </div>
@@ -325,6 +338,9 @@ export const LeftControlBar = ({
               onShowPostCountBadgeToggle,
               onQuickLogToggle,
               onSpeechPanelToggle,
+              tagFilterCandidates,
+              activeTagFilter,
+              onTagFilterChange,
               styles,
             })}
           </div>,
@@ -347,6 +363,9 @@ type OverflowMenuContentProps = {
   onShowPostCountBadgeToggle?: () => void;
   onQuickLogToggle?: () => void;
   onSpeechPanelToggle?: () => void;
+  tagFilterCandidates?: string[];
+  activeTagFilter?: string | null;
+  onTagFilterChange?: (tag: string | null) => void;
   styles: typeof styles;
 };
 
@@ -363,6 +382,9 @@ function renderOverflowMenuContent({
   onShowPostCountBadgeToggle,
   onQuickLogToggle,
   onSpeechPanelToggle,
+  tagFilterCandidates = [],
+  activeTagFilter = null,
+  onTagFilterChange,
   styles,
 }: OverflowMenuContentProps) {
   return (
@@ -442,6 +464,36 @@ function renderOverflowMenuContent({
                 ))}
               </div>
             </div>
+
+            {onTagFilterChange && tagFilterCandidates.length > 0 && (
+              <>
+                <div className={styles.overflowDivider} />
+                <div className={styles.overflowSection}>
+                  <div className={styles.overflowLabel}>タグで絞る</div>
+                  <div className={styles.buttonGroup}>
+                    <button
+                      type="button"
+                      className={`${styles.miniButton} ${activeTagFilter == null ? styles.miniActive : ''}`}
+                      onClick={() => onTagFilterChange(null)}
+                      title="すべて表示"
+                    >
+                      すべて
+                    </button>
+                    {tagFilterCandidates.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={`${styles.miniButton} ${activeTagFilter === tag ? styles.miniActive : ''}`}
+                        onClick={() => onTagFilterChange(tag)}
+                        title={`#${tag}`}
+                      >
+                        #{tag.length > 6 ? `${tag.slice(0, 6)}…` : tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             {(onShowPostCountBadgeToggle || onQuickLogToggle || onSpeechPanelToggle) && (
               <>

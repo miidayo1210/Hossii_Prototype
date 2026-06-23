@@ -1,0 +1,91 @@
+.panel {
+  position: fixed;
+  z-index: 200;
+  min-width: 160px;
+  max-width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+  background: rgba(15, 10, 30, 0.88);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: tagPanelIn 180ms ease-out;
+}
+
+@keyframes tagPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.row:hover,
+.rowFocused {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rowSelected .rowLabel {
+  color: #e879f9;
+  font-weight: 600;
+}
+
+.row:first-child .rowLabel {
+  font-weight: 700;
+}
+
+.row:first-child:not(.rowSelected) .rowLabel {
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+}
+
+.check {
+  width: 14px;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.rowLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.divider {
+  margin: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
