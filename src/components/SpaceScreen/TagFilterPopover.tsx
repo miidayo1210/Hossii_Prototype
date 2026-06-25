@@ -44,10 +44,7 @@ export function TagFilterPopover({
   const itemCount = 1 + candidates.length;
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPosition(null);
-      return;
-    }
+    if (!open) return;
 
     const updatePosition = () => {
       const anchor = anchorRef.current;

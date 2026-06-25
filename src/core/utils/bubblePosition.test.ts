@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   createBubblePosition,
+  createBubblePositionFromId,
   createBubblePositionInSharp,
+  createBubblePositionInSharpFromId,
   createOrderedBubblePosition,
 } from './bubblePosition';
 
@@ -49,5 +51,27 @@ describe('createBubblePositionInSharp', () => {
 describe('createOrderedBubblePosition', () => {
   it('preserves existing grid anchor for 9 posts', () => {
     expect(createOrderedBubblePosition(0, 9)).toEqual({ x: 8, y: 12 });
+  });
+});
+
+describe('createBubblePositionFromId', () => {
+  it('is deterministic per id', () => {
+    expect(createBubblePositionFromId('post-abc')).toEqual(createBubblePositionFromId('post-abc'));
+  });
+
+  it('keeps coordinates within 8–92%', () => {
+    const { x, y } = createBubblePositionFromId('hossii-xyz');
+    expect(x).toBeGreaterThanOrEqual(8);
+    expect(x).toBeLessThanOrEqual(92);
+    expect(y).toBeGreaterThanOrEqual(8);
+    expect(y).toBeLessThanOrEqual(92);
+  });
+
+  it('sharp variant stays within 5–95%', () => {
+    const { x, y } = createBubblePositionInSharpFromId('hossii-xyz');
+    expect(x).toBeGreaterThanOrEqual(5);
+    expect(x).toBeLessThanOrEqual(95);
+    expect(y).toBeGreaterThanOrEqual(5);
+    expect(y).toBeLessThanOrEqual(95);
   });
 });

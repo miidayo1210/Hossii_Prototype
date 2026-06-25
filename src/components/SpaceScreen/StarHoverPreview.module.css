@@ -1,54 +1,94 @@
 .card {
   position: fixed;
   z-index: 250;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(255, 251, 235, 0.88);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  width: min(300px, 28vw);
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.48) 0%,
+    rgba(235, 220, 255, 0.36) 100%
+  );
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.60);
+  box-shadow:
+    0 8px 32px rgba(139, 92, 246, 0.18),
+    0 2px 10px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
   pointer-events: none;
-  animation: hoverIn 150ms ease-out;
+  animation: hoverPopIn 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-@keyframes hoverIn {
+.pinButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  pointer-events: all;
+}
+
+.card::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(240, 230, 255, 0.50);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+@keyframes hoverPopIn {
   from {
     opacity: 0;
-    transform: translateX(-4px);
+    transform: translateY(8px) scale(0.72);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .thumb {
   display: block;
   max-width: 100%;
-  max-height: 60px;
+  max-height: 80px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-bottom: 6px;
 }
 
 .message {
   margin: 0 0 6px;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: #374151;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: rgba(30, 20, 50, 0.88);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .author {
-  font-size: 0.75rem;
-  color: #6b7280;
+  font-size: 0.8125rem;
+  color: rgba(109, 40, 217, 0.90);
+  font-weight: 600;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card {
-    animation: none;
+    animation: hoverFadeIn 120ms ease both;
+  }
+}
+
+@keyframes hoverFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

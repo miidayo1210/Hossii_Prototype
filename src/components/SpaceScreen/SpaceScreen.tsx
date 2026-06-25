@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import type { CSSProperties } from 'react';
-import { Hash, ImageDown } from 'lucide-react';
+import { Hash, ImageDown, Info } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
@@ -12,15 +12,20 @@ import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useSpaceSettings } from './useSpaceSettings';
 import { useNeighborSpace } from './useNeighborSpace';
-import type { EmotionKey } from '../../core/types';
+import type { EmotionKey, Hossii } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
-import { createBubblePosition, createOrderedBubblePosition, createBubblePositionInSharp, createOrderedBubblePositionInSharp, createAuthorRowPosition, createAuthorRowPositionInSharp } from '../../core/utils/bubblePosition';
 import { mapLogicalToContainerPercent, mapContainerPercentToLogical } from '../../core/utils/sharpContentRect';
 import { useSharpContentRect } from '../../core/hooks/useSharpContentRect';
 import { incrementLike } from '../../core/utils/likesApi';
-import { coerceIsHidden } from '../../core/utils/hossiisApi';
-import { getPeriodCutoff, loadShowPostCountBadge, saveShowPostCountBadge } from '../../core/utils/displayPrefsStorage';
+import { loadShowPostCountBadge, saveShowPostCountBadge } from '../../core/utils/displayPrefsStorage';
+import { resolveAnimationLevel, displayStackZFromIndex } from '../../core/utils/animationLevel';
+import { runDisplayPipeline } from '../../core/utils/hossiiDisplayPipeline';
+import { computeBubblePositions, type PositionCache } from '../../core/utils/hossiiPositionCache';
+import { useSpaceHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
+import { usePinnedHossiis } from '../../core/hooks/usePinnedHossiis';
+import { buildQueryKey } from '../../core/utils/hossiiQueryKey';
+import { isSupabaseConfigured } from '../../core/supabase';
 import {
   loadPresentationMode,
   savePresentationMode,
@@ -41,8 +46,10 @@ import {
   SPACE_EXPORT_MAX_BUBBLES,
 } from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
+import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { StarView } from './StarView';
 import { StarHoverPreview } from './StarHoverPreview';
+import { PinTray } from './PinTray';
 import { TagFilterPopover } from './TagFilterPopover';
 import { AuthorClusterBubble } from './AuthorClusterBubble';
 import { AuthorTimelineModal } from './AuthorTimelineModal';
@@ -55,6 +62,8 @@ import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { TopBar } from '../Navigation/TopBar';
 import { LeftControlBar, type ControlState } from '../Navigation/LeftControlBar';
 import { QRCodePanel } from '../Navigation/QRCodePanel';
+import { SpaceDescriptionPanel } from './SpaceDescriptionPanel';
+import { SpaceDescriptionSheet } from './SpaceDescriptionSheet';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { VoiceConsentModal } from '../VoiceConsentModal/VoiceConsentModal';
@@ -132,8 +141,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     updateHossiiScaleAction,
     hideHossii,
     communitySlug,
+    syncFetchedHossiis,
+    setHossiiFetchLoading,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
+  const hossiisRef = useRef(state.hossiis);
+  hossiisRef.current = state.hossiis;
   const {
     prefs: {
       showHossii, listenMode, hasConsentedToListen,
@@ -155,6 +168,25 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setAuthorGroupSort,
     setSpeechLevels,
   } = useDisplayPrefs();
+
+  const handleSpaceFetched = useCallback(
+    (items: Hossii[], opts?: { merge?: boolean }) => {
+      if (!activeSpaceId) return;
+      syncFetchedHossiis(items, buildQueryKey(activeSpaceId, displayPeriod), opts);
+    },
+    [activeSpaceId, displayPeriod, syncFetchedHossiis],
+  );
+
+  const fetchProgress = useSpaceHossiiFetch({
+    spaceId: activeSpaceId,
+    displayLimit,
+    displayPeriod,
+    enabled: !visitingSpaceId && isSupabaseConfigured,
+    onFetched: handleSpaceFetched,
+    onLoadingChange: setHossiiFetchLoading,
+    getExistingHossiis: () => hossiisRef.current,
+  });
+
   const activeSpace = getActiveSpace();
   const isVisiting = visitingSpaceId !== null;
   const { currentUser } = useAuth();
@@ -184,9 +216,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [tagFilterPhase, setTagFilterPhase] = useState<'idle' | 'out' | 'in'>('idle');
   const [hoveredHossiiId, setHoveredHossiiId] = useState<string | null>(null);
   const [hoverAnchorRect, setHoverAnchorRect] = useState<DOMRect | null>(null);
+  const [pinHighlightId, setPinHighlightId] = useState<string | null>(null);
   const tagFilterButtonRef = useRef<HTMLButtonElement>(null);
   const hoverEnterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pinHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modeTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tagFilterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
@@ -252,7 +286,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [speechPostInitialMessage, setSpeechPostInitialMessage] = useState<string | undefined>();
   const [postScreenKey, setPostScreenKey] = useState(0);
 
-  // クイック投稿パネル（setQuickPostPos を下のコールバックより先に宣言）
+  // クイック投稿パネル（開閉とダブルタップ位置は別管理）
+  const [quickPostOpen, setQuickPostOpen] = useState(false);
+  /** ダブルタップで指定した論理座標（未指定時は id ベースのランダム配置） */
   const [quickPostPos, setQuickPostPos] = useState<{ x: number; y: number } | null>(null);
   /** PostScreen のフリー編集へ音声候補を渡す（`PostScreen` が登録） */
   const speechToFreePosterRef = useRef<((text: string) => void) | undefined>(undefined);
@@ -260,6 +296,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const pendingQuickPostOpenRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [qrPanelVisible, setQrPanelVisible] = useState(true);
+  const [descriptionPanelVisible, setDescriptionPanelVisible] = useState(true);
+  const [descriptionSheetOpen, setDescriptionSheetOpen] = useState(false);
   const [showPostCountBadge, setShowPostCountBadge] = useState(loadShowPostCountBadge);
   const [visitingToastVisible, setVisitingToastVisible] = useState(false);
 
@@ -277,6 +315,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, []);
 
   const handleQuickPostClose = useCallback(() => {
+    setQuickPostOpen(false);
     setQuickPostPos(null);
     resetQuickPostSpeechState();
   }, [resetQuickPostSpeechState]);
@@ -301,23 +340,23 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     });
   }, [isVisiting]);
 
-  /** 右側キューブから投稿パネルを開く（中央付きの既定位置）／閉じる */
+  /** 投稿パネルを開く（位置未指定＝ランダム配置）／閉じる */
   const openQuickPost = useCallback(() => {
     if (isVisiting) return;
-    if (quickPostPos) return;
+    if (quickPostOpen) return;
     resetQuickPostSpeechState();
     setPostScreenKey((k) => k + 1);
-    setQuickPostPos({ x: 50, y: 50 });
-  }, [isVisiting, quickPostPos, resetQuickPostSpeechState]);
+    setQuickPostOpen(true);
+  }, [isVisiting, quickPostOpen, resetQuickPostSpeechState]);
 
   const handleQuickPostDockToggle = useCallback(() => {
     if (isVisiting) return;
-    if (quickPostPos) {
+    if (quickPostOpen) {
       handleQuickPostClose();
       return;
     }
     openQuickPost();
-  }, [isVisiting, quickPostPos, handleQuickPostClose, openQuickPost]);
+  }, [isVisiting, quickPostOpen, handleQuickPostClose, openQuickPost]);
 
   const handleTopRightPostClick = useCallback(() => {
     if (isVisiting) {
@@ -396,7 +435,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setSpeechEditOriginal(candidate);
     setSpeechPostInitialMessage(candidate);
     setPostScreenKey((k) => k + 1);
-    setQuickPostPos((prev) => prev ?? { x: 50, y: 50 });
+    setQuickPostOpen(true);
   }, []);
 
   const dismissSpeechCandidate = useCallback((text: string) => {
@@ -416,6 +455,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // スペース設定（設定画面から戻ったときにフォーカスで再読み込み）
   const { spaceSettings } = useSpaceSettings(activeSpace);
+  const { pinnedIds, pinnedOrder, isPinned, toggle, unpin } = usePinnedHossiis(activeSpace?.id);
+  const showPinUi = !isMobile;
 
   // 隣人スペース・訪問モード・漂着ボトル管理
   const {
@@ -437,6 +478,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   // 訪問中は背景・タイトル・装飾を訪問先に合わせる（投稿 0 件でも自スペースの見た目が残らないようにする）
   const spaceForVisual =
     isVisiting && visitingSpaceInfo ? visitingSpaceInfo : activeSpace;
+
+  const spaceDescription = spaceForVisual?.description?.trim() ?? '';
+  const hasDescription = spaceDescription.length > 0;
 
   // 背景スタイルを生成（訪問中は visitingSpaceInfo の background を使用）
   const { backgroundClass, backgroundStyle, imageWallpaperUrl } = useMemo(() => {
@@ -590,11 +634,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, [isMobile, isPortrait]);
 
   useEffect(() => {
-    if (isVisiting && quickPostPos) {
+    if (isVisiting && quickPostOpen) {
+      setQuickPostOpen(false);
       setQuickPostPos(null);
       resetQuickPostSpeechState();
     }
-  }, [isVisiting, quickPostPos, resetQuickPostSpeechState]);
+  }, [isVisiting, quickPostOpen, resetQuickPostSpeechState]);
 
   const handleControlToggle = useCallback((key: keyof ControlState) => {
     if (key === 'hossiiVisible') {
@@ -750,42 +795,45 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setTimeout(() => setParticles([]), 1200);
   }, []);
 
-  // 新しい順にソートして上限まで表示（非表示・期間フィルタ・表示モードを適用）
-  const displayHossiis = useMemo(() => {
-    const cutoff = getPeriodCutoff(displayPeriod);
-    const limit = displayLimit === 'unlimited' ? Infinity : displayLimit;
-    const visible = hossiis.filter((h) => {
-      if (coerceIsHidden(h.isHidden)) return false;
-      if (cutoff && h.createdAt < cutoff) return false;
-      if (viewMode === 'image' && !h.imageUrl) return false;
-      return true;
-    });
-    const sorted = [...visible].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    return sorted.slice(0, limit);
-  }, [hossiis, displayPeriod, displayLimit, viewMode]);
+  const pipeline = useMemo(
+    () =>
+      runDisplayPipeline({
+        hossiis,
+        displayPeriod,
+        displayLimit,
+        viewMode,
+        activeTagFilter,
+      }),
+    [hossiis, displayPeriod, displayLimit, viewMode, activeTagFilter],
+  );
+
+  const { filteredHossiis, tagCounts } = pipeline;
+
+  const pinnedHossiisForTray = useMemo(() => {
+    const byId = new Map(filteredHossiis.map((h) => [h.id, h]));
+    return pinnedOrder
+      .map((id) => byId.get(id))
+      .filter((h): h is Hossii => h != null);
+  }, [filteredHossiis, pinnedOrder]);
+
+  const handlePinToggle = useCallback(
+    (id: string) => toggle(id),
+    [toggle],
+  );
+
+  const handlePinHighlight = useCallback((id: string) => {
+    if (pinHighlightTimerRef.current) clearTimeout(pinHighlightTimerRef.current);
+    setPinHighlightId(id);
+    pinHighlightTimerRef.current = setTimeout(() => {
+      setPinHighlightId(null);
+      pinHighlightTimerRef.current = null;
+    }, 3000);
+  }, []);
 
   useEffect(() => {
     if (!activeSpace?.id) return;
     setActiveTagFilter(loadSpaceTagFilter(activeSpace.id));
   }, [activeSpace?.id]);
-
-  const filteredHossiis = useMemo(() => {
-    if (!activeTagFilter) return displayHossiis;
-    return displayHossiis.filter((h) => {
-      const combined = [...(h.tags ?? []), ...(h.hashtags ?? [])];
-      return combined.includes(activeTagFilter);
-    });
-  }, [displayHossiis, activeTagFilter]);
-
-  const tagCounts = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const h of displayHossiis) {
-      for (const t of [...(h.tags ?? []), ...(h.hashtags ?? [])]) {
-        map.set(t, (map.get(t) ?? 0) + 1);
-      }
-    }
-    return map;
-  }, [displayHossiis]);
 
   const tagCandidates = useMemo(() => {
     const fromPosts = [...tagCounts.keys()];
@@ -844,15 +892,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const handleStarMouseEnter = useCallback(
     (hossiiId: string, e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!showPcStarHover) return;
+      if (!useStarView) return;
+      const rect = e.currentTarget.getBoundingClientRect();
       if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
       if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
       hoverEnterTimerRef.current = setTimeout(() => {
         setHoveredHossiiId(hossiiId);
-        setHoverAnchorRect(e.currentTarget.getBoundingClientRect());
+        setHoverAnchorRect(rect);
       }, 50);
     },
-    [showPcStarHover],
+    [useStarView],
   );
 
   const handleStarMouseLeave = useCallback(() => {
@@ -864,12 +913,26 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     }, 100);
   }, []);
 
+  const handleStarClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const id = e.currentTarget.dataset.hossiiId;
+    if (id) setSelectedPostId(id);
+  }, []);
+
+  const handleStarMouseEnterStable = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const id = e.currentTarget.dataset.hossiiId;
+      if (id) handleStarMouseEnter(id, e);
+    },
+    [handleStarMouseEnter],
+  );
+
   useEffect(() => {
     return () => {
       if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
       if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
       if (modeTransitionTimerRef.current) clearTimeout(modeTransitionTimerRef.current);
       if (tagFilterTimerRef.current) clearTimeout(tagFilterTimerRef.current);
+      if (pinHighlightTimerRef.current) clearTimeout(pinHighlightTimerRef.current);
     };
   }, []);
 
@@ -915,9 +978,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       backgroundPeekTapTimerRef.current = null;
     }
     if (isVisiting) return;
-    if (quickPostPos) {
-      setQuickPostPos(null);
-      resetQuickPostSpeechState();
+    if (quickPostOpen) {
+      handleQuickPostClose();
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
@@ -931,9 +993,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setPostScreenKey((k) => k + 1);
     pendingQuickPostOpenRef.current = setTimeout(() => {
       pendingQuickPostOpenRef.current = null;
+      setQuickPostOpen(true);
       setQuickPostPos(savedPos);
     }, 320);
-  }, [isVisiting, quickPostPos, resetQuickPostSpeechState, shouldMapToSharp]);
+  }, [isVisiting, quickPostOpen, resetQuickPostSpeechState, shouldMapToSharp, handleQuickPostClose]);
 
   const handlePositionSave = useCallback(
     (id: string, x: number, y: number) => {
@@ -955,7 +1018,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         selectedAuthorGroup ||
         showListenConsent ||
         showVoiceConsent ||
-        quickPostPos ||
+        quickPostOpen ||
         quickLogOpen ||
         speechPanelOpen ||
         selectedDecorationId
@@ -965,7 +1028,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       selectedAuthorGroup,
       showListenConsent,
       showVoiceConsent,
-      quickPostPos,
+      quickPostOpen,
       quickLogOpen,
       speechPanelOpen,
       selectedDecorationId,
@@ -1071,22 +1134,27 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return sortAuthorGroups(groupHossiisByAuthor(filteredHossiis), authorGroupSort);
   }, [filteredHossiis, layoutMode, authorGroupSort]);
 
-  const bubblePositions = useMemo(() => {
-    const createRandom = shouldMapToSharp ? createBubblePositionInSharp : createBubblePosition;
-    const createOrdered = shouldMapToSharp
-      ? createOrderedBubblePositionInSharp
-      : createOrderedBubblePosition;
-    const createAuthorRow = shouldMapToSharp
-      ? createAuthorRowPositionInSharp
-      : createAuthorRowPosition;
-    if (layoutMode === 'byAuthor') {
-      return authorGroups.map((_, i) => createAuthorRow(i, authorGroups.length));
-    }
-    if (layoutMode === 'ordered') {
-      return filteredHossiis.map((_, i) => createOrdered(i, filteredHossiis.length));
-    }
-    return filteredHossiis.map((_, i) => createRandom(i));
-  }, [filteredHossiis, layoutMode, shouldMapToSharp, authorGroups]);
+  const positionCacheRef = useRef<PositionCache>({});
+
+  const { positionsByHossiiId, authorClusterPositions } = useMemo(() => {
+    const result = computeBubblePositions({
+      filteredHossiis,
+      authorGroupCount: authorGroups.length,
+      layoutMode,
+      shouldMapToSharp,
+      orderedSortDirection,
+      cache: positionCacheRef.current,
+    });
+    positionCacheRef.current = result.positionsByHossiiId;
+    return result;
+  }, [filteredHossiis, authorGroups.length, layoutMode, shouldMapToSharp, orderedSortDirection]);
+
+  const showByAuthorLoadingOverlay =
+    layoutMode === 'byAuthor' &&
+    displayLimit === 'unlimited' &&
+    !fetchProgress.fetchComplete &&
+    isSupabaseConfigured &&
+    !isVisiting;
 
   const toggleClusterExpand = useCallback((groupKey: string) => {
     setExpandedClusterKeys((prev) => {
@@ -1128,7 +1196,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       setPreviewHossiiIds(new Set());
       return;
     }
-    const postsWithContent = filteredHossiis.filter((h) => h.message || h.imageUrl);
+    const postsWithContent = filteredHossiis.filter(
+      (h) => (h.message || h.imageUrl) && !pinnedIds.has(h.id),
+    );
     const pick = () => {
       const shuffled = [...postsWithContent].sort(() => Math.random() - 0.5);
       const picked = shuffled.slice(0, previewSlotCount).map((h) => h.id);
@@ -1138,7 +1208,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     const interval = setInterval(pick, 6000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewSlotCount, filteredHossiis.length]);
+  }, [previewSlotCount, filteredHossiis.length, pinnedIds]);
 
   useEffect(() => {
     if (!isMobilePortrait) setBackgroundPeekMode(false);
@@ -1209,7 +1279,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const showDoubleTapHint =
     isMobilePortrait &&
     !isVisiting &&
-    quickPostPos == null &&
+    !quickPostOpen &&
     viewMode !== 'slideshow';
 
   const [doubleTapHintCoords, setDoubleTapHintCoords] = useState<{
@@ -1288,7 +1358,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const scaledUp = displayScale > 1;
   /** スマホ縦: 16:9 スペース上 + 固定投稿ドック下 */
-  const mobilePostSplit = useMobileBottomSheet && quickPostPos != null;
+  const mobilePostSplit = useMobileBottomSheet && quickPostOpen;
 
   // ボトムシート表示中は背面の縦スクロールを止める（iOS でパネル外に抜けるのを防ぐ）
   useEffect(() => {
@@ -1300,13 +1370,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     };
   }, [mobilePostSplit]);
   /** スマホ横: 左スペース + 右固定投稿ドック */
-  const mobilePostLandscapeSplit = isMobileLandscape && quickPostPos != null;
+  const mobilePostLandscapeSplit = isMobileLandscape && quickPostOpen;
 
   const quickPostPanel = (
     <PostScreen
       key={postScreenKey}
       panelMode={mobilePostSplit ? 'bottom' : 'side'}
-      initialPosition={quickPostPos!}
+      initialPosition={quickPostPos ?? undefined}
       initialMessage={speechPostInitialMessage}
       speechEditMode={!!speechEditOriginal}
       speechEditOriginal={speechEditOriginal}
@@ -1368,6 +1438,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           }
         }}
       >
+        <PinTray
+          pinnedHossiis={pinnedHossiisForTray}
+          onHighlight={handlePinHighlight}
+          onUnpin={unpin}
+        />
+        {showByAuthorLoadingOverlay && (
+          <div className={styles.byAuthorLoadingOverlay} data-space-export="exclude">
+            <p className={styles.byAuthorLoadingText}>投稿者を整理しています…</p>
+          </div>
+        )}
         {filteredHossiis.length === 0 && activeTagFilter != null && (
           <div className={styles.tagFilterEmpty} data-space-export="exclude">
             <span className={styles.tagFilterEmptyIcon} aria-hidden>🏷</span>
@@ -1385,8 +1465,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         )}
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
-              // 投稿順モードと同様、並び替え可能な横一列配置を常に使う（random の固定座標は無視）
-              const pos = bubblePositions[index] ?? { x: 8, y: 22 };
+              const pos = authorClusterPositions[index] ?? { x: 8, y: 22 };
               const clusterPos = isMobile ? mapDisplayPos(pos) : pos;
 
               return (
@@ -1405,32 +1484,35 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               );
             })
           : filteredHossiis.map((hossii, index) => {
-            const n = filteredHossiis.length;
             const postAnimClass =
               tagFilterPhase === 'out'
                 ? styles.postItemFilterOut
                 : tagFilterPhase === 'in'
                   ? styles.postItemFilterIn
                   : '';
-            // 投稿順: 降順＝新しいほど左上（index 一致）、昇順＝古いほど左上（セル index を反転）
             const orderedGridIndex =
               layoutMode === 'ordered' && orderedSortDirection === 'asc'
-                ? n - 1 - index
+                ? filteredHossiis.length - 1 - index
                 : index;
-            // ランダム: 固定座標があれば優先。投稿順: 常に格子の計算座標（全件きれいに整列）
-            const pos =
-              layoutMode === 'random' &&
-              hossii.isPositionFixed &&
-              hossii.positionX != null &&
-              hossii.positionY != null
-                ? { x: hossii.positionX, y: hossii.positionY }
-                : layoutMode === 'ordered'
-                  ? bubblePositions[orderedGridIndex]
-                  : bubblePositions[index];
+            const pos = positionsByHossiiId[hossii.id] ?? { x: 50, y: 50 };
 
             const displayPos = mapDisplayPos(pos);
 
             const isThisSelected = selectedBubbleId === hossii.id;
+            const isPinHighlighted = pinHighlightId === hossii.id;
+            const animationLevel = resolveAnimationLevel(index, {
+              promoteFull:
+                selectedPostId === hossii.id ||
+                hoveredHossiiId === hossii.id ||
+                previewHossiiIds.has(hossii.id) ||
+                activeBubbleId === hossii.id ||
+                isThisSelected,
+              promoteLight: recentHighlightIds.has(hossii.id) || isPinHighlighted,
+            });
+            const displayStackZ =
+              layoutMode === 'ordered'
+                ? orderedGridIndex + 1
+                : displayStackZFromIndex(index);
 
             if (renderAsStar) {
               return (
@@ -1440,18 +1522,22 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                     x={displayPos.x}
                     y={displayPos.y}
                     anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
-                    onClick={() => setSelectedPostId(hossii.id)}
-                    onMouseEnter={(e) => handleStarMouseEnter(hossii.id, e)}
+                    onClick={handleStarClick}
+                    onMouseEnter={handleStarMouseEnterStable}
                     onMouseLeave={handleStarMouseLeave}
                     showPreview={
                       useStarView &&
                       !backgroundPeekMode &&
-                      previewHossiiIds.has(hossii.id)
+                      (previewHossiiIds.has(hossii.id) || pinnedIds.has(hossii.id))
                     }
-                    isRecentHighlight={recentHighlightIds.has(hossii.id)}
-                    orderedStackZ={
-                      layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
-                    }
+                    isPcStarMode={showPcStarHover}
+                    markerType={spaceSettings?.starMarkerType ?? DEFAULT_STAR_MARKER}
+                    isPinned={isPinned(hossii.id)}
+                    onPinToggle={handlePinToggle}
+                    showPinUi={showPinUi}
+                    isRecentHighlight={recentHighlightIds.has(hossii.id) || isPinHighlighted}
+                    orderedStackZ={displayStackZ}
+                    animationLevel={animationLevel}
                   />
                 </div>
               );
@@ -1463,9 +1549,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 hossii={hossii}
                 index={index}
                 position={displayPos}
-                orderedStackZ={
-                  layoutMode === 'ordered' ? orderedGridIndex + 1 : undefined
-                }
+                orderedStackZ={displayStackZ}
                 isActive={activeBubbleId === hossii.id}
                 onActivate={() =>
                   setActiveBubbleId(
@@ -1483,7 +1567,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onLike={handleLike}
                 bubbleShapePng={hossii.bubbleShapePng ?? spaceForVisual?.bubbleShapePng}
                 layoutAlignTopLeft={layoutMode === 'ordered'}
-                isRecentHighlight={recentHighlightIds.has(hossii.id)}
+                isRecentHighlight={recentHighlightIds.has(hossii.id) || isPinHighlighted}
+                isPinned={isPinned(hossii.id)}
+                onPinToggle={handlePinToggle}
+                showPinUi={showPinUi}
+                animationLevel={animationLevel}
               />
               </div>
             );
@@ -1493,15 +1581,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             背景を表示中 — もう一度タップで戻る
           </div>
         )}
-        {showPcStarHover && hoveredHossiiId && hoverAnchorRect && (() => {
+        {useStarView && hoveredHossiiId && hoverAnchorRect && (() => {
           const hovered = filteredHossiis.find((h) => h.id === hoveredHossiiId);
           if (!hovered) return null;
-          const previewSide = hoverAnchorRect.left / window.innerWidth > 0.6 ? 'left' : 'right';
           return (
             <StarHoverPreview
               hossii={hovered}
               anchorRect={hoverAnchorRect}
-              previewSide={previewSide}
+              isPinned={isPinned(hovered.id)}
+              onPinToggle={handlePinToggle}
+              showPinUi={showPinUi}
             />
           );
         })()}
@@ -1608,10 +1697,29 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       )}
 
       {/* スペースタイトル pill バッジ（モバイル専用・書き出し対象外） */}
-      <div className={styles.spaceTitle} data-space-export="exclude">
-        <span className={styles.spaceTitleDot} />
-        <span className={styles.spaceTitleText}>{spaceForVisual?.name ?? 'My Space'}</span>
+      <div className={styles.spaceTitleRow} data-space-export="exclude">
+        <div className={styles.spaceTitle}>
+          <span className={styles.spaceTitleDot} />
+          <span className={styles.spaceTitleText}>{spaceForVisual?.name ?? 'My Space'}</span>
+        </div>
+        {hasDescription && isMobile && (
+          <button
+            type="button"
+            className={styles.descriptionInfoButton}
+            onClick={() => setDescriptionSheetOpen(true)}
+            aria-label="スペースの説明を表示"
+          >
+            <Info size={16} />
+          </button>
+        )}
       </div>
+      {hasDescription && isMobile && (
+        <SpaceDescriptionSheet
+          open={descriptionSheetOpen}
+          onClose={() => setDescriptionSheetOpen(false)}
+          description={spaceDescription}
+        />
+      )}
 
       {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー / タグ・星 */}
       {(showPostCountBadge ||
@@ -1647,6 +1755,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               <Hash size={11} />
               <span className={styles.postCountBadgeValue}>{filteredHossiis.length}</span>
               <span className={styles.postCountBadgeUnit}>件</span>
+            </div>
+          )}
+          {fetchProgress.loading && displayLimit === 'unlimited' && !isVisiting && (
+            <div className={styles.fetchLoadingBadge} aria-live="polite">
+              読み込み中… ({fetchProgress.loadedCount}件)
             </div>
           )}
           {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
@@ -1782,6 +1895,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         </div>
       )}
 
+      {hasDescription &&
+        descriptionPanelVisible &&
+        !isMobile &&
+        !isMobileLandscape &&
+        viewMode !== 'slideshow' && (
+          <SpaceDescriptionPanel description={spaceDescription} />
+        )}
+
       {/* Listening インジケーター（タップで音声パネル開閉・書き出し対象外） */}
       {listenMode && (
         <div
@@ -1863,7 +1984,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             onDismissCandidate={dismissSpeechCandidate}
             dismissedCandidates={dismissedSpeechCandidates}
             onSendCandidateToFreePost={
-              quickPostPos
+              quickPostOpen
                 ? (text) => speechToFreePosterRef.current?.(text)
                 : undefined
             }
@@ -1947,6 +2068,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             onQrToggle={
               isMobile ? undefined : () => setQrPanelVisible((v) => !v)
             }
+            descriptionPanelVisible={descriptionPanelVisible}
+            onDescriptionToggle={
+              hasDescription && !isMobile
+                ? () => setDescriptionPanelVisible((v) => !v)
+                : undefined
+            }
             showPostCountBadge={showPostCountBadge}
             onShowPostCountBadgeToggle={
               isMobile ? undefined : handleShowPostCountBadgeToggle
@@ -1961,7 +2088,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       )}
 
       {/* クイック投稿パネル（スマホ縦=固定ボトムシート、横=右固定ドック、PC のみ FloatingPanelShell） */}
-      {quickPostPos &&
+      {quickPostOpen &&
         (mobilePostSplit ? (
           <div className={styles.mobilePostSheet}>{quickPostPanel}</div>
         ) : mobilePostLandscapeSplit ? (

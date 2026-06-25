@@ -1,4 +1,4 @@
-import { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, memo } from 'react';
 import { ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import type { Hossii } from '../../core/types';
 import type { ViewMode } from '../../core/utils/displayPrefsStorage';
@@ -40,7 +40,7 @@ type Props = {
   isMobilePortrait?: boolean;
 };
 
-export const AuthorClusterBubble = ({
+function AuthorClusterBubbleInner({
   group,
   position,
   viewMode,
@@ -51,7 +51,7 @@ export const AuthorClusterBubble = ({
   canEdit = false,
   orderedStackZ,
   isMobilePortrait = false,
-}: Props) => {
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -287,6 +287,8 @@ export const AuthorClusterBubble = ({
                   src={post.imageUrl}
                   alt=""
                   className={styles.imageGridThumb}
+                  loading="lazy"
+                  decoding="async"
                 />
               ))}
             </div>
@@ -298,3 +300,5 @@ export const AuthorClusterBubble = ({
     </div>
   );
 };
+
+export const AuthorClusterBubble = memo(AuthorClusterBubbleInner);

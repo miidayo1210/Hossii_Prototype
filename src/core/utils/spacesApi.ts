@@ -16,6 +16,7 @@ type SpaceRow = {
   is_private?: boolean | null;
   preset_tags?: string[] | null;
   welcome_message?: string | null;
+  description?: string | null;
 };
 
 // SpaceRow → Space（camelCase）
@@ -32,6 +33,7 @@ function rowToSpace(row: SpaceRow): Space {
     isPrivate: row.is_private ?? undefined,
     presetTags: row.preset_tags ?? undefined,
     welcomeMessage: row.welcome_message ?? undefined,
+    description: row.description ?? undefined,
   };
 }
 
@@ -48,6 +50,7 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
     created_at: space.createdAt.toISOString(),
     preset_tags: space.presetTags ?? null,
     welcome_message: space.welcomeMessage ?? null,
+    description: space.description ?? null,
   };
 }
 
@@ -105,6 +108,7 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   if (patch.isPrivate !== undefined) updateObj.is_private = patch.isPrivate ?? null;
   if (patch.presetTags !== undefined) updateObj.preset_tags = patch.presetTags ?? null;
   if (patch.welcomeMessage !== undefined) updateObj.welcome_message = patch.welcomeMessage ?? null;
+  if (patch.description !== undefined) updateObj.description = patch.description ?? null;
 
   if (Object.keys(updateObj).length === 0) return;
 

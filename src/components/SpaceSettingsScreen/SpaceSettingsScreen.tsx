@@ -6,6 +6,7 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsStorage';
 import { fetchSpaceSettings, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import type { SpaceSettings } from '../../core/types/settings';
+import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import type { Space } from '../../core/types/space';
 import { GeneralTab } from './GeneralTab';
 import { HossiiCustomTab } from './HossiiCustomTab';
@@ -44,9 +45,13 @@ export const SpaceSettingsScreen = () => {
   useEffect(() => {
     if (!activeSpace) return;
     fetchSpaceSettings(activeSpace.id, activeSpace.name).then((loaded) => {
-      setSettings(loaded);
-      // localStorage にも同期してオフライン表示を保証
-      saveSpaceSettings(loaded);
+      const local = loadSpaceSettings(activeSpace.id, activeSpace.name);
+      const merged: SpaceSettings = {
+        ...loaded,
+        starMarkerType: loaded.starMarkerType ?? local.starMarkerType ?? DEFAULT_STAR_MARKER,
+      };
+      setSettings(merged);
+      saveSpaceSettings(merged);
     });
   }, [activeSpace?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

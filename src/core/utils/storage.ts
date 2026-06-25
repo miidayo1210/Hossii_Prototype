@@ -96,6 +96,9 @@ export function loadHossiis(): unknown[] {
   }
 }
 
+/** デモ（Supabase 未設定）時の localStorage 投稿上限 */
+export const DEMO_MAX_HOSSIIS = 200;
+
 /**
  * Hossiis を保存
  */

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Maximize2, Minimize2, Eye, EyeOff, Hash, Mic, MicOff, MoreHorizontal, QrCode, Users, Volume2, VolumeX, ZoomIn } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, EyeOff, Hash, Info, Mic, MicOff, MoreHorizontal, QrCode, Users, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import type { DisplayPeriod, DisplayLimit, ViewMode, LayoutMode } from '../../core/utils/displayPrefsStorage';
 import type { Space } from '../../core/types/space';
@@ -35,6 +35,9 @@ type Props = {
   /** QRコードパネルの表示切替 */
   qrPanelVisible?: boolean;
   onQrToggle?: () => void;
+  /** スペース説明パネルの表示切替（PC） */
+  descriptionPanelVisible?: boolean;
+  onDescriptionToggle?: () => void;
   /** スペース右上に現在の表示条件での投稿数を出す */
   showPostCountBadge?: boolean;
   onShowPostCountBadgeToggle?: () => void;
@@ -96,6 +99,8 @@ export const LeftControlBar = ({
   isVisiting = false,
   qrPanelVisible = true,
   onQrToggle,
+  descriptionPanelVisible = true,
+  onDescriptionToggle,
   showPostCountBadge = false,
   onShowPostCountBadgeToggle,
   isMobile = false,
@@ -242,6 +247,20 @@ export const LeftControlBar = ({
             aria-pressed={showPostCountBadge}
           >
             <Hash size={18} />
+          </button>
+        </Tooltip>
+      )}
+
+      {onDescriptionToggle && (
+        <Tooltip text={descriptionPanelVisible ? 'スペース説明を隠す' : 'スペース説明を表示'}>
+          <button
+            type="button"
+            className={`${styles.controlButton} ${descriptionPanelVisible ? styles.active : ''}`}
+            onClick={onDescriptionToggle}
+            aria-label={descriptionPanelVisible ? 'スペース説明を隠す' : 'スペース説明を表示'}
+            aria-pressed={descriptionPanelVisible}
+          >
+            <Info size={18} />
           </button>
         </Tooltip>
       )}

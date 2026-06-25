@@ -46,7 +46,7 @@
     padding-right: env(safe-area-inset-right, 0px);
   }
 
-  .containerImmersive .spaceTitle {
+  .containerImmersive .spaceTitleRow {
     top: max(8px, env(safe-area-inset-top, 0px));
     left: max(12px, env(safe-area-inset-left, 0px));
   }
@@ -82,13 +82,19 @@
   }
 }
 
-/* スペースタイトル pill バッジ（左上・独立ガラス pill） */
-.spaceTitle {
+/* スペースタイトル行（モバイル: pill + 説明ボタン） */
+.spaceTitleRow {
   position: fixed;
   top: 12px;
   left: 12px;
   z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
+/* スペースタイトル pill バッジ */
+.spaceTitle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -115,6 +121,24 @@
   transition: background 0.2s;
 }
 
+.descriptionInfoButton {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* スペース名テキスト */
 .spaceTitleDot {
   flex-shrink: 0;
@@ -133,14 +157,14 @@
 
 /* PC: TopBar と重ならないよう非表示 */
 @media (min-width: 769px) {
-  .spaceTitle {
+  .spaceTitleRow {
     display: none;
   }
 }
 
 /* スマホ縦 */
 @media (max-width: 768px) and (orientation: portrait) {
-  .spaceTitle {
+  .spaceTitleRow {
     top: max(8px, env(safe-area-inset-top, 0px));
     left: max(12px, env(safe-area-inset-left, 0px));
   }
@@ -195,6 +219,44 @@
 .postCountBadgeUnit {
   font-size: 0.75rem;
   opacity: 0.85;
+}
+
+.fetchLoadingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 1.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(15, 10, 30, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-variant-numeric: tabular-nums;
+}
+
+.byAuthorLoadingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 6, 18, 0.45);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.byAuthorLoadingText {
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(20, 16, 36, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 }
 
 .topRightRow {
@@ -598,7 +660,6 @@
   }
 }
 
-/* 個別バブル */
 .bubble {
   position: absolute;
   max-width: 240px;
@@ -617,11 +678,34 @@
   user-select: none;
 }
 
+.bubblePinButton {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 25;
+}
+
 .bubble:hover {
   transform: scale(1.05);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   background: var(--bubble-bg-hover, rgba(255, 251, 235, 0.90));
   z-index: 20;
+}
+
+/* Animation tier: 31件目以降 — blur オフ・不透明（87 §8.4） */
+.bubbleAnimNone {
+  animation: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--bubble-bg-opaque, rgba(255, 251, 235, 0.96)) !important;
+}
+
+.bubbleAnimNone:hover {
+  background: var(--bubble-bg-opaque-hover, rgba(255, 251, 235, 0.98)) !important;
+}
+
+.bubbleAnimLight {
+  animation: none;
 }
 
 /* キャンバス投稿（9:16 ラスタカード） */
@@ -739,6 +823,32 @@
 .bubbleLayoutGrid:hover,
 .bubbleLayoutGrid.bubbleActive {
   transform-origin: left top;
+}
+
+/* ランダム配置: アニメ tier（最新30件）を index ベースで手前に */
+.bubbleStack {
+  z-index: var(--bubble-stack);
+}
+
+.bubbleStack:hover {
+  z-index: calc(var(--bubble-stack) + 10);
+}
+
+.bubbleStack.bubbleActive {
+  z-index: calc(var(--bubble-stack) + 20);
+}
+
+.bubbleStack.bubbleRecentGlow {
+  z-index: calc(var(--bubble-stack) + 2);
+}
+
+.bubbleStack.bubbleRecentGlow:hover {
+  z-index: calc(var(--bubble-stack) + 12);
+}
+
+.bubbleStack.bubbleSelected,
+.bubbleStack.bubbleSelectedShape {
+  z-index: calc(var(--bubble-stack) + 30) !important;
 }
 
 .bubble.bubbleLayoutGrid:hover {

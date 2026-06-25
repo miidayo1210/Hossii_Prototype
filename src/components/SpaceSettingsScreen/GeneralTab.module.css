@@ -200,6 +200,88 @@
   white-space: nowrap;
 }
 
+/* 星マーカープレビュー（設定画面） */
+.markerPreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 36px;
+  color: #a78bfa;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.markerPreview_star::before {
+  content: '★';
+}
+
+.markerPreview_circle::before {
+  content: '●';
+}
+
+.markerPreview_pin {
+  font-size: 0;
+  position: relative;
+  width: 14px;
+  height: 18px;
+}
+
+.markerPreview_pin::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(-45deg);
+  border-radius: 50% 50% 50% 0;
+  background: currentColor;
+}
+
+.markerPreview_pin::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.markerPreview_person {
+  font-size: 0;
+  position: relative;
+  width: 12px;
+  height: 16px;
+}
+
+.markerPreview_person::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.markerPreview_person::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 9px;
+  border-radius: 3px 3px 0 0;
+  background: currentColor;
+}
+
 .textarea {
   width: 100%;
   padding: 0.75rem 1rem;

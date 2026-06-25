@@ -15,7 +15,7 @@ import type { AppMode } from '../types/mode';
 import type { UserProfile, SpaceNicknames } from '../types/profile';
 import { DEFAULT_SPACE, DEFAULT_QUICK_EMOTIONS, DEFAULT_BACKGROUND } from '../types/space';
 import { generateId } from '../utils';
-import { createBubblePosition } from '../utils/bubblePosition';
+import { createBubblePositionFromId } from '../utils/bubblePosition';
 import {
   loadSpaces,
   saveSpaces,
@@ -24,6 +24,21 @@ import {
   loadHossiis,
   saveHossiis,
 } from '../utils/storage';
+import { persistHossiisLocal } from '../utils/hossiiPersistence';
+import {
+  applyFetchResult,
+  createEmptyEntitiesSlice,
+  getHossiisForQueryKey,
+  insertOrderedId,
+  materializeHossiisArray,
+  patchEntity,
+  removeEntity,
+  reindexIdInAllQueryKeys,
+  shouldReindexOrderedIds,
+  upsertEntities,
+  type HossiiEntitiesSlice,
+} from '../utils/hossiiEntitiesState';
+import type { HossiiQueryKey } from '../utils/hossiiQueryKey';
 import { loadMode, saveMode } from '../utils/modeStorage';
 import {
   loadProfile,
@@ -42,7 +57,6 @@ import {
   deleteSpaceFromDb,
 } from '../utils/spacesApi';
 import {
-  fetchHossiis,
   insertHossii,
   updateHossiiColor,
   updateHossiiPosition,
@@ -62,6 +76,8 @@ import {
 import { useAuth } from '../contexts/useAuth';
 import { useAdminNavigation } from '../contexts/useAdminNavigation';
 import { HossiiContext } from './useHossiiStore';
+import { setHossiiEntitiesSnapshot } from './hossiiEntityStore';
+import { HossiiActionsContext } from './useHossiiActions';
 
 // createdAt を Date に正規化（Supabase から string で来ても対応）
 const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
@@ -261,6 +277,9 @@ type ExtendedHossiiState = HossiiState & {
   profile: UserProfile | null;
   spaceNicknames: SpaceNicknames;
   visitingSpaceId: string | null;
+  entities: HossiiEntitiesSlice;
+  /** getActiveSpaceHossiis が参照する queryKey（Space / Comments fetch が設定） */
+  listQueryKey: HossiiQueryKey | null;
 };
 
 // 拡張Action型
@@ -285,7 +304,50 @@ type ExtendedHossiiAction =
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
   | { type: 'RESTORE_HOSSII'; payload: string }
   | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii }
-  | { type: 'SET_VISITING_SPACE'; payload: string | null };
+  | { type: 'SET_VISITING_SPACE'; payload: string | null }
+  | {
+      type: 'APPLY_FETCH_RESULT';
+      payload: { queryKey: HossiiQueryKey; items: Hossii[]; merge: boolean };
+    };
+
+function hossiisFromEntities(
+  state: ExtendedHossiiState,
+  entities: HossiiEntitiesSlice,
+  listQueryKey: HossiiQueryKey | null,
+): Hossii[] {
+  if (listQueryKey) {
+    return getHossiisForQueryKey(entities, listQueryKey);
+  }
+  return materializeHossiisArray(entities, state.activeSpaceId);
+}
+
+function withEntitiesUpdate(
+  state: ExtendedHossiiState,
+  entities: HossiiEntitiesSlice,
+  listQueryKey: HossiiQueryKey | null = state.listQueryKey,
+): ExtendedHossiiState {
+  const hossiis = hossiisFromEntities(state, entities, listQueryKey);
+  persistHossiisLocal(hossiis);
+  return { ...state, entities, listQueryKey, hossiis };
+}
+
+function insertHossiiIntoSpaceQueries(
+  entities: HossiiEntitiesSlice,
+  hossii: Hossii,
+): HossiiEntitiesSlice {
+  let next = upsertEntities(entities, [hossii]);
+  const prefix = `${hossii.spaceId}:`;
+  const keys = Object.keys(next.orderedIdsByQueryKey).filter((k) =>
+    k.startsWith(prefix),
+  );
+  if (keys.length === 0) {
+    return next;
+  }
+  for (const key of keys) {
+    next = insertOrderedId(next, key as HossiiQueryKey, hossii.id, hossii);
+  }
+  return next;
+}
 
 // アクティブなニックネームを取得するヘルパー
 const getActiveNicknameFromState = (state: ExtendedHossiiState): string => {
@@ -338,36 +400,24 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
           hashtags: action.payload.hashtags,
           imageUrl: action.payload.imageUrl,
         };
-        const newHossiis = [...state.hossiis, newHossii];
-        saveHossiis(newHossiis);
-        return {
-          ...state,
-          profile: currentProfile,
-          hossiis: newHossiis,
-        };
+        const entities = insertHossiiIntoSpaceQueries(state.entities, newHossii);
+        return withEntitiesUpdate({ ...state, profile: currentProfile }, entities);
       }
 
       case 'ADD_HOSSII_FULL': {
-        // 完全な Hossii オブジェクトを直接追加（Supabase 経由・Realtime 経由共通）
         const hossii = action.payload;
-        if (state.hossiis.some((h) => h.id === hossii.id)) {
-          return state; // 重複回避
+        if (state.entities.entitiesById[hossii.id]) {
+          return state;
         }
-        const newHossiis = [...state.hossiis, hossii];
-        saveHossiis(newHossiis);
-        return {
-          ...state,
-          hossiis: newHossiis,
-        };
+        const entities = insertHossiiIntoSpaceQueries(state.entities, hossii);
+        return withEntitiesUpdate(state, entities);
       }
 
       case 'REMOVE_HOSSII': {
-        const newHossiis = state.hossiis.filter((h) => h.id !== action.payload);
-        saveHossiis(newHossiis);
-        return {
-          ...state,
-          hossiis: newHossiis,
-        };
+        const id = action.payload;
+        const spaceId = state.entities.entitiesById[id]?.spaceId;
+        const entities = removeEntity(state.entities, id, spaceId);
+        return withEntitiesUpdate(state, entities);
       }
 
       case 'SELECT_HOSSII':
@@ -377,12 +427,12 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         };
 
       case 'CLEAR_ALL': {
-        saveHossiis([]);
-        return {
-          ...state,
-          hossiis: [],
-          selectedHossiiId: null,
-        };
+        const entities = createEmptyEntitiesSlice();
+        return withEntitiesUpdate(
+          { ...state, selectedHossiiId: null },
+          entities,
+          null,
+        );
       }
 
       case 'SET_ACTIVE_SPACE': {
@@ -482,10 +532,18 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       }
 
       case 'SYNC_HOSSIIS': {
-        return {
-          ...state,
-          hossiis: action.payload,
-        };
+        let entities = createEmptyEntitiesSlice();
+        entities = upsertEntities(entities, action.payload);
+        if (state.listQueryKey) {
+          entities = applyFetchResult(entities, state.listQueryKey, action.payload, false);
+        }
+        return withEntitiesUpdate(state, entities, state.listQueryKey);
+      }
+
+      case 'APPLY_FETCH_RESULT': {
+        const { queryKey, items, merge } = action.payload;
+        const entities = applyFetchResult(state.entities, queryKey, items, merge);
+        return withEntitiesUpdate(state, entities, queryKey);
       }
 
       case 'SET_MODE': {
@@ -542,65 +600,74 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
 
       case 'UPDATE_HOSSII_POSITION': {
         const { id, positionX, positionY } = action.payload;
-        const newHossiis = state.hossiis.map((h) =>
-          h.id === id ? { ...h, positionX, positionY, isPositionFixed: true } : h
-        );
-        saveHossiis(newHossiis);
-        return { ...state, hossiis: newHossiis };
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const updated = { ...prev, positionX, positionY, isPositionFixed: true };
+        const entities = patchEntity(state.entities, updated);
+        return withEntitiesUpdate(state, entities);
       }
 
       case 'UPDATE_HOSSII_SCALE': {
         const { id, scale } = action.payload;
-        const newHossiis = state.hossiis.map((h) =>
-          h.id === id ? { ...h, scale } : h
-        );
-        saveHossiis(newHossiis);
-        return { ...state, hossiis: newHossiis };
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const entities = patchEntity(state.entities, { ...prev, scale });
+        return withEntitiesUpdate(state, entities);
       }
 
       case 'UPDATE_HOSSII_COLOR': {
         const { id, color } = action.payload;
-        const newHossiis = state.hossiis.map((h) =>
-          h.id === id ? { ...h, bubbleColor: color ?? undefined } : h
-        );
-        saveHossiis(newHossiis);
-        return { ...state, hossiis: newHossiis };
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const entities = patchEntity(state.entities, {
+          ...prev,
+          bubbleColor: color ?? undefined,
+        });
+        return withEntitiesUpdate(state, entities);
       }
 
       case 'HIDE_HOSSII': {
         const { hossiiId, adminId } = action.payload;
+        const prev = state.entities.entitiesById[hossiiId];
+        if (!prev) return state;
         const now = new Date();
-        const newHossiis = state.hossiis.map((h) =>
-          h.id === hossiiId
-            ? { ...h, isHidden: true, hiddenAt: now, hiddenBy: adminId }
-            : h
-        );
-        saveHossiis(newHossiis);
-        return { ...state, hossiis: newHossiis };
+        const updated = {
+          ...prev,
+          isHidden: true,
+          hiddenAt: now,
+          hiddenBy: adminId,
+        };
+        let entities = patchEntity(state.entities, updated);
+        entities = reindexIdInAllQueryKeys(entities, hossiiId);
+        return withEntitiesUpdate(state, entities);
       }
 
       case 'RESTORE_HOSSII': {
-        const newHossiis = state.hossiis.map((h) =>
-          h.id === action.payload
-            ? { ...h, isHidden: false, hiddenAt: undefined, hiddenBy: undefined }
-            : h
-        );
-        saveHossiis(newHossiis);
-        return { ...state, hossiis: newHossiis };
+        const prev = state.entities.entitiesById[action.payload];
+        if (!prev) return state;
+        const updated = {
+          ...prev,
+          isHidden: false,
+          hiddenAt: undefined,
+          hiddenBy: undefined,
+        };
+        let entities = patchEntity(state.entities, updated);
+        entities = reindexIdInAllQueryKeys(entities, action.payload);
+        return withEntitiesUpdate(state, entities);
       }
 
       case 'UPDATE_HOSSII_FROM_REALTIME': {
-        // Realtime の UPDATE イベント由来。localStorage は更新しない（Supabase が正）
         const updated = action.payload;
-        const newHossiis = state.hossiis.map((h) => {
-          if (h.id !== updated.id) return h;
-          // Supabase にまだカラムが存在しないフィールドは既存のローカル値を保持する
-          return {
-            ...updated,
-            bubbleShapePng: updated.bubbleShapePng ?? h.bubbleShapePng,
-          };
-        });
-        return { ...state, hossiis: newHossiis };
+        const prev = state.entities.entitiesById[updated.id];
+        const merged: Hossii = {
+          ...updated,
+          bubbleShapePng: updated.bubbleShapePng ?? prev?.bubbleShapePng,
+        };
+        let entities = patchEntity(state.entities, merged);
+        if (shouldReindexOrderedIds(prev, merged)) {
+          entities = reindexIdInAllQueryKeys(entities, merged.id);
+        }
+        return withEntitiesUpdate(state, entities);
       }
 
       default:
@@ -635,6 +702,13 @@ export type HossiiContextValue = {
   updateHossiiScaleAction: (id: string, scale: number) => void;
   hideHossii: (id: string, adminId?: string) => void;
   restoreHossii: (id: string, adminId?: string) => void;
+  /** ページ fetch 結果を optimistic 投稿と merge して反映 */
+  syncFetchedHossiis: (
+    items: Hossii[],
+    queryKey: HossiiQueryKey,
+    options?: { merge?: boolean },
+  ) => void;
+  setHossiiFetchLoading: (loading: boolean) => void;
 };
 
 type HossiiProviderProps = {
@@ -678,6 +752,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     profile: initialProfile,
     spaceNicknames: initialSpaceNicknames,
     visitingSpaceId: null,
+    entities: upsertEntities(createEmptyEntitiesSlice(), initialHossiisFromStorage),
+    listQueryKey: null,
   });
 
   // 自分が Supabase に INSERT した ID を追跡（fetch マージで掃除するまで保持）
@@ -699,6 +775,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   useLayoutEffect(() => {
     stateRef.current = state;
   });
+
+  useEffect(() => {
+    setHossiiEntitiesSnapshot(state.entities.entitiesById);
+  }, [state.entities.entitiesById]);
 
   // Supabase からのスペース読み込みが完了したかどうか
   // Supabase 未設定の場合は localStorage のみを使うため即 true
@@ -800,7 +880,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     currentUser?.communityId,
   ]);
 
-  // ===== Supabase: アクティブスペースの hossiis を同期 =====
+  // ===== Supabase: アクティブスペースの hossiis は useSpaceHossiiFetch / useCommentsHossiiFetch が取得 =====
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -821,32 +901,42 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const spaceChanged = prevHossiiSyncSpaceIdRef.current !== activeSpaceId;
     prevHossiiSyncSpaceIdRef.current = activeSpaceId;
 
-    /* eslint-disable-next-line react-hooks/set-state-in-effect -- fetch 開始と同時にローディング表示（Promise 完了で true に戻す） */
-    setHossiiLoadedFromSupabase(false);
-    // スペース切替時のみ一覧を空にする。同一スペースで spaceIdsSignature だけ変わった再 fetch では
-    // SYNC_HOSSIIS([]) すると楽観投稿が一瞬消え、fetch が古い応答だと戻らない。
     if (spaceChanged) {
       insertedHossiiIdsRef.current.clear();
       pendingOptimisticHossiiRef.current.clear();
       queueMicrotask(() => {
+        setHossiiLoadedFromSupabase(false);
         dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
       });
     }
-
-    fetchHossiis(activeSpaceId).then((supabaseHossiis) => {
-      if (stateRef.current.activeSpaceId !== activeSpaceId) return;
-
-      const merged = mergeFetchedHossiisWithPendingInserts(
-        supabaseHossiis,
-        activeSpaceId,
-        stateRef.current.hossiis,
-        insertedHossiiIdsRef,
-        pendingOptimisticHossiiRef,
-      );
-      dispatch({ type: 'SYNC_HOSSIIS', payload: merged });
-      setHossiiLoadedFromSupabase(true);
-    });
   }, [state.activeSpaceId, spaceIdsSignature]);
+
+  const syncFetchedHossiis = useCallback((
+    supabaseHossiis: Hossii[],
+    queryKey: HossiiQueryKey,
+    options?: { merge?: boolean },
+  ) => {
+    const activeSpaceId = stateRef.current.activeSpaceId;
+    const merged = mergeFetchedHossiisWithPendingInserts(
+      supabaseHossiis,
+      activeSpaceId,
+      stateRef.current.hossiis,
+      insertedHossiiIdsRef,
+      pendingOptimisticHossiiRef,
+    );
+    dispatch({
+      type: 'APPLY_FETCH_RESULT',
+      payload: { queryKey, items: merged, merge: options?.merge ?? false },
+    });
+    setHossiiLoadedFromSupabase(true);
+  }, []);
+
+  const setHossiiFetchLoading = useCallback((loading: boolean) => {
+    setHossiiLoadedFromSupabase(!loading);
+  }, []);
+
+  // ===== 旧: fetchHossiis 全件 — useSpaceHossiiFetch に移行 =====
+  // （削除済み）
 
   // ===== Supabase Realtime: hossiis の INSERT/UPDATE/DELETE を購読 =====
   useEffect(() => {
@@ -958,16 +1048,14 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       input.authorNameOverride ??
       (getActiveNicknameFromState(currentState) || undefined);
 
-    // 投稿時に初期座標を確定する（同一スペース内の現在の投稿数をインデックスとして使用）
-    const spaceHossiiCount = stateRef.current.hossiis.filter(
-      (h) => h.spaceId === activeSpaceIdRef.current
-    ).length;
-    const initialPos = createBubblePosition(spaceHossiiCount);
+    // 投稿時に初期座標を確定する（id ベースの決定論的配置）
+    const id = generateId();
+    const initialPos = createBubblePositionFromId(id);
     const defaultCanvasScale = 1.2;
 
     const newHossii: Hossii = isCanvas
       ? {
-          id: generateId(),
+          id,
           message: msg,
           spaceId: activeSpaceIdRef.current,
           authorId: input.authorNameOverride ? undefined : profile.id,
@@ -984,7 +1072,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           tags: input.tags,
         }
       : {
-          id: generateId(),
+          id,
           message: msg,
           emotion: input.emotion,
           spaceId: activeSpaceIdRef.current,
@@ -1057,8 +1145,11 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, [state.spaces, state.activeSpaceId]);
 
   const getActiveSpaceHossiis = useCallback(() => {
+    if (state.listQueryKey) {
+      return getHossiisForQueryKey(state.entities, state.listQueryKey);
+    }
     return state.hossiis.filter((h) => h.spaceId === state.activeSpaceId);
-  }, [state.hossiis, state.activeSpaceId]);
+  }, [state.entities, state.listQueryKey, state.hossiis, state.activeSpaceId]);
 
   const addSpace = useCallback((space: Space) => {
     pendingSpaceIds.current.add(space.id);
@@ -1212,9 +1303,39 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         updateHossiiScaleAction,
         hideHossii,
         restoreHossii,
+        syncFetchedHossiis,
+        setHossiiFetchLoading,
       }}
     >
-      {children}
+      <HossiiActionsContext.Provider
+        value={{
+          addHossii,
+          selectHossii,
+          clearAll,
+          setActiveSpace,
+          getActiveSpace,
+          getActiveSpaceHossiis,
+          addSpace,
+          addSpaceLocal,
+          updateSpace,
+          removeSpace,
+          setMode,
+          setDefaultNickname,
+          setSpaceNickname,
+          getActiveNickname,
+          hasNicknameForSpace,
+          setVisitingSpace,
+          updateHossiiColorAction,
+          updateHossiiPositionAction,
+          updateHossiiScaleAction,
+          hideHossii,
+          restoreHossii,
+          syncFetchedHossiis,
+          setHossiiFetchLoading,
+        }}
+      >
+        {children}
+      </HossiiActionsContext.Provider>
     </HossiiContext.Provider>
   );
 };

@@ -1,4 +1,5 @@
-import type { SpaceSettings, CardType, BubbleEditPermission } from '../../core/types/settings';
+import type { SpaceSettings, CardType, BubbleEditPermission, StarMarkerType } from '../../core/types/settings';
+import { STAR_MARKER_OPTIONS, DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import type { Space } from '../../core/types/space';
 import { BUBBLE_SHAPE_PRESETS } from '../../core/assets/bubbleShapes';
 import styles from './GeneralTab.module.css';
@@ -40,6 +41,12 @@ export const GeneralTab = ({ settings, onUpdate, space, onUpdateSpace }: Props) 
   const handleBubbleShapeChange = (shapePath: string | undefined) => {
     onUpdateSpace?.({ bubbleShapePng: shapePath });
   };
+
+  const handleStarMarkerChange = (starMarkerType: StarMarkerType) => {
+    onUpdate({ ...settings, starMarkerType });
+  };
+
+  const activeMarker = settings.starMarkerType ?? DEFAULT_STAR_MARKER;
 
   return (
     <div className={styles.container}>
@@ -210,6 +217,47 @@ export const GeneralTab = ({ settings, onUpdate, space, onUpdateSpace }: Props) 
           <p className={styles.charCount}>{(space?.welcomeMessage ?? '').length} / 100</p>
         </section>
       )}
+
+      {onUpdateSpace && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>スペース説明</h2>
+          <p className={styles.description}>
+            スペース画面に表示する、このスペースの目的や使い方の一言説明です。
+          </p>
+          <input
+            type="text"
+            className={styles.nameInput}
+            value={space?.description ?? ''}
+            onChange={(e) => onUpdateSpace({ description: e.target.value || undefined })}
+            placeholder="例: チームの日々の気持ちを共有するスペースです。"
+            maxLength={50}
+          />
+          <p className={styles.charCount}>{(space?.description ?? '').length} / 50</p>
+        </section>
+      )}
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>星モードのマーカー形状</h2>
+        <p className={styles.description}>
+          星表示モードで投稿位置を示すマーカーの形を選択します。
+        </p>
+        <div className={styles.shapeList}>
+          {STAR_MARKER_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={`${styles.shapeOption} ${activeMarker === option.id ? styles.shapeOptionActive : ''}`}
+              onClick={() => handleStarMarkerChange(option.id)}
+            >
+              <span
+                className={`${styles.markerPreview} ${styles[`markerPreview_${option.id}`]}`}
+                aria-hidden="true"
+              />
+              <span className={styles.shapeLabel}>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>カードタイプ</h2>

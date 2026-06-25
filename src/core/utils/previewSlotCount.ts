@@ -23,7 +23,7 @@ export function computePreviewSlotCount(options: {
   if (!useStarView || postsWithContentCount === 0) return 0;
 
   if (!isMobile && presentationMode === 'stars') {
-    return Math.min(postsWithContentCount, 5);
+    return Math.min(postsWithContentCount, 6);
   }
 
   if (isMobile && isPortrait) {

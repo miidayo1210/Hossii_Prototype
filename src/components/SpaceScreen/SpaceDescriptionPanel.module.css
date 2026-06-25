@@ -1,0 +1,35 @@
+.panel {
+  position: fixed;
+  top: calc(4rem + 56px);
+  right: 12px;
+  z-index: 95;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(360px, 32vw);
+  padding: 6px 14px 6px 10px;
+  border-radius: 9999px;
+
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+
+  pointer-events: none;
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.text {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

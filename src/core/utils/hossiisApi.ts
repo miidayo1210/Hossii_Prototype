@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 import type { Hossii } from '../types';
+import { buildKeysetOrFilter, sortHossiisNewestFirst, type HossiiPageCursor } from './hossiiFetchPage';
 
 // Supabase の行型（snake_case）
 export type HossiiRow = {
@@ -145,6 +146,74 @@ export async function fetchHossiis(spaceId: string): Promise<Hossii[]> {
   }
 
   return (data as HossiiRow[]).map(rowToHossii);
+}
+
+export type FetchHossiisPageParams = {
+  spaceId: string;
+  limit: number;
+  cursor?: HossiiPageCursor;
+  periodCutoff?: Date | null;
+  upperBound?: string | null;
+  signal?: AbortSignal;
+};
+
+export type FetchHossiisPageResult = {
+  items: Hossii[];
+  nextCursor: HossiiPageCursor | null;
+  hasMore: boolean;
+};
+
+export async function fetchHossiisPage(
+  params: FetchHossiisPageParams,
+): Promise<FetchHossiisPageResult> {
+  if (!isSupabaseConfigured) {
+    return { items: [], nextCursor: null, hasMore: false };
+  }
+
+  const { spaceId, limit, cursor, periodCutoff, upperBound, signal } = params;
+
+  let query = supabase
+    .from('hossiis')
+    .select('*')
+    .eq('space_id', spaceId)
+    .or('is_hidden.eq.false,is_hidden.is.null')
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit);
+
+  if (periodCutoff) {
+    query = query.gte('created_at', periodCutoff.toISOString());
+  }
+  if (upperBound) {
+    query = query.lte('created_at', upperBound);
+  }
+  if (cursor) {
+    query = query.or(buildKeysetOrFilter(cursor));
+  }
+
+  if (signal) {
+    query = query.abortSignal(signal);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    if (error.message?.includes('AbortError') || error.name === 'AbortError') {
+      return { items: [], nextCursor: null, hasMore: false };
+    }
+    console.error('[hossiisApi] fetchHossiisPage error:', error.message);
+    return { items: [], nextCursor: null, hasMore: false };
+  }
+
+  const items = sortHossiisNewestFirst((data as HossiiRow[]).map(rowToHossii));
+  const oldest = items[items.length - 1];
+  const nextCursor =
+    items.length > 0
+      ? { createdAt: oldest.createdAt.toISOString(), id: oldest.id }
+      : null;
+  const hasMore = items.length === limit;
+
+  return { items, nextCursor, hasMore };
 }
 
 /** 非表示を含む全投稿を取得（モデレーション画面専用） */

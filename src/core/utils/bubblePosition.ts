@@ -2,6 +2,25 @@
  * 吹き出しの初期表示座標をインデックスから決定論的に算出する。
  * ストア（addHossii）とSpaceScreen（既存データのフォールバック）の両方から利用する。
  */
+/** id 文字列から決定論的 seed (0–999) */
+export function idSeed(id: string, salt: number): number {
+  let hash = salt;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (Math.imul(31, hash) + id.charCodeAt(i)) >>> 0;
+  }
+  return hash % 1000;
+}
+
+export function createBubblePositionFromId(id: string): { x: number; y: number } {
+  const seed = idSeed(id, 7919);
+  const seed2 = idSeed(id, 6271);
+  const r1 = seed / 1000;
+  const r2 = seed2 / 1000;
+  const x = 8 + r1 * 84;
+  const y = 8 + r2 * 84;
+  return { x, y };
+}
+
 export function createBubblePosition(index: number): { x: number; y: number } {
   const seed = (index * 7919 + 1) % 1000;
   const seed2 = (index * 6271 + 3) % 1000;
@@ -34,6 +53,17 @@ export function createOrderedBubblePosition(index: number, total: number): { x: 
 const SHARP_INNER_MIN = 5;
 const SHARP_INNER_MAX = 95;
 const SHARP_INNER_SPAN = SHARP_INNER_MAX - SHARP_INNER_MIN;
+
+/** モバイル壁紙向け: 論理座標をシャープ矩形内側（5–95%）に生成 */
+export function createBubblePositionInSharpFromId(id: string): { x: number; y: number } {
+  const seed = idSeed(id, 7919);
+  const seed2 = idSeed(id, 6271);
+  const r1 = seed / 1000;
+  const r2 = seed2 / 1000;
+  const x = SHARP_INNER_MIN + r1 * SHARP_INNER_SPAN;
+  const y = SHARP_INNER_MIN + r2 * SHARP_INNER_SPAN;
+  return { x, y };
+}
 
 /** モバイル壁紙向け: 論理座標をシャープ矩形内側（5–95%）に生成 */
 export function createBubblePositionInSharp(index: number): { x: number; y: number } {

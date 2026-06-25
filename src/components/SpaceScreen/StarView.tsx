@@ -1,25 +1,41 @@
+import { memo } from 'react';
 import type { Hossii } from '../../core/types';
+import type { AnimationLevel } from '../../core/utils/animationLevel';
+import type { StarMarkerType } from '../../core/types/settings';
+import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
+import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
+import { PinButton } from './PinButton';
 import styles from './StarView.module.css';
 
 type Props = {
   hossii: Hossii;
-  x: number; // % position
-  y: number; // % position
-  /** center: 従来どおり星の中心が (x,y)。topLeft: 格子整列用に星ボタンの左上が (x,y) */
+  x: number;
+  y: number;
   anchor?: 'center' | 'topLeft';
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onMouseEnter?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onMouseLeave?: () => void;
   showPreview?: boolean;
-  /** 投稿順モード時: 格子セルに応じた重ね順（大きいほど手前） */
+  isPcStarMode?: boolean;
   orderedStackZ?: number;
-  /** 直近の新着投稿として強調する */
   isRecentHighlight?: boolean;
+  animationLevel?: AnimationLevel;
+  markerType?: StarMarkerType;
+  isPinned?: boolean;
+  onPinToggle?: (id: string) => void;
+  showPinUi?: boolean;
 };
 
-const MAX_PREVIEW_TEXT = 40;
+const MAX_PREVIEW_TEXT = 60;
 
-export const StarView = ({
+const MARKER_CHAR: Record<StarMarkerType, string> = {
+  star: '★',
+  circle: '●',
+  pin: '',
+  person: '',
+};
+
+function StarViewInner({
   hossii,
   x,
   y,
@@ -28,18 +44,27 @@ export const StarView = ({
   onMouseEnter,
   onMouseLeave,
   showPreview,
+  isPcStarMode = false,
   orderedStackZ,
   isRecentHighlight = false,
-}: Props) => {
+  animationLevel = 'full',
+  markerType = DEFAULT_STAR_MARKER,
+  isPinned = false,
+  onPinToggle,
+  showPinUi = false,
+}: Props) {
+  const { ref: visibilityRef, level: visibleLevel } = useVisibleAnimationLevel(
+    animationLevel,
+    animationLevel !== 'none',
+  );
+
   const isLaughter = hossii.autoType === 'laughter';
   const emotion = hossii.emotion;
 
-  // Create varied animation delays based on position for organic feel
   const pulseDelay = ((x + y) * 37) % 100 / 100;
   const floatDelay = ((x * 53 + y * 71) % 100) / 100;
   const pulseDuration = 3 + ((x * y) % 20) / 10;
 
-  // プレビューバブルは x>60% なら左側、それ以外は右側に出す
   const previewSide = x > 60 ? 'left' : 'right';
 
   const previewText = hossii.message
@@ -48,9 +73,11 @@ export const StarView = ({
 
   return (
     <button
+      ref={visibilityRef}
       type="button"
       data-hossii-bubble
-      className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''} ${isRecentHighlight ? styles.starRecentGlow : ''}`}
+      data-hossii-id={hossii.id}
+      className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${isPcStarMode ? styles.starPc : ''} ${showPreview && isPcStarMode ? styles.starPreviewRotate : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''} ${isRecentHighlight ? styles.starRecentGlow : ''}`}
       style={{
         left: `${x}%`,
         top: `${y}%`,
@@ -64,11 +91,17 @@ export const StarView = ({
       onMouseLeave={onMouseLeave}
       aria-label={`${hossii.authorName || 'Post'} from ${hossii.createdAt.toLocaleTimeString()}`}
       data-emotion={emotion}
+      data-animation-level={visibleLevel}
     >
-      <span className={styles.starDot}>★</span>
+      <span
+        className={`${styles.starDot}${markerType === 'pin' || markerType === 'person' ? ` ${styles[`marker_${markerType}`]}` : ''}`}
+        aria-hidden="true"
+      >
+        {MARKER_CHAR[markerType]}
+      </span>
       {isLaughter && <span className={styles.laughterBadge}>😂</span>}
 
-      {showPreview && (previewText || hossii.imageUrl) && (
+      {showPreview && (previewText || hossii.imageUrl || hossii.authorName) && (
         <div
           className={`${styles.previewBubble} ${previewSide === 'left' ? styles.previewLeft : styles.previewRight}`}
           onClick={(e) => e.stopPropagation()}
@@ -79,6 +112,8 @@ export const StarView = ({
               src={hossii.imageUrl}
               alt=""
               className={styles.previewImage}
+              loading="lazy"
+              decoding="async"
             />
           )}
           {previewText && (
@@ -87,8 +122,39 @@ export const StarView = ({
           {hossii.authorName && (
             <span className={styles.previewAuthor}>{hossii.authorName}</span>
           )}
+          {showPinUi && onPinToggle && (
+            <PinButton
+              className={styles.previewPinButton}
+              isPinned={isPinned}
+              visible={isPinned}
+              onToggle={() => onPinToggle(hossii.id)}
+            />
+          )}
         </div>
       )}
     </button>
   );
-};
+}
+
+function starViewPropsEqual(prev: Props, next: Props): boolean {
+  return (
+    prev.hossii === next.hossii &&
+    prev.x === next.x &&
+    prev.y === next.y &&
+    prev.animationLevel === next.animationLevel &&
+    prev.showPreview === next.showPreview &&
+    prev.isPcStarMode === next.isPcStarMode &&
+    prev.markerType === next.markerType &&
+    prev.isPinned === next.isPinned &&
+    prev.showPinUi === next.showPinUi &&
+    prev.onPinToggle === next.onPinToggle &&
+    prev.isRecentHighlight === next.isRecentHighlight &&
+    prev.anchor === next.anchor &&
+    prev.orderedStackZ === next.orderedStackZ &&
+    prev.onClick === next.onClick &&
+    prev.onMouseEnter === next.onMouseEnter &&
+    prev.onMouseLeave === next.onMouseLeave
+  );
+}
+
+export const StarView = memo(StarViewInner, starViewPropsEqual);

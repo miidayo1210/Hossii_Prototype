@@ -6,6 +6,17 @@ export type BottleFrequency = '1d' | '3d-7d' | '2w' | '1m' | 'off';
 
 export type HossiiColor = 'pink' | 'blue' | 'yellow' | 'green' | 'purple';
 
+export type StarMarkerType = 'star' | 'circle' | 'pin' | 'person';
+
+export const STAR_MARKER_OPTIONS: { id: StarMarkerType; label: string }[] = [
+  { id: 'star', label: '星' },
+  { id: 'circle', label: 'まる' },
+  { id: 'pin', label: 'ピン' },
+  { id: 'person', label: '人型' },
+];
+
+export const DEFAULT_STAR_MARKER: StarMarkerType = 'star';
+
 export type SpaceFeatures = {
   commentPost: boolean;
   emotionPost: boolean;
@@ -51,6 +62,7 @@ export type SpaceSettings = {
   bubbleEditPermission: BubbleEditPermission;
   bottleFrequency: BottleFrequency;
   postFields?: PostFieldSettings;
+  starMarkerType?: StarMarkerType;
 };
 
 export const DEFAULT_SPACE_FEATURES: SpaceFeatures = {

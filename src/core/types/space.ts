@@ -72,6 +72,7 @@ export type Space = {
   //   各投稿に実際についたタグは hossiis.tags（フェーズ2で追加予定）に分離して管理する。
   presetTags?: string[];
   welcomeMessage?: string;  // 入室時ウェルカムメッセージ（未設定時はデフォルト文言）
+  description?: string;     // スペースの一行説明（最大50文字、未設定時は説明 UI 非表示）
 };
 
 // 背景画像の保存上限

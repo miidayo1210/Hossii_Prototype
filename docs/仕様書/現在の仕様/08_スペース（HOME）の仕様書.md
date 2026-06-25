@@ -4,9 +4,10 @@
 
 ## 現在の実装状況（ベースライン）
 
-- 表示上限: `state.displayLimit`（デフォルト50件、LeftControlBar から変更可）
-- バブル座標: index × シード値によるdeterministicランダム配置（画面端 8%〜92% / 12%〜78% の範囲）
-- Supabase Realtime: hossiis の INSERT / DELETE を既に購読済み
+- 表示上限: `displayLimit`（デフォルト 50 件、LeftControlBar から 50 / 100 / 150 / 全件）。Supabase 有効時は `useSpaceHossiiFetch` が **ページング取得**（[87](./87_スペース表示パフォーマンス最適化.md)）
+- バブル座標: **投稿 ID** シードの deterministic ランダム（8〜92%）。投稿順は id キー格子キャッシュ
+- データ層: `entitiesById` + `orderedIdsByQueryKey` 正規化 store（`hossiiEntitiesState.ts`）
+- Supabase Realtime: INSERT / UPDATE / DELETE を購読。PATCH は entity 参照のみ更新
 - デバイス分岐: モバイル → StarView、デスクトップ → Bubble（**PC は右上「星」トグルで StarView に切替可** — [84](./84_スペース表示モード拡張.md)）
 - **モバイル + 画像壁紙:** 星の表示座標は **16:9 シャープ領域** 内にマップ（[78](./78_スマホ投稿配置と16比9領域.md)）
 - 吹き出し背景: 半透明（[77](./77_吹き出し半透明表示.md)）
@@ -14,9 +15,12 @@
 - 表示期間フィルタ: 1日/1週/1月/全期間（LeftControlBar、デフォルト1週間）
 - 表示モード: フル / バブル / 画像のみ の3種類（LeftControlBar）
 - 並びモード: ランダム / 投稿順 / **投稿者まとめ**（`byAuthor`、[81](./81_投稿者別まとめ表示モード.md)）
-- **PC 星表示モード:** 右上「☆ 星」トグルで吹き出し ↔ 星表示（`localStorage` 永続化、同時プレビュー最大 5 件 — [84](./84_スペース表示モード拡張.md)）
+- **PC 星表示モード:** 右上「☆ 星」トグルで吹き出し ↔ 星表示（`localStorage` 永続化、同時プレビュー最大 **6** 件、星 22px・回転プレビュー — [84 §14](./84_スペース表示モード拡張.md)）
 - **タグ絞り込み:** 右上「🏷 タグ」から表示投稿を単一タグで絞り込み（スペースごと `localStorage` 永続化 — [84](./84_スペース表示モード拡張.md)）
 - 吹き出し絵文字: バブル上部の大アイコンとして表示（コメント内には重複しない）
+- **パフォーマンス最適化:** ✅ 実装済み — ページング fetch・アニメ tier（full/light/none）+ IO 停止・`React.memo`・`runDisplayPipeline`（[87](./87_スペース表示パフォーマンス最適化.md)）
+- **表示スタック:** ランダム配置で最新 30 件以内は `displayStackZFromIndex` により **手前 z-index**（[87 §8.6](./87_スペース表示パフォーマンス最適化.md)）
+- **スペース説明:** `Space.description`（最大 50 文字）。PC は右上ガラス pill + 左バー Info トグル、モバイルは左上 pill 横 `(i)` → ボトムシート（[91](./91_スペース説明表示.md)）
 
 ---
 

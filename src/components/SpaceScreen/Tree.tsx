@@ -1,8 +1,11 @@
-import { useRef, useEffect, useLayoutEffect, useState } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, memo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import type { ViewMode } from '../../core/utils/displayPrefsStorage';
+import type { AnimationLevel } from '../../core/utils/animationLevel';
+import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
+import { PinButton } from './PinButton';
 import { BUBBLE_INLINE_EDIT_COLORS } from '../../core/utils/bubbleColorPalettes';
 import { withBubbleAlpha, BUBBLE_BG_ALPHA, BUBBLE_BG_ALPHA_HOVER } from '../../core/utils/bubbleColorAlpha';
 import styles from './SpaceScreen.module.css';
@@ -70,9 +73,14 @@ type BubbleProps = {
   orderedStackZ?: number;
   /** 直近の新着投稿として紫の輪郭で強調する */
   isRecentHighlight?: boolean;
+  /** アニメーション tier（87 §8） */
+  animationLevel?: AnimationLevel;
+  isPinned?: boolean;
+  onPinToggle?: (id: string) => void;
+  showPinUi?: boolean;
 };
 
-export const Bubble = ({
+export function BubbleInner({
   hossii,
   index,
   position,
@@ -91,8 +99,23 @@ export const Bubble = ({
   layoutAlignTopLeft = false,
   orderedStackZ,
   isRecentHighlight = false,
-}: BubbleProps) => {
+  animationLevel = 'full',
+  isPinned = false,
+  onPinToggle,
+  showPinUi = false,
+}: BubbleProps) {
+  const { ref: visibilityRef, level: visibleAnimLevel } = useVisibleAnimationLevel(
+    animationLevel,
+    animationLevel !== 'none',
+  );
   const containerRef = useRef<HTMLDivElement>(null);
+  const mergeContainerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      containerRef.current = node;
+      visibilityRef(node);
+    },
+    [visibilityRef],
+  );
 
   // ドラッグ中のローカル状態（親 state を汚染しない）
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -341,9 +364,12 @@ export const Bubble = ({
 
   const classNames = [
     styles.bubble,
+    visibleAnimLevel === 'none' ? styles.bubbleAnimNone : '',
+    visibleAnimLevel === 'light' ? styles.bubbleAnimLight : '',
     isCanvasPost ? styles.bubbleCanvas : '',
     !isCanvasPost && bubbleShapePng ? styles.bubbleCustomShape : '',
     layoutAlignTopLeft ? styles.bubbleLayoutGrid : '',
+    !layoutAlignTopLeft && orderedStackZ != null ? styles.bubbleStack : '',
     isActive && !isSelected ? styles.bubbleActive : '',
     isSelected
       ? isCanvasPost
@@ -366,7 +392,7 @@ export const Bubble = ({
   return (
     <>
     <div
-      ref={containerRef}
+      ref={mergeContainerRef}
       className={classNames}
       style={bubbleStyle}
       data-hossii-bubble
@@ -383,6 +409,15 @@ export const Bubble = ({
       }}
       onMouseLeave={() => setIsBubbleHovered(false)}
     >
+      {showPinUi && onPinToggle && (isBubbleHovered || isPinned) && (
+        <PinButton
+          className={styles.bubblePinButton}
+          isPinned={isPinned}
+          visible={isBubbleHovered || isPinned}
+          onToggle={() => onPinToggle(hossii.id)}
+        />
+      )}
+
       {/* B02: 形状 PNG をフレームとしてオーバーレイ表示 */}
       {!isCanvasPost && bubbleShapePng && (
         <img
@@ -634,7 +669,29 @@ export const Bubble = ({
     )}
     </>
   );
-};
+}
+
+function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
+  return (
+    prev.hossii === next.hossii &&
+    prev.position.x === next.position.x &&
+    prev.position.y === next.position.y &&
+    prev.animationLevel === next.animationLevel &&
+    prev.isActive === next.isActive &&
+    prev.isSelected === next.isSelected &&
+    prev.viewMode === next.viewMode &&
+    prev.index === next.index &&
+    prev.orderedStackZ === next.orderedStackZ &&
+    prev.isRecentHighlight === next.isRecentHighlight &&
+    prev.isPinned === next.isPinned &&
+    prev.showPinUi === next.showPinUi &&
+    prev.onPinToggle === next.onPinToggle &&
+    prev.onActivate === next.onActivate &&
+    prev.onSelect === next.onSelect
+  );
+}
+
+export const Bubble = memo(BubbleInner, bubblePropsEqual);
 
 // 後方互換のため Tree も export
 export const Tree = Bubble;

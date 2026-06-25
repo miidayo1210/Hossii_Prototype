@@ -32,6 +32,10 @@
   z-index: calc(var(--star-stack) + 10);
 }
 
+.starOrderedStack.starHighlight {
+  z-index: calc(var(--star-stack) + 15);
+}
+
 .starAnchorTopLeft.starOrderedStack:hover {
   z-index: calc(var(--star-stack) + 10);
 }
@@ -50,6 +54,79 @@
     var(--pulse-delay, 0s),
     var(--float-delay, 0s),
     calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+/* CSS-drawn markers (pin / person) */
+.marker_pin,
+.marker_person {
+  text-shadow: none;
+  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.5));
+}
+
+.marker_pin {
+  font-size: 0;
+  display: inline-block;
+  width: 14px;
+  height: 18px;
+  position: relative;
+  vertical-align: middle;
+}
+
+.marker_pin::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(-45deg);
+  border-radius: 50% 50% 50% 0;
+  background: currentColor;
+}
+
+.marker_pin::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.marker_person {
+  font-size: 0;
+  display: inline-block;
+  width: 12px;
+  height: 16px;
+  position: relative;
+  vertical-align: middle;
+}
+
+.marker_person::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.marker_person::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 9px;
+  border-radius: 3px 3px 0 0;
+  background: currentColor;
 }
 
 /* Emotion-based colors with custom twinkle animations */
@@ -252,6 +329,17 @@
   right: calc(100% + 10px);
 }
 
+.previewPinButton {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+}
+
+.star:hover .previewPinButton {
+  opacity: 1;
+}
+
 @keyframes previewFadeIn {
   from {
     opacity: 0;
@@ -377,5 +465,296 @@
 
   .starDot {
     font-size: 12px;
+  }
+}
+
+/* --- Animation tier (87 §8) --- */
+.star[data-animation-level='none'] .starDot,
+.star[data-animation-level='none'][data-emotion] .starDot {
+  animation: none !important;
+}
+
+.star[data-animation-level='light'] .starDot {
+  animation: twinkle 4s ease-in-out infinite;
+  animation-delay: calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+.star[data-animation-level='light'][data-emotion='joy'] .starDot {
+  animation: twinkleJoy 4s ease-in-out infinite;
+  animation-delay: calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+.star[data-animation-level='light'][data-emotion='wow'] .starDot {
+  animation: twinkleWow 4s ease-in-out infinite;
+  animation-delay: calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+.star[data-animation-level='light'][data-emotion='empathy'] .starDot {
+  animation: twinkleEmpathy 4s ease-in-out infinite;
+  animation-delay: calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+.star[data-animation-level='light'][data-emotion='inspire'] .starDot {
+  animation: twinkleInspire 4s ease-in-out infinite;
+  animation-delay: calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+.star[data-animation-level='light'][data-emotion='think'] .starDot {
+  animation: twinkleThink 4s ease-in-out infinite;
+  animation-delay: calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+.star[data-animation-level='light'][data-emotion='laugh'] .starDot {
+  animation: twinkleLaugh 4s ease-in-out infinite;
+  animation-delay: calc(var(--pulse-delay, 0s) + 0.5s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star .starDot,
+  .star[data-emotion] .starDot {
+    animation: none !important;
+  }
+}
+
+/* --- PC star mode UX (84 §14) --- */
+@keyframes previewFadeAbove {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes previewBobAbove {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-5px);
+  }
+}
+
+@keyframes starPreviewSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 769px) {
+  .starPc .starDot {
+    font-size: 26px;
+    text-shadow: 0 0 14px rgba(167, 139, 250, 0.5);
+  }
+
+  .starPc .marker_pin {
+    width: 18px;
+    height: 22px;
+  }
+
+  .starPc .marker_pin::before {
+    width: 16px;
+    height: 16px;
+  }
+
+  .starPc .marker_pin::after {
+    width: 5px;
+    height: 5px;
+  }
+
+  .starPc .marker_person {
+    width: 16px;
+    height: 20px;
+  }
+
+  .starPc .marker_person::before {
+    width: 8px;
+    height: 8px;
+  }
+
+  .starPc .marker_person::after {
+    width: 12px;
+    height: 11px;
+  }
+
+  .starPc .marker_pin,
+  .starPc .marker_person {
+    filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.5));
+  }
+
+  .starPc:hover {
+    transform: translate(-50%, -50%) scale(1.16);
+  }
+
+  .starPc.starAnchorTopLeft:hover {
+    transform: scale(1.16);
+  }
+
+  .starPc.starHighlight .starDot {
+    transform: scale(1.12);
+  }
+
+  .starPc .laughterBadge {
+    font-size: 0.9375rem;
+  }
+
+  .starPc .previewBubble {
+    /* position: above the star */
+    top: auto;
+    bottom: calc(100% + 14px);
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+
+    /* size */
+    width: min(320px, 28vw);
+    padding: 0.75rem 1rem;
+    border-radius: 18px;
+
+    /* frosted glass — brighter to stay readable on dark space bg */
+    background: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.48) 0%,
+      rgba(235, 220, 255, 0.36) 100%
+    );
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.60);
+    box-shadow:
+      0 8px 32px rgba(139, 92, 246, 0.18),
+      0 2px 10px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+
+    /* animation: fade-in first, then float */
+    animation-name: previewFadeAbove, previewBobAbove;
+    animation-duration: 0.45s, 4.5s;
+    animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1), ease-in-out;
+    animation-delay: 0s, 0.45s;
+    animation-iteration-count: 1, infinite;
+    animation-fill-mode: both, none;
+  }
+
+  /* glass tail pointing down toward the star */
+  .starPc .previewBubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid rgba(240, 230, 255, 0.50);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06));
+  }
+
+  /* left/right offsets are disabled — bubble is always above */
+  .starPc .previewRight {
+    left: 50%;
+  }
+
+  .starPc .previewLeft {
+    right: auto;
+    left: 50%;
+  }
+
+  .starPc .previewImage {
+    height: 130px;
+  }
+
+  .starPc .previewText {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: rgba(30, 20, 50, 0.88);
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .starPc .previewAuthor {
+    font-size: 0.8125rem;
+    color: rgba(109, 40, 217, 0.90);
+  }
+}
+
+/* Preview rotation: spin + twinkle only (no pulse/float transform conflict) */
+.starPc.starPreviewRotate .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkle 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+  transform-origin: center center;
+}
+
+.starPc.starPreviewRotate[data-emotion='joy'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkleJoy 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+.starPc.starPreviewRotate[data-emotion='wow'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkleWow 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+.starPc.starPreviewRotate[data-emotion='empathy'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkleEmpathy 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+.starPc.starPreviewRotate[data-emotion='inspire'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkle 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+.starPc.starPreviewRotate[data-emotion='think'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkleThink 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+.starPc.starPreviewRotate[data-emotion='laugh'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkleLaugh 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+.starPc.starPreviewRotate[data-emotion='moved'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkleMoved 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+.starPc.starPreviewRotate[data-emotion='fun'] .starDot {
+  animation:
+    starPreviewSpin 14s linear infinite,
+    twinkleFun 4s ease-in-out infinite !important;
+  animation-delay: 0s, calc(var(--pulse-delay, 0s) + 0.5s) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .starPc.starPreviewRotate .starDot,
+  .starPc.starPreviewRotate[data-emotion] .starDot {
+    animation: none !important;
+  }
+
+  .starPc .previewBubble {
+    animation: previewFadeAbove 0.4s ease both !important;
   }
 }
