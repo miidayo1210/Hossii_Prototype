@@ -57,7 +57,6 @@ export async function fetchNeighbors(spaceId: string): Promise<Space[]> {
     name: s.name as string,
     spaceURL: (s.space_url as string | null) ?? undefined,
     background: (s.background as Space['background']) ?? undefined,
-    cardType: ((s.card_type as string) === 'stamp' ? 'stamp' : 'constellation') as Space['cardType'],
     quickEmotions: (s.quick_emotions as Space['quickEmotions']) ?? [],
     isPrivate: (s.is_private as boolean | null) ?? false,
     createdAt: new Date(s.created_at as string),

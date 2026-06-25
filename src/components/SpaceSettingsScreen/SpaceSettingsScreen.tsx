@@ -1,39 +1,44 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
 import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsStorage';
 import { fetchSpaceSettings, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import type { SpaceSettings } from '../../core/types/settings';
-import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
+import { DEFAULT_STAR_MARKER, DEFAULT_SPACE_MODE_STATE } from '../../core/types/settings';
 import type { Space } from '../../core/types/space';
-import { GeneralTab } from './GeneralTab';
-import { HossiiCustomTab } from './HossiiCustomTab';
-import { BackgroundTab } from './BackgroundTab';
-import { ShareTab } from './ShareTab';
-import { ModerationTab } from './ModerationTab';
-import { DecorationTab } from './DecorationTab';
-import { FeatureFlagsTab } from './FeatureFlagsTab';
-import { TagsTab } from './TagsTab';
+import { refreshModeCustomization } from '../../core/utils/spaceModeCustomize';
+import { SettingsLayout } from './SettingsLayout';
+import { SpaceModeTab } from './SpaceModeTab';
+import { BasicInfoTab } from './BasicInfoTab';
+import { PublicShareTab } from './PublicShareTab';
 import { PostFormTab } from './PostFormTab';
+import { InteractionRulesTab } from './InteractionRulesTab';
+import { TagsTab } from './TagsTab';
+import { BackgroundTab } from './BackgroundTab';
+import { AppearanceTab } from './AppearanceTab';
+import { CharacterTab } from './CharacterTab';
+import { DecorationTab } from './DecorationTab';
+import { ModerationTab } from './ModerationTab';
+import { ExportRecordTab } from './ExportRecordTab';
 import { NeighborsTab } from './NeighborsTab';
+import {
+  DEFAULT_SETTINGS_SCREEN,
+  EXPLICIT_SAVE_SCREENS,
+  type SettingsScreenId,
+} from './settingsScreenIds';
 import styles from './SpaceSettingsScreen.module.css';
-
-type Tab = 'general' | 'postForm' | 'hossii' | 'background' | 'share' | 'moderation' | 'decoration' | 'featureFlags' | 'tags' | 'neighbors';
 
 export const SpaceSettingsScreen = () => {
   const { navigate } = useRouter();
   const { state, updateSpace } = useHossiiStore();
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin ?? false;
-  const [activeTab, setActiveTab] = useState<Tab>('general');
-  const [isSaving, setIsSaving] = useState(false);
 
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
+  const [activeScreen, setActiveScreen] = useState<SettingsScreenId>(DEFAULT_SETTINGS_SCREEN);
+  const [screenDirty, setScreenDirty] = useState(false);
 
-  // localStorage から同期的に初期値を取得することで「読み込み中...」フラッシュを防ぐ。
-  // Supabase からの最新値は useEffect で非同期に上書きする。
   const [settings, setSettings] = useState<SpaceSettings | null>(() => {
     const spaceId = state.activeSpaceId;
     if (!spaceId) return null;
@@ -41,7 +46,6 @@ export const SpaceSettingsScreen = () => {
     return loadSpaceSettings(spaceId, space?.name ?? '');
   });
 
-  // Supabase から最新の設定を取得して上書き
   useEffect(() => {
     if (!activeSpace) return;
     fetchSpaceSettings(activeSpace.id, activeSpace.name).then((loaded) => {
@@ -49,27 +53,80 @@ export const SpaceSettingsScreen = () => {
       const merged: SpaceSettings = {
         ...loaded,
         starMarkerType: loaded.starMarkerType ?? local.starMarkerType ?? DEFAULT_STAR_MARKER,
+        posting: loaded.posting ?? local.posting,
+        reflection: loaded.reflection ?? local.reflection,
+        mode: loaded.mode ?? local.mode ?? DEFAULT_SPACE_MODE_STATE,
       };
       setSettings(merged);
       saveSpaceSettings(merged);
     });
   }, [activeSpace?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSave = async () => {
-    if (!settings) return;
+  const handleDirtyChange = useCallback((dirty: boolean) => {
+    setScreenDirty(dirty);
+  }, []);
 
-    setIsSaving(true);
-    // localStorage に即時保存（楽観的更新）
-    saveSpaceSettings(settings);
-    // Supabase に非同期で保存
-    await upsertSpaceSettings(settings);
+  const persistModeCustomization = useCallback((space: Space, current: SpaceSettings) => {
+    const refreshed = refreshModeCustomization(space, current);
+    if (!refreshed) return current;
+    const next = { ...current, mode: refreshed };
+    saveSpaceSettings(next);
+    upsertSpaceSettings(next).catch((err) => {
+      console.error('[SpaceSettingsScreen] mode customization sync failed', err);
+    });
+    return next;
+  }, []);
 
-    setTimeout(() => {
-      setIsSaving(false);
-    }, 500);
-  };
+  const handleSettingsUpdate = useCallback(
+    (updated: SpaceSettings) => {
+      if (!activeSpace) {
+        setSettings(updated);
+        return;
+      }
+      setSettings(persistModeCustomization(activeSpace, updated));
+    },
+    [activeSpace, persistModeCustomization],
+  );
+
+  const handleSpaceUpdate = useCallback(
+    (patch: Partial<Space>) => {
+      if (!activeSpace) return;
+      updateSpace(activeSpace.id, patch);
+      if (settings && patch.isPrivate !== undefined) {
+        const updatedSpace = { ...activeSpace, isPrivate: patch.isPrivate };
+        setSettings(persistModeCustomization(updatedSpace, settings));
+      }
+    },
+    [activeSpace, settings, updateSpace, persistModeCustomization],
+  );
+
+  const handleNavigate = useCallback(
+    (next: SettingsScreenId) => {
+      if (
+        screenDirty &&
+        EXPLICIT_SAVE_SCREENS.has(activeScreen) &&
+        !window.confirm(
+          '変更が保存されていません。\nこのまま移動すると変更が失われます。\n\n変更を破棄して移動しますか？',
+        )
+      ) {
+        return;
+      }
+      setScreenDirty(false);
+      setActiveScreen(next);
+    },
+    [activeScreen, screenDirty],
+  );
 
   const handleBack = () => {
+    if (
+      screenDirty &&
+      EXPLICIT_SAVE_SCREENS.has(activeScreen) &&
+      !window.confirm(
+        '変更が保存されていません。\nこのまま移動すると変更が失われます。\n\n変更を破棄して移動しますか？',
+      )
+    ) {
+      return;
+    }
     navigate(isAdmin ? 'spaces' : 'screen');
   };
 
@@ -81,158 +138,123 @@ export const SpaceSettingsScreen = () => {
     );
   }
 
+  const renderScreen = () => {
+    switch (activeScreen) {
+      case 'spaceMode':
+        return (
+          <SpaceModeTab
+            key={`mode-${activeSpace.id}`}
+            space={activeSpace}
+            settings={settings}
+            onUpdateSpace={(patch) => updateSpace(activeSpace.id, patch)}
+            onUpdateSettings={handleSettingsUpdate}
+          />
+        );
+      case 'basicInfo':
+        return (
+          <BasicInfoTab
+            key={`basic-${activeSpace.id}`}
+            space={activeSpace}
+            settings={settings}
+            onUpdateSpace={handleSpaceUpdate}
+            onUpdateSettings={handleSettingsUpdate}
+            onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'publicShare':
+        return (
+          <PublicShareTab
+            key={`share-${activeSpace.id}`}
+            space={activeSpace}
+            onUpdateSpace={handleSpaceUpdate}
+            onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'postForm':
+        return (
+          <PostFormTab
+            key={`postform-${activeSpace.id}`}
+            settings={settings}
+            onUpdate={handleSettingsUpdate}
+            onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'interactionRules':
+        return (
+          <InteractionRulesTab
+            key={`rules-${activeSpace.id}`}
+            settings={settings}
+            onUpdate={handleSettingsUpdate}
+            onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'tags':
+        return (
+          <TagsTab
+            space={activeSpace}
+            onUpdateSpace={handleSpaceUpdate}
+          />
+        );
+      case 'background':
+        return (
+          <BackgroundTab
+            key={`bg-${activeSpace.id}`}
+            space={activeSpace}
+            onUpdateSpace={handleSpaceUpdate}
+            onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'appearance':
+        return (
+          <AppearanceTab
+            key={`appearance-${activeSpace.id}`}
+            space={activeSpace}
+            settings={settings}
+            onUpdate={handleSettingsUpdate}
+            onUpdateSpace={handleSpaceUpdate}
+            onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'character':
+        return (
+          <CharacterTab
+            key={`char-${activeSpace.id}`}
+            space={activeSpace}
+            onUpdateSpace={handleSpaceUpdate}
+            onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'decoration':
+        return (
+          <DecorationTab space={activeSpace} />
+        );
+      case 'moderation':
+        return <ModerationTab spaceId={activeSpace.id} space={activeSpace} />;
+      case 'exportRecord':
+        return <ExportRecordTab />;
+      case 'neighbors':
+        return (
+          <NeighborsTab
+            settings={settings}
+            onUpdate={handleSettingsUpdate}
+            spaceId={activeSpace.id}
+            communitySpaces={state.spaces}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <button className={styles.backButton} onClick={handleBack}>
-          <ArrowLeft size={20} />
-          <span>ホームに戻る</span>
-        </button>
-
-        <h1 className={styles.title}>スペース管理</h1>
-
-        <button
-          className={`${styles.saveButton} ${isSaving ? styles.saving : ''}`}
-          onClick={handleSave}
-          disabled={isSaving}
-        >
-          <Save size={18} />
-          <span>{isSaving ? '保存中...' : '保存'}</span>
-        </button>
-      </header>
-
-      <div className={styles.content}>
-        <aside className={styles.sidebar}>
-          <nav className={styles.tabs}>
-            <button
-              className={`${styles.tab} ${activeTab === 'general' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('general')}
-            >
-              基本設定
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'postForm' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('postForm')}
-            >
-              投稿フォーム
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'hossii' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('hossii')}
-            >
-              Hossiiカスタマイズ
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'background' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('background')}
-            >
-              背景設定
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'share' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('share')}
-            >
-              シェア / QR
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'decoration' ? styles.activeTab : ''}`}
-              onClick={() => setActiveTab('decoration')}
-            >
-              スペース装飾
-            </button>
-            {isAdmin && (
-              <button
-                className={`${styles.tab} ${activeTab === 'tags' ? styles.activeTab : ''}`}
-                onClick={() => setActiveTab('tags')}
-              >
-                タグ設定
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                className={`${styles.tab} ${activeTab === 'moderation' ? styles.activeTab : ''}`}
-                onClick={() => setActiveTab('moderation')}
-              >
-                モデレーション
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                className={`${styles.tab} ${activeTab === 'featureFlags' ? styles.activeTab : ''}`}
-                onClick={() => setActiveTab('featureFlags')}
-              >
-                Feature Flags
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                className={`${styles.tab} ${activeTab === 'neighbors' ? styles.activeTab : ''}`}
-                onClick={() => setActiveTab('neighbors')}
-              >
-                隣のスペース
-              </button>
-            )}
-          </nav>
-        </aside>
-
-        <main className={styles.main}>
-          {activeTab === 'general' && (
-            <GeneralTab
-              settings={settings}
-              onUpdate={setSettings}
-              space={activeSpace}
-              onUpdateSpace={(patch: Partial<Space>) => updateSpace(activeSpace.id, patch)}
-            />
-          )}
-          {activeTab === 'postForm' && (
-            <PostFormTab
-              settings={settings}
-              onUpdate={setSettings}
-              spaceId={activeSpace.id}
-            />
-          )}
-          {activeTab === 'hossii' && (
-            <HossiiCustomTab
-              settings={settings}
-              onUpdate={setSettings}
-              space={activeSpace}
-              onUpdateSpace={(patch: Partial<Space>) => updateSpace(activeSpace.id, patch)}
-            />
-          )}
-          {activeTab === 'background' && activeSpace && (
-            <BackgroundTab
-              space={activeSpace}
-              onUpdateSpace={(patch) => updateSpace(activeSpace.id, patch)}
-            />
-          )}
-          {activeTab === 'share' && (
-            <ShareTab />
-          )}
-          {activeTab === 'decoration' && activeSpace && (
-            <DecorationTab space={activeSpace} />
-          )}
-          {activeTab === 'tags' && activeSpace && (
-            <TagsTab
-              space={activeSpace}
-              onUpdateSpace={(patch) => updateSpace(activeSpace.id, patch)}
-            />
-          )}
-          {activeTab === 'moderation' && activeSpace && (
-            <ModerationTab spaceId={activeSpace.id} space={activeSpace} />
-          )}
-          {activeTab === 'featureFlags' && activeSpace && (
-            <FeatureFlagsTab spaceId={activeSpace.id} />
-          )}
-          {activeTab === 'neighbors' && activeSpace && (
-            <NeighborsTab
-              settings={settings}
-              onUpdate={setSettings}
-              spaceId={activeSpace.id}
-              communitySpaces={state.spaces}
-            />
-          )}
-        </main>
-      </div>
-    </div>
+    <SettingsLayout
+      spaceName={activeSpace.name}
+      activeScreen={activeScreen}
+      isAdmin={isAdmin}
+      onBack={handleBack}
+      onNavigate={handleNavigate}
+    >
+      {renderScreen()}
+    </SettingsLayout>
   );
 };

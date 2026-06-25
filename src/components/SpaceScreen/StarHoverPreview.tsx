@@ -9,6 +9,8 @@ type Props = {
   isPinned?: boolean;
   onPinToggle?: (id: string) => void;
   showPinUi?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 };
 
 const GAP = 12;
@@ -21,6 +23,8 @@ export function StarHoverPreview({
   isPinned = false,
   onPinToggle,
   showPinUi = false,
+  onMouseEnter,
+  onMouseLeave,
 }: Props) {
   const centerX = anchorRect.left + anchorRect.width / 2;
   let left = centerX - MAX_W / 2;
@@ -39,6 +43,8 @@ export function StarHoverPreview({
       className={styles.card}
       style={{ left, bottom, width: MAX_W }}
       role="tooltip"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {showPinUi && onPinToggle && (
         <PinButton

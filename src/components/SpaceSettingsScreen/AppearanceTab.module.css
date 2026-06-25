@@ -1,0 +1,152 @@
+/* ============================================================
+   AppearanceTab — shape picker (diagram style, light theme)
+   ============================================================ */
+
+.shapeList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.shapeOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.6875rem 0.875rem;
+  border-radius: 0.625rem;
+  background: #f9fafb;
+  border: 1.5px solid #e4e7ed;
+  cursor: pointer;
+  transition: background 0.13s, border-color 0.13s, box-shadow 0.13s, transform 0.13s;
+  color: #374151;
+  min-width: 88px;
+}
+
+.shapeOption:hover {
+  background: #f3f4f6;
+  border-color: #c4b5fd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.08);
+}
+
+.shapeOptionActive {
+  border-color: #4f46e5;
+  background: #ede9fe;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* デフォルト角丸 — CSS ダイアグラム */
+.shapePreviewDefault {
+  display: block;
+  width: 56px;
+  height: 36px;
+  background: #e5e7eb;
+  border-radius: 10px;
+  border: 1.5px solid #9ca3af;
+}
+
+/* カスタム形状 — PNG をシルエット図として表示 */
+.shapePreviewImg {
+  width: 56px;
+  height: 36px;
+  object-fit: contain;
+  filter: brightness(0) opacity(0.42);
+}
+
+.shapeLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+}
+
+/* 星マーカープレビュー（CSS ダイアグラム）— 全オプション共通 56×36 枠 */
+.markerPreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 36px;
+  flex-shrink: 0;
+  color: #7c3aed;
+  font-size: 22px;
+  line-height: 36px;
+  text-align: center;
+}
+
+.markerPreview_star::before {
+  content: '★';
+  display: block;
+  line-height: 36px;
+}
+
+.markerPreview_circle::before {
+  content: '●';
+  display: block;
+  line-height: 36px;
+  font-size: 20px;
+}
+
+.markerPreview_pin {
+  font-size: 0;
+  position: relative;
+}
+
+.markerPreview_pin::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -8px;
+  margin-left: -6px;
+  transform: rotate(-45deg);
+  border-radius: 50% 50% 50% 0;
+  background: currentColor;
+}
+
+.markerPreview_pin::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: 5px;
+  margin-left: -2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.markerPreview_person {
+  font-size: 0;
+  position: relative;
+}
+
+.markerPreview_person::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: -8px;
+  margin-left: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.markerPreview_person::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: 0;
+  margin-left: -5px;
+  width: 10px;
+  height: 9px;
+  border-radius: 3px 3px 0 0;
+  background: currentColor;
+}

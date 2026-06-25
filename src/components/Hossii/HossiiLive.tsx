@@ -9,7 +9,6 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import type { EmotionKey, Hossii } from '../../core/types';
-import type { HossiiColor } from '../../core/types/settings';
 import { getRandomBubble8, EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getHossiiFace } from '../../core/assets/hossiiFaces';
 import { HOSSII_IDLE, getDefaultIdle, getRandomInteractionFace, getListeningFace } from '../../core/assets/hossiiIdle';
@@ -22,7 +21,6 @@ type Props = {
   emotion?: EmotionKey | null;
   onParticle?: (emotion: EmotionKey) => void;
   isListening?: boolean;
-  hossiiColor?: HossiiColor;
   brainMessage?: string | null;
   /** F07: 読み上げ候補の投稿リスト */
   hossiis?: Hossii[];
@@ -62,23 +60,6 @@ const TAP_LINES: string[] = [
   'えへへ〜',
   'ぴょん！',
 ];
-
-/** Hossiiカラーに対応するhue-rotate値を計算 */
-const getHueRotation = (color?: HossiiColor): number => {
-  if (!color || color === 'pink') return 0; // デフォルト（ピンク）
-  switch (color) {
-    case 'blue':
-      return 180;
-    case 'yellow':
-      return 45;
-    case 'green':
-      return 120;
-    case 'purple':
-      return 270;
-    default:
-      return 0;
-  }
-};
 
 /** 自発セリフ（投稿数連動カテゴリ） */
 const IDLE_SPEECH = {
@@ -179,7 +160,6 @@ export function HossiiLive({
   emotion,
   onParticle,
   isListening = false,
-  hossiiColor,
   brainMessage,
   hossiis = [],
   readingEnabled = false,
@@ -642,10 +622,6 @@ export function HossiiLive({
         ? `${baseTransform ?? ''} ${tapTransform}`.trim()
         : baseTransform;
 
-  // Hossiiカラーのfilter適用
-  const hueRotate = getHueRotation(hossiiColor);
-  const colorFilter = hueRotate !== 0 ? `hue-rotate(${hueRotate}deg)` : undefined;
-
   return (
     <>
       {/* Hossii本体 */}
@@ -678,7 +654,6 @@ export function HossiiLive({
             src={displayFace}
             alt="Hossii"
             className={styles.hossiiImage}
-            style={{ filter: colorFilter }}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}

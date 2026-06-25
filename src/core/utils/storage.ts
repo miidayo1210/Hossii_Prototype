@@ -1,6 +1,30 @@
 import type { Space, SpaceId } from '../types/space';
 import type { Hossii } from '../types';
 
+function serializeSpace(f: Space): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    id: f.id,
+    spaceURL: f.spaceURL,
+    name: f.name,
+    quickEmotions: f.quickEmotions,
+    createdAt: f.createdAt.toISOString(),
+  };
+  if (f.background?.kind !== 'image' || f.background.source !== 'temp') {
+    base.background = f.background;
+  }
+  if (f.presetTags) base.presetTags = f.presetTags;
+  if (f.isPrivate !== undefined) base.isPrivate = f.isPrivate;
+  if (f.welcomeMessage) base.welcomeMessage = f.welcomeMessage;
+  if (f.description) base.description = f.description;
+  if (f.characterName) base.characterName = f.characterName;
+  if (f.characterImageUrl) base.characterImageUrl = f.characterImageUrl;
+  if (f.customEmotions?.length) base.customEmotions = f.customEmotions;
+  if (f.decorations?.length) base.decorations = f.decorations;
+  if (f.bubbleShapePng) base.bubbleShapePng = f.bubbleShapePng;
+  if (f.savedBackgroundImages?.length) base.savedBackgroundImages = f.savedBackgroundImages;
+  return base;
+}
+
 // localStorage キー
 const SPACES_KEY = 'hossii.spaces';
 const ACTIVE_SPACE_ID_KEY = 'hossii.activeSpaceId';
@@ -27,32 +51,7 @@ export function loadSpaces(): unknown[] {
  */
 export function saveSpaces(spaces: Space[]): void {
   try {
-    const toSave = spaces.map((f) => {
-      // 一時画像の場合は background を除外
-      if (f.background?.kind === 'image' && f.background.source === 'temp') {
-      return {
-        id: f.id,
-        spaceURL: f.spaceURL,
-        name: f.name,
-        cardType: f.cardType,
-        quickEmotions: f.quickEmotions,
-        createdAt: f.createdAt.toISOString(),
-        presetTags: f.presetTags,
-        // background は保存しない（一時画像のため）
-      };
-      }
-
-      return {
-        id: f.id,
-        spaceURL: f.spaceURL,
-        name: f.name,
-        cardType: f.cardType,
-        quickEmotions: f.quickEmotions,
-        createdAt: f.createdAt.toISOString(),
-        background: f.background, // 背景設定を保存
-        presetTags: f.presetTags, // T01: プリセットタグ
-      };
-    });
+    const toSave = spaces.map(serializeSpace);
     localStorage.setItem(SPACES_KEY, JSON.stringify(toSave));
   } catch {
     // ignore

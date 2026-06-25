@@ -61,7 +61,7 @@ type BubbleProps = {
   viewMode?: ViewMode;
   /** F02/F04: 編集権限（false の場合ドラッグ・リサイズ・色変更不可） */
   canEdit?: boolean;
-  /** likes_enabled Feature Flag が ON の場合のみ true */
+  /** SpaceSettings.features.likesEnabled が ON の場合のみ true */
   likesEnabled?: boolean;
   /** いいねトグル時のコールバック（楽観的更新は Bubble 内で行い、Supabase 処理は親で行う） */
   onLike?: (id: string) => void;

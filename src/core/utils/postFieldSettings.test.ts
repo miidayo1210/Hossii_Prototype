@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SpaceSettings } from '../types/settings';
-import { DEFAULT_POST_FIELD_SETTINGS, DEFAULT_SPACE_FEATURES } from '../types/settings';
+import { DEFAULT_POST_FIELD_SETTINGS } from '../types/settings';
 import {
   applyPostFieldChange,
   allPostFieldsDisabled,
@@ -11,9 +11,7 @@ import {
 const baseSettings: SpaceSettings = {
   spaceId: 's1',
   spaceName: 'Test',
-  features: { ...DEFAULT_SPACE_FEATURES },
-  cardType: 'constellation',
-  hossiiColor: 'pink',
+  features: { likesEnabled: true },
   bubbleEditPermission: 'all',
   bottleFrequency: '3d-7d',
 };
@@ -27,8 +25,8 @@ describe('resolvePostFields', () => {
     const pf = resolvePostFields({
       ...baseSettings,
       features: {
-        ...DEFAULT_SPACE_FEATURES,
-        commentPost: false,
+        likesEnabled: true,
+        messagePost: false,
         numberPost: true,
       },
     });

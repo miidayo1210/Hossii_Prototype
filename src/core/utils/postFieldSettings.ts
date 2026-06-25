@@ -44,13 +44,13 @@ export function resolvePostFields(settings: SpaceSettings | null | undefined): P
 
   const f = settings.features;
   return mergePostFieldSettings({
-    message: { enabled: f.commentPost, required: false },
-    emotion: { enabled: f.emotionPost, required: false },
+    message: { enabled: f.messagePost ?? true, required: false },
+    emotion: { enabled: f.emotionPost ?? true, required: false },
     tags: { enabled: true, required: false },
-    photo: { enabled: f.photoPost, required: false },
+    photo: { enabled: f.photoPost ?? true, required: false },
     bubbleColor: { enabled: true, required: false },
     bubbleShape: { enabled: true, required: false },
-    numberPost: { enabled: f.numberPost, required: false },
+    numberPost: { enabled: f.numberPost ?? false, required: false },
   });
 }
 

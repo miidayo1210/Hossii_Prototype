@@ -1,27 +1,32 @@
+/* ============================================================
+   ModerationTab — light theme
+   ============================================================ */
 .container {
-  padding: 2rem;
-  color: #fff;
+  padding: 0;
+  color: #111827;
   max-width: 900px;
 }
 
 .title {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 700;
-  margin: 0 0 0.5rem 0;
+  color: #111827;
+  margin: 0 0 0.375rem 0;
 }
 
 .description {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.65);
-  margin: 0 0 1.75rem 0;
+  color: #6b7280;
+  margin: 0 0 1.25rem 0;
+  line-height: 1.5;
 }
 
 /* ---- フィルターバー ---- */
 .filterBar {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
 }
 
 .segmentGroup {
@@ -30,25 +35,27 @@
 }
 
 .segmentButton {
-  padding: 0.4rem 0.875rem;
+  padding: 0.375rem 0.875rem;
   border-radius: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid #e4e7ed;
+  background: #ffffff;
+  color: #6b7280;
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.13s;
 }
 
 .segmentButton:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f3f4f6;
+  color: #374151;
 }
 
 .segmentActive {
-  background: rgba(168, 85, 247, 0.5);
-  border-color: rgba(168, 85, 247, 0.8);
-  color: #fff;
+  background: #ede9fe;
+  border-color: #a5b4fc;
+  color: #4f46e5;
+  font-weight: 600;
 }
 
 .searchRow {
@@ -69,37 +76,38 @@
   left: 0.625rem;
   top: 50%;
   transform: translateY(-50%);
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
   padding: 0.5rem 0.75rem 0.5rem 2rem;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 0.5rem;
-  color: #fff;
+  color: #111827;
   font-size: 0.8125rem;
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .searchInput::placeholder {
-  color: rgba(255, 255, 255, 0.35);
+  color: #9ca3af;
 }
 
 .searchInput:focus {
-  border-color: rgba(168, 85, 247, 0.6);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .dateInput {
   padding: 0.5rem 0.625rem;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 0.5rem;
-  color: #fff;
+  color: #374151;
   font-size: 0.8125rem;
   outline: none;
   cursor: pointer;
@@ -107,11 +115,11 @@
 }
 
 .dateInput:focus {
-  border-color: rgba(168, 85, 247, 0.6);
+  border-color: #4f46e5;
 }
 
 .dateSep {
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   font-size: 0.8125rem;
 }
 
@@ -119,8 +127,8 @@
 .tableWrapper {
   overflow-x: auto;
   border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid #e4e7ed;
+  background: #ffffff;
 }
 
 .table {
@@ -130,17 +138,18 @@
 }
 
 .th {
-  padding: 0.75rem 1rem;
+  padding: 0.625rem 1rem;
   text-align: left;
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #6b7280;
+  border-bottom: 1px solid #f0f1f5;
   white-space: nowrap;
+  background: #f9fafb;
 }
 
 .tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid #f0f1f5;
   transition: background 0.1s;
 }
 
@@ -149,7 +158,7 @@
 }
 
 .tr:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: #fafafa;
 }
 
 .hiddenRow {
@@ -158,7 +167,7 @@
 
 .td {
   padding: 0.75rem 1rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: #374151;
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -174,7 +183,7 @@
   line-height: 0;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #e4e7ed;
 }
 
 .thumbImg {
@@ -185,13 +194,13 @@
 }
 
 .thumbEmpty {
-  color: rgba(255, 255, 255, 0.25);
+  color: #d1d5db;
   font-size: 0.875rem;
 }
 
 .tdMessage {
   padding: 0.75rem 1rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: #374151;
   vertical-align: middle;
   max-width: 300px;
 }
@@ -213,22 +222,21 @@
   white-space: nowrap;
 }
 
-/* プリセットタグ（tags フィールド）: 紫系 */
 .rowTagChipPreset {
-  background: rgba(124, 58, 237, 0.2);
-  color: #c4b5fd;
-  border: 1px solid rgba(124, 58, 237, 0.35);
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
 }
 
-/* 自由入力タグ（hashtags フィールド）: グレー系 */
 .rowTagChipFree {
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e4e7ed;
 }
 
 .authorName {
   font-weight: 500;
+  color: #111827;
 }
 
 .messageText {
@@ -236,10 +244,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #374151;
 }
 
 .noMessage {
-  color: rgba(255, 255, 255, 0.3);
+  color: #d1d5db;
   font-style: italic;
 }
 
@@ -249,9 +258,9 @@
   border-radius: 2rem;
   font-size: 0.6875rem;
   font-weight: 600;
-  background: rgba(16, 185, 129, 0.2);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 
 .badgeHidden {
@@ -260,9 +269,9 @@
   border-radius: 2rem;
   font-size: 0.6875rem;
   font-weight: 600;
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 .hideButton,
@@ -270,47 +279,47 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.375rem 0.625rem;
+  padding: 0.3125rem 0.625rem;
   border-radius: 0.375rem;
   border: none;
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.13s;
   white-space: nowrap;
 }
 
 .hideButton {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 .hideButton:hover {
-  background: rgba(239, 68, 68, 0.3);
+  background: #fecaca;
 }
 
 .restoreButton {
-  background: rgba(16, 185, 129, 0.15);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 
 .restoreButton:hover {
-  background: rgba(16, 185, 129, 0.3);
+  background: #a7f3d0;
 }
 
 .empty {
   padding: 2.5rem 1rem;
   text-align: center;
-  color: rgba(255, 255, 255, 0.35);
+  color: #9ca3af;
   font-size: 0.875rem;
 }
 
 .count {
   margin-top: 0.75rem;
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
 }
 
 /* ---- タグフィルター ---- */
@@ -330,9 +339,9 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px 3px 7px;
-  background: rgba(124, 58, 237, 0.25);
-  color: #c4b5fd;
-  border: 1px solid rgba(124, 58, 237, 0.4);
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
@@ -346,7 +355,7 @@
   margin-left: 2px;
   background: none;
   border: none;
-  color: #c4b5fd;
+  color: #7c3aed;
   cursor: pointer;
   opacity: 0.7;
   transition: opacity 0.15s;
@@ -365,19 +374,19 @@
   align-items: center;
   gap: 5px;
   padding: 4px 12px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e4e7ed;
   border-radius: 999px;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.13s, color 0.13s;
   white-space: nowrap;
 }
 
 .tagAddButton:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.9);
+  background: #e5e7eb;
+  color: #374151;
 }
 
 .tagDropdown {
@@ -385,12 +394,12 @@
   top: calc(100% + 6px);
   left: 0;
   min-width: 140px;
-  background: #1e1b2e;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  border: 1px solid #e4e7ed;
   border-radius: 8px;
   padding: 4px;
   z-index: 50;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
 .tagDropdownItem {
@@ -400,7 +409,7 @@
   background: none;
   border: none;
   border-radius: 5px;
-  color: rgba(255, 255, 255, 0.8);
+  color: #374151;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
@@ -408,13 +417,23 @@
 }
 
 .tagDropdownItem:hover {
-  background: rgba(124, 58, 237, 0.25);
-  color: #c4b5fd;
+  background: #ede9fe;
+  color: #4f46e5;
 }
 
 .tagDropdownEmpty {
   display: block;
   padding: 8px 12px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  color: #9ca3af;
+}
+
+.undoLink {
+  background: none;
+  border: none;
+  color: #4f46e5;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
 }

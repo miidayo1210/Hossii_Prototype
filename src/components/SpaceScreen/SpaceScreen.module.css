@@ -1589,6 +1589,20 @@
   word-break: break-word;
 }
 
+.decorationImage {
+  max-width: 120px;
+  max-height: 80px;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+
+.decorationPopupLink {
+  font-size: 0.8125rem;
+  color: rgba(168, 85, 247, 0.95);
+  text-decoration: underline;
+}
+
 .decorationPopupClose {
   align-self: flex-end;
   padding: 0.3rem 0.75rem;

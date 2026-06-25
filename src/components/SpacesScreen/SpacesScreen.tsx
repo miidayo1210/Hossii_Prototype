@@ -8,7 +8,7 @@ import { BackgroundSelector } from '../BackgroundSelector/BackgroundSelector';
 import { generateId } from '../../core/utils';
 import { generateSpaceURL, validateSpaceURL, isSpaceURLUnique } from '../../core/utils/spaceUrlUtils';
 import { updateCommunitySlug, fetchCommunityBySlug } from '../../core/utils/communitiesApi';
-import type { Space, CardType, SpaceBackground } from '../../core/types/space';
+import type { Space, SpaceBackground } from '../../core/types/space';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import styles from './SpacesScreen.module.css';
 
@@ -86,7 +86,6 @@ export const SpacesScreen = () => {
   const [newSpaceName, setNewSpaceName] = useState('');
   const [newSpaceSlug, setNewSpaceSlug] = useState('');
   const [newSpaceSlugError, setNewSpaceSlugError] = useState<string | null>(null);
-  const [newSpaceCardType, setNewSpaceCardType] = useState<CardType>('constellation');
 
   // インライン編集
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
@@ -181,7 +180,6 @@ export const SpacesScreen = () => {
     setNewSpaceName('');
     setNewSpaceSlug(generateSpaceURL());
     setNewSpaceSlugError(null);
-    setNewSpaceCardType('constellation');
     setShowCreateModal(true);
   };
 
@@ -208,7 +206,6 @@ export const SpacesScreen = () => {
       id: generateId(),
       spaceURL: newSpaceSlug,
       name: trimmedName,
-      cardType: newSpaceCardType,
       quickEmotions: DEFAULT_QUICK_EMOTIONS,
       createdAt: new Date(),
     };
@@ -535,21 +532,6 @@ export const SpacesScreen = () => {
                   )}
                 </div>
 
-                {/* カードタイプ */}
-                <div className={styles.cardTypeRow}>
-                  <span className={styles.cardTypeLabel}>タイプ</span>
-                  <select
-                    className={styles.cardTypeSelect}
-                    value={space.cardType}
-                    onChange={(e) =>
-                      updateSpace(space.id, { cardType: e.target.value as CardType })
-                    }
-                  >
-                    <option value="constellation">星座</option>
-                    <option value="stamp">スタンプ</option>
-                  </select>
-                </div>
-
                 {/* スペース ID (slug) */}
                 <div>
                   <div className={styles.cardSlugRow}>
@@ -704,30 +686,6 @@ export const SpacesScreen = () => {
                 {newSpaceSlugError && (
                   <p className={styles.formError}>{newSpaceSlugError}</p>
                 )}
-              </div>
-
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>カードタイプ</label>
-                <div className={styles.formRadioGroup}>
-                  <label className={styles.formRadioLabel}>
-                    <input
-                      type="radio"
-                      name="newCardType"
-                      checked={newSpaceCardType === 'constellation'}
-                      onChange={() => setNewSpaceCardType('constellation')}
-                    />
-                    星座
-                  </label>
-                  <label className={styles.formRadioLabel}>
-                    <input
-                      type="radio"
-                      name="newCardType"
-                      checked={newSpaceCardType === 'stamp'}
-                      onChange={() => setNewSpaceCardType('stamp')}
-                    />
-                    スタンプ
-                  </label>
-                </div>
               </div>
             </div>
 

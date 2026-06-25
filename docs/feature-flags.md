@@ -11,11 +11,25 @@ Hossii の Feature Flag システムは、**スペース単位**で機能を ON/
 
 ---
 
-## 現在実装されているフラグ（A段階）
+## 現在実装されているフラグ（Internal）
+
+管理 UI からは削除済み。`featureFlagsApi` に残る Internal キーのみ:
 
 | Key | デフォルト | 説明 |
 |-----|-----------|------|
-| `comments_thumbnail` | `true` | コメント一覧で画像サムネイルを表示する |
+| `public_board_mode` | `false` | 未接続（廃止予定） |
+| `zine_export_enabled` | `false` | 未接続（Internal） |
+| `bubble_shapes_extended` | `false` | 投稿画面の個別吹き出し形状選択（管理画面デフォルト形状は FF 非依存） |
+
+以下は **正式設定へ移行済み**（Feature Flag 廃止）:
+
+| 旧 Key | 移行先 |
+|--------|--------|
+| `likes_enabled` | `SpaceSettings.features.likesEnabled` |
+| `comments_thumbnail` | 常時 ON（廃止） |
+| `position_selector` | `SpaceSettings.posting.positionMode` |
+| `random_recall_enabled` | `SpaceSettings.reflection.randomRecallEnabled` |
+| `space_canvas_export_enabled` | 管理者常時 ON |
 
 ---
 

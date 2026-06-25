@@ -1,27 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { generateId } from '../../core/utils';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
-import type { Space, SpaceDecoration } from '../../core/types/space';
+import type { Space, SpaceDecoration, SpaceDecorationType } from '../../core/types/space';
+import { updateSpaceInDb } from '../../core/utils/spacesApi';
+import sharedStyles from './SettingsShared.module.css';
 import styles from './DecorationTab.module.css';
 
 type Props = {
   space: Space;
 };
 
+const TYPE_LABELS: Record<SpaceDecorationType, string> = {
+  bulletin_board: '掲示板',
+  sign: '看板',
+  image: '画像',
+};
+
+const TYPE_ICONS: Record<SpaceDecorationType, string> = {
+  bulletin_board: '📋',
+  sign: '🪧',
+  image: '🖼',
+};
+
 type EditorState = {
   mode: 'add' | 'edit';
   decorationId?: string;
+  type: SpaceDecorationType;
   title: string;
   body: string;
+  imageUrl: string;
+  linkUrl: string;
   x: string;
   y: string;
 };
 
 const EMPTY_EDITOR: EditorState = {
   mode: 'add',
+  type: 'bulletin_board',
   title: '',
   body: '',
+  imageUrl: '',
+  linkUrl: '',
   x: '50',
   y: '50',
 };
@@ -30,9 +50,23 @@ export const DecorationTab = ({ space }: Props) => {
   const { updateSpace } = useHossiiStore();
   const decorations = space.decorations ?? [];
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const saveDecorations = (next: SpaceDecoration[]) => {
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const persistDecorations = async (next: SpaceDecoration[], successMessage: string) => {
     updateSpace(space.id, { decorations: next });
+    try {
+      await updateSpaceInDb(space.id, { decorations: next });
+      setToast({ message: successMessage, type: 'success' });
+    } catch (err) {
+      console.error('[DecorationTab] save failed', err);
+      setToast({ message: '保存に失敗しました', type: 'error' });
+    }
   };
 
   const openAddEditor = () => {
@@ -43,8 +77,11 @@ export const DecorationTab = ({ space }: Props) => {
     setEditor({
       mode: 'edit',
       decorationId: d.id,
+      type: d.type,
       title: d.content.title ?? '',
       body: d.content.body,
+      imageUrl: d.imageUrl ?? '',
+      linkUrl: d.linkUrl ?? '',
       x: String(d.position.x),
       y: String(d.position.y),
     });
@@ -52,36 +89,32 @@ export const DecorationTab = ({ space }: Props) => {
 
   const handleSave = () => {
     if (!editor) return;
-    if (!editor.body.trim()) return;
+    if (!editor.body.trim() && editor.type !== 'image') return;
+    if (editor.type === 'image' && !editor.imageUrl.trim()) return;
 
     const x = Math.min(100, Math.max(0, Number(editor.x) || 50));
     const y = Math.min(100, Math.max(0, Number(editor.y) || 50));
 
+    const payload: Omit<SpaceDecoration, 'id'> = {
+      type: editor.type,
+      position: { x, y },
+      content: {
+        title: editor.title.trim() || undefined,
+        body: editor.body.trim() || editor.title.trim() || ' ',
+      },
+      imageUrl: editor.imageUrl.trim() || undefined,
+      linkUrl: editor.linkUrl.trim() || undefined,
+    };
+
     if (editor.mode === 'add') {
-      const newDecoration: SpaceDecoration = {
-        id: generateId(),
-        type: 'bulletin_board',
-        position: { x, y },
-        content: {
-          title: editor.title.trim() || undefined,
-          body: editor.body.trim(),
-        },
-      };
-      saveDecorations([...decorations, newDecoration]);
+      const newDecoration: SpaceDecoration = { id: generateId(), ...payload };
+      void persistDecorations([...decorations, newDecoration], '装飾を追加しました');
     } else {
-      saveDecorations(
+      void persistDecorations(
         decorations.map((d) =>
-          d.id === editor.decorationId
-            ? {
-                ...d,
-                position: { x, y },
-                content: {
-                  title: editor.title.trim() || undefined,
-                  body: editor.body.trim(),
-                },
-              }
-            : d
-        )
+          d.id === editor.decorationId ? { ...d, ...payload } : d,
+        ),
+        '装飾を更新しました',
       );
     }
     setEditor(null);
@@ -89,26 +122,29 @@ export const DecorationTab = ({ space }: Props) => {
 
   const handleDelete = (id: string) => {
     if (!window.confirm('この装飾を削除しますか？')) return;
-    saveDecorations(decorations.filter((d) => d.id !== id));
+    void persistDecorations(
+      decorations.filter((d) => d.id !== id),
+      '装飾を削除しました',
+    );
   };
 
   return (
     <div className={styles.container}>
       <h2 className={styles.title}>スペース装飾</h2>
       <p className={styles.description}>
-        スペース上に掲示板などのウィジェットを配置できます。参加者は閲覧のみ可能です。
+        スペース上に掲示板・看板・画像などのウィジェットを配置できます。参加者は閲覧のみ可能です。
       </p>
 
-      {/* 装飾一覧 */}
       {decorations.length > 0 && (
         <div className={styles.list}>
           {decorations.map((d) => (
             <div key={d.id} className={styles.item}>
-              <div className={styles.itemIcon}>📋</div>
+              <div className={styles.itemIcon}>{TYPE_ICONS[d.type] ?? '📋'}</div>
               <div className={styles.itemContent}>
-                {d.content.title && (
-                  <p className={styles.itemTitle}>{d.content.title}</p>
-                )}
+                <p className={styles.itemTitle}>
+                  {TYPE_LABELS[d.type]}
+                  {d.content.title ? ` — ${d.content.title}` : ''}
+                </p>
                 <p className={styles.itemBody}>
                   {d.content.body.slice(0, 80)}{d.content.body.length > 80 ? '…' : ''}
                 </p>
@@ -117,20 +153,10 @@ export const DecorationTab = ({ space }: Props) => {
                 </p>
               </div>
               <div className={styles.itemActions}>
-                <button
-                  type="button"
-                  className={styles.editButton}
-                  onClick={() => openEditEditor(d)}
-                  title="編集"
-                >
+                <button type="button" className={styles.editButton} onClick={() => openEditEditor(d)} title="編集">
                   <Pencil size={13} />
                 </button>
-                <button
-                  type="button"
-                  className={styles.deleteButton}
-                  onClick={() => handleDelete(d.id)}
-                  title="削除"
-                >
+                <button type="button" className={styles.deleteButton} onClick={() => handleDelete(d.id)} title="削除">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -140,11 +166,7 @@ export const DecorationTab = ({ space }: Props) => {
       )}
 
       {!editor ? (
-        <button
-          type="button"
-          className={styles.addButton}
-          onClick={openAddEditor}
-        >
+        <button type="button" className={styles.addButton} onClick={openAddEditor}>
           <Plus size={14} />
           装飾を追加
         </button>
@@ -153,6 +175,19 @@ export const DecorationTab = ({ space }: Props) => {
           <h3 className={styles.editorTitle}>
             {editor.mode === 'add' ? '装飾を追加' : '装飾を編集'}
           </h3>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>種類</label>
+            <select
+              className={styles.input}
+              value={editor.type}
+              onChange={(e) => setEditor({ ...editor, type: e.target.value as SpaceDecorationType })}
+            >
+              {(Object.keys(TYPE_LABELS) as SpaceDecorationType[]).map((t) => (
+                <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+          </div>
 
           <div className={styles.formGroup}>
             <label className={styles.label}>タイトル（任意）</label>
@@ -166,17 +201,45 @@ export const DecorationTab = ({ space }: Props) => {
             />
           </div>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>本文</label>
-            <textarea
-              className={styles.textarea}
-              placeholder="掲示板の内容を入力してください"
-              value={editor.body}
-              onChange={(e) => setEditor({ ...editor, body: e.target.value })}
-              rows={4}
-              maxLength={500}
-            />
-          </div>
+          {editor.type !== 'image' && (
+            <div className={styles.formGroup}>
+              <label className={styles.label}>本文</label>
+              <textarea
+                className={styles.textarea}
+                placeholder={editor.type === 'sign' ? '看板に表示するテキスト' : '掲示板の内容を入力してください'}
+                value={editor.body}
+                onChange={(e) => setEditor({ ...editor, body: e.target.value })}
+                rows={4}
+                maxLength={500}
+              />
+            </div>
+          )}
+
+          {editor.type === 'image' && (
+            <div className={styles.formGroup}>
+              <label className={styles.label}>画像 URL</label>
+              <input
+                type="url"
+                className={styles.input}
+                placeholder="https://..."
+                value={editor.imageUrl}
+                onChange={(e) => setEditor({ ...editor, imageUrl: e.target.value })}
+              />
+            </div>
+          )}
+
+          {editor.type === 'sign' && (
+            <div className={styles.formGroup}>
+              <label className={styles.label}>リンク URL（任意）</label>
+              <input
+                type="url"
+                className={styles.input}
+                placeholder="https://..."
+                value={editor.linkUrl}
+                onChange={(e) => setEditor({ ...editor, linkUrl: e.target.value })}
+              />
+            </div>
+          )}
 
           <div className={styles.posRow}>
             <div className={styles.formGroup}>
@@ -204,11 +267,7 @@ export const DecorationTab = ({ space }: Props) => {
           </div>
 
           <div className={styles.editorActions}>
-            <button
-              type="button"
-              className={styles.cancelButton}
-              onClick={() => setEditor(null)}
-            >
+            <button type="button" className={styles.cancelButton} onClick={() => setEditor(null)}>
               <X size={14} />
               キャンセル
             </button>
@@ -216,7 +275,10 @@ export const DecorationTab = ({ space }: Props) => {
               type="button"
               className={styles.saveButton}
               onClick={handleSave}
-              disabled={!editor.body.trim()}
+              disabled={
+                (editor.type !== 'image' && !editor.body.trim()) ||
+                (editor.type === 'image' && !editor.imageUrl.trim())
+              }
             >
               <Check size={14} />
               {editor.mode === 'add' ? '追加する' : '更新する'}
@@ -227,6 +289,12 @@ export const DecorationTab = ({ space }: Props) => {
 
       {decorations.length === 0 && !editor && (
         <p className={styles.empty}>まだ装飾が追加されていません</p>
+      )}
+
+      {toast && (
+        <div className={`${sharedStyles.toast} ${toast.type === 'success' ? sharedStyles.toastSuccess : sharedStyles.toastError}`}>
+          {toast.message}
+        </div>
       )}
     </div>
   );

@@ -14,6 +14,7 @@ import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
+import { resolvePositionSelectorEnabled } from '../../core/utils/spaceSettingResolvers';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import { allPostFieldsDisabled, resolvePostFields } from '../../core/utils/postFieldSettings';
 import { addStamp } from '../../core/utils/stampStorage';
@@ -48,24 +49,7 @@ import {
   requestAndOpenSerialPort,
 } from '../../core/utils/webSerialArduino';
 
-// B02: 吹き出し形状プリセット（14種）
-type BubbleShapePreset = { path: string; label: string };
-const BUBBLE_SHAPE_PRESETS: BubbleShapePreset[] = [
-  { path: '/assets/bubble-shapes/Hossiiコメ枠ハート.png', label: 'ハート' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠雲.png', label: '雲' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠風船.png', label: '風船' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠葉っぱ.png', label: '葉っぱ' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠雫.png', label: '雫' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠付箋小.png', label: '付箋' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠メモ大.png', label: 'メモ' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠ネコ.png', label: 'ネコ' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠金魚.png', label: '金魚' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠いるか.png', label: 'いるか' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠イチョウ.png', label: 'イチョウ' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠コウモリ.png', label: 'コウモリ' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠絵馬.png', label: '絵馬' },
-  { path: '/assets/bubble-shapes/Hossiiコメ枠紙ひこうき.png', label: '紙ひこうき' },
-];
+import { BUBBLE_SHAPE_PRESETS } from '../../core/assets/bubbleShapes';
 
 // 感情のラベルマッピング（全種類）
 const EMOTION_LABELS: Record<EmotionKey, string> = {
@@ -248,12 +232,13 @@ export const PostScreen = ({
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
   const pf = useMemo(() => resolvePostFields(spaceSettings), [spaceSettings]);
   const showBubbleShape = pf.bubbleShape.enabled && featureFlags.bubble_shapes_extended;
+  const positionSelectorEnabled = resolvePositionSelectorEnabled(spaceSettings);
 
   useEffect(() => {
-    if (!featureFlags.position_selector) {
+    if (!positionSelectorEnabled) {
       setSelectedArea(null);
     }
-  }, [featureFlags.position_selector]);
+  }, [positionSelectorEnabled]);
 
   useEffect(() => {
     if (speechEditMode) setPostTab('bubble');
@@ -296,10 +281,10 @@ export const PostScreen = ({
 
   const canvasPosition = useMemo(() => {
     if (panelMode && initialPosition) return initialPosition;
-    const positionGridActive = !panelMode && featureFlags.position_selector;
+    const positionGridActive = !panelMode && positionSelectorEnabled;
     if (positionGridActive && selectedArea !== null) return areaToPosition(selectedArea);
     return null;
-  }, [panelMode, initialPosition, featureFlags.position_selector, selectedArea]);
+  }, [panelMode, initialPosition, positionSelectorEnabled, selectedArea]);
 
   /** 音声候補の編集モードでは吹き出しのみ（タブ非表示） */
   const showPostModeTabs = !speechEditMode;
@@ -661,7 +646,7 @@ export const PostScreen = ({
         }
       }
 
-      const positionGridActive = !panelMode && featureFlags.position_selector;
+      const positionGridActive = !panelMode && positionSelectorEnabled;
       const areaPos =
         panelMode && initialPosition
           ? initialPosition
@@ -791,7 +776,7 @@ export const PostScreen = ({
       {/* ヘッダー：Hossii（showHossii時のみ・パネルモード時は非表示） */}
       {showHossii && !panelMode && (
         <header className={styles.header}>
-          <HossiiMini onClick={shuffleGreeting} hossiiColor={spaceSettings?.hossiiColor} />
+          <HossiiMini onClick={shuffleGreeting} />
           <div className={styles.greetingArea}>
             <div className={styles.greeting}>{greeting}</div>
           </div>
@@ -866,7 +851,7 @@ export const PostScreen = ({
         )}
 
         {/* 位置選択グリッド（吹き出し・フリー共通） */}
-        {!panelMode && featureFlags.position_selector && (
+        {!panelMode && positionSelectorEnabled && (
           <div className={styles.section}>
             <div className={styles.label}>置く場所（任意）</div>
             <div className={styles.areaGrid}>

@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
-import { loadSpaceSettings } from '../../core/utils/settingsStorage';
 import styles from './TopBar.module.css';
 
 export const TopBar = () => {
@@ -16,11 +15,8 @@ export const TopBar = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  const spaceName = useMemo(() => {
-    void focusCount;
-    if (!activeSpace) return 'Hossii';
-    return loadSpaceSettings(activeSpace.id, activeSpace.name).spaceName;
-  }, [activeSpace, focusCount]);
+  void focusCount;
+  const spaceName = activeSpace?.name ?? 'Hossii';
 
   return (
     <header className={styles.topBar}>

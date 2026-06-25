@@ -4,6 +4,19 @@ import { mergePostFieldSettings } from './postFieldSettings';
 
 const SETTINGS_KEY_PREFIX = 'space_settings_';
 
+function normalizeStoredFeatures(raw: unknown): SpaceSettings['features'] {
+  const f = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const legacy = f as { commentPost?: boolean; messagePost?: boolean };
+  return {
+    ...DEFAULT_SPACE_SETTINGS.features,
+    messagePost: legacy.messagePost ?? legacy.commentPost ?? DEFAULT_SPACE_SETTINGS.features.messagePost,
+    emotionPost: typeof f.emotionPost === 'boolean' ? f.emotionPost : DEFAULT_SPACE_SETTINGS.features.emotionPost,
+    photoPost: typeof f.photoPost === 'boolean' ? f.photoPost : DEFAULT_SPACE_SETTINGS.features.photoPost,
+    numberPost: typeof f.numberPost === 'boolean' ? f.numberPost : DEFAULT_SPACE_SETTINGS.features.numberPost,
+    likesEnabled: typeof f.likesEnabled === 'boolean' ? f.likesEnabled : DEFAULT_SPACE_SETTINGS.features.likesEnabled,
+  };
+}
+
 /**
  * スペース設定をlocalStorageから読み込む
  */
@@ -19,11 +32,11 @@ export const loadSpaceSettings = (spaceId: string, spaceName: string): SpaceSett
         ...parsed,
         spaceId,
         spaceName,
-        features: {
-          ...DEFAULT_SPACE_SETTINGS.features,
-          ...(parsed.features ?? {}),
-        },
+        features: normalizeStoredFeatures(parsed.features),
         postFields: mergePostFieldSettings(parsed.postFields),
+        posting: parsed.posting ?? DEFAULT_SPACE_SETTINGS.posting,
+        reflection: parsed.reflection ?? DEFAULT_SPACE_SETTINGS.reflection,
+        mode: parsed.mode ?? DEFAULT_SPACE_SETTINGS.mode,
       };
       return merged;
     } catch (error) {

@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
-import type { Space, SpaceId, CardType, SpaceBackground } from '../types/space';
+import type { Space, SpaceId, SpaceBackground } from '../types/space';
 import type { AppMode } from '../types/mode';
 import type { UserProfile, SpaceNicknames } from '../types/profile';
 import { DEFAULT_SPACE, DEFAULT_QUICK_EMOTIONS, DEFAULT_BACKGROUND } from '../types/space';
@@ -24,6 +24,7 @@ import {
   loadHossiis,
   saveHossiis,
 } from '../utils/storage';
+import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from '../utils/spaceDecorations';
 import { persistHossiisLocal } from '../utils/hossiiPersistence';
 import {
   applyFetchResult,
@@ -146,30 +147,12 @@ function mergeFetchedHossiisWithPendingInserts(
   return extras.length === 0 ? serverList : [...serverList, ...extras];
 }
 
-// 有効な CardType かどうかをチェック
-const isValidCardType = (value: unknown): value is CardType => {
-  return value === 'stamp' || value === 'constellation';
-};
-
-// 有効な SpaceBackground かどうかをチェック
-const isValidBackground = (value: unknown): value is SpaceBackground => {
-  if (!value || typeof value !== 'object') return false;
-  const bg = value as Record<string, unknown>;
-
-  if (bg.kind === 'color' && typeof bg.value === 'string') return true;
-  if (bg.kind === 'pattern' && typeof bg.value === 'string') return true;
-  if (bg.kind === 'image' && typeof bg.value === 'string' && typeof bg.source === 'string') return true;
-
-  return false;
-};
-
 // スペースを正規化（localStorage が壊れても安全）
 const normalizeSpace = (f: unknown): Space => {
   const raw = (f ?? {}) as Record<string, unknown>;
 
   const id = typeof raw.id === 'string' && raw.id ? raw.id : generateId();
   const name = typeof raw.name === 'string' && raw.name ? raw.name : 'My Space';
-  const cardType = isValidCardType(raw.cardType) ? raw.cardType : 'constellation';
 
   let quickEmotions = DEFAULT_QUICK_EMOTIONS;
   if (Array.isArray(raw.quickEmotions) && raw.quickEmotions.length > 0 && raw.quickEmotions.length <= 8) {
@@ -206,8 +189,46 @@ const normalizeSpace = (f: unknown): Space => {
       ? (raw.presetTags as string[])
       : undefined;
 
-  return { id, spaceURL, name, cardType, quickEmotions, createdAt, background, savedBackgroundImages, presetTags };
+  const isPrivate = typeof raw.isPrivate === 'boolean' ? raw.isPrivate : undefined;
+  const welcomeMessage = typeof raw.welcomeMessage === 'string' ? raw.welcomeMessage : undefined;
+  const description = typeof raw.description === 'string' ? raw.description : undefined;
+  const characterName = typeof raw.characterName === 'string' ? raw.characterName : undefined;
+  const characterImageUrl = typeof raw.characterImageUrl === 'string' ? raw.characterImageUrl : undefined;
+  const bubbleShapePng = typeof raw.bubbleShapePng === 'string' ? raw.bubbleShapePng : undefined;
+  const decorations = parseDecorationsFromJson(raw.decorations);
+  const customEmotions = parseCustomEmotionsFromJson(raw.customEmotions);
+
+  return {
+    id,
+    spaceURL,
+    name,
+    quickEmotions,
+    createdAt,
+    background,
+    savedBackgroundImages,
+    presetTags,
+    isPrivate,
+    welcomeMessage,
+    description,
+    characterName,
+    characterImageUrl,
+    customEmotions: customEmotions.length > 0 ? customEmotions : undefined,
+    decorations: decorations.length > 0 ? decorations : undefined,
+    bubbleShapePng,
+  };
 };
+
+// 有効な SpaceBackground かどうかをチェック
+function isValidBackground(value: unknown): value is SpaceBackground {
+  if (!value || typeof value !== 'object') return false;
+  const bg = value as Record<string, unknown>;
+
+  if (bg.kind === 'color' && typeof bg.value === 'string') return true;
+  if (bg.kind === 'pattern' && typeof bg.value === 'string') return true;
+  if (bg.kind === 'image' && typeof bg.value === 'string' && typeof bg.source === 'string') return true;
+
+  return false;
+}
 
 // 初期化: localStorage からスペースを読み込み、なければデフォルトスペースを作成
 function initializeSpaces(): { spaces: Space[]; activeSpaceId: SpaceId } {

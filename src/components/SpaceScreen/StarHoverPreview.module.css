@@ -16,8 +16,20 @@
     0 8px 32px rgba(139, 92, 246, 0.18),
     0 2px 10px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  pointer-events: none;
+  pointer-events: auto;
+  text-align: center;
   animation: hoverPopIn 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 星から吹き出しへカーソル移動するときの当たり判定ブリッジ */
+.card::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  right: -12px;
+  bottom: -24px;
+  height: 28px;
+  pointer-events: auto;
 }
 
 .pinButton {
@@ -57,7 +69,7 @@
   max-height: 80px;
   object-fit: cover;
   border-radius: 8px;
-  margin-bottom: 6px;
+  margin: 0 auto 6px;
 }
 
 .message {
@@ -73,6 +85,7 @@
 }
 
 .author {
+  display: block;
   font-size: 0.8125rem;
   color: rgba(109, 40, 217, 0.90);
   font-weight: 600;

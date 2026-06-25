@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 import type { Space, SpaceId } from '../types/space';
 import type { EmotionKey } from '../types';
+import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from './spaceDecorations';
 
 // Supabase の行型（snake_case）
 type SpaceRow = {
@@ -8,7 +9,6 @@ type SpaceRow = {
   community_id?: string | null;
   space_url: string | null;
   name: string;
-  card_type: string;
   quick_emotions: string[];
   background: unknown;
   saved_background_images: string[] | null;
@@ -17,6 +17,11 @@ type SpaceRow = {
   preset_tags?: string[] | null;
   welcome_message?: string | null;
   description?: string | null;
+  character_name?: string | null;
+  decorations?: unknown;
+  character_image_url?: string | null;
+  custom_emotions?: unknown;
+  bubble_shape_png?: string | null;
 };
 
 // SpaceRow → Space（camelCase）
@@ -25,7 +30,6 @@ function rowToSpace(row: SpaceRow): Space {
     id: row.id,
     spaceURL: row.space_url ?? undefined,
     name: row.name,
-    cardType: row.card_type as Space['cardType'],
     quickEmotions: row.quick_emotions as EmotionKey[],
     background: row.background as Space['background'],
     savedBackgroundImages: row.saved_background_images ?? undefined,
@@ -34,6 +38,17 @@ function rowToSpace(row: SpaceRow): Space {
     presetTags: row.preset_tags ?? undefined,
     welcomeMessage: row.welcome_message ?? undefined,
     description: row.description ?? undefined,
+    characterName: row.character_name ?? undefined,
+    ...((): Pick<Space, 'decorations' | 'customEmotions'> => {
+      const decorations = parseDecorationsFromJson(row.decorations);
+      const customEmotions = parseCustomEmotionsFromJson(row.custom_emotions);
+      return {
+        ...(decorations.length > 0 ? { decorations } : {}),
+        ...(customEmotions.length > 0 ? { customEmotions } : {}),
+      };
+    })(),
+    characterImageUrl: row.character_image_url ?? undefined,
+    bubbleShapePng: row.bubble_shape_png ?? undefined,
   };
 }
 
@@ -43,7 +58,6 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
     id: space.id,
     space_url: space.spaceURL ?? null,
     name: space.name,
-    card_type: space.cardType,
     quick_emotions: space.quickEmotions,
     background: space.background ?? { kind: 'pattern', value: 'mist' },
     saved_background_images: space.savedBackgroundImages ?? null,
@@ -51,6 +65,11 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
     preset_tags: space.presetTags ?? null,
     welcome_message: space.welcomeMessage ?? null,
     description: space.description ?? null,
+    character_name: space.characterName ?? null,
+    decorations: space.decorations ?? [],
+    character_image_url: space.characterImageUrl ?? null,
+    custom_emotions: space.customEmotions ?? [],
+    bubble_shape_png: space.bubbleShapePng ?? null,
   };
 }
 
@@ -101,7 +120,6 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   const updateObj: Partial<SpaceRow> = {};
   if (patch.spaceURL !== undefined) updateObj.space_url = patch.spaceURL ?? null;
   if (patch.name !== undefined) updateObj.name = patch.name;
-  if (patch.cardType !== undefined) updateObj.card_type = patch.cardType;
   if (patch.quickEmotions !== undefined) updateObj.quick_emotions = patch.quickEmotions;
   if (patch.background !== undefined) updateObj.background = patch.background;
   if (patch.savedBackgroundImages !== undefined) updateObj.saved_background_images = patch.savedBackgroundImages ?? null;
@@ -109,6 +127,11 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   if (patch.presetTags !== undefined) updateObj.preset_tags = patch.presetTags ?? null;
   if (patch.welcomeMessage !== undefined) updateObj.welcome_message = patch.welcomeMessage ?? null;
   if (patch.description !== undefined) updateObj.description = patch.description ?? null;
+  if (patch.characterName !== undefined) updateObj.character_name = patch.characterName ?? null;
+  if (patch.decorations !== undefined) updateObj.decorations = patch.decorations;
+  if (patch.characterImageUrl !== undefined) updateObj.character_image_url = patch.characterImageUrl ?? null;
+  if (patch.customEmotions !== undefined) updateObj.custom_emotions = patch.customEmotions;
+  if (patch.bubbleShapePng !== undefined) updateObj.bubble_shape_png = patch.bubbleShapePng ?? null;
 
   if (Object.keys(updateObj).length === 0) return;
 

@@ -5,6 +5,8 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { fetchAllHossiisForModeration } from '../../core/utils/hossiisApi';
 import type { Hossii } from '../../core/types';
 import type { Space } from '../../core/types/space';
+import { SettingsPageHeader } from './SettingsPageHeader';
+import sharedStyles from './SettingsShared.module.css';
 import styles from './ModerationTab.module.css';
 
 type FilterMode = 'visible' | 'hidden' | 'all';
@@ -23,6 +25,7 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
   const [dateTo, setDateTo] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null);
 
   // ページリロード後も非表示投稿を確認・復元できるよう、DB から全件取得する
   const [dbHossiis, setDbHossiis] = useState<Hossii[]>([]);
@@ -83,11 +86,23 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [spaceHossiis, filterMode, keyword, dateFrom, dateTo, selectedTags]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   const handleHide = (id: string) => {
-    if (!window.confirm('この投稿を非表示にしますか？')) return;
     hideHossii(id, currentUser?.uid ?? undefined);
-    // dbHossiis 内のエントリも非表示状態に更新
-    setDbHossiis((prev) => prev.map((h) => h.id === id ? { ...h, isHidden: true } : h));
+    setDbHossiis((prev) => prev.map((h) => (h.id === id ? { ...h, isHidden: true } : h)));
+    setToast({
+      message: '投稿を非表示にしました',
+      undo: () => {
+        restoreHossii(id, currentUser?.uid ?? undefined);
+        setDbHossiis((prev) => prev.map((h) => (h.id === id ? { ...h, isHidden: false } : h)));
+        setToast(null);
+      },
+    });
   };
 
   const handleRestore = (id: string) => {
@@ -107,12 +122,11 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
   };
 
   return (
-    <div className={styles.container}>
-      <h2 className={styles.title}>モデレーション</h2>
-      <p className={styles.description}>
-        スペース内の投稿を確認し、不適切な投稿を非表示にできます。
-      </p>
-
+    <>
+      <SettingsPageHeader
+        title="投稿管理"
+        description="スペース内の投稿を確認し、不適切な投稿を非表示にできます。"
+      >
       {/* フィルターバー */}
       <div className={styles.filterBar}>
         <div className={styles.segmentGroup}>
@@ -323,6 +337,21 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
       <p className={styles.count}>
         {filtered.length} 件表示 / 合計 {spaceHossiis.length} 件
       </p>
-    </div>
+      </SettingsPageHeader>
+
+      {toast && (
+        <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`}>
+          {toast.message}
+          {toast.undo && (
+            <>
+              {' '}
+              <button type="button" className={styles.undoLink} onClick={toast.undo}>
+                元に戻す
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </>
   );
 };

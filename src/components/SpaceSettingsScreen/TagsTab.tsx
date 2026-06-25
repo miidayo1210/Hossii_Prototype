@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Plus, X, Tag } from 'lucide-react';
 import type { Space } from '../../core/types/space';
+import { SettingsPageHeader } from './SettingsPageHeader';
+import sharedStyles from './SettingsShared.module.css';
 import styles from './TagsTab.module.css';
 
 type Props = {
@@ -19,7 +21,7 @@ function normalizeTag(input: string): string {
 export const TagsTab = ({ space, onUpdateSpace }: Props) => {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const tags: string[] = space.presetTags ?? [];
 
@@ -47,12 +49,14 @@ export const TagsTab = ({ space, onUpdateSpace }: Props) => {
     setError(null);
     onUpdateSpace({ presetTags: [...tags, tagWithHash] });
     setInput('');
-    setSaved(false);
+    setToast('タグを追加しました');
+    setTimeout(() => setToast(null), 3000);
   };
 
   const removeTag = (tag: string) => {
     onUpdateSpace({ presetTags: tags.filter((t) => t !== tag) });
-    setSaved(false);
+    setToast('タグを削除しました');
+    setTimeout(() => setToast(null), 3000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -62,19 +66,12 @@ export const TagsTab = ({ space, onUpdateSpace }: Props) => {
     }
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
   return (
-    <div className={styles.container}>
-      <h2 className={styles.title}>タグ設定</h2>
-      <p className={styles.description}>
-        投稿時にワンタップで選択できるタグを登録できます。
-        登録したタグはログ一覧のフィルタリングにも使用できます。
-      </p>
-
+    <>
+      <SettingsPageHeader
+        title="タグ"
+        description="投稿時にワンタップで選択できるタグを登録できます。登録したタグはログ一覧のフィルタリングにも使用できます。"
+      >
       <div className={styles.inputSection}>
         <div className={styles.inputRow}>
           <span className={styles.hashPrefix}>#</span>
@@ -126,16 +123,9 @@ export const TagsTab = ({ space, onUpdateSpace }: Props) => {
       ) : (
         <p className={styles.emptyText}>登録済みのタグはありません</p>
       )}
+      </SettingsPageHeader>
 
-      <div className={styles.footer}>
-        <button
-          type="button"
-          className={`${styles.saveButton} ${saved ? styles.saveButtonSaved : ''}`}
-          onClick={handleSave}
-        >
-          {saved ? '保存しました ✓' : '保存'}
-        </button>
-      </div>
-    </div>
+      {toast && <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`}>{toast}</div>}
+    </>
   );
 };

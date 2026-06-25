@@ -3,8 +3,7 @@ import type { EmotionKey } from './index';
 // Space ID
 export type SpaceId = string;
 
-// カードタイプ（スタンプ or 星座）
-export type CardType = 'stamp' | 'constellation';
+export type SpaceDecorationType = 'bulletin_board' | 'sign' | 'image';
 
 // パターンの種類
 export type PatternKey =
@@ -38,12 +37,19 @@ export type CustomEmotion = {
 // スペース装飾の型
 export type SpaceDecoration = {
   id: string;
-  type: 'bulletin_board';
-  position: { x: number; y: number }; // % 単位（0〜100）
+  type: SpaceDecorationType;
+  position: { x: number; y: number };
   content: {
     title?: string;
     body: string;
   };
+  imageUrl?: string;
+  linkUrl?: string;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  layer?: number;
+  isVisible?: boolean;
   style?: {
     width?: number;
     backgroundColor?: string;
@@ -57,12 +63,12 @@ export type Space = {
   id: SpaceId;
   spaceURL?: string;            // パブリックURL用スラッグ（変更可）例: "mornings-team"
   name: string;
-  cardType: CardType;
   quickEmotions: EmotionKey[]; // 最大8（UI用、制限ではない）
   createdAt: Date;
   background?: SpaceBackground; // 背景設定（オプショナル）
   savedBackgroundImages?: string[]; // 保存済み背景画像URLリスト（最大 MAX_BACKGROUND_IMAGES 枚）
   characterImageUrl?: string;   // A01: キャラクター画像（透過PNG推奨）
+  characterName?: string;       // 中心キャラクターの表示名
   customEmotions?: CustomEmotion[]; // A03: カスタム表情パターン（最大20件）
   decorations?: SpaceDecoration[];  // A02: スペース装飾（掲示板など）
   isPrivate?: boolean;              // 非公開スペース（内省スペースなど個人利用向け）
@@ -104,7 +110,6 @@ export const DEFAULT_SPACE: Space = {
   id: DEFAULT_SPACE_ID,
   spaceURL: 'my-space',
   name: 'わたしのスペース',
-  cardType: 'constellation',
   quickEmotions: DEFAULT_QUICK_EMOTIONS,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   background: DEFAULT_BACKGROUND,

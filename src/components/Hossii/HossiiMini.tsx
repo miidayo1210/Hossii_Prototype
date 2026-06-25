@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback } from 'react';
-import type { HossiiColor } from '../../core/types/settings';
 import styles from './HossiiMini.module.css';
 
 const IDLE_BASE = '/hossii/idle/idle_base.png';
@@ -7,27 +6,9 @@ const IDLE_SMILE = '/hossii/idle/idle_smile.png';
 
 type Props = {
   onClick?: () => void;
-  hossiiColor?: HossiiColor;
 };
 
-/** Hossiiカラーに対応するhue-rotate値を計算 */
-const getHueRotation = (color?: HossiiColor): number => {
-  if (!color || color === 'pink') return 0;
-  switch (color) {
-    case 'blue':
-      return 180;
-    case 'yellow':
-      return 45;
-    case 'green':
-      return 120;
-    case 'purple':
-      return 270;
-    default:
-      return 0;
-  }
-};
-
-export const HossiiMini = ({ onClick, hossiiColor }: Props) => {
+export const HossiiMini = ({ onClick }: Props) => {
   const [isSmiling, setIsSmiling] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [showSparkles, setShowSparkles] = useState(false);
@@ -69,9 +50,6 @@ export const HossiiMini = ({ onClick, hossiiColor }: Props) => {
     onClick?.();
   }, [onClick]);
 
-  const hueRotate = getHueRotation(hossiiColor);
-  const colorFilter = hueRotate !== 0 ? `hue-rotate(${hueRotate}deg)` : undefined;
-
   return (
     <div className={styles.wrapper}>
       <button
@@ -84,7 +62,6 @@ export const HossiiMini = ({ onClick, hossiiColor }: Props) => {
           src={isSmiling ? IDLE_SMILE : IDLE_BASE}
           alt="Hossii"
           className={styles.image}
-          style={{ filter: colorFilter }}
         />
       </button>
       {showSparkles && (

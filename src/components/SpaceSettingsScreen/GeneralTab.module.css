@@ -1,82 +1,184 @@
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: 2.5rem;
-}
+/* ============================================================
+   GeneralTab / BasicInfoTab — Form styles (light theme)
+   ============================================================ */
 
-.section {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border-radius: 1.25rem;
-  padding: 1.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.sectionTitle {
-  font-size: 1.125rem;
+/* ---- Form field building blocks ---- */
+.toggleLabel {
+  display: block;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: #fff;
-  margin: 0 0 1.25rem 0;
+  color: #111827;
+  margin: 0 0 0.3125rem 0;
 }
 
 .description {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin: -0.75rem 0 1rem 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0 0 0.625rem 0;
+  line-height: 1.5;
 }
 
 .nameInput {
   width: 100%;
-  padding: 0.875rem 1.125rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  font-size: 1rem;
-  transition: all 0.2s;
+  padding: 0.5625rem 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .nameInput:focus {
-  outline: none;
-  border-color: #a855f7;
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
 }
 
 .nameInput::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
 }
 
-/* Toggle switches */
-.toggleList {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.textarea {
+  width: 100%;
+  padding: 0.5625rem 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.toggleItem {
+.textarea:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.textarea::placeholder {
+  color: #9ca3af;
+}
+
+.charCount {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: right;
+  margin: 0.25rem 0 0 0;
+}
+
+/* ---- PostForm table (used by PostFormTab, InteractionRulesTab) ---- */
+.container {
+  padding: 0;
+  color: #111827;
+  max-width: 720px;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.375rem 0;
+}
+
+.table {
+  border: 1px solid #e4e7ed;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 1fr 100px 100px;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #f0f1f5;
+  background: #f9fafb;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 100px 100px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f1f5;
+  transition: background 0.1s;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: #fafafa;
+}
+
+.fieldInfo {
+  min-width: 0;
+}
+
+.fieldLabel {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.toggleItem:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.toggleLabel {
+  gap: 0.5rem;
   font-size: 0.9375rem;
-  color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
+  color: #111827;
+  flex-wrap: wrap;
 }
 
-.toggle {
+.fieldDesc {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0.1875rem 0 0 0;
+  line-height: 1.4;
+}
+
+.flagBadge {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.toggleCell {
+  display: flex;
+  justify-content: center;
+}
+
+.toggleCellDisabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.requiredPlaceholder {
+  font-size: 0.75rem;
+  color: #c4c9d4;
+  text-align: center;
+}
+
+/* ---- Toggle switch ---- */
+.toggleWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggleInput {
   position: absolute;
   opacity: 0;
   width: 0;
@@ -84,232 +186,98 @@
 }
 
 .toggleSlider {
-  position: relative;
-  width: 48px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 24px;
-  transition: all 0.3s;
-}
-
-.toggleSlider::before {
-  content: '';
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  left: 3px;
-  top: 3px;
-  background: #fff;
-  border-radius: 50%;
-  transition: all 0.3s;
-}
-
-.toggle:checked ~ .toggleSlider {
-  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
-}
-
-.toggle:checked ~ .toggleSlider::before {
-  transform: translateX(24px);
-}
-
-/* Radio buttons */
-.radioList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.radioItem {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.radioItem:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.radioItem input[type='radio'] {
-  width: 18px;
-  height: 18px;
-  accent-color: #a855f7;
-  cursor: pointer;
-}
-
-.radioLabel {
-  font-size: 0.9375rem;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-}
-
-/* 吹き出し形状セレクター */
-.shapeList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.shapeOption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: rgba(255, 255, 255, 0.9);
-  min-width: 90px;
-}
-
-.shapeOption:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(168, 85, 247, 0.4);
-}
-
-.shapeOptionActive {
-  border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.15);
-}
-
-.shapePreviewDefault {
   display: block;
-  width: 56px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.shapePreviewImg {
-  width: 56px;
-  height: 36px;
-  object-fit: contain;
-  filter: brightness(0) invert(1) opacity(0.7);
-}
-
-.shapeLabel {
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-/* 星マーカープレビュー（設定画面） */
-.markerPreview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 36px;
-  color: #a78bfa;
-  font-size: 22px;
-  line-height: 1;
-}
-
-.markerPreview_star::before {
-  content: '★';
-}
-
-.markerPreview_circle::before {
-  content: '●';
-}
-
-.markerPreview_pin {
-  font-size: 0;
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: #d1d5db;
+  transition: background 0.2s;
   position: relative;
-  width: 14px;
-  height: 18px;
 }
 
-.markerPreview_pin::before {
+.toggleSlider::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 50%;
-  width: 12px;
-  height: 12px;
-  transform: translateX(-50%) rotate(-45deg);
-  border-radius: 50% 50% 50% 0;
-  background: currentColor;
-}
-
-.markerPreview_pin::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.125rem;
+  height: 1.125rem;
   border-radius: 50%;
-  background: currentColor;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
 }
 
-.markerPreview_person {
-  font-size: 0;
-  position: relative;
-  width: 12px;
-  height: 16px;
+.toggleInput:checked + .toggleSlider {
+  background: #4f46e5;
 }
 
-.markerPreview_person::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+.toggleInput:checked + .toggleSlider::after {
+  transform: translateX(1.25rem);
 }
 
-.markerPreview_person::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 10px;
-  height: 9px;
-  border-radius: 3px 3px 0 0;
-  background: currentColor;
+.toggleSlider.saving {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.textarea {
-  width: 100%;
+.footnote {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 1rem 0 0 0;
+  line-height: 1.5;
+}
+
+/* ---- Warning banner ---- */
+.warning {
+  margin-top: 1rem;
   padding: 0.75rem 1rem;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  resize: vertical;
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  font-family: inherit;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
-.textarea::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+.warningTitle {
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
 }
 
-.textarea:focus {
-  border-color: rgba(168, 85, 247, 0.5);
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+/* ---- Toast ---- */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 999;
+  animation: fadeIn 0.2s ease;
 }
 
-.charCount {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
-  text-align: right;
-  margin: 0.25rem 0 0;
+.success {
+  background: #065f46;
+  color: #fff;
+}
+
+.error {
+  background: #991b1b;
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(0.5rem); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .tableHeader,
+  .row {
+    grid-template-columns: 1fr 72px 72px;
+  }
 }

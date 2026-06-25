@@ -275,7 +275,6 @@ const AppContent = () => {
       addSpace({
         id: spaceId,
         name: '共有されたスペース',
-        cardType: 'constellation',
         quickEmotions: DEFAULT_QUICK_EMOTIONS,
         createdAt: new Date(),
       });

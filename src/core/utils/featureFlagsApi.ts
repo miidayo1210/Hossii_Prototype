@@ -5,14 +5,9 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 // 新しいフラグを追加する時はここに追加する
 // ============================================================
 export type FeatureFlagKey =
-  | 'comments_thumbnail'
-  | 'likes_enabled'
-  | 'random_recall_enabled'
   | 'public_board_mode'
   | 'zine_export_enabled'
-  | 'space_canvas_export_enabled'
-  | 'bubble_shapes_extended'
-  | 'position_selector';
+  | 'bubble_shapes_extended';
 
 export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 
@@ -170,39 +165,24 @@ export async function setSpaceFeatureFlag(
 // DB 未設定・フォールバック用のデフォルト値（全フラグのデフォルト）
 function buildDefaults(): FeatureFlags {
   return {
-    comments_thumbnail: true,
-    likes_enabled: false,
-    random_recall_enabled: false,
     public_board_mode: false,
     zine_export_enabled: false,
-    space_canvas_export_enabled: false,
     bubble_shapes_extended: false,
-    position_selector: false,
   };
 }
 
 function buildAllFalse(): FeatureFlags {
   return {
-    comments_thumbnail: false,
-    likes_enabled: false,
-    random_recall_enabled: false,
     public_board_mode: false,
     zine_export_enabled: false,
-    space_canvas_export_enabled: false,
     bubble_shapes_extended: false,
-    position_selector: false,
   };
 }
 
-function castToFeatureFlags(raw: Record<string, boolean>): FeatureFlags {
+export function castToFeatureFlags(raw: Record<string, boolean>): FeatureFlags {
   return {
-    comments_thumbnail: raw['comments_thumbnail'] ?? true,
-    likes_enabled: raw['likes_enabled'] ?? false,
-    random_recall_enabled: raw['random_recall_enabled'] ?? false,
     public_board_mode: raw['public_board_mode'] ?? false,
     zine_export_enabled: raw['zine_export_enabled'] ?? false,
-    space_canvas_export_enabled: raw['space_canvas_export_enabled'] ?? false,
     bubble_shapes_extended: raw['bubble_shapes_extended'] ?? false,
-    position_selector: raw['position_selector'] ?? false,
   };
 }

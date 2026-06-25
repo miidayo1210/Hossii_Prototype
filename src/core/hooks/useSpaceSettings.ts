@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { SpaceSettings } from '../../core/types/settings';
-import { loadSpaceSettings } from '../../core/utils/settingsStorage';
-import type { Space } from '../../core/types/space';
+import type { SpaceSettings } from '../types/settings';
+import { loadSpaceSettings } from '../utils/settingsStorage';
+import type { Space } from '../types/space';
 
 /**
  * スペース設定の読み込みと、ウィンドウフォーカス時の再読み込みを管理するフック。

@@ -10,14 +10,9 @@ const cache = new Map<string, { flags: FeatureFlags; fetchedAt: number }>();
 const CACHE_TTL_MS = 60_000; // 1分
 
 const DEFAULT_FLAGS: FeatureFlags = {
-  comments_thumbnail: true,
-  likes_enabled: false,
-  random_recall_enabled: false,
   public_board_mode: false,
   zine_export_enabled: false,
-  space_canvas_export_enabled: false,
   bubble_shapes_extended: false,
-  position_selector: false,
 };
 
 function getCached(spaceId: string): FeatureFlags | null {

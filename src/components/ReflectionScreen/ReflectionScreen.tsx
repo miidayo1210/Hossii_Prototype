@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
-import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
+import { loadSpaceSettings } from '../../core/utils/settingsStorage';
+import { resolveRandomRecallEnabled } from '../../core/utils/spaceSettingResolvers';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import type { EmotionKey } from '../../core/types';
@@ -62,8 +63,12 @@ function groupByDate(hossiis: ReturnType<typeof useHossiiStore>['state']['hossii
 
 export const ReflectionScreen = () => {
   const { state } = useHossiiStore();
-  const { hossiis, activeSpaceId } = state;
-  const { flags } = useFeatureFlags(activeSpaceId);
+  const { hossiis, activeSpaceId, spaces } = state;
+  const activeSpace = spaces.find((s) => s.id === activeSpaceId);
+  const spaceSettings = activeSpace
+    ? loadSpaceSettings(activeSpace.id, activeSpace.name)
+    : null;
+  const randomRecallEnabled = resolveRandomRecallEnabled(spaceSettings);
 
   const [emotionFilter, setEmotionFilter] = useState<EmotionFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
@@ -109,7 +114,7 @@ export const ReflectionScreen = () => {
   // ランダム想起
   const { recalled, refresh: refreshRecall, hasRecallable } = useRandomRecall(
     spaceHossiis,
-    flags.random_recall_enabled,
+    randomRecallEnabled,
   );
 
   // 日付グループ
@@ -197,7 +202,7 @@ export const ReflectionScreen = () => {
         {viewMode === 'timeline' && (
           <>
         {/* ランダム想起カード */}
-        {flags.random_recall_enabled && hasRecallable && recalled && (
+        {randomRecallEnabled && hasRecallable && recalled && (
           <section className={styles.recallSection}>
             <div className={styles.recallLabel}>
               <span className={styles.recallIcon}>✦</span>

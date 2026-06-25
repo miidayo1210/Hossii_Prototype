@@ -10,7 +10,7 @@ import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useRe
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/useAuth';
-import { useSpaceSettings } from './useSpaceSettings';
+import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useNeighborSpace } from './useNeighborSpace';
 import type { EmotionKey, Hossii } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
@@ -36,7 +36,7 @@ import {
   saveSpaceTagFilter,
 } from '../../core/utils/spaceTagFilterStorage';
 import { computePreviewSlotCount } from '../../core/utils/previewSlotCount';
-import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
+import { resolveCanvasExportAllowed } from '../../core/utils/spaceSettingResolvers';
 import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
 import { buildSpaceExportFilename } from '../../core/utils/spaceExportFilename';
 import {
@@ -904,14 +904,26 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     [useStarView],
   );
 
-  const handleStarMouseLeave = useCallback(() => {
+  const scheduleHoverDismiss = useCallback(() => {
     if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
     if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
     hoverLeaveTimerRef.current = setTimeout(() => {
       setHoveredHossiiId(null);
       setHoverAnchorRect(null);
-    }, 100);
+    }, 200);
   }, []);
+
+  const handleStarMouseLeave = useCallback(() => {
+    scheduleHoverDismiss();
+  }, [scheduleHoverDismiss]);
+
+  const handlePreviewMouseEnter = useCallback(() => {
+    if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
+  }, []);
+
+  const handlePreviewMouseLeave = useCallback(() => {
+    scheduleHoverDismiss();
+  }, [scheduleHoverDismiss]);
 
   const handleStarClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     const id = e.currentTarget.dataset.hossiiId;
@@ -936,9 +948,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     };
   }, []);
 
-  const { flags } = useFeatureFlags(activeSpace?.id);
-  const canSpaceExportByPermission =
-    isAdmin || flags.space_canvas_export_enabled;
+  const canSpaceExportByPermission = resolveCanvasExportAllowed(isAdmin);
 
   const spaceExportRootRef = useRef<HTMLDivElement>(null);
   const bubbleAreaRef = useRef<HTMLDivElement | null>(null);
@@ -1078,7 +1088,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         spaceURL: space.spaceURL,
         activeSpaceId: space.id,
       });
-      const spaceTitle = spaceSettings?.spaceName ?? space.name;
+      const spaceTitle = space.name;
       const blob = await exportSpaceCanvasWithFrame({
         element: root,
         signal: ac.signal,
@@ -1117,7 +1127,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     spaceExportBlockedUI,
     activeSpace,
     communitySlug,
-    spaceSettings?.spaceName,
     filteredHossiis.length,
   ]);
 
@@ -1563,7 +1572,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onColorSave={handleColorSave}
                 viewMode={viewMode}
                 canEdit={canEditBubble(hossii)}
-                likesEnabled={spaceSettings?.features.likesEnabled ?? false}
+                likesEnabled={spaceSettings?.features.likesEnabled ?? true}
                 onLike={handleLike}
                 bubbleShapePng={hossii.bubbleShapePng ?? spaceForVisual?.bubbleShapePng}
                 layoutAlignTopLeft={layoutMode === 'ordered'}
@@ -1591,6 +1600,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               isPinned={isPinned(hovered.id)}
               onPinToggle={handlePinToggle}
               showPinUi={showPinUi}
+              onMouseEnter={handlePreviewMouseEnter}
+              onMouseLeave={handlePreviewMouseLeave}
             />
           );
         })()}
@@ -1615,7 +1626,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           emotion={reactionTrigger?.emotion}
           onParticle={handleParticle}
           isListening={isRecognizing}
-          hossiiColor={spaceSettings?.hossiiColor}
           brainMessage={brainMessage?.text ?? null}
           hossiis={filteredHossiis}
           readingEnabled={voiceEnabled}
@@ -1625,7 +1635,27 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
       {/* A02: スペース装飾オーバーレイ */}
       {(spaceForVisual?.decorations ?? []).map((decoration: SpaceDecoration) => {
+        if (decoration.isVisible === false) return null;
         const isOpen = selectedDecorationId === decoration.id;
+
+        if (decoration.type === 'image' && decoration.imageUrl) {
+          return (
+            <div
+              key={decoration.id}
+              className={styles.decorationWidget}
+              style={{ left: `${decoration.position.x}%`, top: `${decoration.position.y}%` }}
+            >
+              <img
+                src={decoration.imageUrl}
+                alt={decoration.content.title ?? '装飾画像'}
+                className={styles.decorationImage}
+              />
+            </div>
+          );
+        }
+
+        const icon = decoration.type === 'sign' ? '🪧' : '📋';
+
         return (
           <div
             key={decoration.id}
@@ -1633,9 +1663,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             style={{ left: `${decoration.position.x}%`, top: `${decoration.position.y}%` }}
             onClick={() => setSelectedDecorationId(isOpen ? null : decoration.id)}
           >
-            <span className={styles.decorationIcon}>📋</span>
+            <span className={styles.decorationIcon}>{icon}</span>
             {decoration.content.title && (
               <span className={styles.decorationTitle}>{decoration.content.title}</span>
+            )}
+            {decoration.type === 'sign' && !isOpen && (
+              <span className={styles.decorationTitle}>{decoration.content.body.slice(0, 24)}</span>
             )}
             {isOpen && (
               <div
@@ -1646,6 +1679,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                   <p className={styles.decorationPopupTitle}>{decoration.content.title}</p>
                 )}
                 <p className={styles.decorationPopupBody}>{decoration.content.body}</p>
+                {decoration.linkUrl && (
+                  <a
+                    href={decoration.linkUrl}
+                    className={styles.decorationPopupLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    リンクを開く
+                  </a>
+                )}
                 <button
                   type="button"
                   className={styles.decorationPopupClose}
@@ -2002,7 +2045,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         <PostDetailModal
           hossii={selectedPost}
           onClose={() => setSelectedPostId(null)}
-          likesEnabled={spaceSettings?.features.likesEnabled ?? false}
+          likesEnabled={spaceSettings?.features.likesEnabled ?? true}
           onLike={handleLike}
         />
       )}
@@ -2012,7 +2055,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           group={selectedAuthorGroup}
           onClose={() => setSelectedAuthorGroup(null)}
           onSelectPost={(id) => setSelectedPostId(id)}
-          likesEnabled={spaceSettings?.features.likesEnabled ?? false}
+          likesEnabled={spaceSettings?.features.likesEnabled ?? true}
           onLike={handleLike}
           isMobilePortrait={isMobilePortrait}
         />

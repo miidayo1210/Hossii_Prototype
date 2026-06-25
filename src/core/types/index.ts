@@ -66,7 +66,7 @@ export type Hossii = {
   hiddenBy?: string; // 管理者の userId
   // numberPost: 数値投稿
   numberValue?: number;
-  // いいね機能（likes_enabled Feature Flag が ON の場合のみ使用）
+  // いいね機能（SpaceSettings.features.likesEnabled が ON の場合のみ使用）
   likeCount?: number;
   likedByMe?: boolean; // クライアント側ローカル状態（Supabase には保存しない）
   /** 未設定・bubble = 従来の吹き出し。canvas = フリー投稿（可変比率のラスタ PNG） */

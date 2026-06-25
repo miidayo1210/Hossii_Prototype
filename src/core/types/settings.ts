@@ -1,10 +1,6 @@
 // スペース設定の型定義
 
-export type CardType = 'stamp' | 'constellation' | 'graph';
-
 export type BottleFrequency = '1d' | '3d-7d' | '2w' | '1m' | 'off';
-
-export type HossiiColor = 'pink' | 'blue' | 'yellow' | 'green' | 'purple';
 
 export type StarMarkerType = 'star' | 'circle' | 'pin' | 'person';
 
@@ -18,15 +14,35 @@ export const STAR_MARKER_OPTIONS: { id: StarMarkerType; label: string }[] = [
 export const DEFAULT_STAR_MARKER: StarMarkerType = 'star';
 
 export type SpaceFeatures = {
-  commentPost: boolean;
-  emotionPost: boolean;
-  photoPost: boolean;
-  numberPost: boolean;
+  /** @deprecated 正本は postFields.message。localStorage 互換用 */
+  messagePost?: boolean;
+  /** @deprecated 正本は postFields */
+  emotionPost?: boolean;
+  /** @deprecated 正本は postFields */
+  photoPost?: boolean;
+  /** @deprecated 正本は postFields */
+  numberPost?: boolean;
   likesEnabled: boolean;
 };
 
 // バブル編集権限: 'all' = 全員可, 'owner_and_admin' = 投稿者本人と管理者のみ
 export type BubbleEditPermission = 'all' | 'owner_and_admin';
+
+export type PostingSettings = {
+  positionMode: 'auto' | 'selector';
+};
+
+export type ReflectionSettings = {
+  randomRecallEnabled: boolean;
+};
+
+export const DEFAULT_POSTING_SETTINGS: PostingSettings = {
+  positionMode: 'auto',
+};
+
+export const DEFAULT_REFLECTION_SETTINGS: ReflectionSettings = {
+  randomRecallEnabled: false,
+};
 
 export type PostFieldConfig = {
   enabled: boolean;
@@ -53,31 +69,53 @@ export const DEFAULT_POST_FIELD_SETTINGS: PostFieldSettings = {
   numberPost: { enabled: false, required: false },
 };
 
+export type SpaceModeId = 'plaza' | 'reflection' | 'workshop' | 'event' | 'custom';
+
+export type SpaceModeSnapshot = {
+  isPrivate: boolean;
+  likesEnabled: boolean;
+  positionMode: 'auto' | 'selector';
+  randomRecallEnabled: boolean;
+  bubbleEditPermission: BubbleEditPermission;
+  postFields: PostFieldSettings;
+};
+
+export type SpaceModeState = {
+  appliedMode: SpaceModeId;
+  isCustomized: boolean;
+  appliedAt?: string;
+  snapshot?: SpaceModeSnapshot;
+};
+
+export const DEFAULT_SPACE_MODE_STATE: SpaceModeState = {
+  appliedMode: 'custom',
+  isCustomized: false,
+};
+
 export type SpaceSettings = {
   spaceId: string;
+  /** 表示用。正本は Space.name（DB には保存しない） */
   spaceName: string;
   features: SpaceFeatures;
-  cardType: CardType;
-  hossiiColor: HossiiColor;
   bubbleEditPermission: BubbleEditPermission;
   bottleFrequency: BottleFrequency;
   postFields?: PostFieldSettings;
   starMarkerType?: StarMarkerType;
+  posting?: PostingSettings;
+  reflection?: ReflectionSettings;
+  mode?: SpaceModeState;
 };
 
 export const DEFAULT_SPACE_FEATURES: SpaceFeatures = {
-  commentPost: true,
-  emotionPost: true,
-  photoPost: true,
-  numberPost: false,
   likesEnabled: true,
 };
 
 export const DEFAULT_SPACE_SETTINGS: Omit<SpaceSettings, 'spaceId' | 'spaceName'> = {
   features: DEFAULT_SPACE_FEATURES,
-  cardType: 'constellation',
-  hossiiColor: 'pink',
   bubbleEditPermission: 'all',
   bottleFrequency: '3d-7d',
   postFields: DEFAULT_POST_FIELD_SETTINGS,
+  posting: DEFAULT_POSTING_SETTINGS,
+  reflection: DEFAULT_REFLECTION_SETTINGS,
+  mode: DEFAULT_SPACE_MODE_STATE,
 };

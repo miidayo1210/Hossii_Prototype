@@ -6,7 +6,7 @@ import { loadLogScope, saveLogScope, type LogScope } from '../../core/utils/logS
 import { getRelativeTime } from '../../core/utils/relativeTime';
 import type { Hossii } from '../../core/types';
 import { FilterBar } from '../FilterBar/FilterBar';
-import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
+import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
@@ -95,7 +95,12 @@ export function LogListBody({
   const { state, hideHossii, getActiveNickname } = useHossiiStore();
   const { profile } = state;
   const isAdmin = currentUser?.isAdmin ?? false;
-  const { flags } = useFeatureFlags(spaceId ?? undefined);
+  const space = useMemo(
+    () => (spaceId ? state.spaces.find((s) => s.id === spaceId) ?? null : null),
+    [state.spaces, spaceId],
+  );
+  const { spaceSettings } = useSpaceSettings(space);
+  const likesEnabled = spaceSettings?.features.likesEnabled ?? true;
 
   const filterKey = spaceId ?? '';
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(filterKey));
@@ -162,11 +167,11 @@ export function LogListBody({
   }, [presetTags, scopedHossiis]);
 
   useEffect(() => {
-    if (!currentUser || !flags.likes_enabled || scopedHossiis.length === 0) return;
+    if (!currentUser || !likesEnabled || scopedHossiis.length === 0) return;
     const ids = scopedHossiis.map((h) => h.id);
     fetchLikedIds(currentUser.uid, ids).then(setLikedIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid, flags.likes_enabled, spaceId, logScope]);
+  }, [currentUser?.uid, likesEnabled, spaceId, logScope]);
 
   const handleHideFromLog = useCallback(
     (id: string) => {
@@ -365,7 +370,7 @@ export function LogListBody({
                         {renderHossiiText(hossii)}
                       </div>
                     )}
-                    {hossii.imageUrl && flags.comments_thumbnail && (
+                    {hossii.imageUrl && (
                       <button
                         type="button"
                         className={styles.imageThumb}
@@ -380,16 +385,6 @@ export function LogListBody({
                         />
                         <span className={styles.thumbHint}>タップして拡大</span>
                       </button>
-                    )}
-                    {hossii.imageUrl && !flags.comments_thumbnail && (
-                      <a
-                        href={hossii.imageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.imageLinkFallback}
-                      >
-                        📎 画像を開く
-                      </a>
                     )}
                     {((hossii.tags?.length ?? 0) > 0 || (hossii.hashtags?.length ?? 0) > 0) && (
                       <div className={styles.cardTags}>
@@ -424,7 +419,7 @@ export function LogListBody({
                             非表示
                           </button>
                         )}
-                        {flags.likes_enabled ? (
+                        {likesEnabled ? (
                           <LikeButton
                             hossii={hossii}
                             likedByMe={likedIds.has(hossii.id)}
