@@ -63,6 +63,25 @@ describe('mergeFetchedHossiisWithPendingInserts', () => {
     expect(paneAMerged.map((x) => x.id)).toEqual(['server-1']);
   });
 
+  it('excludes pane A pending from default pane key merge', () => {
+    const pending = h('pending-a', paneAId);
+    const { pendingInsertIdsRef, pendingOptimisticByIdRef } = refs(
+      ['pending-a'],
+      new Map([['pending-a', pending]]),
+    );
+    const serverList = [h('server-1')];
+
+    const defaultMerged = mergeFetchedHossiisWithPendingInserts(
+      serverList,
+      spaceId,
+      [],
+      pendingInsertIdsRef,
+      pendingOptimisticByIdRef,
+      defaultKey,
+    );
+    expect(defaultMerged.map((x) => x.id)).toEqual(['server-1']);
+  });
+
   it('includes pane A pending in pane A and all-panes keys', () => {
     const pending = h('pending-a', paneAId);
     const { pendingInsertIdsRef, pendingOptimisticByIdRef } = refs(

@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/useAuth';
@@ -223,6 +224,8 @@ export const PostScreen = ({
   }, [speechToFreePosterRef]);
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
+  const { activePaneId, isLoading: panesLoading } = useSpacePane();
+  const canPost = !panesLoading && activePaneId != null;
   const { prefs: { showHossii } } = useDisplayPrefs();
   const { navigate } = useRouter();
   const { currentUser } = useAuth();
@@ -343,7 +346,7 @@ export const PostScreen = ({
     selectedPresetTags,
   ]);
 
-  const canSubmit = allRequiredSatisfied && hasAnyInput && !sending;
+  const canSubmit = allRequiredSatisfied && hasAnyInput && !sending && canPost;
 
   const scrollToFirstFieldError = useCallback(() => {
     const checks: [boolean, RefObject<HTMLDivElement | null>][] = [
@@ -605,7 +608,7 @@ export const PostScreen = ({
   }, []);
 
   const handleSubmit = async () => {
-    if (sending) return;
+    if (sending || !canPost) return;
 
     if (!allRequiredSatisfied) {
       setSubmitAttempted(true);
@@ -1218,7 +1221,7 @@ export const PostScreen = ({
               type="button"
               onClick={handleSubmitClick}
               onAnimationEnd={() => setPoyonActive(false)}
-              disabled={sending || !hasAnyInput}
+              disabled={sending || !hasAnyInput || !canPost}
               className={`${styles.submitButton} ${styles.submitButtonHalf}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}${!canSubmit && hasAnyInput ? ` ${styles.submitButtonInactive}` : ''}`}
               title="⌘+Enter（Windows は Ctrl+Enter）でも投稿できます"
             >
@@ -1242,7 +1245,7 @@ export const PostScreen = ({
             type="button"
             onClick={handleSubmitClick}
             onAnimationEnd={() => setPoyonActive(false)}
-            disabled={sending || !hasAnyInput}
+            disabled={sending || !hasAnyInput || !canPost}
             className={`${styles.submitButton}${poyonActive ? ` ${styles.submitButtonPoyon}` : ''}${!canSubmit && hasAnyInput ? ` ${styles.submitButtonInactive}` : ''}`}
             title="⌘+Enter（Windows は Ctrl+Enter）でも投稿できます"
           >

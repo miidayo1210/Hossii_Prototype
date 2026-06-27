@@ -92,6 +92,21 @@ export function applyFetchResult(
   return next;
 }
 
+/** Remove id from a single query key's ordered list; entity remains in entitiesById. */
+export function removeOrderedIdFromQueryKey(
+  slice: HossiiEntitiesSlice,
+  queryKey: HossiiQueryKey,
+  id: string,
+): HossiiEntitiesSlice {
+  const prev = slice.orderedIdsByQueryKey[queryKey];
+  if (!prev?.includes(id)) return slice;
+  return setOrderedIdsForQuery(
+    slice,
+    queryKey,
+    prev.filter((x) => x !== id),
+  );
+}
+
 export function insertOrderedId(
   slice: HossiiEntitiesSlice,
   queryKey: HossiiQueryKey,
@@ -131,6 +146,7 @@ export function shouldReindexOrderedIds(
   if (prev.createdAt.getTime() !== next.createdAt.getTime()) return true;
   if (prev.spaceId !== next.spaceId) return true;
   if (Boolean(prev.isHidden) !== Boolean(next.isHidden)) return true;
+  if ((prev.spacePaneId ?? null) !== (next.spacePaneId ?? null)) return true;
   return false;
 }
 

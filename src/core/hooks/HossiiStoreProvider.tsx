@@ -33,6 +33,7 @@ import {
   materializeHossiisArray,
   patchEntity,
   removeEntity,
+  removeOrderedIdFromQueryKey,
   reindexIdInAllQueryKeys,
   shouldReindexOrderedIds,
   upsertEntities,
@@ -41,6 +42,12 @@ import {
 import type { HossiiQueryKey } from '../utils/hossiiQueryKey';
 import { queryKeysForHossii } from '../utils/hossiiQueryKey';
 import { mergeFetchedHossiisWithPendingInserts } from '../utils/hossiiPendingMerge';
+import {
+  classifyRealtimeUpdate,
+  runtimeMatchesActiveSpace,
+  shouldAcceptRealtimeInsert,
+} from '../utils/hossiiRealtimePane';
+import { validateHossiiPaneSpaceMatch } from '../utils/spacePanesApi';
 import {
   EMPTY_SPACE_PANE_RUNTIME,
   SpacePaneRuntimeContext,
@@ -308,6 +315,14 @@ type ExtendedHossiiAction =
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
   | { type: 'RESTORE_HOSSII'; payload: string }
   | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii }
+  | {
+      type: 'APPLY_REALTIME_PANE_UPDATE';
+      payload: {
+        before: Hossii;
+        after: Hossii;
+        transition: 'patchOnly' | 'removeFromActive' | 'addToActive';
+      };
+    }
   | { type: 'SET_VISITING_SPACE'; payload: string | null }
   | {
       type: 'APPLY_FETCH_RESULT';
@@ -671,6 +686,32 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return withEntitiesUpdate(state, entities);
       }
 
+      case 'APPLY_REALTIME_PANE_UPDATE': {
+        const { before, after, transition } = action.payload;
+        const prev = state.entities.entitiesById[after.id];
+        const merged: Hossii = {
+          ...after,
+          bubbleShapePng: after.bubbleShapePng ?? prev?.bubbleShapePng,
+        };
+        let entities = patchEntity(state.entities, merged);
+
+        if (transition === 'removeFromActive') {
+          const keys = queryKeysForHossii(entities, before);
+          for (const key of keys) {
+            entities = removeOrderedIdFromQueryKey(entities, key, after.id);
+          }
+        } else if (transition === 'addToActive') {
+          const keys = queryKeysForHossii(entities, merged);
+          for (const key of keys) {
+            entities = insertOrderedId(entities, key, merged.id, merged);
+          }
+        } else if (shouldReindexOrderedIds(prev ?? before, merged)) {
+          entities = reindexIdInAllQueryKeys(entities, merged.id);
+        }
+
+        return withEntitiesUpdate(state, entities);
+      }
+
       default:
         return state;
     }
@@ -960,15 +1001,18 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         (payload) => {
           const row = payload.new as HossiiRow;
           if (row.space_id !== activeSpaceId) return;
+          const hossii = rowToHossii(row);
+          const runtime = spacePaneRuntimeRef.current;
+          if (!shouldAcceptRealtimeInsert(hossii, runtime, activeSpaceId)) return;
           // 自分が INSERT した場合は重複 ADD のみ避ける。insertedHossiiIdsRef は fetch マージで掃除する
           // （ここで delete すると、遅れて届く古い fetch が楽観行をマージせず消す）。
           if (insertedHossiiIdsRef.current.has(row.id)) {
             if (!stateRef.current.hossiis.some((h) => h.id === row.id)) {
-              dispatch({ type: 'ADD_HOSSII_FULL', payload: rowToHossii(row) });
+              dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
             }
             return;
           }
-          dispatch({ type: 'ADD_HOSSII_FULL', payload: rowToHossii(row) });
+          dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
         }
       )
       .on(
@@ -977,7 +1021,28 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         (payload) => {
           const row = payload.new as HossiiRow;
           if (row.space_id !== activeSpaceId) return;
-          dispatch({ type: 'UPDATE_HOSSII_FROM_REALTIME', payload: rowToHossii(row) });
+          const after = rowToHossii(row);
+          const runtime = spacePaneRuntimeRef.current;
+          if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
+
+          const before = stateRef.current.entities.entitiesById[row.id];
+          if (!before) {
+            if (shouldAcceptRealtimeInsert(after, runtime, activeSpaceId)) {
+              dispatch({ type: 'ADD_HOSSII_FULL', payload: after });
+            }
+            return;
+          }
+
+          const transition = classifyRealtimeUpdate(before, after, runtime);
+          if (transition === 'ignore') return;
+          if (transition === 'patchOnly') {
+            dispatch({ type: 'UPDATE_HOSSII_FROM_REALTIME', payload: after });
+            return;
+          }
+          dispatch({
+            type: 'APPLY_REALTIME_PANE_UPDATE',
+            payload: { before, after, transition },
+          });
         }
       )
       .on(
@@ -1037,6 +1102,20 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
 
     const currentState = stateRef.current;
+    const activeSpaceId = activeSpaceIdRef.current;
+    const runtime = spacePaneRuntimeRef.current;
+
+    if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
+    const activePaneId = runtime.activePaneId;
+    if (activePaneId == null) return;
+    if (
+      !validateHossiiPaneSpaceMatch(
+        { spaceId: activeSpaceId, spacePaneId: activePaneId },
+        activeSpaceId,
+      )
+    ) {
+      return;
+    }
 
     // プロフィールが無ければ作成
     let profile = currentState.profile;
@@ -1063,7 +1142,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       ? {
           id,
           message: msg,
-          spaceId: activeSpaceIdRef.current,
+          spaceId: activeSpaceId,
+          spacePaneId: activePaneId,
           authorId: input.authorNameOverride ? undefined : profile.id,
           authorName,
           createdAt: new Date(),
@@ -1081,7 +1161,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           id,
           message: msg,
           emotion: input.emotion,
-          spaceId: activeSpaceIdRef.current,
+          spaceId: activeSpaceId,
+          spacePaneId: activePaneId,
           authorId: input.authorNameOverride ? undefined : profile.id,
           authorName,
           createdAt: new Date(),

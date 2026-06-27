@@ -5,6 +5,8 @@ import {
   createEmptyEntitiesSlice,
   getHossiisForQueryKey,
   patchEntity,
+  removeOrderedIdFromQueryKey,
+  shouldReindexOrderedIds,
   upsertEntities,
 } from './hossiiEntitiesState';
 import { buildQueryKeyV2 } from './hossiiQueryKey';
@@ -56,5 +58,22 @@ describe('hossiiEntitiesState', () => {
     expect(getHossiisForQueryKey(slice, keyPaneA).map((x) => x.id)).toEqual(['pane-a-post']);
     expect(slice.entitiesById['null-post']).toBeDefined();
     expect(slice.entitiesById['pane-a-post']).toBeDefined();
+  });
+
+  it('removeOrderedIdFromQueryKey drops id from one key only', () => {
+    const spaceId = 'space-1';
+    const defaultPaneId = `${spaceId}-pane-default`;
+    const keyDefault = buildQueryKeyV2(spaceId, { kind: 'pane', paneId: defaultPaneId }, '1w');
+    const post = h('x', '2026-01-01');
+    let slice = applyFetchResult(createEmptyEntitiesSlice(), keyDefault, [post], false);
+    slice = removeOrderedIdFromQueryKey(slice, keyDefault, 'x');
+    expect(getHossiisForQueryKey(slice, keyDefault)).toEqual([]);
+    expect(slice.entitiesById.x).toBeDefined();
+  });
+
+  it('shouldReindexOrderedIds when spacePaneId changes', () => {
+    const base = h('a', '2026-01-01');
+    expect(shouldReindexOrderedIds(base, { ...base, spacePaneId: 'pane-b' })).toBe(true);
+    expect(shouldReindexOrderedIds(base, { ...base, likeCount: 1 })).toBe(false);
   });
 });
