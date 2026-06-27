@@ -25,8 +25,8 @@ import { computeBubblePositions, type PositionCache } from '../../core/utils/hos
 import { useSpaceHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
 import { usePinnedHossiis } from '../../core/hooks/usePinnedHossiis';
 import { buildQueryKeyV2 } from '../../core/utils/hossiiQueryKey';
-import { defaultSpacePaneId } from '../../core/utils/spacePanesApi';
 import type { PaneContext } from '../../core/utils/hossiiPaneMembership';
+import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { isSupabaseConfigured } from '../../core/supabase';
 import {
   loadPresentationMode,
@@ -171,21 +171,26 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setSpeechLevels,
   } = useDisplayPrefs();
 
+  const {
+    activePaneId: contextActivePaneId,
+    defaultPane,
+    isLoading: panesLoading,
+  } = useSpacePane();
+
   const paneContext = useMemo((): PaneContext | null => {
-    if (!activeSpaceId) return null;
-    const defaultPaneId = defaultSpacePaneId(activeSpaceId);
+    if (!activeSpaceId || !contextActivePaneId || !defaultPane) return null;
     return {
       spaceId: activeSpaceId,
-      activePaneId: defaultPaneId,
-      defaultPaneId,
+      activePaneId: contextActivePaneId,
+      defaultPaneId: defaultPane.id,
     };
-  }, [activeSpaceId]);
+  }, [activeSpaceId, contextActivePaneId, defaultPane]);
 
   const screenQueryKey = useMemo(() => {
     if (!activeSpaceId || !paneContext) return null;
     return buildQueryKeyV2(
       activeSpaceId,
-      { kind: 'pane', paneId: paneContext.defaultPaneId },
+      { kind: 'pane', paneId: paneContext.activePaneId },
       displayPeriod,
     );
   }, [activeSpaceId, paneContext, displayPeriod]);
@@ -209,7 +214,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     displayLimit,
     displayPeriod,
     paneContext,
-    enabled: !visitingSpaceId && isSupabaseConfigured,
+    enabled: !visitingSpaceId && isSupabaseConfigured && !panesLoading && paneContext !== null,
     onFetched: handleSpaceFetched,
     onLoadingChange: setHossiiFetchLoading,
     getExistingHossiis: () => hossiisRef.current,

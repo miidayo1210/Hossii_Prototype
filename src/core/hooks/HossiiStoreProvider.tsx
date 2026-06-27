@@ -41,6 +41,10 @@ import {
 import type { HossiiQueryKey } from '../utils/hossiiQueryKey';
 import { queryKeysForHossii } from '../utils/hossiiQueryKey';
 import { mergeFetchedHossiisWithPendingInserts } from '../utils/hossiiPendingMerge';
+import {
+  EMPTY_SPACE_PANE_RUNTIME,
+  SpacePaneRuntimeContext,
+} from './spacePaneRuntime';
 import { loadMode, saveMode } from '../utils/modeStorage';
 import {
   loadProfile,
@@ -733,6 +737,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const initialSpaceNicknames = useMemo(() => loadSpaceNicknames(), []);
 
   const activeSpaceIdRef = useMemo(() => ({ current: activeSpaceId }), [activeSpaceId]);
+  const spacePaneRuntimeRef = useRef({ ...EMPTY_SPACE_PANE_RUNTIME });
 
   const reducer = useMemo(() => createReducer(activeSpaceIdRef), [activeSpaceIdRef]);
 
@@ -1284,6 +1289,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, [state.hossiis]);
 
   return (
+    <SpacePaneRuntimeContext.Provider value={spacePaneRuntimeRef}>
     <HossiiContext.Provider
       value={{
         state,
@@ -1347,6 +1353,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         {children}
       </HossiiActionsContext.Provider>
     </HossiiContext.Provider>
+    </SpacePaneRuntimeContext.Provider>
   );
 };
 

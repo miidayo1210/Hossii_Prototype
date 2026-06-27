@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from './core/hooks/useRouter';
 import { useMediaQuery } from './core/hooks/useMediaQuery';
 import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
+import { SpacePaneProvider } from './core/hooks/SpacePaneProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
 import { isSupabaseConfigured } from './core/supabase';
@@ -608,7 +609,9 @@ const App = () => {
       <AdminNavigationProvider>
         <DisplayPrefsProvider>
           <HossiiProvider initialHossiis={mockHossiis}>
-            <AppContent />
+            <SpacePaneProvider>
+              <AppContent />
+            </SpacePaneProvider>
           </HossiiProvider>
         </DisplayPrefsProvider>
       </AdminNavigationProvider>
