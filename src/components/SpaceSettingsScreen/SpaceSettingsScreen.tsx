@@ -186,6 +186,7 @@ export const SpaceSettingsScreen = () => {
           <PaneManagementTab
             key={`panes-${activeSpace.id}`}
             spaceId={activeSpace.id}
+            spaceURL={activeSpace.spaceURL}
           />
         );
       case 'interactionRules':

@@ -1,0 +1,7 @@
+.modalWide {
+  width: min(100%, 28rem);
+}
+
+.modalWide .actions {
+  margin-top: 1rem;
+}

@@ -10,6 +10,7 @@ import { Copy, Download } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { getDefaultQrRect } from '../../core/utils/floatingPanelStorage';
+import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
 import { svgQrToPngBlob } from '../../core/utils/qrSvgToPng';
 import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import styles from './QRCodePanel.module.css';
@@ -51,13 +52,12 @@ function QRCodePanelInner() {
   const [qrImageCopied, setQrImageCopied] = useState(false);
   const [qrImageSaved, setQrImageSaved] = useState(false);
 
-  const spaceUrl = activeSpace?.spaceURL
-    ? communitySlug
-      ? `${window.location.origin}/c/${communitySlug}/s/${activeSpace.spaceURL}`
-      : `${window.location.origin}/s/${activeSpace.spaceURL}`
-    : state.activeSpaceId
-      ? `${window.location.origin}?space=${state.activeSpaceId}`
-      : window.location.origin;
+  const spaceUrl = buildSpaceShareUrl({
+    origin: window.location.origin,
+    communitySlug,
+    spaceURL: activeSpace?.spaceURL,
+    activeSpaceId: state.activeSpaceId ?? activeSpace?.id ?? '',
+  });
 
   const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(spaceUrl).then(() => {

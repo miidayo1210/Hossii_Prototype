@@ -1,18 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'react-qr-code';
 import { Copy, Download, Check, AlertCircle } from 'lucide-react';
 import type { Space } from '../../core/types/space';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
+import { isSupabaseConfigured } from '../../core/supabase';
 import {
   generateSpaceURL,
   validateSpaceURL,
   isSpaceURLUnique,
 } from '../../core/utils/spaceUrlUtils';
+import {
+  buildShareUrlForPane,
+  buildSpaceShareUrl,
+  paneQrDownloadFilename,
+} from '../../core/utils/spaceShareUrl';
+import { sortPanesForDisplay } from '../../core/utils/spacePaneManagement';
 import { updateSpaceInDb } from '../../core/utils/spacesApi';
 import { useScreenDraft } from '../../core/hooks/useScreenDraft';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import { SettingsSaveBar } from './SettingsSaveBar';
+import { PaneShareBlock } from './PaneShareBlock';
 import sharedStyles from './SettingsShared.module.css';
 import styles from './ShareTab.module.css';
 
@@ -29,6 +38,7 @@ type Props = {
 
 export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => {
   const { state, communitySlug } = useHossiiStore();
+  const { panes } = useSpacePane();
   const initial: PublicShareDraft = {
     isPrivate: space.isPrivate ?? false,
     spaceURLInput: space.spaceURL ?? '',
@@ -49,10 +59,31 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
   const isDuplicate = validation?.valid && !isUnique;
 
   const shareURL = savedURL
-    ? communitySlug
-      ? `${window.location.origin}/c/${communitySlug}/s/${savedURL}`
-      : `${window.location.origin}/s/${savedURL}`
+    ? buildSpaceShareUrl({
+        origin: window.location.origin,
+        communitySlug,
+        spaceURL: savedURL,
+        activeSpaceId: space.id,
+      })
     : null;
+
+  const additionalPanes = useMemo(
+    () => sortPanesForDisplay(panes).filter((p) => !p.isDefault),
+    [panes],
+  );
+
+  const showPaneQrSection =
+    isSupabaseConfigured && shareURL !== null && panes.length >= 2 && additionalPanes.length > 0;
+
+  const shareUrlParams = useMemo(
+    () => ({
+      origin: window.location.origin,
+      communitySlug,
+      spaceURL: savedURL ?? undefined,
+      activeSpaceId: space.id,
+    }),
+    [communitySlug, savedURL, space.id],
+  );
 
   useEffect(() => {
     onDirtyChange(isDirty);
@@ -216,6 +247,31 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
         ) : (
           <SettingsSection title="QR コード">
             <p className={styles.emptyState}>スペース URL を保存すると、QR コードが表示されます。</p>
+          </SettingsSection>
+        )}
+
+        {showPaneQrSection && (
+          <SettingsSection title="タブごとの QR コード">
+            <p className={styles.description}>
+              メインタブは上の QR コードから。追加タブは以下の URL で直接開けます。
+            </p>
+            {additionalPanes.map((pane) => (
+              <PaneShareBlock
+                key={pane.id}
+                label={pane.name}
+                shareUrl={buildShareUrlForPane({
+                  ...shareUrlParams,
+                  pane: { slug: pane.slug, isDefault: pane.isDefault },
+                })}
+                downloadFilename={paneQrDownloadFilename(savedURL ?? undefined, space.id, pane.slug)}
+                disabled={!pane.isVisible}
+                disabledHint={
+                  !pane.isVisible
+                    ? '非表示のためこの URL は現在使えません。再表示すると利用できます。'
+                    : undefined
+                }
+              />
+            ))}
           </SettingsSection>
         )}
 

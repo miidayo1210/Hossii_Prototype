@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Link2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Link2, Plus, QrCode } from 'lucide-react';
 import type { SpacePane } from '../../core/types/spacePane';
 import { isSupabaseConfigured } from '../../core/supabase';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
@@ -21,11 +21,13 @@ import {
 import { SpacePaneCreateDialog } from '../SpaceScreen/SpacePaneCreateDialog';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { PaneSlugEditDialog } from './PaneSlugEditDialog';
+import { PaneShareDialog } from './PaneShareDialog';
 import sharedStyles from './SettingsShared.module.css';
 import styles from './PaneManagementTab.module.css';
 
 type Props = {
   spaceId: string;
+  spaceURL: string | undefined;
 };
 
 function showToast(setter: (msg: string | null) => void, message: string) {
@@ -33,12 +35,13 @@ function showToast(setter: (msg: string | null) => void, message: string) {
   setTimeout(() => setter(null), 3000);
 }
 
-export function PaneManagementTab({ spaceId }: Props) {
+export function PaneManagementTab({ spaceId, spaceURL }: Props) {
   const { panes, reloadPanesAndSyncActive, setActivePaneById } = useSpacePane();
   const [toast, setToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [slugEditPane, setSlugEditPane] = useState<SpacePane | null>(null);
+  const [sharePane, setSharePane] = useState<SpacePane | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -263,6 +266,16 @@ export function PaneManagementTab({ spaceId }: Props) {
                     type="button"
                     className={styles.iconButton}
                     disabled={isBusy}
+                    aria-label="URL・QR コード"
+                    title="URL・QR コード"
+                    onClick={() => setSharePane(pane)}
+                  >
+                    <QrCode size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.iconButton}
+                    disabled={isBusy}
                     aria-label="slug を変更"
                     title="slug を変更"
                     onClick={() => setSlugEditPane(pane)}
@@ -312,6 +325,14 @@ export function PaneManagementTab({ spaceId }: Props) {
         onClose={() => setCreateOpen(false)}
         onCreated={(pane) => void handleCreated(pane)}
         onError={handleError}
+      />
+
+      <PaneShareDialog
+        open={sharePane !== null}
+        pane={sharePane}
+        spaceURL={spaceURL}
+        spaceId={spaceId}
+        onClose={() => setSharePane(null)}
       />
 
       <PaneSlugEditDialog
