@@ -33,6 +33,8 @@ export type Hossii = {
   message: string;
   emotion?: EmotionKey;
   spaceId: string; // 所属するスペースのID
+  /** 所属 Pane ID。NULL/未設定 = レガシー投稿（default Pane 扱い） */
+  spacePaneId?: string | null;
   authorId?: string; // 投稿者ID（端末固有、判定用）
   authorName?: string; // 投稿者名（表示用）
   createdAt: Date;

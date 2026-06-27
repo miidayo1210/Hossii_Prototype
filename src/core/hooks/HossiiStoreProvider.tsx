@@ -57,6 +57,7 @@ import {
   updateSpaceInDb,
   deleteSpaceFromDb,
 } from '../utils/spacesApi';
+import { ensureDefaultSpacePane, healDefaultSpacePanes } from '../utils/ensureDefaultSpacePane';
 import {
   insertHossii,
   updateHossiiColor,
@@ -88,6 +89,12 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
     message: raw.message as string,
     emotion: raw.emotion as Hossii['emotion'],
     spaceId: (raw.spaceId as string) || defaultSpaceId,
+    spacePaneId:
+      typeof raw.spacePaneId === 'string'
+        ? raw.spacePaneId
+        : raw.spacePaneId === null
+          ? null
+          : undefined,
     authorId: typeof raw.authorId === 'string' ? raw.authorId : undefined,
     authorName: typeof raw.authorName === 'string' ? raw.authorName : undefined,
     createdAt: raw.createdAt instanceof Date
@@ -868,6 +875,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
       if (supabaseSpaces !== null) {
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces, preserveIds });
+        healDefaultSpacePanes(supabaseSpaces.map((s) => s.id));
         lastScopedCommunityFetchKeyRef.current = effectiveId;
         const st = stateRef.current;
         if (
@@ -1176,7 +1184,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     pendingSpaceIds.current.add(space.id);
     dispatch({ type: 'ADD_SPACE', payload: space });
     if (isSupabaseConfigured) {
-      const promise = insertSpace(space, communityId).finally(() => {
+      const promise = insertSpace(space, communityId)
+        .then(() => ensureDefaultSpacePane(space.id).then(() => undefined))
+        .finally(() => {
         pendingSpaceIds.current.delete(space.id);
         pendingSpacePromises.current.delete(space.id);
       });

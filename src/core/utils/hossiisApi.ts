@@ -8,6 +8,7 @@ export type HossiiRow = {
   message: string;
   emotion: string | null;
   space_id: string;
+  space_pane_id?: string | null;
   author_id: string | null;
   author_name: string | null;
   origin: string;
@@ -72,6 +73,7 @@ export function rowToHossii(row: HossiiRow): Hossii {
     message: row.message,
     emotion: row.emotion as Hossii['emotion'] ?? undefined,
     spaceId: row.space_id,
+    spacePaneId: row.space_pane_id ?? undefined,
     authorId: row.author_id ?? undefined,
     authorName: row.author_name ?? undefined,
     origin: row.origin as Hossii['origin'],
@@ -100,7 +102,7 @@ export function rowToHossii(row: HossiiRow): Hossii {
 // Hossii（camelCase）→ INSERT 用オブジェクト（snake_case）
 // post_kind は未マイグレーションの DB に列が無いと 400 になるため送らない（キャンバスは image_url パスで復元）
 function hossiiToInsertRow(hossii: Hossii): Omit<HossiiRow, 'created_at' | 'post_kind'> & { created_at: string } {
-  return {
+  const row: Omit<HossiiRow, 'created_at' | 'post_kind'> & { created_at: string } = {
     id: hossii.id,
     message: hossii.message,
     emotion: hossii.emotion ?? null,
@@ -127,6 +129,17 @@ function hossiiToInsertRow(hossii: Hossii): Omit<HossiiRow, 'created_at' | 'post
     number_value: hossii.numberValue ?? null,
     like_count: hossii.likeCount ?? 0,
   };
+
+  if (hossii.spacePaneId != null) {
+    row.space_pane_id = hossii.spacePaneId;
+  }
+
+  return row;
+}
+
+/** Exported for Phase 1 insert-payload regression tests. */
+export function buildHossiiInsertPayload(hossii: Hossii): ReturnType<typeof hossiiToInsertRow> {
+  return hossiiToInsertRow(hossii);
 }
 
 export async function fetchHossiis(spaceId: string): Promise<Hossii[]> {

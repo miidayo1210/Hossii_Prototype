@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 import type { Space, SpaceId } from '../types/space';
 import type { EmotionKey } from '../types';
 import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from './spaceDecorations';
+import { ensureDefaultSpacePane } from './ensureDefaultSpacePane';
 
 // Supabase の行型（snake_case）
 type SpaceRow = {
@@ -222,5 +223,9 @@ export async function fetchSpaceByUrl(spaceUrl: string): Promise<Space | null> {
     return null;
   }
 
-  return data ? rowToSpace(data as SpaceRow) : null;
+  if (!data) return null;
+
+  const space = rowToSpace(data as SpaceRow);
+  void ensureDefaultSpacePane(space.id);
+  return space;
 }
