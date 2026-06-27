@@ -609,6 +609,147 @@
   opacity: 0.75;
 }
 
+/* ---- Pane フィルタ（Phase 9B） ---- */
+.paneFilterTrack {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 2.5rem;
+  background: #eef2ff;
+  border-radius: 999px;
+  border: 1px solid #c7d2fe;
+  overflow: visible;
+  margin-bottom: 0.75rem;
+}
+
+.paneFilterPill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 33.333%;
+  height: 100%;
+  background: #4f46e5;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+  transition: transform 0.22s cubic-bezier(0.34, 1, 0.64, 1);
+  pointer-events: none;
+}
+
+.paneFilterTab {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6366f1;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.18s ease;
+  z-index: 1;
+  background: none;
+  border: none;
+  padding: 0 0.35rem;
+  font-family: inherit;
+}
+
+.paneFilterTab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -3px;
+}
+
+.paneFilterTabActive {
+  color: #fff;
+}
+
+.paneFilterCount {
+  font-size: 0.625rem;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.paneFilterDropdownWrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.paneFilterDropdownBtn {
+  width: 100%;
+  padding-right: 0.25rem;
+}
+
+.paneFilterDropdownLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 5.5rem;
+}
+
+.paneFilterChevron {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.paneFilterDropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  left: 0;
+  min-width: 10rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.625rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.paneFilterDropdownItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.paneFilterDropdownItem:hover {
+  background: #f3f4f6;
+}
+
+.paneFilterDropdownItemActive {
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.paneFilterDropdownItemCount {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.paneFilterDropdownItemActive .paneFilterDropdownItemCount {
+  color: #6366f1;
+}
+
 /* ---- アイデンティティバナー ---- */
 .identityBanner {
   display: flex;

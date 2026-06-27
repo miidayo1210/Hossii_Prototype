@@ -1,15 +1,19 @@
 import { useEffect, useRef, useCallback, useState, type MutableRefObject } from 'react';
 import type { Hossii } from '../types';
 import { isSupabaseConfigured } from '../supabase';
-import { fetchHossiisPage, type PaneFetchScope } from '../utils/hossiisApi';
+import { fetchHossiisPage } from '../utils/hossiisApi';
 import {
   cursorFromOldest,
   mergeHossiiListsUnique,
   type HossiiPageCursor,
 } from '../utils/hossiiFetchPage';
-import { buildQueryKey, buildQueryKeyV2 } from '../utils/hossiiQueryKey';
 import type { PaneContext } from '../utils/hossiiPaneMembership';
-import { isDefaultPane } from '../utils/hossiiPaneMembership';
+import {
+  paneFetchScopeOverrideKey,
+  resolveSpaceHossiiPaneFilter,
+  resolveSpaceHossiiQueryKey,
+  type PaneFetchScopeOverride,
+} from '../utils/spaceHossiiFetchResolve';
 import {
   getPeriodCutoff,
   type DisplayLimit,
@@ -37,6 +41,8 @@ export type UseSpaceHossiiFetchOptions = {
   enabled: boolean;
   /** default / additional pane context (Phase 2). Omit for legacy v1 fetch. */
   paneContext?: PaneContext | null;
+  /** Comments all-panes / specific pane fetch (Phase 9B). Default: context. */
+  paneFetchScope?: PaneFetchScopeOverride;
   /** 取得結果を store に反映（optimistic merge 込み） */
   onFetched: (items: Hossii[], options?: FetchDeliverOptions) => void;
   onLoadingChange: (loading: boolean) => void;
@@ -46,29 +52,6 @@ export type UseSpaceHossiiFetchOptions = {
 
 function numericLimit(displayLimit: DisplayLimit): number | 'unlimited' {
   return displayLimit === 'unlimited' ? 'unlimited' : displayLimit;
-}
-
-function resolveQueryKey(
-  spaceId: string,
-  displayPeriod: DisplayPeriod,
-  paneContext?: PaneContext | null,
-): string {
-  if (paneContext) {
-    return buildQueryKeyV2(
-      spaceId,
-      { kind: 'pane', paneId: paneContext.activePaneId },
-      displayPeriod,
-    );
-  }
-  return buildQueryKey(spaceId, displayPeriod);
-}
-
-function resolvePaneFilter(paneContext?: PaneContext | null): PaneFetchScope | undefined {
-  if (!paneContext) return undefined;
-  if (isDefaultPane(paneContext)) {
-    return { kind: 'default', defaultPaneId: paneContext.defaultPaneId };
-  }
-  return { kind: 'pane', paneId: paneContext.activePaneId };
 }
 
 function idleWait(): Promise<void> {
@@ -108,6 +91,7 @@ export function useSpaceHossiiFetch({
   displayPeriod,
   enabled,
   paneContext,
+  paneFetchScope,
   onFetched,
   onLoadingChange,
   getExistingHossiis,
@@ -124,6 +108,7 @@ export function useSpaceHossiiFetch({
 
   const activePaneId = paneContext?.activePaneId ?? null;
   const defaultPaneId = paneContext?.defaultPaneId ?? null;
+  const paneFetchScopeKey = paneFetchScopeOverrideKey(paneFetchScope);
 
   const [progress, setProgress] = useState<SpaceHossiiFetchProgress>({
     loading: false,
@@ -140,12 +125,13 @@ export function useSpaceHossiiFetch({
       fetchSpaceId: string,
       fetchPeriod: DisplayPeriod,
       fetchPaneContext: PaneContext | null | undefined,
+      fetchPaneFetchScope: PaneFetchScopeOverride | undefined,
     ) => {
       if (!fetchSpaceId || !isSupabaseConfigured) return;
 
       const periodCutoff = getPeriodCutoff(fetchPeriod);
       const signal = abortRef.current?.signal;
-      const paneFilter = resolvePaneFilter(fetchPaneContext);
+      const paneFilter = resolveSpaceHossiiPaneFilter(fetchPaneContext, fetchPaneFetchScope);
 
       if (targetCount === 'unlimited') {
         const upperBound = new Date().toISOString();
@@ -193,7 +179,12 @@ export function useSpaceHossiiFetch({
         const finalCount = accumulated.filter((h) => h.spaceId === fetchSpaceId).length;
         onFetchedRef.current(accumulated, { merge: false });
         fetchedMetaRef.current = {
-          queryKey: resolveQueryKey(fetchSpaceId, fetchPeriod, fetchPaneContext),
+          queryKey: resolveSpaceHossiiQueryKey(
+            fetchSpaceId,
+            fetchPeriod,
+            fetchPaneContext,
+            fetchPaneFetchScope,
+          ),
           count: finalCount,
         };
         setProgress({ loading: false, loadedCount: finalCount, fetchComplete: true });
@@ -230,7 +221,12 @@ export function useSpaceHossiiFetch({
       onFetchedRef.current(accumulated);
       const count = accumulated.filter((h) => h.spaceId === fetchSpaceId).length;
       fetchedMetaRef.current = {
-        queryKey: resolveQueryKey(fetchSpaceId, fetchPeriod, fetchPaneContext),
+        queryKey: resolveSpaceHossiiQueryKey(
+          fetchSpaceId,
+          fetchPeriod,
+          fetchPaneContext,
+          fetchPaneFetchScope,
+        ),
         count,
       };
       setProgress({ loading: false, loadedCount: count, fetchComplete: true });
@@ -249,7 +245,12 @@ export function useSpaceHossiiFetch({
     const ac = new AbortController();
     abortRef.current = ac;
 
-    const queryKey = resolveQueryKey(spaceId, displayPeriod, paneContext);
+    const queryKey = resolveSpaceHossiiQueryKey(
+      spaceId,
+      displayPeriod,
+      paneContext,
+      paneFetchScope,
+    );
     const limit = numericLimit(displayLimit);
     const prev = fetchedMetaRef.current;
     const sameQuery = prev?.queryKey === queryKey;
@@ -287,10 +288,20 @@ export function useSpaceHossiiFetch({
             spaceId,
             displayPeriod,
             paneContext,
+            paneFetchScope,
           );
         } else {
           fetchedMetaRef.current = null;
-          await runFetch(reqId, targetCount, [], null, spaceId, displayPeriod, paneContext);
+          await runFetch(
+            reqId,
+            targetCount,
+            [],
+            null,
+            spaceId,
+            displayPeriod,
+            paneContext,
+            paneFetchScope,
+          );
         }
       } finally {
         if (reqId === requestIdRef.current) onLoadingChangeRef.current(false);
@@ -309,6 +320,8 @@ export function useSpaceHossiiFetch({
     defaultPaneId,
     runFetch,
     paneContext,
+    paneFetchScopeKey,
+    paneFetchScope,
   ]);
 
   return progress;

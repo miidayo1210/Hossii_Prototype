@@ -1830,11 +1830,16 @@ Pane切替 / 投稿分離 / 背景 override / postFields override / Pane URL / P
 
 関連: `CommentsScreen.tsx`
 
-#### Phase 9B — 未実装（延期可）
+#### Phase 9B — ✅ 実装済み（2026-06-27）
 
-* すべてのPane / 指定Pane フィルタ
-* query key `pane:*`
-* PaneFilterSegment
+* PaneFilterSegment（このタブ / すべてのタブ / 各タブ dropdown）
+* すべての Pane: query key `pane:*`、`paneFetchScope: all-panes`
+* 指定 Pane: query key `pane:{paneId}`、`paneFetchScope: pane`
+* 永続化: `hossii.commentsPaneFilter.{spaceId}`
+* `useSpaceHossiiFetch` に `paneFetchScope` override（`spaceHossiiFetchResolve.ts`）
+* クイックログ・URL / タブバーは変更なし（Comments 内フィルタのみ）
+
+関連: `CommentsScreen.tsx`, `PaneFilterSegment.tsx`, `commentsPaneFilterStorage.ts`
 
 ### Phase 10：任意のデータ整理
 

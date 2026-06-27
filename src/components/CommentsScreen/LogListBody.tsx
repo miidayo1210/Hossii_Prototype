@@ -12,6 +12,9 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { LogScopeSegment } from './LogScopeSegment';
+import { PaneFilterSegment, type PaneFilterCountMode } from './PaneFilterSegment';
+import type { CommentsPaneFilter } from '../../core/utils/commentsPaneFilterStorage';
+import type { SpacePane } from '../../core/types/spacePane';
 import styles from './CommentsScreen.module.css';
 
 type LikeButtonProps = {
@@ -78,6 +81,13 @@ export type LogListBodyProps = {
   onNavigateToPost?: () => void;
   /** クイックログパネルの「投稿してみる」 */
   onOpenQuickPost?: () => void;
+  /** Phase 9B: #comments の Pane フィルタ（panelMode では未使用） */
+  paneFilter?: CommentsPaneFilter;
+  visiblePanes?: SpacePane[];
+  activePane?: SpacePane | null;
+  onPaneFilterChange?: (next: CommentsPaneFilter) => void;
+  getPaneFilterCount?: (mode: PaneFilterCountMode, paneId?: string) => number;
+  commentsFetchLoading?: boolean;
 };
 
 export function LogListBody({
@@ -90,6 +100,12 @@ export function LogListBody({
   initialLogScope,
   onNavigateToPost,
   onOpenQuickPost,
+  paneFilter,
+  visiblePanes,
+  activePane,
+  onPaneFilterChange,
+  getPaneFilterCount,
+  commentsFetchLoading = false,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
   const { state, hideHossii, getActiveNickname } = useHossiiStore();
@@ -472,6 +488,14 @@ export function LogListBody({
     ? `${sortedHossiis.length} 件`
     : `${sortedHossiis.length} 件の投稿`;
 
+  const showPaneFilter =
+    !panelMode &&
+    paneFilter &&
+    onPaneFilterChange &&
+    getPaneFilterCount &&
+    visiblePanes &&
+    visiblePanes.length >= 2;
+
   const scopeHeaderBlock = (
     <div className={styles.scopeHeaderBlock}>
       <LogScopeSegment
@@ -481,6 +505,16 @@ export function LogListBody({
         onChange={handleScopeChange}
         compact={panelMode}
       />
+      {showPaneFilter && (
+        <PaneFilterSegment
+          filter={paneFilter}
+          visiblePanes={visiblePanes}
+          activePane={activePane ?? null}
+          getCount={getPaneFilterCount}
+          onChange={onPaneFilterChange}
+          fetchLoading={commentsFetchLoading}
+        />
+      )}
       {isMineScope && activeNickname && (
         <div
           className={`${styles.identityBanner} ${panelMode ? styles.identityBannerCompact : ''}`}
