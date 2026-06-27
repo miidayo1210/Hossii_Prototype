@@ -926,7 +926,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     currentUser?.communityId,
   ]);
 
-  // ===== Supabase: アクティブスペースの hossiis は useSpaceHossiiFetch / useCommentsHossiiFetch が取得 =====
+  // ===== Supabase: アクティブスペースの hossiis は useSpaceHossiiFetch が取得 =====
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 

@@ -1821,9 +1821,18 @@ Pane切替 / 投稿分離 / 背景 override / postFields override / Pane URL / P
 
 ### Phase 9：コメント一覧
 
-* 現在のPane
-* すべてのPane
-* 指定Pane
+#### Phase 9A — ✅ 実装済み（2026-06-27）
+
+* `#comments` を active Pane スコープで fetch（`useSpaceHossiiFetch` + `paneContext`）
+* query key: `{spaceId}:pane:{activePaneId}:all:v2`
+* デモ環境: `matchesPane` によるクライアント filter
+* `useCommentsHossiiFetch`（all-panes 専用）を廃止
+
+関連: `CommentsScreen.tsx`
+
+#### Phase 9B — 未実装（延期可）
+
+* すべてのPane / 指定Pane フィルタ
 * query key `pane:*`
 * PaneFilterSegment
 

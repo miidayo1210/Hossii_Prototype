@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
-import { useCommentsHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
+import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
+import { useSpaceHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
 import { buildQueryKeyV2 } from '../../core/utils/hossiiQueryKey';
+import { matchesPane, type PaneContext } from '../../core/utils/hossiiPaneMembership';
 import { isSupabaseConfigured } from '../../core/supabase';
 import { useRouter } from '../../core/hooks/useRouter';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
@@ -18,31 +20,59 @@ export const CommentsScreen = () => {
     setHossiiFetchLoading,
   } = useHossiiStore();
   const { activeSpaceId } = state;
+  const { activePane, defaultPane, isLoading: panesLoading } = useSpacePane();
 
-  const commentsQueryKey = useMemo(
-    () =>
-      activeSpaceId
-        ? buildQueryKeyV2(activeSpaceId, { kind: 'all-panes' }, 'all')
-        : null,
-    [activeSpaceId],
-  );
+  const paneContext = useMemo((): PaneContext | null => {
+    if (!activeSpaceId || !activePane || !defaultPane) return null;
+    return {
+      spaceId: activeSpaceId,
+      activePaneId: activePane.id,
+      defaultPaneId: defaultPane.id,
+    };
+  }, [activeSpaceId, activePane, defaultPane]);
 
-  useCommentsHossiiFetch(
-    activeSpaceId,
-    (items) => {
-      if (commentsQueryKey) syncFetchedHossiis(items, commentsQueryKey);
+  const commentsQueryKey = useMemo(() => {
+    if (!activeSpaceId || !paneContext) return null;
+    return buildQueryKeyV2(
+      activeSpaceId,
+      { kind: 'pane', paneId: paneContext.activePaneId },
+      'all',
+    );
+  }, [activeSpaceId, paneContext]);
+
+  const handleCommentsFetched = useCallback(
+    (items: Parameters<typeof syncFetchedHossiis>[0], opts?: { merge?: boolean }) => {
+      if (!commentsQueryKey) return;
+      syncFetchedHossiis(items, commentsQueryKey, opts);
     },
-    setHossiiFetchLoading,
+    [commentsQueryKey, syncFetchedHossiis],
   );
+
+  useSpaceHossiiFetch({
+    spaceId: activeSpaceId,
+    displayLimit: 'unlimited',
+    displayPeriod: 'all',
+    paneContext,
+    enabled: isSupabaseConfigured && !panesLoading && paneContext !== null,
+    onFetched: handleCommentsFetched,
+    onLoadingChange: setHossiiFetchLoading,
+    getExistingHossiis: () =>
+      commentsQueryKey ? getHossiisForQueryKey(commentsQueryKey) : [],
+  });
 
   const hossiis = useMemo(() => {
-    if (!commentsQueryKey) return getActiveSpaceHossiis();
-    const keyed = getHossiisForQueryKey(commentsQueryKey);
-    if (!isSupabaseConfigured && keyed.length === 0) {
-      return getActiveSpaceHossiis();
+    if (!paneContext) return [];
+    if (isSupabaseConfigured) {
+      if (!commentsQueryKey) return [];
+      return getHossiisForQueryKey(commentsQueryKey);
     }
-    return keyed.length > 0 ? keyed : getActiveSpaceHossiis();
-  }, [commentsQueryKey, getHossiisForQueryKey, getActiveSpaceHossiis]);
+    return getActiveSpaceHossiis().filter((h) => matchesPane(h, paneContext));
+  }, [
+    paneContext,
+    commentsQueryKey,
+    getHossiisForQueryKey,
+    getActiveSpaceHossiis,
+  ]);
 
   const activeSpace = state.spaces.find((s) => s.id === activeSpaceId);
 

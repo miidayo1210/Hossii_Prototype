@@ -26,6 +26,12 @@ describe('hossiiQueryKey', () => {
         `${spaceId}:pane:*:all:v2`,
       );
     });
+
+    it('builds comments screen key for active pane with all period', () => {
+      expect(buildQueryKeyV2(spaceId, { kind: 'pane', paneId: paneAId }, 'all')).toBe(
+        `${spaceId}:pane:${paneAId}:all:v2`,
+      );
+    });
   });
 
   describe('parseQueryKey', () => {
