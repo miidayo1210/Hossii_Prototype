@@ -43,10 +43,6 @@ type Props = {
   onShowPostCountBadgeToggle?: () => void;
   /** 大画面トグルの説明文をスマホ向けに変える（仕様71） */
   isMobile?: boolean;
-  /** クイックログパネルのトグル */
-  onQuickLogToggle?: () => void;
-  /** 音声パネルのトグル */
-  onSpeechPanelToggle?: () => void;
   /** スペース画面タグ絞り込み（モバイル ... メニュー） */
   tagFilterCandidates?: string[];
   activeTagFilter?: string | null;
@@ -104,8 +100,6 @@ export const LeftControlBar = ({
   showPostCountBadge = false,
   onShowPostCountBadgeToggle,
   isMobile = false,
-  onQuickLogToggle,
-  onSpeechPanelToggle,
   tagFilterCandidates = [],
   activeTagFilter = null,
   onTagFilterChange,
@@ -322,10 +316,6 @@ export const LeftControlBar = ({
               onDisplayPeriodChange,
               displayLimit,
               handleLimitChange,
-              showPostCountBadge,
-              onShowPostCountBadgeToggle,
-              onQuickLogToggle,
-              onSpeechPanelToggle,
               tagFilterCandidates,
               activeTagFilter,
               onTagFilterChange,
@@ -353,10 +343,6 @@ export const LeftControlBar = ({
               onDisplayPeriodChange,
               displayLimit,
               handleLimitChange,
-              showPostCountBadge,
-              onShowPostCountBadgeToggle,
-              onQuickLogToggle,
-              onSpeechPanelToggle,
               tagFilterCandidates,
               activeTagFilter,
               onTagFilterChange,
@@ -378,10 +364,6 @@ type OverflowMenuContentProps = {
   onDisplayPeriodChange: (p: DisplayPeriod) => void;
   displayLimit: DisplayLimit;
   handleLimitChange: (l: DisplayLimit) => void;
-  showPostCountBadge: boolean;
-  onShowPostCountBadgeToggle?: () => void;
-  onQuickLogToggle?: () => void;
-  onSpeechPanelToggle?: () => void;
   tagFilterCandidates?: string[];
   activeTagFilter?: string | null;
   onTagFilterChange?: (tag: string | null) => void;
@@ -397,10 +379,6 @@ function renderOverflowMenuContent({
   onDisplayPeriodChange,
   displayLimit,
   handleLimitChange,
-  showPostCountBadge,
-  onShowPostCountBadgeToggle,
-  onQuickLogToggle,
-  onSpeechPanelToggle,
   tagFilterCandidates = [],
   activeTagFilter = null,
   onTagFilterChange,
@@ -510,45 +488,6 @@ function renderOverflowMenuContent({
                       </button>
                     ))}
                   </div>
-                </div>
-              </>
-            )}
-
-            {(onShowPostCountBadgeToggle || onQuickLogToggle || onSpeechPanelToggle) && (
-              <>
-                <div className={styles.overflowDivider} />
-                <div className={styles.overflowSection}>
-                  {onShowPostCountBadgeToggle && (
-                    <button
-                      type="button"
-                      className={`${styles.overflowRowButton} ${showPostCountBadge ? styles.overflowRowButtonActive : ''}`}
-                      onClick={onShowPostCountBadgeToggle}
-                      aria-pressed={showPostCountBadge}
-                    >
-                      <Hash size={14} />
-                      <span>投稿数{showPostCountBadge ? ' ON' : ' OFF'}</span>
-                    </button>
-                  )}
-                  {onQuickLogToggle && (
-                    <button
-                      type="button"
-                      className={styles.overflowRowButton}
-                      onClick={onQuickLogToggle}
-                    >
-                      <span>📋</span>
-                      <span>ログ一覧</span>
-                    </button>
-                  )}
-                  {onSpeechPanelToggle && (
-                    <button
-                      type="button"
-                      className={styles.overflowRowButton}
-                      onClick={onSpeechPanelToggle}
-                    >
-                      <span>🎙</span>
-                      <span>音声入力</span>
-                    </button>
-                  )}
                 </div>
               </>
             )}

@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import type { Hossii } from '../../core/types';
+import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { PinButton } from './PinButton';
 import styles from './StarHoverPreview.module.css';
 
@@ -37,6 +38,7 @@ export function StarHoverPreview({
     ? rawMessage.slice(0, MAX_TEXT) + (rawMessage.length > MAX_TEXT ? '…' : '')
     : null;
   const author = hossii.authorName?.trim() || '—';
+  const emotionEmoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : null;
 
   return createPortal(
     <div
@@ -58,7 +60,14 @@ export function StarHoverPreview({
         <img src={hossii.imageUrl} alt="" className={styles.thumb} />
       )}
       {message && <p className={styles.message}>{message}</p>}
-      <span className={styles.author}>{author}</span>
+      <span className={styles.authorLine}>
+        {emotionEmoji && (
+          <span className={styles.authorEmotion} aria-hidden="true">
+            {emotionEmoji}
+          </span>
+        )}
+        <span className={styles.author}>{author}</span>
+      </span>
     </div>,
     document.body,
   );

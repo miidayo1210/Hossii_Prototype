@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { SpaceDescriptionInline } from '../SpaceScreen/SpaceDescriptionInline';
 import styles from './TopBar.module.css';
 
-export const TopBar = () => {
+type Props = {
+  description?: string;
+};
+
+export const TopBar = ({ description }: Props) => {
   const { state } = useHossiiStore();
 
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
@@ -20,7 +25,15 @@ export const TopBar = () => {
 
   return (
     <header className={styles.topBar}>
-      <div className={styles.spaceName}>{spaceName}</div>
+      <div className={styles.titleCluster}>
+        <div className={styles.spaceName}>{spaceName}</div>
+        {description && (
+          <SpaceDescriptionInline
+            description={description}
+            className={styles.topBarDescription}
+          />
+        )}
+      </div>
     </header>
   );
 };

@@ -1,8 +1,9 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type { Hossii } from '../../core/types';
 import type { AnimationLevel } from '../../core/utils/animationLevel';
 import type { StarMarkerType } from '../../core/types/settings';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
+import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
 import { PinButton } from './PinButton';
 import styles from './StarView.module.css';
@@ -53,6 +54,9 @@ function StarViewInner({
   onPinToggle,
   showPinUi = false,
 }: Props) {
+  const [isStarHovered, setIsStarHovered] = useState(false);
+  const previewInteractive = showPreview && (isPinned || isStarHovered);
+
   const { ref: visibilityRef, level: visibleLevel } = useVisibleAnimationLevel(
     animationLevel,
     animationLevel !== 'none',
@@ -60,6 +64,7 @@ function StarViewInner({
 
   const isLaughter = hossii.autoType === 'laughter';
   const emotion = hossii.emotion;
+  const emotionEmoji = emotion ? EMOJI_BY_EMOTION[emotion] : null;
 
   const pulseDelay = ((x + y) * 37) % 100 / 100;
   const floatDelay = ((x * 53 + y * 71) % 100) / 100;
@@ -87,8 +92,14 @@ function StarViewInner({
         ...(orderedStackZ != null ? { '--star-stack': orderedStackZ } : {}),
       } as React.CSSProperties}
       onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      onMouseEnter={(e) => {
+        setIsStarHovered(true);
+        onMouseEnter?.(e);
+      }}
+      onMouseLeave={() => {
+        setIsStarHovered(false);
+        onMouseLeave?.();
+      }}
       aria-label={`${hossii.authorName || 'Post'} from ${hossii.createdAt.toLocaleTimeString()}`}
       data-emotion={emotion}
       data-animation-level={visibleLevel}
@@ -103,7 +114,13 @@ function StarViewInner({
 
       {showPreview && (previewText || hossii.imageUrl || hossii.authorName) && (
         <div
-          className={`${styles.previewBubble} ${previewSide === 'left' ? styles.previewLeft : styles.previewRight}`}
+          className={[
+            styles.previewBubble,
+            previewSide === 'left' ? styles.previewLeft : styles.previewRight,
+            previewInteractive ? styles.previewBubbleInteractive : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
@@ -120,13 +137,20 @@ function StarViewInner({
             <p className={styles.previewText}>{previewText}</p>
           )}
           {hossii.authorName && (
-            <span className={styles.previewAuthor}>{hossii.authorName}</span>
+            <span className={styles.previewAuthorLine}>
+              {emotionEmoji && (
+                <span className={styles.previewEmotion} aria-hidden="true">
+                  {emotionEmoji}
+                </span>
+              )}
+              <span className={styles.previewAuthor}>{hossii.authorName}</span>
+            </span>
           )}
           {showPinUi && onPinToggle && (
             <PinButton
               className={styles.previewPinButton}
               isPinned={isPinned}
-              visible={isPinned}
+              visible={isPinned || isStarHovered}
               onToggle={() => onPinToggle(hossii.id)}
             />
           )}

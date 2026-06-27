@@ -8,7 +8,7 @@ export function computePreviewSlotCount(options: {
   postsWithContentCount: number;
   isMobile: boolean;
   isPortrait: boolean;
-  presentationMode: 'bubbles' | 'stars';
+  presentationMode: 'custom' | 'stars';
 }): number {
   const {
     layoutMode,

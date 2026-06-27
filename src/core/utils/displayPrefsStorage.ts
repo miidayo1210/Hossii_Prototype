@@ -14,7 +14,7 @@ import {
 export type DisplayPeriod = '1d' | '1w' | '1m' | 'all';
 
 const DISPLAY_PERIOD_KEY = 'hossii.displayPeriod';
-const DEFAULT_PERIOD: DisplayPeriod = '1w';
+const DEFAULT_PERIOD: DisplayPeriod = 'all';
 
 const VALID_PERIODS: DisplayPeriod[] = ['1d', '1w', '1m', 'all'];
 

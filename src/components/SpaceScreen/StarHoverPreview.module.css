@@ -84,8 +84,20 @@
   overflow: hidden;
 }
 
+.authorLine {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.authorEmotion {
+  font-size: 0.8125rem;
+  line-height: 1;
+}
+
 .author {
-  display: block;
+  display: inline;
   font-size: 0.8125rem;
   color: rgba(109, 40, 217, 0.90);
   font-weight: 600;

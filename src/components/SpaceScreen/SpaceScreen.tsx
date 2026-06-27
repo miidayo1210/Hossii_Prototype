@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import type { CSSProperties } from 'react';
-import { Hash, ImageDown, Info } from 'lucide-react';
+import { Hash, ImageDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
@@ -62,8 +62,7 @@ import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { TopBar } from '../Navigation/TopBar';
 import { LeftControlBar, type ControlState } from '../Navigation/LeftControlBar';
 import { QRCodePanel } from '../Navigation/QRCodePanel';
-import { SpaceDescriptionPanel } from './SpaceDescriptionPanel';
-import { SpaceDescriptionSheet } from './SpaceDescriptionSheet';
+import { SpaceDescriptionInline } from './SpaceDescriptionInline';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { VoiceConsentModal } from '../VoiceConsentModal/VoiceConsentModal';
@@ -297,7 +296,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [qrPanelVisible, setQrPanelVisible] = useState(true);
   const [descriptionPanelVisible, setDescriptionPanelVisible] = useState(true);
-  const [descriptionSheetOpen, setDescriptionSheetOpen] = useState(false);
   const [showPostCountBadge, setShowPostCountBadge] = useState(loadShowPostCountBadge);
   const [visitingToastVisible, setVisitingToastVisible] = useState(false);
 
@@ -323,22 +321,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const handleQuickLogClose = useCallback(() => {
     setQuickLogOpen(false);
   }, []);
-
-  const handleQuickLogToggle = useCallback(() => {
-    setQuickLogOpen((v) => !v);
-  }, []);
-
-  /** 音声パネルを開く／閉じる（閉じるときは全文リセット） */
-  const handleSpeechDockToggle = useCallback(() => {
-    if (isVisiting) return;
-    setSpeechPanelOpen((wasOpen) => {
-      if (wasOpen) {
-        setPanelConfirmedText('');
-        setDismissedSpeechCandidates([]);
-      }
-      return !wasOpen;
-    });
-  }, [isVisiting]);
 
   /** 投稿パネルを開く（位置未指定＝ランダム配置）／閉じる */
   const openQuickPost = useCallback(() => {
@@ -817,8 +799,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, [filteredHossiis, pinnedOrder]);
 
   const handlePinToggle = useCallback(
-    (id: string) => toggle(id),
-    [toggle],
+    (id: string) => {
+      toggle(id);
+      if (hoveredHossiiId === id) {
+        if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
+        if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
+        setHoveredHossiiId(null);
+        setHoverAnchorRect(null);
+      }
+    },
+    [toggle, hoveredHossiiId],
   );
 
   const handlePinHighlight = useCallback((id: string) => {
@@ -870,7 +860,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const handleStarToggle = useCallback(() => {
-    const next: PresentationMode = presentationMode === 'stars' ? 'bubbles' : 'stars';
+    const next: PresentationMode = presentationMode === 'stars' ? 'custom' : 'stars';
     const commit = () => {
       setPresentationMode(next);
       savePresentationMode(next);
@@ -890,9 +880,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     }, 200);
   }, [presentationMode, prefersReducedMotion]);
 
+  const hasInlineStarPreview = useCallback(
+    (hossiiId: string) => isPinned(hossiiId) || previewHossiiIds.has(hossiiId),
+    [isPinned, previewHossiiIds],
+  );
+
   const handleStarMouseEnter = useCallback(
     (hossiiId: string, e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!useStarView) return;
+      if (!useStarView || hasInlineStarPreview(hossiiId)) return;
       const rect = e.currentTarget.getBoundingClientRect();
       if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
       if (hoverEnterTimerRef.current) clearTimeout(hoverEnterTimerRef.current);
@@ -901,7 +896,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         setHoverAnchorRect(rect);
       }, 50);
     },
-    [useStarView],
+    [useStarView, hasInlineStarPreview],
   );
 
   const scheduleHoverDismiss = useCallback(() => {
@@ -1590,7 +1585,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             背景を表示中 — もう一度タップで戻る
           </div>
         )}
-        {useStarView && hoveredHossiiId && hoverAnchorRect && (() => {
+        {useStarView && hoveredHossiiId && hoverAnchorRect && !hasInlineStarPreview(hoveredHossiiId) && (() => {
           const hovered = filteredHossiis.find((h) => h.id === hoveredHossiiId);
           if (!hovered) return null;
           return (
@@ -1746,23 +1741,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           <span className={styles.spaceTitleText}>{spaceForVisual?.name ?? 'My Space'}</span>
         </div>
         {hasDescription && isMobile && (
-          <button
-            type="button"
-            className={styles.descriptionInfoButton}
-            onClick={() => setDescriptionSheetOpen(true)}
-            aria-label="スペースの説明を表示"
-          >
-            <Info size={16} />
-          </button>
+          <SpaceDescriptionInline
+            description={spaceDescription}
+            className={styles.spaceTitleDescription}
+          />
         )}
       </div>
-      {hasDescription && isMobile && (
-        <SpaceDescriptionSheet
-          open={descriptionSheetOpen}
-          onClose={() => setDescriptionSheetOpen(false)}
-          description={spaceDescription}
-        />
-      )}
 
       {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー / タグ・星 */}
       {(showPostCountBadge ||
@@ -1926,25 +1910,25 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                   type="button"
                   className={`${styles.clusterPill} ${presentationMode === 'stars' ? styles.clusterPillActive : ''}`}
                   aria-pressed={presentationMode === 'stars'}
-                  aria-label={`星表示 ${presentationMode === 'stars' ? 'オン' : 'オフ'}`}
-                  title={presentationMode === 'stars' ? '吹き出し表示に切り替え' : '星表示に切り替え'}
+                  aria-label={
+                    presentationMode === 'stars'
+                      ? 'カスタムモードに切り替え'
+                      : '星モードに切り替え'
+                  }
+                  title={
+                    presentationMode === 'stars'
+                      ? 'カスタムモード（吹き出し表示）に切り替え'
+                      : '星モードに切り替え'
+                  }
                   onClick={handleStarToggle}
                 >
-                  {presentationMode === 'stars' ? '★' : '☆'} 星
+                  {presentationMode === 'stars' ? 'カスタム' : '☆ 星'}
                 </button>
               )}
             </div>
           )}
         </div>
       )}
-
-      {hasDescription &&
-        descriptionPanelVisible &&
-        !isMobile &&
-        !isMobileLandscape &&
-        viewMode !== 'slideshow' && (
-          <SpaceDescriptionPanel description={spaceDescription} />
-        )}
 
       {/* Listening インジケーター（タップで音声パネル開閉・書き出し対象外） */}
       {listenMode && (
@@ -2087,7 +2071,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {/* PC版のみ表示: トップバー、右上メニュー、左コントロールバー、QR */}
       {viewMode !== 'slideshow' && (
         <>
-          <TopBar />
+          <TopBar
+            description={
+              hasDescription && descriptionPanelVisible && !isMobile
+                ? spaceDescription
+                : undefined
+            }
+          />
           <TopRightMenu onPostClick={handleTopRightPostClick} />
           <LeftControlBar
             controls={controlState}
@@ -2121,8 +2111,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             onShowPostCountBadgeToggle={
               isMobile ? undefined : handleShowPostCountBadgeToggle
             }
-            onQuickLogToggle={handleQuickLogToggle}
-            onSpeechPanelToggle={handleSpeechDockToggle}
             tagFilterCandidates={isMobile ? tagCandidates : undefined}
             activeTagFilter={isMobile ? activeTagFilter : undefined}
             onTagFilterChange={isMobile ? applyTagFilter : undefined}

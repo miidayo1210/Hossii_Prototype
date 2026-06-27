@@ -82,15 +82,18 @@
   }
 }
 
-/* スペースタイトル行（モバイル: pill + 説明ボタン） */
+/* スペースタイトル行（モバイル: タイトル pill + 説明テキスト） */
 .spaceTitleRow {
   position: fixed;
   top: 12px;
   left: 12px;
   z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 4px;
+  max-width: min(calc(100vw - 24px), 96vw);
+  min-width: 0;
 }
 
 /* スペースタイトル pill バッジ */
@@ -98,21 +101,29 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 
   font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;
-  max-width: min(220px, 55vw);
+  max-width: min(200px, 42vw);
   overflow: hidden;
   text-overflow: ellipsis;
 
-  color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.30);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 1px 2px rgba(8, 4, 20, 0.55);
+  background: linear-gradient(
+    135deg,
+    rgba(30, 16, 52, 0.78) 0%,
+    rgba(48, 22, 68, 0.72) 100%
+  );
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(168, 85, 247, 0.42);
+  box-shadow:
+    0 2px 14px rgba(12, 6, 28, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
   padding: 5px 12px 5px 10px;
   border-radius: 9999px;
@@ -121,22 +132,14 @@
   transition: background 0.2s;
 }
 
-.descriptionInfoButton {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.30);
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
-  color: rgba(255, 255, 255, 0.95);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.spaceTitleDescription {
+  flex: 1 1 8rem;
+  min-width: 0;
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow:
+    0 1px 2px rgba(8, 4, 20, 0.65),
+    0 0 8px rgba(8, 4, 20, 0.35);
 }
 
 /* スペース名テキスト */
