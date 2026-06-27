@@ -37,6 +37,12 @@ import styles from './App.module.css';
 import { ScaledContent } from './components/ScaledContent/ScaledContent';
 import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
 import { HossiiToast } from './core/ui/HossiiToast';
+import {
+  AUTH_ROUTE_CHANGE_EVENT,
+  navigateAuthRoute,
+  pathnameToAppRoute,
+  type AuthAppRoute,
+} from './core/utils/authRoute';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
 const URL_PATH_SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
@@ -106,6 +112,24 @@ const AppContent = () => {
     return slug;
   }, [resolveSlugFromPath]);
 
+  const clearPendingAuthState = useCallback(() => {
+    setPendingReturnPath(null);
+    setPendingLoginSlug(null);
+    setPendingAuthMode('login');
+  }, []);
+
+  const handlePersonalAuthClose = useCallback(() => {
+    const returnPath = pendingReturnPath;
+    clearPendingAuthState();
+    if (returnPath) {
+      window.history.replaceState({}, '', returnPath);
+      setAppRoute('default');
+      return;
+    }
+    window.history.replaceState({}, '', '/');
+    setAppRoute('default');
+  }, [pendingReturnPath, clearPendingAuthState]);
+
   // ゲスト入室中に AccountScreen からログイン/新規登録を要求されたとき
   const handleGuestAuthRequested = (mode: 'login' | 'signup') => {
     const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
@@ -117,46 +141,59 @@ const AppContent = () => {
         setPendingReturnPath(`/s/${activeSpace.spaceURL}`);
       }
       setPendingLoginSlug(activeSpace.spaceURL);
-      setPendingAuthMode(mode);
-      return;
     }
-    window.history.replaceState({}, '', mode === 'login' ? '/login' : '/signup');
-    setAppRoute(mode === 'login' ? 'login' : 'signup');
+    setPendingAuthMode(mode);
+    navigateAuthRoute(mode);
   };
 
   const handleGuestLoginRequested = useCallback(() => {
-    const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
-    if (guestSpace?.spaceURL) {
-      setPendingReturnPath(`/s/${guestSpace.spaceURL}`);
-      setPendingLoginSlug(guestSpace.spaceURL);
-    } else {
-      captureAuthReturnTarget();
-    }
+    captureAuthReturnTarget();
     setPendingAuthMode('login');
-  }, [state.spaces, guestSpaceId, captureAuthReturnTarget]);
+    navigateAuthRoute('login');
+  }, [captureAuthReturnTarget]);
 
   const handleGuestSignUpRequested = useCallback(() => {
-    const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
-    if (guestSpace?.spaceURL) {
-      setPendingReturnPath(`/s/${guestSpace.spaceURL}`);
-      setPendingLoginSlug(guestSpace.spaceURL);
-    } else {
-      captureAuthReturnTarget();
-    }
+    captureAuthReturnTarget();
     setPendingAuthMode('signup');
-  }, [state.spaces, guestSpaceId, captureAuthReturnTarget]);
+    navigateAuthRoute('signup');
+  }, [captureAuthReturnTarget]);
 
   // isPrivate なスペースへの未ログインアクセス時に true になる
   const [guestSpaceIsPrivate, setGuestSpaceIsPrivate] = useState(false);
 
-  // /admin/login パスを検出（pathname ベース）
-  const [appRoute, setAppRoute] = useState<'admin-login' | 'login' | 'signup' | 'default'>(() => {
-    const path = window.location.pathname;
-    if (path === '/admin/login') return 'admin-login';
-    if (path === '/login') return 'login';
-    if (path === '/signup') return 'signup';
-    return 'default';
-  });
+  // /admin/login, /login, /signup を pathname から検出（末尾スラッシュ対応）
+  const [appRoute, setAppRoute] = useState<AuthAppRoute>(() =>
+    pathnameToAppRoute(window.location.pathname),
+  );
+
+  const syncAppRouteFromPathname = useCallback(() => {
+    setAppRoute(pathnameToAppRoute(window.location.pathname));
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => syncAppRouteFromPathname();
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener(AUTH_ROUTE_CHANGE_EVENT, syncAppRouteFromPathname);
+
+    const originalPushState = history.pushState.bind(history);
+    const originalReplaceState = history.replaceState.bind(history);
+
+    history.pushState = (...args: Parameters<History['pushState']>) => {
+      originalPushState(...args);
+      syncAppRouteFromPathname();
+    };
+    history.replaceState = (...args: Parameters<History['replaceState']>) => {
+      originalReplaceState(...args);
+      syncAppRouteFromPathname();
+    };
+
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener(AUTH_ROUTE_CHANGE_EVENT, syncAppRouteFromPathname);
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+    };
+  }, [syncAppRouteFromPathname]);
 
 
   // 処理済みの spaceId を追跡（二重処理防止）
@@ -443,30 +480,6 @@ const AppContent = () => {
     );
   }
 
-  // /login /signup パスの場合: 個人認証画面
-  if (appRoute === 'login' || appRoute === 'signup') {
-    if (isResolvingAuth) {
-      return (
-        <div style={{
-          minHeight: '100dvh',
-          background: 'linear-gradient(150deg, #ede9fe 0%, #f5f3ff 40%, #fce7f3 100%)',
-        }} />
-      );
-    }
-    if (currentUser) {
-      return null;
-    }
-    return (
-      <LoginScreen
-        initialMode={appRoute === 'signup' ? 'signup' : 'login'}
-        onClose={() => {
-          window.history.replaceState({}, '', '/');
-          setAppRoute('default');
-        }}
-      />
-    );
-  }
-
   // /admin/login パスの場合: 管理者ログイン画面を表示
   if (appRoute === 'admin-login') {
     // ログイン済み管理者は useEffect で自動遷移するまでローディング表示
@@ -485,6 +498,27 @@ const AppContent = () => {
           setAppRoute('default');
           navigate(user.isSuperAdmin ? 'communities' : 'spaces');
         }}
+      />
+    );
+  }
+
+  // /login /signup パスの場合: 個人認証画面
+  if (appRoute === 'login' || appRoute === 'signup') {
+    if (isResolvingAuth) {
+      return (
+        <div style={{
+          minHeight: '100dvh',
+          background: 'linear-gradient(150deg, #ede9fe 0%, #f5f3ff 40%, #fce7f3 100%)',
+        }} />
+      );
+    }
+    if (currentUser) {
+      return null;
+    }
+    return (
+      <LoginScreen
+        initialMode={appRoute === 'signup' ? 'signup' : 'login'}
+        onClose={handlePersonalAuthClose}
       />
     );
   }
@@ -557,6 +591,16 @@ const AppContent = () => {
     );
   }
 
+  // ログイン/新規登録が選択された後 → LoginScreen（pathname 未遷移のフォールバック）
+  if (!currentUser && pendingLoginSlug) {
+    return (
+      <LoginScreen
+        initialMode={pendingAuthMode}
+        onClose={handlePersonalAuthClose}
+      />
+    );
+  }
+
   // /s/[slug] アクセス: 未ログインかつ isPrivate なスペース → アクセス拒否画面
   if (!currentUser && guestSpaceIsPrivate) {
     return (
@@ -564,7 +608,7 @@ const AppContent = () => {
         onLoginRequested={() => {
           captureAuthReturnTarget();
           setPendingAuthMode('login');
-          setGuestSpaceIsPrivate(false);
+          navigateAuthRoute('login');
         }}
       />
     );
@@ -585,20 +629,6 @@ const AppContent = () => {
         }}
         onLoginRequested={handleGuestLoginRequested}
         onSignUpRequested={handleGuestSignUpRequested}
-      />
-    );
-  }
-
-  // ログイン/新規登録が選択された後 → LoginScreen を表示（ゲストモード中も含む）
-  if (!currentUser && pendingLoginSlug) {
-    return (
-      <LoginScreen
-        initialMode={pendingAuthMode}
-        onClose={() => {
-          setPendingLoginSlug(null);
-          setPendingReturnPath(null);
-          setPendingAuthMode('login');
-        }}
       />
     );
   }

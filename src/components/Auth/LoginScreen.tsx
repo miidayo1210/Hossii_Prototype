@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Mail, Lock, LogIn, UserPlus, X, Eye, EyeOff, User } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
+import { navigatePersonalAuth } from '../../core/utils/authRoute';
 import { AuthEntryShell } from './AuthEntryShell';
 import shell from './authEntryShell.module.css';
 import styles from './LoginScreen.module.css';
@@ -18,18 +19,28 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [birthdate, setBirthdate] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | 'other' | 'prefer_not_to_say' | ''>('');
+  const [birthdate] = useState('');
+  const [gender] = useState<'male' | 'female' | 'other' | 'prefer_not_to_say' | ''>('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  const switchMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setError(null);
+    navigatePersonalAuth(nextMode, 'replace');
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (mode === 'signup' && !username.trim()) {
-      setError('ユーザー名を入力してください');
+      setError('表示名を入力してください');
       return;
     }
 
@@ -133,7 +144,7 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
         <div className={styles.tabs}>
           <button
             className={`${styles.tab} ${mode === 'login' ? styles.tabActive : ''}`}
-            onClick={() => setMode('login')}
+            onClick={() => switchMode('login')}
             disabled={loading}
           >
             <LogIn size={16} />
@@ -141,7 +152,7 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
           </button>
           <button
             className={`${styles.tab} ${mode === 'signup' ? styles.tabActive : ''}`}
-            onClick={() => setMode('signup')}
+            onClick={() => switchMode('signup')}
             disabled={loading}
           >
             <UserPlus size={16} />
@@ -165,7 +176,7 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
               <input
                 type="text"
                 className={styles.input}
-                placeholder="ユーザー名（必須）"
+                placeholder="表示名（必須）"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -210,36 +221,6 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-
-          {mode === 'signup' && (
-            <>
-              <div className={styles.inputGroup}>
-                <input
-                  type="date"
-                  className={`${styles.input} ${styles.inputNoIcon}`}
-                  placeholder="生年月日（任意）"
-                  value={birthdate}
-                  onChange={(e) => setBirthdate(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-
-              <div className={styles.inputGroup}>
-                <select
-                  className={`${styles.input} ${styles.inputNoIcon} ${styles.selectInput}`}
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as typeof gender)}
-                  disabled={loading}
-                >
-                  <option value="">性別（任意）</option>
-                  <option value="male">男性</option>
-                  <option value="female">女性</option>
-                  <option value="other">その他</option>
-                  <option value="prefer_not_to_say">回答しない</option>
-                </select>
-              </div>
-            </>
-          )}
 
           <button
             type="submit"

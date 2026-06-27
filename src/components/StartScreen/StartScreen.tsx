@@ -3,6 +3,7 @@ import { Hash } from 'lucide-react';
 import { AuthEntryShell } from '../Auth/AuthEntryShell';
 import shell from '../Auth/authEntryShell.module.css';
 import authStyles from '../Auth/LoginScreen.module.css';
+import { navigateAuthRoute } from '../../core/utils/authRoute';
 import { parseSpaceSlugFromInput, validateSpaceURL } from '../../core/utils/spaceUrlUtils';
 import styles from './StartScreen.module.css';
 
@@ -68,16 +69,24 @@ export const StartScreen = () => {
           <span className={authStyles.dividerText}>または</span>
         </div>
 
-        <div className={styles.comingSoonBlock}>
+        <div className={styles.authLinks}>
           <button
             type="button"
-            className={styles.createSpaceSoon}
-            disabled
-            aria-disabled="true"
+            className={authStyles.submitButton}
+            onClick={() => navigateAuthRoute('login')}
           >
-            <span>ログインしてスペースを作る</span>
-            <span className={styles.comingSoonBadge}>Coming soon</span>
+            アカウントでログイン
           </button>
+          <p className={styles.signupHint}>
+            はじめての方はこちら{' '}
+            <button
+              type="button"
+              className={styles.signupLink}
+              onClick={() => navigateAuthRoute('signup')}
+            >
+              新規登録
+            </button>
+          </p>
         </div>
       </div>
     </AuthEntryShell>
