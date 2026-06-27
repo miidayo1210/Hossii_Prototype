@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useAuth } from '../../core/contexts/useAuth';
+import { isOwnHossii } from '../../core/utils/isOwnHossii';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { getRelativeTime } from '../../core/utils/relativeTime';
@@ -17,7 +19,8 @@ import styles from './MyLogsScreen.module.css';
 type FilterType = 'all' | 'current';
 
 export const MyLogsScreen = () => {
-  const { state, getActiveSpaceHossiis } = useHossiiStore();
+  const { state, getActiveSpaceHossiis, myAuthorshipIds, refreshMyAuthorshipIds } = useHossiiStore();
+  const { currentUser } = useAuth();
   const { hossiis, spaces, profile, activeSpaceId } = state;
   const { visiblePanes, defaultPane, activePane } = useSpacePane();
 
@@ -48,6 +51,20 @@ export const MyLogsScreen = () => {
 
   const [sortOrder, setSortOrder] = useState<'newest' | 'likes'>('newest');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const guestProfileId = profile?.id;
+
+  const isMineHossii = useCallback(
+    (h: (typeof hossiis)[number]) =>
+      isOwnHossii(h, myAuthorshipIds, guestProfileId),
+    [myAuthorshipIds, guestProfileId],
+  );
+
+  useEffect(() => {
+    if (currentUser) {
+      void refreshMyAuthorshipIds();
+    }
+  }, [currentUser, refreshMyAuthorshipIds]);
 
   useEffect(() => {
     if (!lightboxUrl) return;
@@ -83,12 +100,12 @@ export const MyLogsScreen = () => {
   }, [activeSpaceId, defaultPane, activePane, paneFilter]);
 
   const getPaneFilterCount = (mode: PaneFilterCountMode, paneId?: string): number => {
-    if (!activeSpaceId || !defaultPane || !profile?.id) return 0;
+    if (!activeSpaceId || !defaultPane) return 0;
 
     const countVisible = (items: typeof hossiis) =>
       items.filter(
         (h) =>
-          h.authorId === profile.id &&
+          isMineHossii(h) &&
           h.spaceId === activeSpaceId &&
           !coerceIsHidden(h.isHidden),
       ).length;
@@ -122,9 +139,13 @@ export const MyLogsScreen = () => {
   };
 
   const myLogs = useMemo(() => {
-    if (!profile?.id) return [];
-
-    let logs = hossiis.filter((h) => h.authorId === profile.id);
+    const seen = new Set<string>();
+    let logs = hossiis.filter((h) => {
+      if (!isMineHossii(h)) return false;
+      if (seen.has(h.id)) return false;
+      seen.add(h.id);
+      return true;
+    });
 
     if (filter === 'current') {
       logs = logs.filter((h) => h.spaceId === activeSpaceId);
@@ -140,7 +161,7 @@ export const MyLogsScreen = () => {
     );
   }, [
     hossiis,
-    profile,
+    isMineHossii,
     filter,
     activeSpaceId,
     sortOrder,
@@ -215,7 +236,7 @@ export const MyLogsScreen = () => {
         <div className={styles.list}>
           {myLogs.length === 0 ? (
             <div className={styles.empty}>
-              {!profile?.id
+              {!profile?.id && !currentUser
                 ? 'まだ投稿がありません'
                 : filter === 'current'
                   ? 'このスペースへの投稿はまだありません'

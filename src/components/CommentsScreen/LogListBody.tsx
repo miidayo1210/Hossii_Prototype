@@ -8,6 +8,7 @@ import type { Hossii } from '../../core/types';
 import { FilterBar } from '../FilterBar/FilterBar';
 import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { isOwnHossii } from '../../core/utils/isOwnHossii';
 import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
@@ -118,8 +119,14 @@ export function LogListBody({
   movePaneBusyId = null,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
-  const { state, hideHossii, getActiveNickname } = useHossiiStore();
+  const { state, hideHossii, getActiveNickname, myAuthorshipIds } = useHossiiStore();
   const { profile } = state;
+  const guestProfileId = profile?.id;
+
+  const isMineHossii = useCallback(
+    (h: Hossii) => isOwnHossii(h, myAuthorshipIds, guestProfileId),
+    [myAuthorshipIds, guestProfileId],
+  );
   const isAdmin = currentUser?.isAdmin ?? false;
   const space = useMemo(
     () => (spaceId ? state.spaces.find((s) => s.id === spaceId) ?? null : null),
@@ -170,18 +177,14 @@ export function LogListBody({
 
   const allCount = visibleHossiis.length;
   const mineCount = useMemo(
-    () =>
-      profile?.id
-        ? visibleHossiis.filter((h) => h.authorId === profile.id).length
-        : 0,
-    [visibleHossiis, profile?.id]
+    () => visibleHossiis.filter((h) => isMineHossii(h)).length,
+    [visibleHossiis, isMineHossii]
   );
 
   const scopedHossiis = useMemo(() => {
     if (logScope !== 'mine') return visibleHossiis;
-    if (!profile?.id) return [];
-    return visibleHossiis.filter((h) => h.authorId === profile.id);
-  }, [visibleHossiis, logScope, profile?.id]);
+    return visibleHossiis.filter((h) => isMineHossii(h));
+  }, [visibleHossiis, logScope, isMineHossii]);
 
   const allTagCandidates = useMemo(() => {
     const set = new Set<string>(presetTags);

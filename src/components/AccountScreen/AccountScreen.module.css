@@ -102,6 +102,29 @@
   white-space: nowrap;
 }
 
+.linkActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.linkButton {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #4c1d95;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.linkButton:hover {
+  background: #faf5ff;
+}
+
 /* ゲスト表示 */
 .guestInfo {
   display: flex;

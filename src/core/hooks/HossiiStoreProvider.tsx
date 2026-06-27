@@ -70,6 +70,7 @@ import {
   deleteSpaceFromDb,
 } from '../utils/spacesApi';
 import { ensureDefaultSpacePane, healDefaultSpacePanes } from '../utils/ensureDefaultSpacePane';
+import { fetchMyAuthorshipIdsForSpace } from '../utils/hossiiAuthorshipsApi';
 import {
   insertHossii,
   updateHossiiColor,
@@ -737,6 +738,8 @@ export type HossiiContextValue = {
   spacesLoadedFromSupabase: boolean;
   hossiiLoadedFromSupabase: boolean;
   communitySlug: string | null | undefined;
+  myAuthorshipIds: ReadonlySet<string>;
+  refreshMyAuthorshipIds: () => Promise<void>;
   addHossii: (input: AddHossiiInput) => void;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -777,6 +780,12 @@ type HossiiProviderProps = {
 
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
   const { currentUser, isResolvingAuth } = useAuth();
+  const currentUserRef = useRef(currentUser);
+  useLayoutEffect(() => {
+    currentUserRef.current = currentUser;
+  });
+  const [myAuthorshipIds, setMyAuthorshipIds] = useState<ReadonlySet<string>>(() => new Set());
+  const authorshipFetchSeqRef = useRef(0);
   const { overrideCommunityId, overrideCommunitySlug } = useAdminNavigation();
   /** 直近で成功した fetchSpaces のコミュニティ ID（スーパー管理者のスコープ切替検知用） */
   const lastScopedCommunityFetchKeyRef = useRef<string | undefined>(undefined);
@@ -858,6 +867,84 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
   /** hossii 同期 effect が「同じスペースの再 fetch」か「スペース切替」かを判別する */
   const prevHossiiSyncSpaceIdRef = useRef<string | null>(null);
+
+  const invalidateAuthorshipFetch = useCallback(() => {
+    authorshipFetchSeqRef.current += 1;
+  }, []);
+
+  const applyAuthorshipIdsIfCurrent = useCallback(
+    (seq: number, uid: string, spaceId: string, ids: ReadonlySet<string>) => {
+      if (seq !== authorshipFetchSeqRef.current) return;
+      if (currentUserRef.current?.uid !== uid) return;
+      if (stateRef.current.activeSpaceId !== spaceId) return;
+      setMyAuthorshipIds(ids);
+    },
+    [],
+  );
+
+  const fetchAndApplyAuthorshipIds = useCallback(
+    async (uid: string, spaceId: string) => {
+      const seq = ++authorshipFetchSeqRef.current;
+      const ids = await fetchMyAuthorshipIdsForSpace(spaceId);
+      if (ids === null) return;
+      applyAuthorshipIdsIfCurrent(seq, uid, spaceId, ids);
+    },
+    [applyAuthorshipIdsIfCurrent],
+  );
+
+  const clearMyAuthorshipIds = useCallback(() => {
+    invalidateAuthorshipFetch();
+    setMyAuthorshipIds(new Set());
+  }, [invalidateAuthorshipFetch]);
+
+  const refreshMyAuthorshipIds = useCallback(async () => {
+    if (!isSupabaseConfigured || !currentUserRef.current) {
+      clearMyAuthorshipIds();
+      return;
+    }
+    const uid = currentUserRef.current.uid;
+    const spaceId = stateRef.current.activeSpaceId;
+    if (!spaceId) {
+      clearMyAuthorshipIds();
+      return;
+    }
+    await fetchAndApplyAuthorshipIds(uid, spaceId);
+  }, [clearMyAuthorshipIds, fetchAndApplyAuthorshipIds]);
+
+  // Provider unmount 時に in-flight 反映を止める
+  useEffect(() => () => {
+    authorshipFetchSeqRef.current += 1;
+  }, []);
+
+  // ログイン・スペース切替・セッション復元後に authorship を取得 / ログアウト時にクリア
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    if (isResolvingAuth) return;
+
+    if (!currentUser?.uid) {
+      queueMicrotask(() => clearMyAuthorshipIds());
+      return;
+    }
+
+    const uid = currentUser.uid;
+    const spaceId = state.activeSpaceId;
+    if (!spaceId) {
+      queueMicrotask(() => clearMyAuthorshipIds());
+      return;
+    }
+
+    void fetchAndApplyAuthorshipIds(uid, spaceId);
+
+    return () => {
+      authorshipFetchSeqRef.current += 1;
+    };
+  }, [
+    currentUser?.uid,
+    state.activeSpaceId,
+    isResolvingAuth,
+    clearMyAuthorshipIds,
+    fetchAndApplyAuthorshipIds,
+  ]);
 
   // ===== Supabase: スペースをマウント時に同期 =====
   // isResolvingAuth が true の間は発火しない。
@@ -1217,6 +1304,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
             insertedHossiiIdsRef.current.delete(newHossii.id);
             pendingOptimisticHossiiRef.current.delete(newHossii.id);
             dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
+          } else if (currentUserRef.current) {
+            setMyAuthorshipIds((prev) => new Set([...prev, newHossii.id]));
           }
         })
         .catch(() => {
@@ -1422,6 +1511,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         spacesLoadedFromSupabase,
         hossiiLoadedFromSupabase,
         communitySlug,
+        myAuthorshipIds,
+        refreshMyAuthorshipIds,
         addHossii,
         selectHossii,
         clearAll,
@@ -1451,6 +1542,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     >
       <HossiiActionsContext.Provider
         value={{
+          myAuthorshipIds,
+          refreshMyAuthorshipIds,
           addHossii,
           selectHossii,
           clearAll,

@@ -7,6 +7,26 @@ import type { CommunityStatus } from '../utils/communitiesApi';
 import { upsertUserProfile, fetchUserProfile } from '../utils/userProfilesApi';
 import { AuthContext } from './useAuth';
 
+function deriveInitialUsername(user: User): string {
+  const meta = user.user_metadata ?? {};
+  const fullName = typeof meta.full_name === 'string' ? meta.full_name.trim() : '';
+  if (fullName) return fullName;
+  const name = typeof meta.name === 'string' ? meta.name.trim() : '';
+  if (name) return name;
+  const email = user.email;
+  if (email?.includes('@')) {
+    const prefix = email.split('@')[0]?.trim();
+    if (prefix) return prefix;
+  }
+  return `user_${user.id.slice(0, 8)}`;
+}
+
+async function ensureUserProfile(user: User): Promise<void> {
+  const existing = await fetchUserProfile(user.id);
+  if (existing) return;
+  await upsertUserProfile(user.id, deriveInitialUsername(user));
+}
+
 export type AppUser = {
   uid: string;
   email: string | null;
@@ -70,7 +90,16 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     fetchUserProfile(user.id),
   ]);
 
-  const username = userProfile?.username ?? undefined;
+  if (!userProfile) {
+    try {
+      await ensureUserProfile(user);
+    } catch (err) {
+      console.error('[AuthContext] ensureUserProfile failed:', err);
+    }
+  }
+
+  const resolvedProfile = userProfile ?? (await fetchUserProfile(user.id));
+  const username = resolvedProfile?.username ?? undefined;
 
   // app_metadata.role = "admin" は承認済みとして扱う（communityId は取得できた場合のみ付与）
   if (roleFromMetadata === 'admin') {

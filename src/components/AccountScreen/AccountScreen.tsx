@@ -3,8 +3,8 @@ import { LogOut, User, Mail } from 'lucide-react';
 import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { useAuth } from '../../core/contexts/useAuth';
+import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
-import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -14,6 +14,7 @@ type Props = {
 
 export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) => {
   const { currentUser, logout } = useAuth();
+  const { navigate } = useRouter();
   const { state, setDefaultNickname, setSpaceNickname, getActiveSpace } = useHossiiStore();
   const { profile, spaceNicknames, activeSpaceId } = state;
   const activeSpace = getActiveSpace();
@@ -44,8 +45,6 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     setTimeout(() => setSavedSpace(false), 2000);
   };
 
-  const guestAuthLocked = !currentUser && ACCOUNT_AUTH_COMING_SOON;
-
   const handleLogout = async () => {
     if (isLoggingOut) return;
     const confirmed = window.confirm('ログアウトしてもよろしいですか？');
@@ -60,6 +59,12 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     }
   };
 
+  const displayName =
+    currentUser?.username ??
+    profile?.defaultNickname ??
+    currentUser?.displayName ??
+    'ニックネーム未設定';
+
   return (
     <div className={styles.container}>
       <TopRightMenu />
@@ -70,7 +75,6 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
 
       <main className={styles.content}>
 
-        {/* アカウント情報 */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>アカウント情報</h2>
 
@@ -81,14 +85,30 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
                   <User size={28} />
                 </div>
                 <div className={styles.userDetails}>
-                  <div className={styles.userName}>
-                    {profile?.defaultNickname || 'ニックネーム未設定'}
-                  </div>
+                  <div className={styles.userName}>{displayName}</div>
                   <div className={styles.userMeta}>
                     <Mail size={13} />
-                    <span>{currentUser.email}</span>
+                    <span>{currentUser.email ?? 'メール未設定'}</span>
                   </div>
                 </div>
+              </div>
+              <div className={styles.linkActions}>
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => navigate('mylogs')}
+                >
+                  マイログを見る
+                </button>
+                {currentUser.isAdmin && (
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={() => navigate(currentUser.isSuperAdmin ? 'communities' : 'spaces')}
+                  >
+                    管理画面へ
+                  </button>
+                )}
               </div>
               <button
                 className={styles.logoutButton}
@@ -105,24 +125,17 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               <p className={styles.guestDesc}>
                 アカウントを作成すると、複数の端末で同じ情報を使えます。
               </p>
-              {guestAuthLocked && (
-                <p className={styles.comingSoonHint} role="status">
-                  ログイン・新規会員登録は Coming soon です。
-                </p>
-              )}
               <div className={styles.guestActions}>
                 <button
                   type="button"
-                  className={`${styles.loginButton} ${guestAuthLocked ? styles.guestAuthLocked : ''}`}
-                  disabled={guestAuthLocked}
+                  className={styles.loginButton}
                   onClick={onLoginRequested}
                 >
                   アカウントでログイン
                 </button>
                 <button
                   type="button"
-                  className={`${styles.signUpButton} ${guestAuthLocked ? styles.guestAuthLocked : ''}`}
-                  disabled={guestAuthLocked}
+                  className={styles.signUpButton}
                   onClick={onSignUpRequested}
                 >
                   新規会員登録
@@ -132,7 +145,6 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
           )}
         </section>
 
-        {/* このスペースでのニックネーム */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>このスペースでのニックネーム</h2>
           {activeSpace && (
@@ -164,7 +176,6 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
           )}
         </section>
 
-        {/* デフォルトニックネーム */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>デフォルトニックネーム</h2>
           <p className={styles.sectionDesc}>
