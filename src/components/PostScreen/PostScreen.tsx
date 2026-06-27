@@ -15,9 +15,10 @@ import { useDisplayPrefs } from '../../core/contexts/DisplayPrefsContext';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
-import { resolvePositionSelectorEnabled } from '../../core/utils/spaceSettingResolvers';
+import { resolvePanePositionMode } from '../../core/utils/resolvePanePositionMode';
+import { resolvePanePostFields } from '../../core/utils/resolvePanePostFields';
 import { loadSpaceSettings } from '../../core/utils/settingsStorage';
-import { allPostFieldsDisabled, resolvePostFields } from '../../core/utils/postFieldSettings';
+import { allPostFieldsDisabled } from '../../core/utils/postFieldSettings';
 import { addStamp } from '../../core/utils/stampStorage';
 import { upsertStampCount } from '../../core/utils/stampsApi';
 import { uploadHossiiImage } from '../../core/utils/imageStorageApi';
@@ -237,7 +238,7 @@ export const PostScreen = ({
   }, [speechToFreePosterRef]);
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
-  const { activePaneId, isLoading: panesLoading } = useSpacePane();
+  const { activePaneId, activePane, isLoading: panesLoading } = useSpacePane();
   const canPost = !panesLoading && activePaneId != null;
   const { prefs: { showHossii } } = useDisplayPrefs();
   const { navigate } = useRouter();
@@ -246,9 +247,12 @@ export const PostScreen = ({
 
   // スペース設定の読み込み
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
-  const pf = useMemo(() => resolvePostFields(spaceSettings), [spaceSettings]);
+  const pf = useMemo(() => resolvePanePostFields(activePane, spaceSettings), [activePane, spaceSettings]);
   const showBubbleShape = pf.bubbleShape.enabled && featureFlags.bubble_shapes_extended;
-  const positionSelectorEnabled = resolvePositionSelectorEnabled(spaceSettings);
+  const positionSelectorEnabled = useMemo(
+    () => resolvePanePositionMode(activePane, spaceSettings) === 'selector',
+    [activePane, spaceSettings],
+  );
 
   useEffect(() => {
     if (!positionSelectorEnabled) {

@@ -68,6 +68,7 @@ import { SpaceDescriptionInline } from './SpaceDescriptionInline';
 import { SpacePaneBar } from './SpacePaneBar';
 import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
+import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
@@ -554,8 +555,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   });
 
   // 訪問中は背景・タイトル・装飾を訪問先に合わせる（投稿 0 件でも自スペースの見た目が残らないようにする）
-  const spaceForVisual =
-    isVisiting && visitingSpaceInfo ? visitingSpaceInfo : activeSpace;
+  const spaceForVisual = useMemo(() => {
+    if (isVisiting && visitingSpaceInfo) return visitingSpaceInfo;
+    return resolvePaneVisualSpace(activePane, activeSpace);
+  }, [isVisiting, visitingSpaceInfo, activePane, activeSpace]);
 
   const spaceDescription = spaceForVisual?.description?.trim() ?? '';
   const hasDescription = spaceDescription.length > 0;

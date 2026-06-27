@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { SettingsNav } from './SettingsNav';
+import { SettingsPaneSelector } from './SettingsPaneSelector';
 import type { SettingsScreenId } from './settingsScreenIds';
+import { PANE_OVERRIDE_SCREENS } from './settingsScreenIds';
 import shellStyles from './SpaceSettingsScreen.module.css';
 import styles from './SettingsShared.module.css';
 
@@ -39,7 +41,10 @@ export const SettingsLayout = ({
       <aside className={shellStyles.sidebar}>
         <SettingsNav activeScreen={activeScreen} onNavigate={onNavigate} isAdmin={isAdmin} />
       </aside>
-      <main className={shellStyles.main}>{children}</main>
+      <main className={shellStyles.main}>
+        {PANE_OVERRIDE_SCREENS.has(activeScreen) && <SettingsPaneSelector />}
+        {children}
+      </main>
     </div>
   </div>
 );

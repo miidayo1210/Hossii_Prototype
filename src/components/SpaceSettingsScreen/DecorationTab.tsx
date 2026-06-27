@@ -1,14 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { generateId } from '../../core/utils';
-import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import type { Space, SpaceDecoration, SpaceDecorationType } from '../../core/types/space';
-import { updateSpaceInDb } from '../../core/utils/spacesApi';
+import { resolvePaneDecorations } from '../../core/utils/resolvePaneDecorations';
+import { hasPaneColumnOverride, isAdditionalPane } from '../../core/utils/paneOverrideFields';
+import {
+  PaneOverrideSaveError,
+  resetPaneDecorationsOverride,
+  savePaneDecorationsOverride,
+} from '../../core/utils/savePaneSettingOverride';
+import { useSettingsEditPane } from './SettingsEditPaneContext';
+import { PaneOverrideHint } from './PaneOverrideHint';
 import sharedStyles from './SettingsShared.module.css';
 import styles from './DecorationTab.module.css';
 
 type Props = {
   space: Space;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 const TYPE_LABELS: Record<SpaceDecorationType, string> = {
@@ -46,11 +54,25 @@ const EMPTY_EDITOR: EditorState = {
   y: '50',
 };
 
-export const DecorationTab = ({ space }: Props) => {
-  const { updateSpace } = useHossiiStore();
-  const decorations = space.decorations ?? [];
+export const DecorationTab = ({ space, onDirtyChange }: Props) => {
+  const { editPane, saveContext } = useSettingsEditPane();
+  const decorations = useMemo(
+    () => resolvePaneDecorations(editPane, space),
+    [editPane, space],
+  );
+  const [localDecorations, setLocalDecorations] = useState(decorations);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalDecorations(decorations);
+    setEditor(null);
+  }, [decorations, editPane?.id]);
+
+  useEffect(() => {
+    onDirtyChange?.(false);
+  }, [editPane?.id, onDirtyChange]);
 
   useEffect(() => {
     if (!toast) return;
@@ -58,14 +80,41 @@ export const DecorationTab = ({ space }: Props) => {
     return () => clearTimeout(t);
   }, [toast]);
 
+  const hasOverride =
+    editPane != null && isAdditionalPane(editPane) && hasPaneColumnOverride(editPane, 'decorations');
+
   const persistDecorations = async (next: SpaceDecoration[], successMessage: string) => {
-    updateSpace(space.id, { decorations: next });
+    if (!saveContext) return;
+    setIsSaving(true);
     try {
-      await updateSpaceInDb(space.id, { decorations: next });
+      await savePaneDecorationsOverride(saveContext, next);
+      setLocalDecorations(next);
       setToast({ message: successMessage, type: 'success' });
     } catch (err) {
       console.error('[DecorationTab] save failed', err);
-      setToast({ message: '保存に失敗しました', type: 'error' });
+      const message =
+        err instanceof PaneOverrideSaveError
+          ? err.message
+          : '保存に失敗しました';
+      setToast({ message, type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!saveContext || !editPane || !isAdditionalPane(editPane)) return;
+    setIsSaving(true);
+    try {
+      await resetPaneDecorationsOverride(saveContext);
+      const next = resolvePaneDecorations({ ...editPane, decorations: null }, space);
+      setLocalDecorations(next);
+      setToast({ message: 'Space 設定に戻しました', type: 'success' });
+    } catch (err) {
+      console.error('[DecorationTab] reset failed', err);
+      setToast({ message: 'リセットに失敗しました', type: 'error' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -108,10 +157,10 @@ export const DecorationTab = ({ space }: Props) => {
 
     if (editor.mode === 'add') {
       const newDecoration: SpaceDecoration = { id: generateId(), ...payload };
-      void persistDecorations([...decorations, newDecoration], '装飾を追加しました');
+      void persistDecorations([...localDecorations, newDecoration], '装飾を追加しました');
     } else {
       void persistDecorations(
-        decorations.map((d) =>
+        localDecorations.map((d) =>
           d.id === editor.decorationId ? { ...d, ...payload } : d,
         ),
         '装飾を更新しました',
@@ -123,7 +172,7 @@ export const DecorationTab = ({ space }: Props) => {
   const handleDelete = (id: string) => {
     if (!window.confirm('この装飾を削除しますか？')) return;
     void persistDecorations(
-      decorations.filter((d) => d.id !== id),
+      localDecorations.filter((d) => d.id !== id),
       '装飾を削除しました',
     );
   };
@@ -135,9 +184,13 @@ export const DecorationTab = ({ space }: Props) => {
         スペース上に掲示板・看板・画像などのウィジェットを配置できます。参加者は閲覧のみ可能です。
       </p>
 
-      {decorations.length > 0 && (
+      {editPane && isAdditionalPane(editPane) && (
+        <PaneOverrideHint hasOverride={hasOverride} onReset={handleReset} />
+      )}
+
+      {localDecorations.length > 0 && (
         <div className={styles.list}>
-          {decorations.map((d) => (
+          {localDecorations.map((d) => (
             <div key={d.id} className={styles.item}>
               <div className={styles.itemIcon}>{TYPE_ICONS[d.type] ?? '📋'}</div>
               <div className={styles.itemContent}>
@@ -153,10 +206,10 @@ export const DecorationTab = ({ space }: Props) => {
                 </p>
               </div>
               <div className={styles.itemActions}>
-                <button type="button" className={styles.editButton} onClick={() => openEditEditor(d)} title="編集">
+                <button type="button" className={styles.editButton} onClick={() => openEditEditor(d)} title="編集" disabled={isSaving}>
                   <Pencil size={13} />
                 </button>
-                <button type="button" className={styles.deleteButton} onClick={() => handleDelete(d.id)} title="削除">
+                <button type="button" className={styles.deleteButton} onClick={() => handleDelete(d.id)} title="削除" disabled={isSaving}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -166,7 +219,7 @@ export const DecorationTab = ({ space }: Props) => {
       )}
 
       {!editor ? (
-        <button type="button" className={styles.addButton} onClick={openAddEditor}>
+        <button type="button" className={styles.addButton} onClick={openAddEditor} disabled={isSaving}>
           <Plus size={14} />
           装飾を追加
         </button>
@@ -276,6 +329,7 @@ export const DecorationTab = ({ space }: Props) => {
               className={styles.saveButton}
               onClick={handleSave}
               disabled={
+                isSaving ||
                 (editor.type !== 'image' && !editor.body.trim()) ||
                 (editor.type === 'image' && !editor.imageUrl.trim())
               }
@@ -287,7 +341,7 @@ export const DecorationTab = ({ space }: Props) => {
         </div>
       )}
 
-      {decorations.length === 0 && !editor && (
+      {localDecorations.length === 0 && !editor && (
         <p className={styles.empty}>まだ装飾が追加されていません</p>
       )}
 

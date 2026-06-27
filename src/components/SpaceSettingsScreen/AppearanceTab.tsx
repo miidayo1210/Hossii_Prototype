@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SpaceSettings, StarMarkerType } from '../../core/types/settings';
 import { STAR_MARKER_OPTIONS, DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import type { Space } from '../../core/types/space';
@@ -6,7 +6,19 @@ import { BUBBLE_SHAPE_PRESETS } from '../../core/assets/bubbleShapes';
 import { saveSpaceSettings } from '../../core/utils/settingsStorage';
 import { upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import { updateSpaceInDb } from '../../core/utils/spacesApi';
+import {
+  hasPaneBubbleShapeOverride,
+  resolvePaneBubbleShapePng,
+} from '../../core/utils/resolvePaneBubbleShapePng';
+import { isAdditionalPane } from '../../core/utils/paneOverrideFields';
+import {
+  PaneOverrideSaveError,
+  resetPaneBubbleShapeOverride,
+  savePaneBubbleShapeOverride,
+} from '../../core/utils/savePaneSettingOverride';
 import { useScreenDraft } from '../../core/hooks/useScreenDraft';
+import { useSettingsEditPane } from './SettingsEditPaneContext';
+import { PaneOverrideHint } from './PaneOverrideHint';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import { SettingsSaveBar } from './SettingsSaveBar';
@@ -33,10 +45,14 @@ export const AppearanceTab = ({
   onUpdateSpace,
   onDirtyChange,
 }: Props) => {
-  const initial: AppearanceDraft = {
-    starMarkerType: settings.starMarkerType ?? DEFAULT_STAR_MARKER,
-    bubbleShapePng: space.bubbleShapePng ?? null,
-  };
+  const { editPane, saveContext } = useSettingsEditPane();
+  const initial: AppearanceDraft = useMemo(
+    () => ({
+      starMarkerType: settings.starMarkerType ?? DEFAULT_STAR_MARKER,
+      bubbleShapePng: resolvePaneBubbleShapePng(editPane, space) ?? null,
+    }),
+    [settings.starMarkerType, editPane, space],
+  );
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -51,25 +67,53 @@ export const AppearanceTab = ({
     return () => clearTimeout(t);
   }, [toast]);
 
+  const hasBubbleOverride =
+    editPane != null && isAdditionalPane(editPane) && hasPaneBubbleShapeOverride(editPane);
+
   const handleSave = async () => {
+    if (!saveContext) return;
     setIsSaving(true);
     const updatedSettings = { ...settings, starMarkerType: draft.starMarkerType };
-    const bubblePatch = draft.bubbleShapePng
-      ? { bubbleShapePng: draft.bubbleShapePng }
-      : { bubbleShapePng: undefined };
     try {
-      onUpdateSpace(bubblePatch);
       onUpdate(updatedSettings);
       saveSpaceSettings(updatedSettings);
-      await Promise.all([
-        updateSpaceInDb(space.id, bubblePatch),
-        upsertSpaceSettings(updatedSettings),
-      ]);
+      await upsertSpaceSettings(updatedSettings);
+      await savePaneBubbleShapeOverride(saveContext, draft.bubbleShapePng);
+      if (saveContext.editPane.isDefault) {
+        const bubblePatch = draft.bubbleShapePng
+          ? { bubbleShapePng: draft.bubbleShapePng }
+          : { bubbleShapePng: undefined };
+        onUpdateSpace(bubblePatch);
+        await updateSpaceInDb(space.id, bubblePatch);
+      }
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
       console.error('[AppearanceTab] save failed', err);
-      setToast({ message: '保存に失敗しました', type: 'error' });
+      const message =
+        err instanceof PaneOverrideSaveError
+          ? err.message
+          : '保存に失敗しました';
+      setToast({ message, type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetBubble = async () => {
+    if (!saveContext || !editPane || !isAdditionalPane(editPane)) return;
+    setIsSaving(true);
+    try {
+      await resetPaneBubbleShapeOverride(saveContext);
+      const next: AppearanceDraft = {
+        ...draft,
+        bubbleShapePng: resolvePaneBubbleShapePng({ ...editPane, bubbleShapePng: null }, space) ?? null,
+      };
+      commitSaved(next);
+      setToast({ message: 'Space 設定に戻しました', type: 'success' });
+    } catch (err) {
+      console.error('[AppearanceTab] reset failed', err);
+      setToast({ message: 'リセットに失敗しました', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -85,6 +129,9 @@ export const AppearanceTab = ({
           title="デフォルトの吹き出し形状"
           description="スペース全体のデフォルト形状です。投稿者による個別形状選択とは別設定です。"
         >
+          {editPane && isAdditionalPane(editPane) && (
+            <PaneOverrideHint hasOverride={hasBubbleOverride} onReset={handleResetBubble} />
+          )}
           <div className={styles.shapeList}>
             <button
               type="button"
@@ -115,7 +162,7 @@ export const AppearanceTab = ({
 
         <SettingsSection
           title="星モードのマーカー形状"
-          description="星表示モードで投稿位置を示すマーカーの形を選択します。"
+          description="星表示モードで投稿位置を示すマーカーの形を選択します（Space 共通）。"
         >
           <div className={styles.shapeList}>
             {STAR_MARKER_OPTIONS.map((option) => (

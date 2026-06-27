@@ -23,6 +23,7 @@ import { ModerationTab } from './ModerationTab';
 import { ExportRecordTab } from './ExportRecordTab';
 import { NeighborsTab } from './NeighborsTab';
 import { PaneManagementTab } from './PaneManagementTab';
+import { SettingsEditPaneProvider } from './SettingsEditPaneContext';
 import {
   DEFAULT_SETTINGS_SCREEN,
   EXPLICIT_SAVE_SCREENS,
@@ -234,7 +235,11 @@ export const SpaceSettingsScreen = () => {
         );
       case 'decoration':
         return (
-          <DecorationTab space={activeSpace} />
+          <DecorationTab
+            key={`deco-${activeSpace.id}`}
+            space={activeSpace}
+            onDirtyChange={handleDirtyChange}
+          />
         );
       case 'moderation':
         return <ModerationTab spaceId={activeSpace.id} space={activeSpace} />;
@@ -255,14 +260,22 @@ export const SpaceSettingsScreen = () => {
   };
 
   return (
-    <SettingsLayout
-      spaceName={activeSpace.name}
-      activeScreen={activeScreen}
-      isAdmin={isAdmin}
-      onBack={handleBack}
-      onNavigate={handleNavigate}
+    <SettingsEditPaneProvider
+      space={activeSpace}
+      settings={settings}
+      screenDirty={screenDirty}
+      onUpdateSpace={handleSpaceUpdate}
+      onUpdateSettings={handleSettingsUpdate}
     >
-      {renderScreen()}
-    </SettingsLayout>
+      <SettingsLayout
+        spaceName={activeSpace.name}
+        activeScreen={activeScreen}
+        isAdmin={isAdmin}
+        onBack={handleBack}
+        onNavigate={handleNavigate}
+      >
+        {renderScreen()}
+      </SettingsLayout>
+    </SettingsEditPaneProvider>
   );
 };

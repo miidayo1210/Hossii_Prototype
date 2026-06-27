@@ -1784,7 +1784,7 @@ Pane切替 / 投稿分離 / 背景 override / postFields override / Pane URL / P
 * 背景切り替え
 * Paneごとの投稿表示
 
-### Phase 6：Pane管理
+### Phase 6：Pane管理 — ✅ 実装済み（2026-06-27）
 
 * Pane追加
 * 名称変更
@@ -1794,17 +1794,20 @@ Pane切替 / 投稿分離 / 背景 override / postFields override / Pane URL / P
 * 管理者権限
 * 非表示Paneの管理画面表示
 
-### Phase 7：Pane設定override
+### Phase 7：Pane設定override — ✅ 実装済み（2026-06-27）
 
-* 背景
-* 保存済み背景
-* 装飾
-* キャラクター
-* customEmotions
-* bubbleShape
-* postFields
-* positionMode
-* Space設定への復帰
+* 背景 / 保存済み背景（`resolvePaneBackground` / `resolvePaneSavedBackgroundImages`）
+* 装飾（`resolvePaneDecorations`）
+* キャラクター / customEmotions（`resolvePaneCharacter`）
+* bubbleShape（`resolvePaneBubbleShapePng`）
+* postFields（`resolvePanePostFields`）
+* positionMode（`resolvePanePositionMode`）
+* 設定画面 Pane セレクタ（`settingsEditPaneId` — URL `activePane` と独立）
+* Space 設定への復帰（override 列 / settings JSON を `null`）
+* デフォルト Pane → `spaces` / `space_settings`、追加 Pane → `space_panes`
+* Runtime: `PostScreen` / `SpaceScreen`（`resolvePaneVisualSpace`）
+
+関連: `savePaneSettingOverride.ts`, `SettingsPaneSelector.tsx`, `SettingsEditPaneContext.tsx`, `PANE_OVERRIDE_SCREENS`
 
 ### Phase 8：URL・QR・共有
 

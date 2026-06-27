@@ -1,9 +1,10 @@
 import type { CustomEmotion, SpaceBackground, SpaceDecoration } from './space';
-import type { PostFieldSettings } from './settings';
+import type { PostFieldSettings, PostingSettings } from './settings';
 
-/** Pane-level override for post form settings (Phase 3+ resolver). */
+/** Pane-level override stored in space_panes.settings JSON (Phase 7). */
 export type SpacePaneSettingsOverride = {
-  postFields?: Partial<PostFieldSettings>;
+  postFields?: Partial<PostFieldSettings> | null;
+  posting?: Pick<PostingSettings, 'positionMode'> | null;
 };
 
 export type SpacePane = {

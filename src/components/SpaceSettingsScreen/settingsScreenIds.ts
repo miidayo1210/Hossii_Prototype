@@ -75,4 +75,14 @@ export const EXPLICIT_SAVE_SCREENS = new Set<SettingsScreenId>([
   'character',
 ]);
 
+/** Tabs that support per-pane setting override (Phase 7). */
+export const PANE_OVERRIDE_SCREENS = new Set<SettingsScreenId>([
+  'background',
+  'postForm',
+  'interactionRules',
+  'appearance',
+  'character',
+  'decoration',
+]);
+
 export const DEFAULT_SETTINGS_SCREEN: SettingsScreenId = 'basicInfo';

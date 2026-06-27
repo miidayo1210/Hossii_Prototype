@@ -1,9 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, X, Plus, Trash2 } from 'lucide-react';
 import { generateId } from '../../core/utils';
 import type { Space, CustomEmotion } from '../../core/types/space';
-import { updateSpaceInDb } from '../../core/utils/spacesApi';
+import { resolvePaneCharacter } from '../../core/utils/resolvePaneCharacter';
+import {
+  hasPaneColumnOverride,
+  isAdditionalPane,
+} from '../../core/utils/paneOverrideFields';
+import {
+  PaneOverrideSaveError,
+  resetPaneCharacterOverride,
+  savePaneCharacterOverride,
+} from '../../core/utils/savePaneSettingOverride';
 import { useScreenDraft } from '../../core/hooks/useScreenDraft';
+import { useSettingsEditPane } from './SettingsEditPaneContext';
+import { PaneOverrideHint } from './PaneOverrideHint';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import { SettingsSaveBar } from './SettingsSaveBar';
@@ -25,12 +36,18 @@ type Props = {
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
-export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => {
-  const initial: CharacterDraft = {
-    characterName: space.characterName ?? '',
-    characterImageUrl: space.characterImageUrl,
-    customEmotions: space.customEmotions ?? [],
+function buildInitialDraft(space: Space, editPane: ReturnType<typeof useSettingsEditPane>['editPane']): CharacterDraft {
+  const resolved = resolvePaneCharacter(editPane, space);
+  return {
+    characterName: resolved.characterName ?? '',
+    characterImageUrl: resolved.characterImageUrl,
+    customEmotions: resolved.customEmotions,
   };
+}
+
+export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => {
+  const { editPane, saveContext } = useSettingsEditPane();
+  const initial = useMemo(() => buildInitialDraft(space, editPane), [space, editPane]);
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -53,6 +70,13 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
     return () => clearTimeout(t);
   }, [toast]);
 
+  const hasOverride =
+    editPane != null &&
+    isAdditionalPane(editPane) &&
+    (hasPaneColumnOverride(editPane, 'characterName') ||
+      hasPaneColumnOverride(editPane, 'characterImageUrl') ||
+      hasPaneColumnOverride(editPane, 'customEmotions'));
+
   const processImageFile = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       if (!file.type.startsWith('image/')) {
@@ -70,20 +94,51 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
     });
 
   const handleSave = async () => {
+    if (!saveContext) return;
     setIsSaving(true);
     try {
-      const patch: Partial<Space> = {
-        characterName: draft.characterName || undefined,
+      await savePaneCharacterOverride(saveContext, {
+        characterName: draft.characterName,
         characterImageUrl: draft.characterImageUrl,
         customEmotions: draft.customEmotions,
-      };
-      onUpdateSpace(patch);
-      await updateSpaceInDb(space.id, patch);
+      });
+      if (saveContext.editPane.isDefault) {
+        onUpdateSpace({
+          characterName: draft.characterName || undefined,
+          characterImageUrl: draft.characterImageUrl,
+          customEmotions: draft.customEmotions,
+        });
+      }
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
       console.error('[CharacterTab] save failed', err);
-      setToast({ message: '保存に失敗しました', type: 'error' });
+      const message =
+        err instanceof PaneOverrideSaveError
+          ? err.message
+          : '保存に失敗しました';
+      setToast({ message, type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!saveContext || !editPane || !isAdditionalPane(editPane)) return;
+    setIsSaving(true);
+    try {
+      await resetPaneCharacterOverride(saveContext);
+      const next = buildInitialDraft(space, {
+        ...editPane,
+        characterName: null,
+        characterImageUrl: null,
+        customEmotions: null,
+      });
+      commitSaved(next);
+      setToast({ message: 'Space 設定に戻しました', type: 'success' });
+    } catch (err) {
+      console.error('[CharacterTab] reset failed', err);
+      setToast({ message: 'リセットに失敗しました', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -95,6 +150,9 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
         title="中心キャラクター"
         description="スペース中央に表示されるキャラクターの見た目と表情を設定します。"
       >
+        {editPane && isAdditionalPane(editPane) && (
+          <PaneOverrideHint hasOverride={hasOverride} onReset={handleReset} />
+        )}
         <SettingsSection title="キャラクター名">
           <input
             type="text"

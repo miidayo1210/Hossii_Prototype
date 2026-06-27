@@ -1,8 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Space } from '../../core/types/space';
-import { updateSpaceInDb } from '../../core/utils/spacesApi';
+import type { SpacePane } from '../../core/types/spacePane';
 import { useScreenDraft } from '../../core/hooks/useScreenDraft';
+import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
+import { resolvePaneSavedBackgroundImages } from '../../core/utils/resolvePaneSavedBackgroundImages';
+import {
+  hasPaneColumnOverride,
+  isAdditionalPane,
+} from '../../core/utils/paneOverrideFields';
+import {
+  PaneOverrideSaveError,
+  resetPaneBackgroundOverride,
+  savePaneBackgroundOverride,
+} from '../../core/utils/savePaneSettingOverride';
 import { BackgroundSelector } from '../BackgroundSelector/BackgroundSelector';
+import { useSettingsEditPane } from './SettingsEditPaneContext';
+import { PaneOverrideHint } from './PaneOverrideHint';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import { SettingsSaveBar } from './SettingsSaveBar';
@@ -19,11 +32,16 @@ type Props = {
   onDirtyChange: (dirty: boolean) => void;
 };
 
-export const BackgroundTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => {
-  const initial: BackgroundDraft = {
-    background: space.background,
-    savedBackgroundImages: space.savedBackgroundImages,
+function buildInitialDraft(space: Space, editPane: SpacePane | null): BackgroundDraft {
+  return {
+    background: resolvePaneBackground(editPane, space),
+    savedBackgroundImages: resolvePaneSavedBackgroundImages(editPane, space),
   };
+}
+
+export const BackgroundTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => {
+  const { editPane, saveContext } = useSettingsEditPane();
+  const initial = useMemo(() => buildInitialDraft(space, editPane), [space, editPane]);
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -46,6 +64,12 @@ export const BackgroundTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =>
     return () => clearTimeout(t);
   }, [toast]);
 
+  const hasOverride =
+    editPane != null &&
+    isAdditionalPane(editPane) &&
+    (hasPaneColumnOverride(editPane, 'background') ||
+      hasPaneColumnOverride(editPane, 'savedBackgroundImages'));
+
   const handleSelect = (background: Space['background']) => {
     if (background?.kind === 'image' && background.source === 'temp') {
       objectURLsRef.current.add(background.value);
@@ -54,19 +78,44 @@ export const BackgroundTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =>
   };
 
   const handleSave = async () => {
+    if (!saveContext) return;
     setIsSaving(true);
     try {
-      const patch: Partial<Space> = {
+      await savePaneBackgroundOverride(saveContext, {
         background: draft.background,
         savedBackgroundImages: draft.savedBackgroundImages,
-      };
-      onUpdateSpace(patch);
-      await updateSpaceInDb(space.id, patch);
+      });
+      if (saveContext.editPane.isDefault) {
+        onUpdateSpace({
+          background: draft.background,
+          savedBackgroundImages: draft.savedBackgroundImages,
+        });
+      }
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
       console.error('[BackgroundTab] save failed', err);
-      setToast({ message: '保存に失敗しました', type: 'error' });
+      const message =
+        err instanceof PaneOverrideSaveError
+          ? err.message
+          : '保存に失敗しました';
+      setToast({ message, type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!saveContext || !editPane || !isAdditionalPane(editPane)) return;
+    setIsSaving(true);
+    try {
+      await resetPaneBackgroundOverride(saveContext);
+      const next = buildInitialDraft(space, { ...editPane, background: null, savedBackgroundImages: null });
+      commitSaved(next);
+      setToast({ message: 'Space 設定に戻しました', type: 'success' });
+    } catch (err) {
+      console.error('[BackgroundTab] reset failed', err);
+      setToast({ message: 'リセットに失敗しました', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -75,6 +124,9 @@ export const BackgroundTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =>
   return (
     <>
       <SettingsPageHeader title="背景" description="スペースの背景デザインを選択してください。">
+        {editPane && isAdditionalPane(editPane) && (
+          <PaneOverrideHint hasOverride={hasOverride} onReset={handleReset} />
+        )}
         <SettingsSection>
           <BackgroundSelector
             currentBackground={draft.background}

@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SpaceSettings, BubbleEditPermission } from '../../core/types/settings';
 import { DEFAULT_POSTING_SETTINGS, DEFAULT_REFLECTION_SETTINGS } from '../../core/types/settings';
 import { saveSpaceSettings } from '../../core/utils/settingsStorage';
 import { upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
+import { resolvePanePositionMode } from '../../core/utils/resolvePanePositionMode';
+import { hasPanePositionModeOverride, isAdditionalPane } from '../../core/utils/paneOverrideFields';
+import {
+  PaneOverrideSaveError,
+  resetPanePositionModeOverride,
+  savePanePositionModeOverride,
+} from '../../core/utils/savePaneSettingOverride';
 import { useScreenDraft } from '../../core/hooks/useScreenDraft';
+import { useSettingsEditPane } from './SettingsEditPaneContext';
+import { PaneOverrideHint } from './PaneOverrideHint';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import { SettingsSaveBar } from './SettingsSaveBar';
@@ -23,33 +32,18 @@ type Props = {
   onDirtyChange: (dirty: boolean) => void;
 };
 
-function toDraft(settings: SpaceSettings): InteractionDraft {
+function toDraft(settings: SpaceSettings, editPane: ReturnType<typeof useSettingsEditPane>['editPane']): InteractionDraft {
   return {
     likesEnabled: settings.features.likesEnabled,
     bubbleEditPermission: settings.bubbleEditPermission ?? 'all',
-    positionMode: settings.posting?.positionMode ?? DEFAULT_POSTING_SETTINGS.positionMode,
+    positionMode: resolvePanePositionMode(editPane, settings),
     randomRecallEnabled: settings.reflection?.randomRecallEnabled ?? DEFAULT_REFLECTION_SETTINGS.randomRecallEnabled,
   };
 }
 
-function draftToSettings(draft: InteractionDraft, settings: SpaceSettings): SpaceSettings {
-  return {
-    ...settings,
-    features: { ...settings.features, likesEnabled: draft.likesEnabled },
-    bubbleEditPermission: draft.bubbleEditPermission,
-    posting: {
-      ...(settings.posting ?? DEFAULT_POSTING_SETTINGS),
-      positionMode: draft.positionMode,
-    },
-    reflection: {
-      ...(settings.reflection ?? DEFAULT_REFLECTION_SETTINGS),
-      randomRecallEnabled: draft.randomRecallEnabled,
-    },
-  };
-}
-
 export const InteractionRulesTab = ({ settings, onUpdate, onDirtyChange }: Props) => {
-  const initial = toDraft(settings);
+  const { editPane, saveContext } = useSettingsEditPane();
+  const initial = useMemo(() => toDraft(settings, editPane), [settings, editPane]);
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -64,18 +58,61 @@ export const InteractionRulesTab = ({ settings, onUpdate, onDirtyChange }: Props
     return () => clearTimeout(t);
   }, [toast]);
 
+  const hasPositionOverride =
+    editPane != null && isAdditionalPane(editPane) && hasPanePositionModeOverride(editPane);
+
   const handleSave = async () => {
+    if (!saveContext) return;
     setIsSaving(true);
-    const updated = draftToSettings(draft, settings);
     try {
-      onUpdate(updated);
-      saveSpaceSettings(updated);
-      await upsertSpaceSettings(updated);
-      commitSaved(draft);
+      const spaceLevel: SpaceSettings = {
+        ...settings,
+        features: { ...settings.features, likesEnabled: draft.likesEnabled },
+        bubbleEditPermission: draft.bubbleEditPermission,
+        reflection: {
+          ...(settings.reflection ?? DEFAULT_REFLECTION_SETTINGS),
+          randomRecallEnabled: draft.randomRecallEnabled,
+        },
+        posting: saveContext.editPane.isDefault
+          ? {
+              ...(settings.posting ?? DEFAULT_POSTING_SETTINGS),
+              positionMode: draft.positionMode,
+            }
+          : settings.posting ?? DEFAULT_POSTING_SETTINGS,
+      };
+      onUpdate(spaceLevel);
+      saveSpaceSettings(spaceLevel);
+      await upsertSpaceSettings(spaceLevel);
+
+      if (!saveContext.editPane.isDefault) {
+        await savePanePositionModeOverride(saveContext, draft.positionMode);
+      }
+
+      commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
       console.error('[InteractionRulesTab] save failed', err);
-      setToast({ message: '保存に失敗しました', type: 'error' });
+      const message =
+        err instanceof PaneOverrideSaveError
+          ? err.message
+          : '保存に失敗しました';
+      setToast({ message, type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetPosition = async () => {
+    if (!saveContext || !editPane || !isAdditionalPane(editPane)) return;
+    setIsSaving(true);
+    try {
+      await resetPanePositionModeOverride(saveContext);
+      const next = toDraft(settings, { ...editPane, settings: null });
+      commitSaved(next);
+      setToast({ message: 'Space 設定に戻しました', type: 'success' });
+    } catch (err) {
+      console.error('[InteractionRulesTab] reset failed', err);
+      setToast({ message: 'リセットに失敗しました', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -125,7 +162,10 @@ export const InteractionRulesTab = ({ settings, onUpdate, onDirtyChange }: Props
           </div>
 
           <h3 className={formStyles.sectionTitle} style={{ marginTop: '2rem' }}>投稿位置</h3>
-          <p className={formStyles.description}>投稿時にスペース内のエリアを指定できるかを設定します</p>
+          <p className={formStyles.description}>投稿時にスペース内のエリアを指定できるかを設定します（タブごとに上書き可能）</p>
+          {editPane && isAdditionalPane(editPane) && (
+            <PaneOverrideHint hasOverride={hasPositionOverride} onReset={handleResetPosition} />
+          )}
           <div className={formStyles.radioList}>
             <label className={formStyles.radioItem}>
               <input
