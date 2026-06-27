@@ -113,6 +113,8 @@ type Props = {
   onSaveSpeechDraft?: (originalCandidate: string, editedMessage: string) => void;
   /** 音声パネルからフリー編集へ候補を送る（クイック投稿＋フリータブ用） */
   speechToFreePosterRef?: MutableRefObject<((text: string) => void) | undefined>;
+  /** クイック投稿パネル: 送信中フラグを親へ通知（Pane 切替ガード用） */
+  onSendingChange?: (sending: boolean) => void;
 };
 
 export const PostScreen = ({
@@ -124,12 +126,23 @@ export const PostScreen = ({
   speechEditOriginal,
   onSaveSpeechDraft,
   speechToFreePosterRef,
+  onSendingChange,
 }: Props) => {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(sending);
   sendingRef.current = sending;
+
+  useEffect(() => {
+    onSendingChange?.(sending);
+  }, [sending, onSendingChange]);
+
+  useEffect(() => {
+    return () => {
+      onSendingChange?.(false);
+    };
+  }, [onSendingChange]);
   const [poyonActive, setPoyonActive] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [greeting, setGreeting] = useState('');

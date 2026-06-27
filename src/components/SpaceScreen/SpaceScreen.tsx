@@ -65,6 +65,10 @@ import { TopBar } from '../Navigation/TopBar';
 import { LeftControlBar, type ControlState } from '../Navigation/LeftControlBar';
 import { QRCodePanel } from '../Navigation/QRCodePanel';
 import { SpaceDescriptionInline } from './SpaceDescriptionInline';
+import { SpacePaneBar } from './SpacePaneBar';
+import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
+import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
+import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { VoiceConsentModal } from '../VoiceConsentModal/VoiceConsentModal';
@@ -173,8 +177,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const {
     activePaneId: contextActivePaneId,
+    activePane,
+    visiblePanes,
     defaultPane,
+    panes,
     isLoading: panesLoading,
+    setActivePaneById,
+    reloadPanes,
   } = useSpacePane();
 
   const paneContext = useMemo((): PaneContext | null => {
@@ -332,6 +341,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [descriptionPanelVisible, setDescriptionPanelVisible] = useState(true);
   const [showPostCountBadge, setShowPostCountBadge] = useState(loadShowPostCountBadge);
   const [visitingToastVisible, setVisitingToastVisible] = useState(false);
+  const [paneCreateOpen, setPaneCreateOpen] = useState(false);
+  const [postSending, setPostSending] = useState(false);
+  const [paneToastVisible, setPaneToastVisible] = useState(false);
+  const [paneToastMessage, setPaneToastMessage] = useState('');
+  const [paneToastType, setPaneToastType] = useState<'success' | 'error' | 'info'>('info');
+  const prevActivePaneIdRef = useRef<string | null>(null);
 
   const handleShowPostCountBadgeToggle = useCallback(() => {
     setShowPostCountBadge((v) => {
@@ -355,6 +370,53 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const handleQuickLogClose = useCallback(() => {
     setQuickLogOpen(false);
   }, []);
+
+  const showPaneToast = useCallback(
+    (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+      setPaneToastMessage(message);
+      setPaneToastType(type);
+      setPaneToastVisible(true);
+    },
+    [],
+  );
+
+  const showPaneBar = shouldShowSpacePaneBar(
+    isAdmin,
+    visiblePanes.length,
+    isVisiting,
+    panesLoading,
+  );
+
+  const handlePaneSelect = useCallback(
+    (paneId: string) => {
+      if (postSending) return;
+      if (paneId === contextActivePaneId) return;
+      setActivePaneById(paneId);
+    },
+    [postSending, contextActivePaneId, setActivePaneById],
+  );
+
+  const handlePaneCreated = useCallback(
+    async (pane: { id: string }) => {
+      await reloadPanes();
+      setActivePaneById(pane.id);
+      showPaneToast('タブを追加しました', 'success');
+    },
+    [reloadPanes, setActivePaneById, showPaneToast],
+  );
+
+  useEffect(() => {
+    const prev = prevActivePaneIdRef.current;
+    if (
+      prev != null &&
+      contextActivePaneId != null &&
+      prev !== contextActivePaneId &&
+      quickPostOpen
+    ) {
+      handleQuickPostClose();
+    }
+    prevActivePaneIdRef.current = contextActivePaneId;
+  }, [contextActivePaneId, quickPostOpen, handleQuickPostClose]);
 
   /** 投稿パネルを開く（位置未指定＝ランダム配置）／閉じる */
   const openQuickPost = useCallback(() => {
@@ -498,9 +560,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const spaceDescription = spaceForVisual?.description?.trim() ?? '';
   const hasDescription = spaceDescription.length > 0;
 
-  // 背景スタイルを生成（訪問中は visitingSpaceInfo の background を使用）
+  const resolvedBackground = useMemo(() => {
+    if (isVisiting && visitingSpaceInfo) {
+      return visitingSpaceInfo.background;
+    }
+    if (!isVisiting && activePane && activeSpace) {
+      return resolvePaneBackground(activePane, activeSpace);
+    }
+    return spaceForVisual?.background;
+  }, [isVisiting, visitingSpaceInfo, activePane, activeSpace, spaceForVisual]);
+
+  // 背景スタイルを生成（Pane 切替時は resolvePaneBackground、訪問中は visitingSpaceInfo）
   const { backgroundClass, backgroundStyle, imageWallpaperUrl } = useMemo(() => {
-    const bg = spaceForVisual?.background;
+    const bg = resolvedBackground;
     if (!bg) {
       return {
         backgroundClass: `${bgStyles.bgBase} ${bgStyles.pattern_mist}`,
@@ -541,7 +613,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       backgroundStyle: {},
       imageWallpaperUrl: null as string | null,
     };
-  }, [spaceForVisual]);
+  }, [resolvedBackground]);
 
   const shouldMapToSharp = isMobile && imageWallpaperUrl != null;
 
@@ -1421,13 +1493,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       onSaveSpeechDraft={handleSaveSpeechDraft}
       onClose={handleQuickPostClose}
       speechToFreePosterRef={speechToFreePosterRef}
+      onSendingChange={setPostSending}
     />
   );
 
   return (
     <div
       ref={attachSpaceRoot}
-      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''} ${mobilePostSplit ? styles.containerMobilePostSheetOpen : ''}`}
+      className={`${styles.container} ${immersiveLayout ? styles.containerImmersive : ''} ${scaledUp ? styles.containerScaledScroll : ''} ${showPaneBar ? styles.containerWithPaneBar : ''} ${mobilePostLandscapeSplit ? styles.containerMobilePostLandscapeSplit : ''} ${mobilePostSplit ? styles.containerMobilePostSheetOpen : ''}`}
     >
       <ScaledContent
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
@@ -1464,6 +1537,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {/* バブルエリア（背景クリックでデセレクト。仕様 63: クイック投稿/ログのダブル・トリプルもこの全面ヒット領域のみ） */}
       <div
         ref={mergeBubbleAreaRef}
+        id="space-pane-panel"
+        role="tabpanel"
+        aria-labelledby={
+          contextActivePaneId ? `space-pane-tab-${contextActivePaneId}` : undefined
+        }
         className={`${styles.bubbleArea} ${backgroundPeekMode && isMobilePortrait ? styles.bubbleAreaBackgroundPeek : ''} ${modeTransitionPhase === 'out' ? styles.modeTransitionOut : ''} ${modeTransitionPhase === 'in' ? styles.modeTransitionIn : ''}`}
         data-bubble-area
         data-space-background
@@ -1781,6 +1859,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           />
         )}
       </div>
+
+      {showPaneBar && (
+        <SpacePaneBar
+          variant="mobile"
+          visiblePanes={visiblePanes}
+          activePaneId={contextActivePaneId}
+          isAdmin={isAdmin}
+          disabled={postSending}
+          onSelect={handlePaneSelect}
+          onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
+        />
+      )}
 
       {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー / タグ・星 */}
       {(showPostCountBadge ||
@@ -2112,6 +2202,17 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 : undefined
             }
           />
+          {showPaneBar && (
+            <SpacePaneBar
+              variant="desktop"
+              visiblePanes={visiblePanes}
+              activePaneId={contextActivePaneId}
+              isAdmin={isAdmin}
+              disabled={postSending}
+              onSelect={handlePaneSelect}
+              onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
+            />
+          )}
           <TopRightMenu onPostClick={handleTopRightPostClick} />
           <LeftControlBar
             controls={controlState}
@@ -2295,6 +2396,25 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         duration={2000}
         onClose={() => setVisitingToastVisible(false)}
       />
+
+      <HossiiToast
+        show={paneToastVisible}
+        message={paneToastMessage}
+        type={paneToastType}
+        duration={2200}
+        onClose={() => setPaneToastVisible(false)}
+      />
+
+      {activeSpaceId && (
+        <SpacePaneCreateDialog
+          open={paneCreateOpen}
+          spaceId={activeSpaceId}
+          existingPanes={panes}
+          onClose={() => setPaneCreateOpen(false)}
+          onCreated={(pane) => void handlePaneCreated(pane)}
+          onError={(message) => showPaneToast(message, 'error')}
+        />
+      )}
     </div>
   );
 });

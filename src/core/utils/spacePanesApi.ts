@@ -33,6 +33,46 @@ export function defaultSpacePaneId(spaceId: string): string {
   return `${spaceId}-pane-default`;
 }
 
+const PANE_SLUG_MAX_LEN = 40;
+
+/** Build [a-z0-9-] slug from pane name; fallback pane-{shortId} when empty (§7.1 / §27 #3). */
+export function generatePaneSlugFromName(name: string, fallbackId: string): string {
+  let slug = name
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, PANE_SLUG_MAX_LEN);
+
+  const validSingle = /^[a-z0-9]$/.test(slug);
+  const validMulti =
+    slug.length >= 2 && /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug);
+
+  if (!validSingle && !validMulti) {
+    const short = fallbackId.replace(/-/g, '').slice(0, 8);
+    slug = `pane-${short}`;
+  }
+
+  return slug.slice(0, PANE_SLUG_MAX_LEN);
+}
+
+/** Ensure slug is unique within the space (append -2, -3, …). */
+export function uniquePaneSlug(baseSlug: string, existingSlugs: string[]): string {
+  const taken = new Set(existingSlugs.map((s) => s.toLowerCase()));
+  if (!taken.has(baseSlug.toLowerCase())) return baseSlug;
+
+  for (let n = 2; n <= 99; n++) {
+    const suffix = `-${n}`;
+    const trimmed = baseSlug.slice(0, Math.max(1, PANE_SLUG_MAX_LEN - suffix.length));
+    const candidate = `${trimmed}${suffix}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+
+  return `${baseSlug.slice(0, 30)}-${Date.now().toString(36).slice(-4)}`;
+}
+
 function parseSettingsOverride(raw: unknown): SpacePaneSettingsOverride | null {
   if (!raw || typeof raw !== 'object') return null;
   return raw as SpacePaneSettingsOverride;

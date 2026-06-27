@@ -24,6 +24,10 @@
   .container {
     padding-top: 4rem;
   }
+
+  .containerWithPaneBar {
+    padding-top: calc(4rem + 2.75rem);
+  }
 }
 
 /* アプリ内「大画面」: 表示領域を最大化し、安全域を確保 */
