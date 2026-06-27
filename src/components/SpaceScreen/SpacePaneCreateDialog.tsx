@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useModalPortalRoot } from '../../core/hooks/useModalPortalRoot';
 import type { SpacePane } from '../../core/types/spacePane';
 import { generateId } from '../../core/utils';
 import {
@@ -34,12 +36,20 @@ export function SpacePaneCreateDialog({
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  const openedAtRef = useRef(0);
+  const portalRoot = useModalPortalRoot();
 
   useEffect(() => {
     if (!open) {
       setName('');
       setNameError(null);
       setSubmitting(false);
+    }
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (open) {
+      openedAtRef.current = Date.now();
     }
   }, [open]);
 
@@ -71,7 +81,7 @@ export function SpacePaneCreateDialog({
     );
 
     try {
-      const created = await createSpacePane({
+      const result = await createSpacePane({
         id: newId,
         spaceId,
         name: trimmed,
@@ -81,12 +91,12 @@ export function SpacePaneCreateDialog({
         isVisible: true,
       });
 
-      if (!created) {
-        onError('タブの作成に失敗しました。件数上限または権限を確認してください');
+      if (!result.ok) {
+        onError(result.error);
         return;
       }
 
-      onCreated(created);
+      onCreated(result.pane);
       onClose();
     } catch {
       onError('タブの作成に失敗しました');
@@ -97,11 +107,14 @@ export function SpacePaneCreateDialog({
 
   if (!open) return null;
 
-  return (
+  const dialog = (
     <div
       className={styles.overlay}
+      data-space-pane-dialog
       role="presentation"
-      onClick={() => {
+      onClick={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (Date.now() - openedAtRef.current < 400) return;
         if (!submitting) onClose();
       }}
     >
@@ -110,6 +123,7 @@ export function SpacePaneCreateDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="space-pane-create-title"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="space-pane-create-title" className={styles.title}>
@@ -131,7 +145,11 @@ export function SpacePaneCreateDialog({
             if (nameError) setNameError(null);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') void handleSubmit();
+            if (e.key === 'Enter') {
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+              e.preventDefault();
+              void handleSubmit();
+            }
             if (e.key === 'Escape' && !submitting) onClose();
           }}
         />
@@ -157,4 +175,6 @@ export function SpacePaneCreateDialog({
       </div>
     </div>
   );
+
+  return createPortal(dialog, portalRoot);
 }

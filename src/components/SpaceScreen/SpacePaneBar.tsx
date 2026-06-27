@@ -51,20 +51,21 @@ export function SpacePaneBar({
             </button>
           );
         })}
-      </div>
-      {isAdmin && onAddPane && (
-        <div className={styles.addWrap}>
+        {isAdmin && onAddPane && (
           <button
             type="button"
             className={styles.addButton}
             aria-label="タブを追加"
             disabled={disabled}
-            onClick={onAddPane}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddPane();
+            }}
           >
             ＋
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </nav>
   );
-}
+};

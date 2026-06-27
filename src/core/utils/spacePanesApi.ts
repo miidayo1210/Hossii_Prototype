@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { appendDemoSpacePane } from './demoSpacePanesStorage';
 import type { Hossii } from '../types';
 import type {
   CreateSpacePaneInput,
@@ -76,6 +77,43 @@ export function uniquePaneSlug(baseSlug: string, existingSlugs: string[]): strin
 function parseSettingsOverride(raw: unknown): SpacePaneSettingsOverride | null {
   if (!raw || typeof raw !== 'object') return null;
   return raw as SpacePaneSettingsOverride;
+}
+
+export type CreateSpacePaneResult =
+  | { ok: true; pane: SpacePane }
+  | { ok: false; error: string };
+
+export function buildSpacePaneFromInput(input: CreateSpacePaneInput): SpacePane {
+  const now = new Date();
+  return {
+    id: input.id,
+    spaceId: input.spaceId,
+    name: input.name,
+    slug: input.slug,
+    sortOrder: input.sortOrder ?? 0,
+    isDefault: input.isDefault ?? false,
+    isVisible: input.isVisible ?? true,
+    background: input.background ?? null,
+    savedBackgroundImages: input.savedBackgroundImages ?? null,
+    decorations: input.decorations ?? null,
+    characterImageUrl: input.characterImageUrl ?? null,
+    characterName: input.characterName ?? null,
+    customEmotions: input.customEmotions ?? null,
+    bubbleShapePng: input.bubbleShapePng ?? null,
+    settings: input.settings ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function formatSpacePaneCreateError(error: { message: string; code?: string }): string {
+  if (error.code === '42501') {
+    return 'タブの作成にはコミュニティ管理者またはスーパー管理者としてのログインが必要です';
+  }
+  if (error.code === '23505') {
+    return '同じ識別子のタブが既に存在します';
+  }
+  return `タブの作成に失敗しました（${error.message}）`;
 }
 
 export function rowToSpacePane(row: SpacePaneRow): SpacePane {
@@ -236,8 +274,12 @@ export async function ensureDefaultSpacePane(spaceId: string): Promise<SpacePane
   return data ? rowToSpacePane(data as SpacePaneRow) : fetchDefaultSpacePane(spaceId);
 }
 
-export async function createSpacePane(input: CreateSpacePaneInput): Promise<SpacePane | null> {
-  if (!isSupabaseConfigured) return null;
+export async function createSpacePane(input: CreateSpacePaneInput): Promise<CreateSpacePaneResult> {
+  if (!isSupabaseConfigured) {
+    const pane = buildSpacePaneFromInput(input);
+    appendDemoSpacePane(pane);
+    return { ok: true, pane };
+  }
 
   const { data, error } = await supabase
     .from('space_panes')
@@ -247,10 +289,14 @@ export async function createSpacePane(input: CreateSpacePaneInput): Promise<Spac
 
   if (error) {
     console.error('[spacePanesApi] createSpacePane error:', error.message);
-    return null;
+    return { ok: false, error: formatSpacePaneCreateError(error) };
   }
 
-  return data ? rowToSpacePane(data as SpacePaneRow) : null;
+  if (!data) {
+    return { ok: false, error: 'タブの作成に失敗しました' };
+  }
+
+  return { ok: true, pane: rowToSpacePane(data as SpacePaneRow) };
 }
 
 export async function updateSpacePane(

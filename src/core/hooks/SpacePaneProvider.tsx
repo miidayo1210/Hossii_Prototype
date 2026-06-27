@@ -12,6 +12,7 @@ import {
 import type { SpacePane } from '../types/spacePane';
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { ensureDefaultSpacePane } from '../utils/ensureDefaultSpacePane';
+import { loadDemoSpacePanesForSpace } from '../utils/demoSpacePanesStorage';
 import {
   defaultSpacePaneId,
   fetchDefaultSpacePane,
@@ -59,7 +60,12 @@ function createDemoDefaultPane(spaceId: string): SpacePane {
 
 async function loadPanesForSpace(spaceId: string): Promise<SpacePane[]> {
   if (!isSupabaseConfigured) {
-    return [createDemoDefaultPane(spaceId)];
+    const defaultPane = createDemoDefaultPane(spaceId);
+    const extras = loadDemoSpacePanesForSpace(spaceId);
+    if (extras.length === 0) return [defaultPane];
+    return [defaultPane, ...extras].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
+    );
   }
 
   let panes = await fetchSpacePanes(spaceId);

@@ -43,6 +43,8 @@ type Props = {
   onShowPostCountBadgeToggle?: () => void;
   /** 大画面トグルの説明文をスマホ向けに変える（仕様71） */
   isMobile?: boolean;
+  /** スペース画面上部に Pane タブバーが出ている（モバイル縦の左バー位置調整） */
+  mobilePaneBarVisible?: boolean;
   /** スペース画面タグ絞り込み（モバイル ... メニュー） */
   tagFilterCandidates?: string[];
   activeTagFilter?: string | null;
@@ -100,6 +102,7 @@ export const LeftControlBar = ({
   showPostCountBadge = false,
   onShowPostCountBadgeToggle,
   isMobile = false,
+  mobilePaneBarVisible = false,
   tagFilterCandidates = [],
   activeTagFilter = null,
   onTagFilterChange,
@@ -176,7 +179,9 @@ export const LeftControlBar = ({
   }, [overflowOpen]);
 
   return (
-    <aside className={styles.controlBar}>
+    <aside
+      className={`${styles.controlBar} ${mobilePaneBarVisible ? styles.controlBarWithPaneBar : ''}`}
+    >
       {/* --- 既存トグルボタン群 --- */}
       {!isMobile && (
         <Tooltip text={controls.isFullscreen ? '画面を元に戻す' : '表示領域を広げる'}>

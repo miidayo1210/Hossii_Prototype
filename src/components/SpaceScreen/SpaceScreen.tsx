@@ -2222,6 +2222,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             onToggle={handleControlToggle}
             onFullscreenToggle={handleFullscreenToggle}
             isMobile={isMobile}
+            mobilePaneBarVisible={showPaneBar && isMobile}
             displayScale={displayScale}
             onDisplayScaleCycle={handleDisplayScaleCycle}
             displayPeriod={displayPeriod}

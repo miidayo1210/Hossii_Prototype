@@ -1,13 +1,12 @@
 # スペース Pane 機能 QA チェックリスト
 
-> 対象: [93_Hossiiタブ機能追加.md](./93_Hossiiタブ機能追加.md) Phase 0–9B  
+> 対象: [93_Hossiiタブ機能追加.md](./93_Hossiiタブ機能追加.md) Phase 0–10B  
 > §26 初期リリース受入および §24 テスト要件に基づく手動確認用
 
 ## 使い方
 
 - 確認者・日付・環境（デモ / Supabase）を記録する
 - 各項目を `[ ]` 未確認 / `[x]` OK / `[-]` スキップ で記入
-- Phase 10 以降の項目は別セクション
 
 ---
 
@@ -50,13 +49,15 @@
 
 ## §24.3 投稿分離
 
-- [ ] デフォルト Pane に NULL 投稿と defaultPaneId 投稿が表示される
-- [ ] 追加 Pane に NULL 投稿が表示されない
+- [ ] デフォルト Pane に defaultPaneId 投稿が表示される
+- [ ] デモ環境で spacePaneId 未設定の投稿も default Pane に表示される
+- [ ] 追加 Pane に defaultPaneId 投稿が表示されない
 - [ ] Pane A の投稿が Pane B に表示されない
 - [ ] Realtime 投稿が異なる Pane に混入しない
 - [ ] 楽観的投稿が異なる Pane に混入しない
 - [ ] ページング結果が異なる Pane に混入しない
 - [ ] Pane 切替中の古い fetch 結果が混入しない
+- [ ] 管理者 Pane 移動後、移動元から消え移動先に表示される
 
 ## §24.4 URL
 
@@ -73,8 +74,18 @@
 
 - [ ] 一般参加者は Pane を作成できない
 - [ ] 管理者は Pane を作成・名称変更・並び替え・非表示・再表示できる
+- [ ] **スーパー管理者**は override 先の任意コミュニティで Pane を作成できる（Supabase + `20260629110000` migration 適用後）
 - [ ] default Pane を非表示にできない
 - [ ] slug 重複を作成できない
+- [ ] 管理者は #comments から投稿を別 Pane へ移動できる
+- [ ] 作成失敗時に具体的なエラーメッセージが toast 表示される（権限不足・slug 重複等）
+
+## §30.17 タブ追加ダイアログ UX
+
+- [ ] 大画面表示（Fullscreen API）中も `＋` → ダイアログが表示される
+- [ ] 日本語 IME: Enter 1 回目は確定のみ、2 回目で保存
+- [ ] デモ環境: 作成した Pane がリロード後も残る（localStorage）
+- [ ] Supabase 環境: 作成した Pane が DB に保存され Realtime で反映される
 
 ## §24.6 設定
 
@@ -93,14 +104,14 @@
 - [ ] all + 私のログ — 全 Pane 横断の自分の投稿
 - [ ] リロード後フィルタ復元（space 単位）
 
----
-
-## Phase 10 以降（別 PR）
+## Phase 10 — 任意整理
 
 ### 10C 投稿 Pane 移動
 
-- [ ] 管理者のみ「タブへ移動」UI が表示される
+- [ ] 管理者のみ「タブへ」UI が表示される
+- [ ] Pane 1 件 Space では非表示
 - [ ] 移動後 active Pane から消え、移動先 Pane に表示される
+- [ ] #comments all-panes モードでも query key 整合
 - [ ] Realtime 他端末でも整合
 
 ### 10D Pane Realtime
@@ -111,4 +122,11 @@
 ### 10E mylogs Pane フィルタ
 
 - [ ] このスペース + Pane 2+ で Pane フィルタ表示
+- [ ] すべて（全スペース）では Pane フィルタ非表示
 - [ ] 指定 Pane の自分の投稿のみ表示
+- [ ] リロード後フィルタ復元（space 単位、Comments とは別キー）
+
+### 10A / 10B NULL 整理
+
+- [ ] backfill migration 適用後、NULL space_pane_id が 0 件（本番確認）
+- [ ] default Pane fetch が explicit defaultPaneId のみ返す

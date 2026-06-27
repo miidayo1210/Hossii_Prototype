@@ -56,6 +56,7 @@ export function GlobalClickStarBurst() {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       /* キーボード等で座標が付かないクリックはスキップ */
       if (e.clientX === 0 && e.clientY === 0) return;
+      if ((e.target as Element).closest('[data-space-pane-dialog]')) return;
       idRef.current += 1;
       setBurst({ x: e.clientX, y: e.clientY, id: idRef.current });
     };

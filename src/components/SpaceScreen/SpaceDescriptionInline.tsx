@@ -5,7 +5,7 @@ type Props = {
   className?: string;
 };
 
-/** スペース名の右隣に置く一行説明（背景なし・省略なし） */
+/** スペース名の右隣に置く一行説明（最大50文字・折り返しなし） */
 export function SpaceDescriptionInline({ description, className }: Props) {
   return (
     <span

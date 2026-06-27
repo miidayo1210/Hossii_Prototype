@@ -22,10 +22,11 @@
 - **各コミュニティのステータス確認**（`approved` / `pending` / `rejected`）
 - **任意コミュニティのスペース管理画面へ遷移**（`overrideCommunityId` 経由）
 - スペース管理画面で「**戻る**」ボタンからコミュニティ一覧に戻れる
+- **任意コミュニティのスペース内タブ（Space Pane）の作成・更新**（`space_panes` RLS — [20260629110000](../../supabase/migrations/20260629110000_space_panes_super_admin_rls.sql)。非表示 Pane の SELECT も可）
 
 ### できないこと（現時点の制限）
 - コミュニティの承認・却下 UI（現在は Supabase Dashboard での手動 SQL）
-- スペースの作成・削除の永続化（RLS 修正が必要）
+- スペースの作成・削除の永続化（`spaces` テーブル向け super_admin RLS は未整備）
 - 自分の `communityId` を持たないため、コミュニティ ID セクションは非表示
 
 ---

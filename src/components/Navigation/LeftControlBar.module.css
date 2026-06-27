@@ -197,6 +197,17 @@
   .controlBar {
     top: max(52px, calc(env(safe-area-inset-top, 0px) + 44px));
   }
+
+  .controlBarWithPaneBar {
+    top: max(104px, calc(env(safe-area-inset-top, 0px) + 96px));
+  }
+}
+
+@media (max-width: 768px) and (orientation: landscape),
+  (max-height: 600px) and (orientation: landscape) {
+  .controlBarWithPaneBar {
+    top: max(56px, calc(env(safe-area-inset-top, 0px) + 48px));
+  }
 }
 
 /* Desktop: 全体表示（横持ちスマホは除外） */
