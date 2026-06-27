@@ -23,14 +23,5 @@ export function isDefaultPane(context: PaneContext): boolean {
 /** Whether a hossii belongs to the active pane in context. */
 export function matchesPane(hossii: HossiiPaneRef, context: PaneContext): boolean {
   if (hossii.spaceId !== context.spaceId) return false;
-
-  const effective = effectivePaneId(hossii, context.defaultPaneId);
-
-  if (isDefaultPane(context)) {
-    return (
-      hossii.spacePaneId == null || hossii.spacePaneId === context.defaultPaneId
-    );
-  }
-
-  return effective === context.activePaneId;
+  return effectivePaneId(hossii, context.defaultPaneId) === context.activePaneId;
 }

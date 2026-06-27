@@ -176,9 +176,9 @@ export type PaneFetchScope =
   | { kind: 'pane'; paneId: string }
   | { kind: 'all-panes' };
 
-/** PostgREST `.or()` filter for default pane (NULL + explicit default id). */
+/** PostgREST filter for default pane (Phase 10B: explicit default pane id only). */
 export function buildDefaultPaneFetchOrFilter(defaultPaneId: string): string {
-  return `space_pane_id.is.null,space_pane_id.eq.${defaultPaneId}`;
+  return `space_pane_id.eq.${defaultPaneId}`;
 }
 
 /** Client-side pane filter (tests / demo validation). */
@@ -188,7 +188,7 @@ export function matchesPaneFetchScope(
 ): boolean {
   if (scope.kind === 'all-panes') return true;
   if (scope.kind === 'default') {
-    return hossii.spacePaneId == null || hossii.spacePaneId === scope.defaultPaneId;
+    return hossii.spacePaneId === scope.defaultPaneId;
   }
   return hossii.spacePaneId === scope.paneId;
 }
@@ -218,7 +218,7 @@ export async function fetchHossiisPage(
     .limit(limit);
 
   if (paneFilter?.kind === 'default') {
-    query = query.or(buildDefaultPaneFetchOrFilter(paneFilter.defaultPaneId));
+    query = query.eq('space_pane_id', paneFilter.defaultPaneId);
   } else if (paneFilter?.kind === 'pane') {
     query = query.eq('space_pane_id', paneFilter.paneId);
   }
@@ -331,6 +331,27 @@ export async function updateHossiiScale(id: string, scale: number): Promise<void
   if (error) {
     console.error('[hossiisApi] updateHossiiScale error:', error.message);
   }
+}
+
+/** Move hossii to another pane in the same space (Phase 10C). */
+export async function updateHossiiPaneId(
+  hossiiId: string,
+  spaceId: string,
+  targetPaneId: string,
+): Promise<boolean> {
+  if (!isSupabaseConfigured) return true;
+
+  const { error } = await supabase
+    .from('hossiis')
+    .update({ space_pane_id: targetPaneId })
+    .eq('id', hossiiId)
+    .eq('space_id', spaceId);
+
+  if (error) {
+    console.error('[hossiisApi] updateHossiiPaneId error:', error.message);
+    return false;
+  }
+  return true;
 }
 
 export async function hideHossiiInDb(id: string, adminId?: string): Promise<void> {

@@ -33,14 +33,14 @@ describe('mergeFetchedHossiisWithPendingInserts', () => {
   const allKey = buildQueryKeyV2(spaceId, { kind: 'all-panes' }, 'all');
   const v1Key = buildQueryKey(spaceId, '1w');
 
-  it('includes NULL pending in default pane key merge only', () => {
-    const pending = h('pending-null');
+  it('includes default-pane pending in default pane key merge only', () => {
+    const pending = h('pending-default', defaultPaneId);
     const { pendingInsertIdsRef, pendingOptimisticByIdRef } = refs(
-      ['pending-null'],
-      new Map([['pending-null', pending]]),
+      ['pending-default'],
+      new Map([['pending-default', pending]]),
     );
 
-    const serverList = [h('server-1')];
+    const serverList = [h('server-1', defaultPaneId)];
 
     const defaultMerged = mergeFetchedHossiisWithPendingInserts(
       serverList,
@@ -50,7 +50,7 @@ describe('mergeFetchedHossiisWithPendingInserts', () => {
       pendingOptimisticByIdRef,
       defaultKey,
     );
-    expect(defaultMerged.map((x) => x.id).sort()).toEqual(['pending-null', 'server-1'].sort());
+    expect(defaultMerged.map((x) => x.id).sort()).toEqual(['pending-default', 'server-1'].sort());
 
     const paneAMerged = mergeFetchedHossiisWithPendingInserts(
       serverList,
@@ -61,6 +61,24 @@ describe('mergeFetchedHossiisWithPendingInserts', () => {
       paneAKey,
     );
     expect(paneAMerged.map((x) => x.id)).toEqual(['server-1']);
+  });
+
+  it('excludes pending without spacePaneId from default pane key merge', () => {
+    const pending = h('pending-legacy');
+    const { pendingInsertIdsRef, pendingOptimisticByIdRef } = refs(
+      ['pending-legacy'],
+      new Map([['pending-legacy', pending]]),
+    );
+
+    const defaultMerged = mergeFetchedHossiisWithPendingInserts(
+      [h('server-1', defaultPaneId)],
+      spaceId,
+      [],
+      pendingInsertIdsRef,
+      pendingOptimisticByIdRef,
+      defaultKey,
+    );
+    expect(defaultMerged.map((x) => x.id)).toEqual(['server-1']);
   });
 
   it('excludes pane A pending from default pane key merge', () => {

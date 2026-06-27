@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { SpacePane } from '../types/spacePane';
-import { isSupabaseConfigured } from '../supabase';
+import { isSupabaseConfigured, supabase } from '../supabase';
 import { ensureDefaultSpacePane } from '../utils/ensureDefaultSpacePane';
 import {
   defaultSpacePaneId,
@@ -317,6 +317,42 @@ export function SpacePaneProvider({ children }: { children: ReactNode }) {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, [activeSpaceId]);
+
+  useEffect(() => {
+    if (!activeSpaceId || !isSupabaseConfigured) return;
+
+    const channel = supabase
+      .channel(`space_panes:${activeSpaceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'space_panes',
+          filter: `space_id=eq.${activeSpaceId}`,
+        },
+        () => {
+          void reloadPanesAndSyncActive();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'space_panes',
+          filter: `space_id=eq.${activeSpaceId}`,
+        },
+        () => {
+          void reloadPanesAndSyncActive();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeSpaceId, reloadPanesAndSyncActive]);
 
   const value = useMemo(
     (): SpacePaneContextValue => ({

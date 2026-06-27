@@ -1,22 +1,54 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { getRelativeTime } from '../../core/utils/relativeTime';
+import { matchesPane, type PaneContext } from '../../core/utils/hossiiPaneMembership';
+import {
+  loadMyLogsPaneFilter,
+  saveMyLogsPaneFilter,
+  type MyLogsPaneFilter,
+} from '../../core/utils/mylogsPaneFilterStorage';
+import { PaneFilterSegment, type PaneFilterCountMode, type PaneFilterValue } from '../CommentsScreen/PaneFilterSegment';
+import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import styles from './MyLogsScreen.module.css';
 
 type FilterType = 'all' | 'current';
 
 export const MyLogsScreen = () => {
-  const { state } = useHossiiStore();
+  const { state, getActiveSpaceHossiis } = useHossiiStore();
   const { hossiis, spaces, profile, activeSpaceId } = state;
+  const { visiblePanes, defaultPane, activePane } = useSpacePane();
+
+  const visiblePaneIds = useMemo(
+    () => visiblePanes.map((pane) => pane.id),
+    [visiblePanes],
+  );
+  const visiblePaneIdsKey = visiblePaneIds.join(',');
+  const paneFilterStorageKey = `${activeSpaceId ?? ''}:${visiblePaneIdsKey}`;
 
   const [filter, setFilter] = useState<FilterType>('all');
+  const [paneFilterState, setPaneFilterState] = useState(() => ({
+    key: paneFilterStorageKey,
+    filter: loadMyLogsPaneFilter(activeSpaceId, visiblePaneIds),
+  }));
+
+  if (paneFilterState.key !== paneFilterStorageKey) {
+    setPaneFilterState({
+      key: paneFilterStorageKey,
+      filter: loadMyLogsPaneFilter(
+        activeSpaceId,
+        visiblePaneIdsKey ? visiblePaneIdsKey.split(',') : [],
+      ),
+    });
+  }
+
+  const paneFilter = paneFilterState.filter;
+
   const [sortOrder, setSortOrder] = useState<'newest' | 'likes'>('newest');
-  // 拡大表示する画像URL（null のときライトボックス非表示）
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  // Escape キーでライトボックスを閉じる
   useEffect(() => {
     if (!lightboxUrl) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -26,38 +58,104 @@ export const MyLogsScreen = () => {
     return () => document.removeEventListener('keydown', handleKey);
   }, [lightboxUrl]);
 
-  // スペース名を解決
   const getSpaceName = (spaceId: string): string => {
     const space = spaces.find((f) => f.id === spaceId);
     return space?.name ?? '不明なスペース';
   };
 
-  // 自分のログを抽出（authorId一致、かつ authorId が存在するもののみ）
+  const paneContext = useMemo((): PaneContext | null => {
+    if (!activeSpaceId || !defaultPane) return null;
+    if (paneFilter.mode === 'specific') {
+      return {
+        spaceId: activeSpaceId,
+        activePaneId: paneFilter.paneId,
+        defaultPaneId: defaultPane.id,
+      };
+    }
+    if (activePane) {
+      return {
+        spaceId: activeSpaceId,
+        activePaneId: activePane.id,
+        defaultPaneId: defaultPane.id,
+      };
+    }
+    return null;
+  }, [activeSpaceId, defaultPane, activePane, paneFilter]);
+
+  const getPaneFilterCount = (mode: PaneFilterCountMode, paneId?: string): number => {
+    if (!activeSpaceId || !defaultPane || !profile?.id) return 0;
+
+    const countVisible = (items: typeof hossiis) =>
+      items.filter(
+        (h) =>
+          h.authorId === profile.id &&
+          h.spaceId === activeSpaceId &&
+          !coerceIsHidden(h.isHidden),
+      ).length;
+
+    if (mode === 'all') {
+      return countVisible(hossiis.filter((h) => h.spaceId === activeSpaceId));
+    }
+
+    let ctx: PaneContext | null = null;
+    if (mode === 'specific' && paneId) {
+      ctx = {
+        spaceId: activeSpaceId,
+        activePaneId: paneId,
+        defaultPaneId: defaultPane.id,
+      };
+    } else if (activePane) {
+      ctx = {
+        spaceId: activeSpaceId,
+        activePaneId: activePane.id,
+        defaultPaneId: defaultPane.id,
+      };
+    }
+    if (!ctx) return 0;
+    return countVisible(getActiveSpaceHossiis().filter((h) => matchesPane(h, ctx!)));
+  };
+
+  const handlePaneFilterChange = (next: PaneFilterValue) => {
+    const myLogsFilter = next as MyLogsPaneFilter;
+    setPaneFilterState({ key: paneFilterStorageKey, filter: myLogsFilter });
+    if (activeSpaceId) saveMyLogsPaneFilter(activeSpaceId, myLogsFilter);
+  };
+
   const myLogs = useMemo(() => {
     if (!profile?.id) return [];
 
     let logs = hossiis.filter((h) => h.authorId === profile.id);
 
-    // フィルタ適用
     if (filter === 'current') {
       logs = logs.filter((h) => h.spaceId === activeSpaceId);
+      if (paneContext && paneFilter.mode !== 'all') {
+        logs = logs.filter((h) => matchesPane(h, paneContext));
+      }
     }
 
     return logs.sort((a, b) =>
       sortOrder === 'likes'
         ? (b.likeCount ?? 0) - (a.likeCount ?? 0)
-        : b.createdAt.getTime() - a.createdAt.getTime()
+        : b.createdAt.getTime() - a.createdAt.getTime(),
     );
-  }, [hossiis, profile, filter, activeSpaceId, sortOrder]);
+  }, [
+    hossiis,
+    profile,
+    filter,
+    activeSpaceId,
+    sortOrder,
+    paneContext,
+    paneFilter.mode,
+  ]);
 
-  // 現在のスペース名
   const currentSpaceName = getSpaceName(activeSpaceId);
+  const showPaneFilter =
+    filter === 'current' && visiblePanes.length >= 2 && defaultPane != null;
 
   return (
     <div className={styles.container}>
       <TopRightMenu />
 
-      {/* ヘッダー */}
       <header className={styles.header}>
         <div className={styles.headerContent}>
           <div className={styles.headerLeft}>
@@ -82,7 +180,17 @@ export const MyLogsScreen = () => {
             </button>
           </div>
         </div>
-        {/* 並び替えバー */}
+        {showPaneFilter && (
+          <div className={styles.paneFilterWrap}>
+            <PaneFilterSegment
+              filter={paneFilter}
+              visiblePanes={visiblePanes}
+              activePane={activePane}
+              getCount={getPaneFilterCount}
+              onChange={handlePaneFilterChange}
+            />
+          </div>
+        )}
         <div className={styles.sortBar}>
           <button
             type="button"
@@ -101,20 +209,17 @@ export const MyLogsScreen = () => {
         </div>
       </header>
 
-      {/* メインコンテンツ */}
       <main className={styles.main}>
-        {/* カウント */}
         <div className={styles.count}>{myLogs.length} 件</div>
 
-        {/* ログ一覧 */}
         <div className={styles.list}>
           {myLogs.length === 0 ? (
             <div className={styles.empty}>
               {!profile?.id
                 ? 'まだ投稿がありません'
                 : filter === 'current'
-                ? 'このスペースへの投稿はまだありません'
-                : '投稿履歴がありません'}
+                  ? 'このスペースへの投稿はまだありません'
+                  : '投稿履歴がありません'}
             </div>
           ) : (
             myLogs.map((hossii, index) => {
@@ -128,18 +233,15 @@ export const MyLogsScreen = () => {
                   className={styles.card}
                   style={{ animationDelay: `${index * 0.03}s` }}
                 >
-                  {/* 1行目: スペース名 + 時間 */}
                   <div className={styles.cardHeader}>
                     <span className={styles.spacePill}>{spaceName}</span>
                     <span className={styles.time}>{relativeTime}</span>
                   </div>
 
-                  {/* 2行目: 本文（画像のみ投稿はスキップ） */}
                   {renderHossiiText(hossii) && (
                     <p className={styles.message}>{renderHossiiText(hossii)}</p>
                   )}
 
-                  {/* 画像サムネイル（タップで拡大） */}
                   {hossii.imageUrl && (
                     <button
                       type="button"
@@ -157,7 +259,6 @@ export const MyLogsScreen = () => {
                     </button>
                   )}
 
-                  {/* 3行目: authorName + emotion（任意） */}
                   {(hossii.authorName || emoji) && (
                     <div className={styles.cardFooter}>
                       {hossii.authorName && (
@@ -173,7 +274,6 @@ export const MyLogsScreen = () => {
         </div>
       </main>
 
-      {/* ライトボックス（画像拡大表示） */}
       {lightboxUrl && (
         <div
           className={styles.lightbox}

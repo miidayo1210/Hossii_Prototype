@@ -26,6 +26,7 @@ export const CommentsScreen = () => {
     getHossiisForQueryKey,
     syncFetchedHossiis,
     setHossiiFetchLoading,
+    moveHossiiToPane,
   } = useHossiiStore();
   const { activeSpaceId } = state;
   const {
@@ -218,6 +219,20 @@ export const CommentsScreen = () => {
     [activeSpaceId, paneFilterStorageKey],
   );
 
+  const [movePaneBusyId, setMovePaneBusyId] = useState<string | null>(null);
+
+  const handleMoveHossiiToPane = useCallback(
+    async (hossiiId: string, targetPaneId: string) => {
+      setMovePaneBusyId(hossiiId);
+      try {
+        await moveHossiiToPane(hossiiId, targetPaneId);
+      } finally {
+        setMovePaneBusyId(null);
+      }
+    },
+    [moveHossiiToPane],
+  );
+
   const activeSpace = state.spaces.find((s) => s.id === activeSpaceId);
 
   return (
@@ -235,6 +250,10 @@ export const CommentsScreen = () => {
         onPaneFilterChange={handlePaneFilterChange}
         getPaneFilterCount={getPaneFilterCount}
         commentsFetchLoading={fetchProgress.loading}
+        movePaneVisiblePanes={visiblePanes.length >= 2 ? visiblePanes : undefined}
+        movePaneDefaultPaneId={defaultPane?.id}
+        onMoveHossiiToPane={handleMoveHossiiToPane}
+        movePaneBusyId={movePaneBusyId}
       />
     </div>
   );

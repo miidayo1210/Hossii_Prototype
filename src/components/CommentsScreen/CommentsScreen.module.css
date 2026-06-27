@@ -750,6 +750,33 @@
   color: #6366f1;
 }
 
+.movePaneSelectWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.movePaneSelectLabel {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.movePaneSelect {
+  font-size: 0.6875rem;
+  padding: 0.15rem 0.25rem;
+  border-radius: 0.35rem;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  max-width: 5.5rem;
+  font-family: inherit;
+}
+
+.movePaneSelect:disabled {
+  opacity: 0.6;
+}
+
 /* ---- アイデンティティバナー ---- */
 .identityBanner {
   display: flex;

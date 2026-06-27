@@ -76,8 +76,11 @@ describe('hossiiQueryKey', () => {
     )!;
     const allKey = parseQueryKey(buildQueryKeyV2(spaceId, { kind: 'all-panes' }, 'all'))!;
 
-    it('NULL post matches default pane key', () => {
-      const h: Pick<Hossii, 'spaceId' | 'spacePaneId'> = { spaceId, spacePaneId: undefined };
+    it('default pane post matches default pane key', () => {
+      const h: Pick<Hossii, 'spaceId' | 'spacePaneId'> = {
+        spaceId,
+        spacePaneId: defaultPaneId,
+      };
       expect(hossiiMatchesParsedQueryKey(h, defaultKey, defaultPaneId)).toBe(true);
       expect(hossiiMatchesParsedQueryKey(h, paneAKey, defaultPaneId)).toBe(false);
       expect(hossiiMatchesParsedQueryKey(h, allKey, defaultPaneId)).toBe(true);
@@ -94,7 +97,7 @@ describe('hossiiQueryKey', () => {
   });
 
   describe('queryKeysForHossii', () => {
-    it('inserts NULL post into default and all-panes keys only', () => {
+    it('inserts default pane post into default and all-panes keys only', () => {
       const defaultKey = buildQueryKeyV2(spaceId, { kind: 'pane', paneId: defaultPaneId }, '1w');
       const paneAKey = buildQueryKeyV2(spaceId, { kind: 'pane', paneId: paneAId }, '1w');
       const allKey = buildQueryKeyV2(spaceId, { kind: 'all-panes' }, 'all');
@@ -110,6 +113,7 @@ describe('hossiiQueryKey', () => {
         id: 'new',
         message: 'x',
         spaceId,
+        spacePaneId: defaultPaneId,
         createdAt: new Date(),
       };
 

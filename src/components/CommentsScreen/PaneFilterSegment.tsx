@@ -4,14 +4,16 @@ import type { SpacePane } from '../../core/types/spacePane';
 import type { CommentsPaneFilter } from '../../core/utils/commentsPaneFilterStorage';
 import styles from './CommentsScreen.module.css';
 
+export type PaneFilterValue = CommentsPaneFilter;
+
 export type PaneFilterCountMode = 'current' | 'all' | 'specific';
 
 type Props = {
-  filter: CommentsPaneFilter;
+  filter: PaneFilterValue;
   visiblePanes: SpacePane[];
   activePane: SpacePane | null;
   getCount: (mode: PaneFilterCountMode, paneId?: string) => number;
-  onChange: (next: CommentsPaneFilter) => void;
+  onChange: (next: PaneFilterValue) => void;
   fetchLoading?: boolean;
 };
 

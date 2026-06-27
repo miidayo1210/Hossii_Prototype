@@ -14,6 +14,7 @@ import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { LogScopeSegment } from './LogScopeSegment';
 import { PaneFilterSegment, type PaneFilterCountMode } from './PaneFilterSegment';
 import type { CommentsPaneFilter } from '../../core/utils/commentsPaneFilterStorage';
+import { MoveHossiiPaneSelect } from './MoveHossiiPaneSelect';
 import type { SpacePane } from '../../core/types/spacePane';
 import styles from './CommentsScreen.module.css';
 
@@ -88,6 +89,11 @@ export type LogListBodyProps = {
   onPaneFilterChange?: (next: CommentsPaneFilter) => void;
   getPaneFilterCount?: (mode: PaneFilterCountMode, paneId?: string) => number;
   commentsFetchLoading?: boolean;
+  /** Phase 10C: 管理者の Pane 間移動 */
+  movePaneVisiblePanes?: SpacePane[];
+  movePaneDefaultPaneId?: string;
+  onMoveHossiiToPane?: (hossiiId: string, targetPaneId: string) => void;
+  movePaneBusyId?: string | null;
 };
 
 export function LogListBody({
@@ -106,6 +112,10 @@ export function LogListBody({
   onPaneFilterChange,
   getPaneFilterCount,
   commentsFetchLoading = false,
+  movePaneVisiblePanes,
+  movePaneDefaultPaneId,
+  onMoveHossiiToPane,
+  movePaneBusyId = null,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
   const { state, hideHossii, getActiveNickname } = useHossiiStore();
@@ -426,14 +436,27 @@ export function LogListBody({
                       <span className={styles.time}>{timestamp}</span>
                       <div className={styles.metaEnd}>
                         {isAdmin && (
-                          <button
-                            type="button"
-                            className={styles.adminHideButton}
-                            onClick={() => handleHideFromLog(hossii.id)}
-                            title="この投稿を非表示にする"
-                          >
-                            非表示
-                          </button>
+                          <>
+                            {showMovePane && (
+                              <MoveHossiiPaneSelect
+                                hossiiId={hossii.id}
+                                spaceId={hossii.spaceId}
+                                spacePaneId={hossii.spacePaneId}
+                                defaultPaneId={movePaneDefaultPaneId}
+                                visiblePanes={movePaneVisiblePanes}
+                                onMove={onMoveHossiiToPane}
+                                disabled={movePaneBusyId === hossii.id}
+                              />
+                            )}
+                            <button
+                              type="button"
+                              className={styles.adminHideButton}
+                              onClick={() => handleHideFromLog(hossii.id)}
+                              title="この投稿を非表示にする"
+                            >
+                              非表示
+                            </button>
+                          </>
                         )}
                         {likesEnabled ? (
                           <LikeButton
@@ -495,6 +518,13 @@ export function LogListBody({
     getPaneFilterCount &&
     visiblePanes &&
     visiblePanes.length >= 2;
+
+  const showMovePane =
+    isAdmin &&
+    movePaneVisiblePanes &&
+    movePaneVisiblePanes.length >= 2 &&
+    movePaneDefaultPaneId &&
+    onMoveHossiiToPane;
 
   const scopeHeaderBlock = (
     <div className={styles.scopeHeaderBlock}>

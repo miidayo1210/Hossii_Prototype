@@ -47,7 +47,7 @@ import {
   runtimeMatchesActiveSpace,
   shouldAcceptRealtimeInsert,
 } from '../utils/hossiiRealtimePane';
-import { validateHossiiPaneSpaceMatch } from '../utils/spacePanesApi';
+import { validateHossiiPaneSpaceMatch, defaultSpacePaneId } from '../utils/spacePanesApi';
 import {
   EMPTY_SPACE_PANE_RUNTIME,
   SpacePaneRuntimeContext,
@@ -75,6 +75,7 @@ import {
   updateHossiiColor,
   updateHossiiPosition,
   updateHossiiScale,
+  updateHossiiPaneId,
   hideHossiiInDb,
   restoreHossiiInDb,
   deleteAllHossiisInSpace,
@@ -82,6 +83,7 @@ import {
   rowToHossii,
   type HossiiRow,
 } from '../utils/hossiisApi';
+import { reconcileHossiiQueryKeys } from '../utils/reconcileHossiiQueryKeys';
 import { insertModerationLog } from '../utils/moderationLogsApi';
 import {
   upsertProfile,
@@ -314,6 +316,7 @@ type ExtendedHossiiAction =
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
   | { type: 'RESTORE_HOSSII'; payload: string }
+  | { type: 'MOVE_HOSSII_PANE'; payload: { id: string; spacePaneId: string } }
   | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii }
   | {
       type: 'APPLY_REALTIME_PANE_UPDATE';
@@ -672,6 +675,17 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return withEntitiesUpdate(state, entities);
       }
 
+      case 'MOVE_HOSSII_PANE': {
+        const prev = state.entities.entitiesById[action.payload.id];
+        if (!prev) return state;
+        const updated: Hossii = {
+          ...prev,
+          spacePaneId: action.payload.spacePaneId,
+        };
+        const entities = reconcileHossiiQueryKeys(state.entities, updated);
+        return withEntitiesUpdate(state, entities);
+      }
+
       case 'UPDATE_HOSSII_FROM_REALTIME': {
         const updated = action.payload;
         const prev = state.entities.entitiesById[updated.id];
@@ -744,6 +758,7 @@ export type HossiiContextValue = {
   updateHossiiScaleAction: (id: string, scale: number) => void;
   hideHossii: (id: string, adminId?: string) => void;
   restoreHossii: (id: string, adminId?: string) => void;
+  moveHossiiToPane: (id: string, targetPaneId: string) => Promise<void>;
   /** ページ fetch 結果を optimistic 投稿と merge して反映 */
   syncFetchedHossiis: (
     items: Hossii[],
@@ -1369,6 +1384,36 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
   }, [state.hossiis]);
 
+  const moveHossiiToPane = useCallback(
+    async (id: string, targetPaneId: string) => {
+      const hossii =
+        state.entities.entitiesById[id] ?? state.hossiis.find((h) => h.id === id);
+      if (!hossii) return;
+      if (
+        !validateHossiiPaneSpaceMatch(
+          { spaceId: hossii.spaceId, spacePaneId: targetPaneId },
+          hossii.spaceId,
+        )
+      ) {
+        return;
+      }
+
+      const rollbackPaneId = hossii.spacePaneId ?? defaultSpacePaneId(hossii.spaceId);
+      dispatch({ type: 'MOVE_HOSSII_PANE', payload: { id, spacePaneId: targetPaneId } });
+
+      if (isSupabaseConfigured) {
+        const ok = await updateHossiiPaneId(id, hossii.spaceId, targetPaneId);
+        if (!ok) {
+          dispatch({
+            type: 'MOVE_HOSSII_PANE',
+            payload: { id, spacePaneId: rollbackPaneId },
+          });
+        }
+      }
+    },
+    [state.entities.entitiesById, state.hossiis],
+  );
+
   return (
     <SpacePaneRuntimeContext.Provider value={spacePaneRuntimeRef}>
     <HossiiContext.Provider
@@ -1399,6 +1444,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         updateHossiiScaleAction,
         hideHossii,
         restoreHossii,
+        moveHossiiToPane,
         syncFetchedHossiis,
         setHossiiFetchLoading,
       }}
@@ -1427,6 +1473,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           updateHossiiScaleAction,
           hideHossii,
           restoreHossii,
+          moveHossiiToPane,
           syncFetchedHossiis,
           setHossiiFetchLoading,
         }}

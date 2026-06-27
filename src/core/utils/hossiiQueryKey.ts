@@ -98,7 +98,7 @@ export function hossiiMatchesParsedQueryKey(
   const paneId = parsed.paneScope.paneId;
 
   if (paneId === resolvedDefault) {
-    return hossii.spacePaneId == null || hossii.spacePaneId === resolvedDefault;
+    return hossii.spacePaneId === resolvedDefault;
   }
 
   return hossii.spacePaneId === paneId;

@@ -1843,16 +1843,58 @@ Pane切替 / 投稿分離 / 背景 override / postFields override / Pane URL / P
 
 ### Phase 10：任意のデータ整理
 
-* レガシー投稿のbackfill
-* `space_pane_id IS NULL` 互換処理の廃止検討
-* Pane設定の構造見直し
-* 監査ログ
-* archived_at
-* 投稿のPane移動
+#### Phase 10C — ✅ 実装済み（2026-06-27）
+
+* 管理者が `#comments` ログ一覧から投稿を別 Pane へ移動（MoveHossiiPaneSelect）
+* API: `updateHossiiPaneId` — `space_pane_id` UPDATE（RLS: 既存 `public update hossiis` + RESTRICTIVE pane/space 整合）
+* Store: `moveHossiiToPane` — 楽観 UPDATE + `reconcileHossiiQueryKeys` + 失敗時ロールバック
+* 座標: 移動時に `positionX/Y` はリセットしない
+* Realtime 経由の他端末反映は Phase 0 基盤（`APPLY_REALTIME_PANE_UPDATE`）を利用
+
+関連: `MoveHossiiPaneSelect.tsx`, `LogListBody.tsx`, `reconcileHossiiQueryKeys.ts`
+
+#### Phase 10D — ✅ 実装済み（2026-06-27）
+
+* `space_panes` を Supabase Realtime publication に追加（migration）
+* `SpacePaneProvider` が Space 単位で INSERT / UPDATE を subscribe → `reloadPanesAndSyncActive`
+* DELETE は UI 非公開のため未対応
+
+関連: `SpacePaneProvider.tsx`, `20260629100000_phase10_backfill_and_pane_realtime.sql`
+
+#### Phase 10E — ✅ 実装済み（2026-06-27）
+
+* `#mylogs` で「このスペース」かつ Pane 2 件以上のとき PaneFilterSegment を表示
+* store 内 `matchesPane` でフィルタ（追加 fetch なし）
+* 永続化: `hossii.mylogsPaneFilter.{spaceId}`
+
+関連: `MyLogsScreen.tsx`, `mylogsPaneFilterStorage.ts`
+
+#### Phase 10A — ✅ 実装済み（2026-06-27）
+
+* migration: NULL `space_pane_id` を default pane id へ backfill（冪等）
+* アプリ変更なし（DB のみ）
+
+関連: `20260629100000_phase10_backfill_and_pane_realtime.sql`
+
+#### Phase 10B — ✅ 実装済み（2026-06-27）
+
+* fetch / query key / pending merge から NULL→default 互換を削除
+* `matchesPane` の表示用 `effectivePaneId` はデモ・レガシー INSERT 向けに `?? defaultPaneId` を維持
+* NOT NULL 制約は付けない（§10.3a レガシー INSERT 互換）
+
+関連: `hossiisApi.ts`, `hossiiQueryKey.ts`, `hossiiPaneMembership.ts`
+
+#### Phase 10F / 10G / 10H — 未着手（要件確定待ち）
+
+* 10F `archived_at` — `is_visible` で十分（§1635）
+* 10G 監査ログ — テーブル・UI 仕様なし
+* 10H Pane 設定構造見直し — 別 ADR 必須
 
 ---
 
 ## 24. テスト要件
+
+> 手動 QA チェックリスト: [94_スペースPane_QAチェックリスト.md](./94_スペースPane_QAチェックリスト.md)
 
 ### 24.1 既存互換
 

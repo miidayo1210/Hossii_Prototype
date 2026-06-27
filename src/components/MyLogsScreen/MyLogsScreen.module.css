@@ -78,6 +78,13 @@
   font-weight: 600;
 }
 
+.paneFilterWrap {
+  max-width: 520px;
+  margin: 0.75rem auto 0;
+  display: flex;
+  justify-content: center;
+}
+
 /* 並び替えバー */
 .sortBar {
   display: flex;

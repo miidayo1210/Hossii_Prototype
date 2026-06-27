@@ -9,9 +9,9 @@ const defaultPaneId = 'space-1-pane-default';
 const paneAId = 'space-1-pane-a';
 
 describe('hossiisApi pane filter', () => {
-  it('buildDefaultPaneFetchOrFilter includes NULL and default id', () => {
+  it('buildDefaultPaneFetchOrFilter uses default pane id only', () => {
     expect(buildDefaultPaneFetchOrFilter(defaultPaneId)).toBe(
-      `space_pane_id.is.null,space_pane_id.eq.${defaultPaneId}`,
+      `space_pane_id.eq.${defaultPaneId}`,
     );
   });
 
@@ -20,9 +20,9 @@ describe('hossiisApi pane filter', () => {
     const paneAScope: PaneFetchScope = { kind: 'pane', paneId: paneAId };
     const allScope: PaneFetchScope = { kind: 'all-panes' };
 
-    it('default scope accepts NULL and explicit default', () => {
-      expect(matchesPaneFetchScope({ spacePaneId: undefined }, defaultScope)).toBe(true);
-      expect(matchesPaneFetchScope({ spacePaneId: null }, defaultScope)).toBe(true);
+    it('default scope accepts explicit default pane id only', () => {
+      expect(matchesPaneFetchScope({ spacePaneId: undefined }, defaultScope)).toBe(false);
+      expect(matchesPaneFetchScope({ spacePaneId: null }, defaultScope)).toBe(false);
       expect(matchesPaneFetchScope({ spacePaneId: defaultPaneId }, defaultScope)).toBe(true);
       expect(matchesPaneFetchScope({ spacePaneId: paneAId }, defaultScope)).toBe(false);
     });
