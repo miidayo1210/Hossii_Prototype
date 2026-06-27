@@ -22,6 +22,7 @@ import { DecorationTab } from './DecorationTab';
 import { ModerationTab } from './ModerationTab';
 import { ExportRecordTab } from './ExportRecordTab';
 import { NeighborsTab } from './NeighborsTab';
+import { PaneManagementTab } from './PaneManagementTab';
 import {
   DEFAULT_SETTINGS_SCREEN,
   EXPLICIT_SAVE_SCREENS,
@@ -177,6 +178,13 @@ export const SpaceSettingsScreen = () => {
             settings={settings}
             onUpdate={handleSettingsUpdate}
             onDirtyChange={handleDirtyChange}
+          />
+        );
+      case 'paneManagement':
+        return (
+          <PaneManagementTab
+            key={`panes-${activeSpace.id}`}
+            spaceId={activeSpace.id}
           />
         );
       case 'interactionRules':

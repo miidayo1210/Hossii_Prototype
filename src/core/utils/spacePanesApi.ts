@@ -283,4 +283,17 @@ export async function setSpacePaneVisible(id: string, visible: boolean): Promise
   return updateSpacePane(id, { isVisible: visible });
 }
 
+export async function applySpacePaneSortOrders(
+  updates: Array<{ id: string; sortOrder: number }>,
+): Promise<boolean> {
+  if (!isSupabaseConfigured || updates.length === 0) return false;
+
+  for (const { id, sortOrder } of updates) {
+    const result = await updateSpacePane(id, { sortOrder });
+    if (!result) return false;
+  }
+
+  return true;
+}
+
 export type { SpaceDecoration, CustomEmotion };

@@ -6,9 +6,13 @@ import {
   generatePaneSlugFromName,
   uniquePaneSlug,
 } from '../../core/utils/spacePanesApi';
+import {
+  MAX_PANE_NAME_LEN,
+  canCreatePane,
+  paneLimitMessage,
+  validatePaneName,
+} from '../../core/utils/spacePaneManagement';
 import styles from './SpacePaneCreateDialog.module.css';
-
-const MAX_NAME_LEN = 30;
 
 type Props = {
   open: boolean;
@@ -40,13 +44,15 @@ export function SpacePaneCreateDialog({
   }, [open]);
 
   const handleSubmit = useCallback(async () => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setNameError('タブ名を入力してください');
+    if (!canCreatePane(existingPanes.length)) {
+      onError(paneLimitMessage());
       return;
     }
-    if (trimmed.length > MAX_NAME_LEN) {
-      setNameError(`${MAX_NAME_LEN}文字以内で入力してください`);
+
+    const trimmed = name.trim();
+    const validation = validatePaneName(trimmed);
+    if (validation) {
+      setNameError(validation);
       return;
     }
 
@@ -110,13 +116,13 @@ export function SpacePaneCreateDialog({
           タブを追加
         </h2>
         <p className={styles.hint}>
-          新しいタブにはスペース共通の背景・設定が使われます。名称は最大 {MAX_NAME_LEN} 文字です。
+          新しいタブにはスペース共通の背景・設定が使われます。名称は最大 {MAX_PANE_NAME_LEN} 文字です。
         </p>
         <input
           type="text"
           className={`${styles.input}${nameError ? ` ${styles.inputError}` : ''}`}
           value={name}
-          maxLength={MAX_NAME_LEN}
+          maxLength={MAX_PANE_NAME_LEN}
           placeholder="例: 今日の問い"
           autoFocus
           disabled={submitting}

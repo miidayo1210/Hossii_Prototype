@@ -183,7 +183,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     panes,
     isLoading: panesLoading,
     setActivePaneById,
-    reloadPanes,
+    reloadPanesAndSyncActive,
   } = useSpacePane();
 
   const paneContext = useMemo((): PaneContext | null => {
@@ -398,11 +398,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const handlePaneCreated = useCallback(
     async (pane: { id: string }) => {
-      await reloadPanes();
+      await reloadPanesAndSyncActive();
       setActivePaneById(pane.id);
       showPaneToast('タブを追加しました', 'success');
     },
-    [reloadPanes, setActivePaneById, showPaneToast],
+    [reloadPanesAndSyncActive, setActivePaneById, showPaneToast],
   );
 
   useEffect(() => {

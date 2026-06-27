@@ -3,6 +3,7 @@ export type SettingsScreenId =
   | 'basicInfo'
   | 'publicShare'
   | 'postForm'
+  | 'paneManagement'
   | 'interactionRules'
   | 'tags'
   | 'background'
@@ -40,6 +41,7 @@ export const SETTINGS_NAV_GROUPS: NavGroup[] = [
     heading: '参加・投稿',
     items: [
       { id: 'postForm', label: '投稿フォーム' },
+      { id: 'paneManagement', label: 'タブ管理', adminOnly: true },
       { id: 'interactionRules', label: '投稿・交流ルール' },
       { id: 'tags', label: 'タグ', adminOnly: true },
     ],

@@ -37,6 +37,7 @@ export type SpacePaneContextValue = {
   setActivePaneById: (paneId: string) => void;
   setActivePaneBySlug: (slug: string) => void;
   reloadPanes: () => Promise<void>;
+  reloadPanesAndSyncActive: () => Promise<void>;
 };
 
 const SpacePaneContext = createContext<SpacePaneContextValue | null>(null);
@@ -183,6 +184,52 @@ export function SpacePaneProvider({ children }: { children: ReactNode }) {
     await loadForSpace(activeSpaceId, reqId);
   }, [activeSpaceId, loadForSpace]);
 
+  const reloadPanesAndSyncActive = useCallback(async () => {
+    if (!activeSpaceId) return;
+
+    const previousActiveId = activePane?.id ?? null;
+    const reqId = ++requestIdRef.current;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const loaded = await loadPanesForSpace(activeSpaceId);
+      if (reqId !== requestIdRef.current) return;
+
+      const def = pickDefaultPane(loaded, activeSpaceId);
+      const snapshot: PaneSnapshot = {
+        panes: loaded,
+        defaultPane: def,
+        visiblePanes: loaded.filter((p) => p.isVisible),
+      };
+
+      let nextActive: SpacePane;
+      if (previousActiveId) {
+        const byId = loaded.find((p) => p.id === previousActiveId);
+        if (byId?.isVisible) {
+          nextActive = byId;
+          pushPaneSlug(byId.slug);
+        } else {
+          nextActive = def;
+          replacePaneSlug(null);
+        }
+      } else {
+        nextActive = resolveFromUrl(snapshot);
+      }
+
+      applySnapshot(snapshot, nextActive);
+    } catch (err) {
+      if (reqId !== requestIdRef.current) return;
+      const message = err instanceof Error ? err : new Error(String(err));
+      setError(message);
+    } finally {
+      if (reqId === requestIdRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, [activeSpaceId, activePane?.id, applySnapshot]);
+
   useEffect(() => {
     if (!activeSpaceId) {
       requestIdRef.current += 1;
@@ -283,6 +330,7 @@ export function SpacePaneProvider({ children }: { children: ReactNode }) {
       setActivePaneById,
       setActivePaneBySlug,
       reloadPanes,
+      reloadPanesAndSyncActive,
     }),
     [
       panes,
@@ -295,6 +343,7 @@ export function SpacePaneProvider({ children }: { children: ReactNode }) {
       setActivePaneById,
       setActivePaneBySlug,
       reloadPanes,
+      reloadPanesAndSyncActive,
     ],
   );
 
