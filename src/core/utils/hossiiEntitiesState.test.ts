@@ -3,9 +3,11 @@ import type { Hossii } from '../types';
 import {
   applyFetchResult,
   createEmptyEntitiesSlice,
+  getHossiisForQueryKey,
   patchEntity,
   upsertEntities,
 } from './hossiiEntitiesState';
+import { buildQueryKeyV2 } from './hossiiQueryKey';
 
 function h(id: string, createdAt: string): Hossii {
   return {
@@ -34,5 +36,25 @@ describe('hossiiEntitiesState', () => {
     const next = patchEntity(base, { ...before!, likeCount: 3 });
     expect(next.entitiesById.a).not.toBe(before);
     expect(next.entitiesById.a?.likeCount).toBe(3);
+  });
+
+  it('keeps orderedIds separate per pane query key while sharing entities', () => {
+    const spaceId = 'space-1';
+    const defaultPaneId = `${spaceId}-pane-default`;
+    const paneAId = `${spaceId}-pane-a`;
+    const keyDefault = buildQueryKeyV2(spaceId, { kind: 'pane', paneId: defaultPaneId }, '1w');
+    const keyPaneA = buildQueryKeyV2(spaceId, { kind: 'pane', paneId: paneAId }, '1w');
+
+    const nullPost = { ...h('null-post', '2026-01-03'), spacePaneId: undefined };
+    const paneAPost = { ...h('pane-a-post', '2026-01-02'), spacePaneId: paneAId };
+
+    let slice = createEmptyEntitiesSlice();
+    slice = applyFetchResult(slice, keyDefault, [nullPost], false);
+    slice = applyFetchResult(slice, keyPaneA, [paneAPost], false);
+
+    expect(getHossiisForQueryKey(slice, keyDefault).map((x) => x.id)).toEqual(['null-post']);
+    expect(getHossiisForQueryKey(slice, keyPaneA).map((x) => x.id)).toEqual(['pane-a-post']);
+    expect(slice.entitiesById['null-post']).toBeDefined();
+    expect(slice.entitiesById['pane-a-post']).toBeDefined();
   });
 });

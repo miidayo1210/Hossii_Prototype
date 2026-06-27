@@ -1,5 +1,5 @@
 import type { Hossii } from '../types';
-import type { HossiiQueryKey } from './hossiiQueryKey';
+import { parseQueryKey, type HossiiQueryKey } from './hossiiQueryKey';
 import { compareHossiiNewestFirst, mergeHossiiListsUnique } from './hossiiFetchPage';
 
 export type HossiiEntitiesSlice = {
@@ -48,7 +48,9 @@ export function removeEntity(
 
   const orderedIdsByQueryKey = { ...slice.orderedIdsByQueryKey };
   for (const [key, ids] of Object.entries(orderedIdsByQueryKey)) {
-    if (targetSpaceId && !key.startsWith(`${targetSpaceId}:`)) continue;
+    const parsed = parseQueryKey(key);
+    if (targetSpaceId && parsed?.spaceId !== targetSpaceId) continue;
+    if (targetSpaceId && !parsed && !key.startsWith(`${targetSpaceId}:`)) continue;
     if (ids.includes(id)) {
       orderedIdsByQueryKey[key as HossiiQueryKey] = ids.filter((x) => x !== id);
     }

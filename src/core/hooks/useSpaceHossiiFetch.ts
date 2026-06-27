@@ -1,13 +1,15 @@
 import { useEffect, useRef, useCallback, useState, type MutableRefObject } from 'react';
 import type { Hossii } from '../types';
 import { isSupabaseConfigured } from '../supabase';
-import { fetchHossiisPage } from '../utils/hossiisApi';
+import { fetchHossiisPage, type PaneFetchScope } from '../utils/hossiisApi';
 import {
   cursorFromOldest,
   mergeHossiiListsUnique,
   type HossiiPageCursor,
 } from '../utils/hossiiFetchPage';
-import { buildQueryKey } from '../utils/hossiiQueryKey';
+import { buildQueryKey, buildQueryKeyV2 } from '../utils/hossiiQueryKey';
+import type { PaneContext } from '../utils/hossiiPaneMembership';
+import { isDefaultPane } from '../utils/hossiiPaneMembership';
 import {
   getPeriodCutoff,
   type DisplayLimit,
@@ -33,6 +35,8 @@ export type UseSpaceHossiiFetchOptions = {
   displayPeriod: DisplayPeriod;
   /** 訪問モード等で fetch しない */
   enabled: boolean;
+  /** default / additional pane context (Phase 2). Omit for legacy v1 fetch. */
+  paneContext?: PaneContext | null;
   /** 取得結果を store に反映（optimistic merge 込み） */
   onFetched: (items: Hossii[], options?: FetchDeliverOptions) => void;
   onLoadingChange: (loading: boolean) => void;
@@ -42,6 +46,29 @@ export type UseSpaceHossiiFetchOptions = {
 
 function numericLimit(displayLimit: DisplayLimit): number | 'unlimited' {
   return displayLimit === 'unlimited' ? 'unlimited' : displayLimit;
+}
+
+function resolveQueryKey(
+  spaceId: string,
+  displayPeriod: DisplayPeriod,
+  paneContext?: PaneContext | null,
+): string {
+  if (paneContext) {
+    return buildQueryKeyV2(
+      spaceId,
+      { kind: 'pane', paneId: paneContext.activePaneId },
+      displayPeriod,
+    );
+  }
+  return buildQueryKey(spaceId, displayPeriod);
+}
+
+function resolvePaneFilter(paneContext?: PaneContext | null): PaneFetchScope | undefined {
+  if (!paneContext) return undefined;
+  if (isDefaultPane(paneContext)) {
+    return { kind: 'default', defaultPaneId: paneContext.defaultPaneId };
+  }
+  return { kind: 'pane', paneId: paneContext.activePaneId };
 }
 
 function idleWait(): Promise<void> {
@@ -80,6 +107,7 @@ export function useSpaceHossiiFetch({
   displayLimit,
   displayPeriod,
   enabled,
+  paneContext,
   onFetched,
   onLoadingChange,
   getExistingHossiis,
@@ -94,6 +122,9 @@ export function useSpaceHossiiFetch({
   onFetchedRef.current = onFetched;
   onLoadingChangeRef.current = onLoadingChange;
 
+  const activePaneId = paneContext?.activePaneId ?? null;
+  const defaultPaneId = paneContext?.defaultPaneId ?? null;
+
   const [progress, setProgress] = useState<SpaceHossiiFetchProgress>({
     loading: false,
     loadedCount: 0,
@@ -106,11 +137,15 @@ export function useSpaceHossiiFetch({
       targetCount: number | 'unlimited',
       appendFrom: Hossii[],
       cursor: HossiiPageCursor | null,
+      fetchSpaceId: string,
+      fetchPeriod: DisplayPeriod,
+      fetchPaneContext: PaneContext | null | undefined,
     ) => {
-      if (!spaceId || !isSupabaseConfigured) return;
+      if (!fetchSpaceId || !isSupabaseConfigured) return;
 
-      const periodCutoff = getPeriodCutoff(displayPeriod);
+      const periodCutoff = getPeriodCutoff(fetchPeriod);
       const signal = abortRef.current?.signal;
+      const paneFilter = resolvePaneFilter(fetchPaneContext);
 
       if (targetCount === 'unlimited') {
         const upperBound = new Date().toISOString();
@@ -121,12 +156,13 @@ export function useSpaceHossiiFetch({
 
         while (hasMore) {
           const page = await fetchHossiisPage({
-            spaceId,
+            spaceId: fetchSpaceId,
             limit: PAGE_SIZE,
             cursor: nextCursor ?? undefined,
             periodCutoff,
             upperBound,
             signal,
+            paneFilter,
           });
           if (reqId !== requestIdRef.current) return;
 
@@ -136,12 +172,12 @@ export function useSpaceHossiiFetch({
           }
 
           accumulated = mergeHossiiListsUnique(accumulated, page.items);
-          const count = accumulated.filter((h) => h.spaceId === spaceId).length;
+          const count = accumulated.filter((h) => h.spaceId === fetchSpaceId).length;
           setProgress({ loading: true, loadedCount: count, fetchComplete: false });
 
           deliveredCount = await deliverInChunks(
             accumulated,
-            spaceId,
+            fetchSpaceId,
             (items, opts) => onFetchedRef.current(items, opts),
             reqId,
             requestIdRef,
@@ -154,10 +190,10 @@ export function useSpaceHossiiFetch({
         }
 
         if (reqId !== requestIdRef.current) return;
-        const finalCount = accumulated.filter((h) => h.spaceId === spaceId).length;
+        const finalCount = accumulated.filter((h) => h.spaceId === fetchSpaceId).length;
         onFetchedRef.current(accumulated, { merge: false });
         fetchedMetaRef.current = {
-          queryKey: buildQueryKey(spaceId, displayPeriod),
+          queryKey: resolveQueryKey(fetchSpaceId, fetchPeriod, fetchPaneContext),
           count: finalCount,
         };
         setProgress({ loading: false, loadedCount: finalCount, fetchComplete: true });
@@ -167,16 +203,17 @@ export function useSpaceHossiiFetch({
       let accumulated = [...appendFrom];
       let nextCursor = cursor;
       let remaining =
-        targetCount - accumulated.filter((h) => h.spaceId === spaceId).length;
+        targetCount - accumulated.filter((h) => h.spaceId === fetchSpaceId).length;
 
       while (remaining > 0) {
         const batchLimit = Math.min(PAGE_SIZE, remaining);
         const page = await fetchHossiisPage({
-          spaceId,
+          spaceId: fetchSpaceId,
           limit: batchLimit,
           cursor: nextCursor ?? undefined,
           periodCutoff,
           signal,
+          paneFilter,
         });
         if (reqId !== requestIdRef.current) return;
 
@@ -184,21 +221,21 @@ export function useSpaceHossiiFetch({
 
         accumulated = mergeHossiiListsUnique(accumulated, page.items);
         remaining =
-          targetCount - accumulated.filter((h) => h.spaceId === spaceId).length;
+          targetCount - accumulated.filter((h) => h.spaceId === fetchSpaceId).length;
         nextCursor = page.nextCursor;
 
         if (!page.hasMore) break;
       }
 
       onFetchedRef.current(accumulated);
-      const count = accumulated.filter((h) => h.spaceId === spaceId).length;
+      const count = accumulated.filter((h) => h.spaceId === fetchSpaceId).length;
       fetchedMetaRef.current = {
-        queryKey: buildQueryKey(spaceId, displayPeriod),
+        queryKey: resolveQueryKey(fetchSpaceId, fetchPeriod, fetchPaneContext),
         count,
       };
       setProgress({ loading: false, loadedCount: count, fetchComplete: true });
     },
-    [spaceId, displayPeriod],
+    [],
   );
 
   useEffect(() => {
@@ -212,7 +249,7 @@ export function useSpaceHossiiFetch({
     const ac = new AbortController();
     abortRef.current = ac;
 
-    const queryKey = buildQueryKey(spaceId, displayPeriod);
+    const queryKey = resolveQueryKey(spaceId, displayPeriod, paneContext);
     const limit = numericLimit(displayLimit);
     const prev = fetchedMetaRef.current;
     const sameQuery = prev?.queryKey === queryKey;
@@ -242,10 +279,18 @@ export function useSpaceHossiiFetch({
           existing.length > 0
         ) {
           const cursor = cursorFromOldest(existing);
-          await runFetch(reqId, targetCount, existing, cursor);
+          await runFetch(
+            reqId,
+            targetCount,
+            existing,
+            cursor,
+            spaceId,
+            displayPeriod,
+            paneContext,
+          );
         } else {
           fetchedMetaRef.current = null;
-          await runFetch(reqId, targetCount, [], null);
+          await runFetch(reqId, targetCount, [], null, spaceId, displayPeriod, paneContext);
         }
       } finally {
         if (reqId === requestIdRef.current) onLoadingChangeRef.current(false);
@@ -255,12 +300,21 @@ export function useSpaceHossiiFetch({
     return () => {
       ac.abort();
     };
-  }, [enabled, spaceId, displayLimit, displayPeriod, runFetch]);
+  }, [
+    enabled,
+    spaceId,
+    displayLimit,
+    displayPeriod,
+    activePaneId,
+    defaultPaneId,
+    runFetch,
+    paneContext,
+  ]);
 
   return progress;
 }
 
-/** #comments 用: 全件取得（period: all） */
+/** #comments 用: 全件取得（period: all, all-panes scope） */
 export function useCommentsHossiiFetch(
   spaceId: string | null,
   onFetched: (items: Hossii[]) => void,
@@ -292,6 +346,7 @@ export function useCommentsHossiiFetch(
             spaceId,
             limit: PAGE_SIZE,
             cursor: cursor ?? undefined,
+            paneFilter: { kind: 'all-panes' },
           });
           if (reqId !== requestIdRef.current) return;
           if (page.items.length === 0) break;

@@ -24,7 +24,9 @@ import { runDisplayPipeline } from '../../core/utils/hossiiDisplayPipeline';
 import { computeBubblePositions, type PositionCache } from '../../core/utils/hossiiPositionCache';
 import { useSpaceHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
 import { usePinnedHossiis } from '../../core/hooks/usePinnedHossiis';
-import { buildQueryKey } from '../../core/utils/hossiiQueryKey';
+import { buildQueryKeyV2 } from '../../core/utils/hossiiQueryKey';
+import { defaultSpacePaneId } from '../../core/utils/spacePanesApi';
+import type { PaneContext } from '../../core/utils/hossiiPaneMembership';
 import { isSupabaseConfigured } from '../../core/supabase';
 import {
   loadPresentationMode,
@@ -132,6 +134,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     state,
     hossiiLoadedFromSupabase,
     getActiveSpaceHossiis,
+    getHossiisForQueryKey,
     getActiveSpace,
     addHossii,
     setVisitingSpace,
@@ -168,18 +171,44 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setSpeechLevels,
   } = useDisplayPrefs();
 
+  const paneContext = useMemo((): PaneContext | null => {
+    if (!activeSpaceId) return null;
+    const defaultPaneId = defaultSpacePaneId(activeSpaceId);
+    return {
+      spaceId: activeSpaceId,
+      activePaneId: defaultPaneId,
+      defaultPaneId,
+    };
+  }, [activeSpaceId]);
+
+  const screenQueryKey = useMemo(() => {
+    if (!activeSpaceId || !paneContext) return null;
+    return buildQueryKeyV2(
+      activeSpaceId,
+      { kind: 'pane', paneId: paneContext.defaultPaneId },
+      displayPeriod,
+    );
+  }, [activeSpaceId, paneContext, displayPeriod]);
+
+  const resolveSpaceHossiis = useCallback(() => {
+    if (!screenQueryKey) return getActiveSpaceHossiis();
+    const keyed = getHossiisForQueryKey(screenQueryKey);
+    return keyed.length > 0 ? keyed : getActiveSpaceHossiis();
+  }, [screenQueryKey, getHossiisForQueryKey, getActiveSpaceHossiis]);
+
   const handleSpaceFetched = useCallback(
     (items: Hossii[], opts?: { merge?: boolean }) => {
-      if (!activeSpaceId) return;
-      syncFetchedHossiis(items, buildQueryKey(activeSpaceId, displayPeriod), opts);
+      if (!screenQueryKey) return;
+      syncFetchedHossiis(items, screenQueryKey, opts);
     },
-    [activeSpaceId, displayPeriod, syncFetchedHossiis],
+    [screenQueryKey, syncFetchedHossiis],
   );
 
   const fetchProgress = useSpaceHossiiFetch({
     spaceId: activeSpaceId,
     displayLimit,
     displayPeriod,
+    paneContext,
     enabled: !visitingSpaceId && isSupabaseConfigured,
     onFetched: handleSpaceFetched,
     onLoadingChange: setHossiiFetchLoading,
@@ -750,8 +779,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     enabled: voiceEnabled,
   });
 
-  // 訪問モード中は訪問先 hossiis を使用、それ以外は自スペース
-  const hossiis = isVisiting ? visitingHossiis : getActiveSpaceHossiis();
+  // 訪問モード中は訪問先 hossiis を使用、それ以外は自スペース（default pane v2 key）
+  const hossiis = isVisiting ? visitingHossiis : resolveSpaceHossiis();
 
   // カケラ粒子を発生させるコールバック
   const handleParticle = useCallback((emotion: EmotionKey) => {
@@ -1273,7 +1302,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // クイックログパネル: 画面上のスペース（訪問中は隣人）と一覧を揃える
   const logListSpaceId = isVisiting ? visitingSpaceId : activeSpaceId;
-  const logListHossiis = isVisiting ? visitingHossiis : getActiveSpaceHossiis();
+  const logListHossiis = isVisiting ? visitingHossiis : resolveSpaceHossiis();
   const logPresetTags =
     isVisiting && visitingSpaceInfo
       ? visitingSpaceInfo.presetTags ?? []

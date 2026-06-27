@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useCommentsHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
-import { buildQueryKey } from '../../core/utils/hossiiQueryKey';
+import { buildQueryKeyV2 } from '../../core/utils/hossiiQueryKey';
+import { isSupabaseConfigured } from '../../core/supabase';
 import { useRouter } from '../../core/hooks/useRouter';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { LogListBody } from './LogListBody';
@@ -11,14 +13,19 @@ export const CommentsScreen = () => {
   const {
     state,
     getActiveSpaceHossiis,
+    getHossiisForQueryKey,
     syncFetchedHossiis,
     setHossiiFetchLoading,
   } = useHossiiStore();
   const { activeSpaceId } = state;
 
-  const commentsQueryKey = activeSpaceId
-    ? buildQueryKey(activeSpaceId, 'all')
-    : null;
+  const commentsQueryKey = useMemo(
+    () =>
+      activeSpaceId
+        ? buildQueryKeyV2(activeSpaceId, { kind: 'all-panes' }, 'all')
+        : null,
+    [activeSpaceId],
+  );
 
   useCommentsHossiiFetch(
     activeSpaceId,
@@ -28,7 +35,15 @@ export const CommentsScreen = () => {
     setHossiiFetchLoading,
   );
 
-  const hossiis = getActiveSpaceHossiis();
+  const hossiis = useMemo(() => {
+    if (!commentsQueryKey) return getActiveSpaceHossiis();
+    const keyed = getHossiisForQueryKey(commentsQueryKey);
+    if (!isSupabaseConfigured && keyed.length === 0) {
+      return getActiveSpaceHossiis();
+    }
+    return keyed.length > 0 ? keyed : getActiveSpaceHossiis();
+  }, [commentsQueryKey, getHossiisForQueryKey, getActiveSpaceHossiis]);
+
   const activeSpace = state.spaces.find((s) => s.id === activeSpaceId);
 
   return (

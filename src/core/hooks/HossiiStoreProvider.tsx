@@ -6,7 +6,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type MutableRefObject,
   type ReactNode,
 } from 'react';
 import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
@@ -40,6 +39,8 @@ import {
   type HossiiEntitiesSlice,
 } from '../utils/hossiiEntitiesState';
 import type { HossiiQueryKey } from '../utils/hossiiQueryKey';
+import { queryKeysForHossii } from '../utils/hossiiQueryKey';
+import { mergeFetchedHossiisWithPendingInserts } from '../utils/hossiiPendingMerge';
 import { loadMode, saveMode } from '../utils/modeStorage';
 import {
   loadProfile,
@@ -123,37 +124,8 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
 
 /**
  * fetch の応答が INSERT / Realtime より先に届くと楽観投稿が一覧に無い — その行を消さないようマージする。
- * サーバー一覧に載った ID は pending から外す。state が一瞬空でも backup から復元する。
+ * @see mergeFetchedHossiisWithPendingInserts in hossiiPendingMerge.ts
  */
-function mergeFetchedHossiisWithPendingInserts(
-  serverList: Hossii[],
-  activeSpaceId: string,
-  currentHossiis: Hossii[],
-  pendingInsertIdsRef: MutableRefObject<Set<string>>,
-  pendingOptimisticByIdRef: MutableRefObject<Map<string, Hossii>>,
-): Hossii[] {
-  const pending = pendingInsertIdsRef.current;
-  const backup = pendingOptimisticByIdRef.current;
-  for (const h of serverList) {
-    pending.delete(h.id);
-    backup.delete(h.id);
-  }
-  if (pending.size === 0) return serverList;
-  const serverIds = new Set(serverList.map((h) => h.id));
-  const extras: Hossii[] = [];
-  for (const id of pending) {
-    if (serverIds.has(id)) continue;
-    const fromState = currentHossiis.find((h) => h.id === id);
-    if (fromState) {
-      extras.push(fromState);
-      continue;
-    }
-    const b = backup.get(id);
-    if (b && b.spaceId === activeSpaceId) extras.push(b);
-  }
-  return extras.length === 0 ? serverList : [...serverList, ...extras];
-}
-
 // スペースを正規化（localStorage が壊れても安全）
 const normalizeSpace = (f: unknown): Space => {
   const raw = (f ?? {}) as Record<string, unknown>;
@@ -364,15 +336,12 @@ function insertHossiiIntoSpaceQueries(
   hossii: Hossii,
 ): HossiiEntitiesSlice {
   let next = upsertEntities(entities, [hossii]);
-  const prefix = `${hossii.spaceId}:`;
-  const keys = Object.keys(next.orderedIdsByQueryKey).filter((k) =>
-    k.startsWith(prefix),
-  );
+  const keys = queryKeysForHossii(next, hossii);
   if (keys.length === 0) {
     return next;
   }
   for (const key of keys) {
-    next = insertOrderedId(next, key as HossiiQueryKey, hossii.id, hossii);
+    next = insertOrderedId(next, key, hossii.id, hossii);
   }
   return next;
 }
@@ -736,6 +705,8 @@ export type HossiiContextValue = {
     queryKey: HossiiQueryKey,
     options?: { merge?: boolean },
   ) => void;
+  /** 明示 query key で ordered 一覧を取得 */
+  getHossiisForQueryKey: (queryKey: HossiiQueryKey) => Hossii[];
   setHossiiFetchLoading: (loading: boolean) => void;
 };
 
@@ -952,6 +923,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       stateRef.current.hossiis,
       insertedHossiiIdsRef,
       pendingOptimisticHossiiRef,
+      queryKey,
     );
     dispatch({
       type: 'APPLY_FETCH_RESULT',
@@ -1173,6 +1145,11 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     return state.spaces.find((f) => f.id === state.activeSpaceId);
   }, [state.spaces, state.activeSpaceId]);
 
+  const getHossiisForQueryKeyFn = useCallback(
+    (queryKey: HossiiQueryKey) => getHossiisForQueryKey(state.entities, queryKey),
+    [state.entities],
+  );
+
   const getActiveSpaceHossiis = useCallback(() => {
     if (state.listQueryKey) {
       return getHossiisForQueryKey(state.entities, state.listQueryKey);
@@ -1319,6 +1296,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         setActiveSpace,
         getActiveSpace,
         getActiveSpaceHossiis,
+        getHossiisForQueryKey: getHossiisForQueryKeyFn,
         addSpace,
         addSpaceLocal,
         updateSpace,
@@ -1346,6 +1324,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           setActiveSpace,
           getActiveSpace,
           getActiveSpaceHossiis,
+          getHossiisForQueryKey: getHossiisForQueryKeyFn,
           addSpace,
           addSpaceLocal,
           updateSpace,

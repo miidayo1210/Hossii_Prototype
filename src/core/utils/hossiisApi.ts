@@ -168,7 +168,30 @@ export type FetchHossiisPageParams = {
   periodCutoff?: Date | null;
   upperBound?: string | null;
   signal?: AbortSignal;
+  paneFilter?: PaneFetchScope;
 };
+
+export type PaneFetchScope =
+  | { kind: 'default'; defaultPaneId: string }
+  | { kind: 'pane'; paneId: string }
+  | { kind: 'all-panes' };
+
+/** PostgREST `.or()` filter for default pane (NULL + explicit default id). */
+export function buildDefaultPaneFetchOrFilter(defaultPaneId: string): string {
+  return `space_pane_id.is.null,space_pane_id.eq.${defaultPaneId}`;
+}
+
+/** Client-side pane filter (tests / demo validation). */
+export function matchesPaneFetchScope(
+  hossii: Pick<Hossii, 'spacePaneId'>,
+  scope: PaneFetchScope,
+): boolean {
+  if (scope.kind === 'all-panes') return true;
+  if (scope.kind === 'default') {
+    return hossii.spacePaneId == null || hossii.spacePaneId === scope.defaultPaneId;
+  }
+  return hossii.spacePaneId === scope.paneId;
+}
 
 export type FetchHossiisPageResult = {
   items: Hossii[];
@@ -183,7 +206,7 @@ export async function fetchHossiisPage(
     return { items: [], nextCursor: null, hasMore: false };
   }
 
-  const { spaceId, limit, cursor, periodCutoff, upperBound, signal } = params;
+  const { spaceId, limit, cursor, periodCutoff, upperBound, signal, paneFilter } = params;
 
   let query = supabase
     .from('hossiis')
@@ -193,6 +216,12 @@ export async function fetchHossiisPage(
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit);
+
+  if (paneFilter?.kind === 'default') {
+    query = query.or(buildDefaultPaneFetchOrFilter(paneFilter.defaultPaneId));
+  } else if (paneFilter?.kind === 'pane') {
+    query = query.eq('space_pane_id', paneFilter.paneId);
+  }
 
   if (periodCutoff) {
     query = query.gte('created_at', periodCutoff.toISOString());
