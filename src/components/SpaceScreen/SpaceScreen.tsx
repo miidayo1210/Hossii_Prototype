@@ -70,6 +70,13 @@ import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
 import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
+import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
+import {
+  buildTabBarGroupPatch,
+  computeVisiblePaneReorderUpdates,
+  splitPanesByTabBarGroup,
+} from '../../core/utils/spacePaneTabBar';
+import type { TabBarGroup } from '../../core/types/spacePaneTabBar';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { VoiceConsentModal } from '../VoiceConsentModal/VoiceConsentModal';
@@ -347,6 +354,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [paneToastVisible, setPaneToastVisible] = useState(false);
   const [paneToastMessage, setPaneToastMessage] = useState('');
   const [paneToastType, setPaneToastType] = useState<'success' | 'error' | 'info'>('info');
+  const [paneReorderBusy, setPaneReorderBusy] = useState(false);
   const prevActivePaneIdRef = useRef<string | null>(null);
 
   const handleShowPostCountBadgeToggle = useCallback(() => {
@@ -404,6 +412,77 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       showPaneToast('タブを追加しました', 'success');
     },
     [reloadPanesAndSyncActive, setActivePaneById, showPaneToast],
+  );
+
+  const handlePaneReorder = useCallback(
+    async (draggedId: string, insertBeforeVisibleIndex: number, group: TabBarGroup) => {
+      const { barPanes, basketPanes } = splitPanesByTabBarGroup(visiblePanes);
+      const stripPanes = group === 'basket' ? basketPanes : barPanes;
+      const updates = computeVisiblePaneReorderUpdates(
+        panes,
+        stripPanes,
+        draggedId,
+        insertBeforeVisibleIndex,
+      );
+      if (updates.length === 0) return;
+
+      setPaneReorderBusy(true);
+      try {
+        const ok = await applySpacePaneSortOrders(updates, { allPanes: panes });
+        if (!ok) {
+          showPaneToast('並び替えに失敗しました', 'error');
+          await reloadPanesAndSyncActive();
+          return;
+        }
+        await reloadPanesAndSyncActive();
+      } finally {
+        setPaneReorderBusy(false);
+      }
+    },
+    [panes, visiblePanes, reloadPanesAndSyncActive, showPaneToast],
+  );
+
+  const handleMoveTabBarGroup = useCallback(
+    async (paneId: string, group: TabBarGroup, insertBeforeBarIndex?: number) => {
+      const pane = panes.find((p) => p.id === paneId);
+      if (!pane) return;
+
+      setPaneReorderBusy(true);
+      try {
+        const patch = buildTabBarGroupPatch(pane, group);
+        const updated = await updateSpacePane(paneId, patch, { allPanes: panes });
+        if (!updated) {
+          showPaneToast('タブの移動に失敗しました', 'error');
+          await reloadPanesAndSyncActive();
+          return;
+        }
+
+        if (group === 'bar' && insertBeforeBarIndex != null) {
+          const nextPanes = panes.map((p) => (p.id === paneId ? updated : p));
+          const nextVisible = nextPanes.filter((p) => p.isVisible);
+          const { barPanes } = splitPanesByTabBarGroup(nextVisible);
+          const updates = computeVisiblePaneReorderUpdates(
+            nextPanes,
+            barPanes,
+            paneId,
+            insertBeforeBarIndex,
+          );
+          if (updates.length > 0) {
+            const ok = await applySpacePaneSortOrders(updates, { allPanes: nextPanes });
+            if (!ok) {
+              showPaneToast('並び替えに失敗しました', 'error');
+              await reloadPanesAndSyncActive();
+              return;
+            }
+          }
+        }
+
+        await reloadPanesAndSyncActive();
+      } finally {
+        setPaneReorderBusy(false);
+      }
+    },
+    [panes, visiblePanes, reloadPanesAndSyncActive, showPaneToast],
   );
 
   useEffect(() => {
@@ -1865,13 +1944,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
       {showPaneBar && (
         <SpacePaneBar
+          spaceId={activeSpaceId ?? ''}
           variant="mobile"
           visiblePanes={visiblePanes}
           activePaneId={contextActivePaneId}
           isAdmin={isAdmin}
-          disabled={postSending}
+          disabled={postSending || paneReorderBusy}
           onSelect={handlePaneSelect}
           onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
+          onReorder={isAdmin ? handlePaneReorder : undefined}
+          onMoveTabBarGroup={isAdmin ? handleMoveTabBarGroup : undefined}
         />
       )}
 
@@ -2207,13 +2289,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           />
           {showPaneBar && (
             <SpacePaneBar
+              spaceId={activeSpaceId ?? ''}
               variant="desktop"
               visiblePanes={visiblePanes}
               activePaneId={contextActivePaneId}
               isAdmin={isAdmin}
-              disabled={postSending}
+              disabled={postSending || paneReorderBusy}
               onSelect={handlePaneSelect}
               onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
+              onReorder={isAdmin ? handlePaneReorder : undefined}
+              onMoveTabBarGroup={isAdmin ? handleMoveTabBarGroup : undefined}
             />
           )}
           <TopRightMenu onPostClick={handleTopRightPostClick} />

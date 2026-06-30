@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
-import { appendDemoSpacePane, removeDemoSpacePane } from './demoSpacePanesStorage';
+import { appendDemoSpacePane, removeDemoSpacePane, saveDemoSpacePanesForSpace } from './demoSpacePanesStorage';
 import { canDeletePane } from './spacePaneManagement';
 import type { Hossii } from '../types';
 import type {
@@ -193,6 +193,31 @@ function patchToUpdateRow(
   return row;
 }
 
+function applySpacePanePatch(pane: SpacePane, patch: UpdateSpacePanePatch): SpacePane {
+  const now = new Date();
+  return {
+    ...pane,
+    ...(patch.name !== undefined ? { name: patch.name } : {}),
+    ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
+    ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
+    ...(patch.isDefault !== undefined ? { isDefault: patch.isDefault } : {}),
+    ...(patch.isVisible !== undefined ? { isVisible: patch.isVisible } : {}),
+    ...(patch.background !== undefined ? { background: patch.background ?? null } : {}),
+    ...(patch.savedBackgroundImages !== undefined
+      ? { savedBackgroundImages: patch.savedBackgroundImages ?? null }
+      : {}),
+    ...(patch.decorations !== undefined ? { decorations: patch.decorations ?? null } : {}),
+    ...(patch.characterImageUrl !== undefined
+      ? { characterImageUrl: patch.characterImageUrl ?? null }
+      : {}),
+    ...(patch.characterName !== undefined ? { characterName: patch.characterName ?? null } : {}),
+    ...(patch.customEmotions !== undefined ? { customEmotions: patch.customEmotions ?? null } : {}),
+    ...(patch.bubbleShapePng !== undefined ? { bubbleShapePng: patch.bubbleShapePng ?? null } : {}),
+    ...(patch.settings !== undefined ? { settings: patch.settings ?? null } : {}),
+    updatedAt: now,
+  };
+}
+
 /**
  * App-side pane ↔ space validation (Phase 4 wiring). Returns true when valid or legacy (no pane).
  */
@@ -303,8 +328,20 @@ export async function createSpacePane(input: CreateSpacePaneInput): Promise<Crea
 export async function updateSpacePane(
   id: string,
   patch: UpdateSpacePanePatch,
+  context?: { allPanes?: SpacePane[] },
 ): Promise<SpacePane | null> {
-  if (!isSupabaseConfigured) return null;
+  if (!isSupabaseConfigured) {
+    const allPanes = context?.allPanes;
+    if (!allPanes?.length) return null;
+
+    const pane = allPanes.find((p) => p.id === id);
+    if (!pane) return null;
+
+    const updated = applySpacePanePatch(pane, patch);
+    const next = allPanes.map((p) => (p.id === id ? updated : p));
+    saveDemoSpacePanesForSpace(pane.spaceId, next);
+    return updated;
+  }
 
   const updateRow = patchToUpdateRow(patch);
   if (Object.keys(updateRow).length <= 1 && updateRow.updated_at) {
@@ -332,8 +369,28 @@ export async function setSpacePaneVisible(id: string, visible: boolean): Promise
 
 export async function applySpacePaneSortOrders(
   updates: Array<{ id: string; sortOrder: number }>,
+  context?: { allPanes?: SpacePane[] },
 ): Promise<boolean> {
-  if (!isSupabaseConfigured || updates.length === 0) return false;
+  if (updates.length === 0) return false;
+
+  if (!isSupabaseConfigured) {
+    const allPanes = context?.allPanes;
+    if (!allPanes?.length) return false;
+
+    const orderMap = new Map(updates.map((u) => [u.id, u.sortOrder]));
+    const spaceId = allPanes[0]?.spaceId;
+    if (!spaceId) return false;
+
+    const now = new Date();
+    const next = allPanes.map((pane) => ({
+      ...pane,
+      sortOrder: orderMap.get(pane.id) ?? pane.sortOrder,
+      updatedAt: orderMap.has(pane.id) ? now : pane.updatedAt,
+    }));
+
+    saveDemoSpacePanesForSpace(spaceId, next);
+    return true;
+  }
 
   for (const { id, sortOrder } of updates) {
     const result = await updateSpacePane(id, { sortOrder });

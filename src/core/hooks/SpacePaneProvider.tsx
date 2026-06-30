@@ -60,10 +60,11 @@ function createDemoDefaultPane(spaceId: string): SpacePane {
 
 async function loadPanesForSpace(spaceId: string): Promise<SpacePane[]> {
   if (!isSupabaseConfigured) {
+    const stored = loadDemoSpacePanesForSpace(spaceId);
+    if (stored.length === 0) return [createDemoDefaultPane(spaceId)];
+    if (stored.some((p) => p.isDefault)) return stored;
     const defaultPane = createDemoDefaultPane(spaceId);
-    const extras = loadDemoSpacePanesForSpace(spaceId);
-    if (extras.length === 0) return [defaultPane];
-    return [defaultPane, ...extras].sort(
+    return [defaultPane, ...stored].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
     );
   }

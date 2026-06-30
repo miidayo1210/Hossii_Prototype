@@ -110,3 +110,131 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.scrollDragging {
+  touch-action: none;
+}
+
+.tabSlot {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tabDraggable {
+  cursor: grab;
+}
+
+.tabDraggable:active {
+  cursor: grabbing;
+}
+
+.tabDragging {
+  opacity: 0.45;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.18);
+}
+
+.dropIndicator {
+  flex-shrink: 0;
+  width: 2px;
+  height: 28px;
+  margin: 0 1px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #c084fc 0%, #a855f7 100%);
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.25);
+}
+
+.basketCluster {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+  min-height: 44px;
+}
+
+.basketChip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 12px;
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #7c3aed;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.basketChip:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.45);
+}
+
+.basketChipOpen {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow: inset 0 -2px 0 #a855f7;
+}
+
+.basketChipDropTarget {
+  background: rgba(168, 85, 247, 0.16);
+  border-color: #a855f7;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+}
+
+.basketChip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.basketIcon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.basketCount {
+  min-width: 1.1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.basketTray {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  transition:
+    max-width 220ms ease-out,
+    opacity 220ms ease-out;
+}
+
+.basketTrayOpen {
+  max-width: min(50vw, 320px);
+  opacity: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  padding-right: 2px;
+}
+
+.basketTrayOpen::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .basketTray {
+    transition: none;
+  }
+}

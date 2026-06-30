@@ -85,7 +85,7 @@ export function PaneManagementTab({ spaceId, spaceURL }: Props) {
 
     setBusyId(pane.id);
     try {
-      const updated = await updateSpacePane(pane.id, { name: trimmed });
+      const updated = await updateSpacePane(pane.id, { name: trimmed }, { allPanes: panes });
       if (!updated) {
         handleError('名称の保存に失敗しました');
         return;
@@ -103,7 +103,7 @@ export function PaneManagementTab({ spaceId, spaceURL }: Props) {
 
     setBusyId(pane.id);
     try {
-      const ok = await applySpacePaneSortOrders(updates);
+      const ok = await applySpacePaneSortOrders(updates, { allPanes: panes });
       if (!ok) {
         handleError('並び替えに失敗しました');
         await reloadPanesAndSyncActive();
