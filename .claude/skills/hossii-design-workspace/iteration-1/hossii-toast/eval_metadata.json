@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "hossii-toast",
+  "prompt": "新しいHossiiが届いたときに出るトースト通知コンポーネントを作りたい。Hossiiらしいデザインで",
+  "assertions": [
+    "uses_css_modules",
+    "glassmorphism",
+    "brand_gradient",
+    "hossii_copy",
+    "hossii_motion",
+    "reduced_motion"
+  ]
+}

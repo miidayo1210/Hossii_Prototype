@@ -1,0 +1,13 @@
+{
+  "eval_id": 0,
+  "eval_name": "emotion-picker",
+  "prompt": "ユーザーが投稿する前に気持ちを選ぶ EmotionPicker コンポーネントを作って。8種類の感情を選べるようにしたい",
+  "assertions": [
+    "uses_css_modules",
+    "uses_brand_gradient_or_purple",
+    "uses_emotion_colors",
+    "pill_shape",
+    "hossii_motion_class",
+    "japanese_emotion_labels"
+  ]
+}

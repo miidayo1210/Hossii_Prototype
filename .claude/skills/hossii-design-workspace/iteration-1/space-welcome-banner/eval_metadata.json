@@ -1,0 +1,13 @@
+{
+  "eval_id": 2,
+  "eval_name": "space-welcome-banner",
+  "prompt": "スペース画面の上部に、初めて来たユーザーへの案内バナーを追加したい。コンシューマー向けのHossiiっぽいデザインで",
+  "assertions": [
+    "uses_css_modules",
+    "glassmorphism",
+    "consumer_context",
+    "warm_japanese_copy",
+    "pill_or_rounded",
+    "dismissible_or_action"
+  ]
+}

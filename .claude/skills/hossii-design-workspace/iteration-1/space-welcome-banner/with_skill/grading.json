@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "uses_css_modules",
+      "passed": true,
+      "evidence": "Checked uses_css_modules in 3 output files"
+    },
+    {
+      "text": "glassmorphism",
+      "passed": true,
+      "evidence": "Checked glassmorphism in 3 output files"
+    },
+    {
+      "text": "consumer_context",
+      "passed": true,
+      "evidence": "Checked consumer_context in 3 output files"
+    },
+    {
+      "text": "warm_japanese_copy",
+      "passed": true,
+      "evidence": "Checked warm_japanese_copy in 3 output files"
+    },
+    {
+      "text": "pill_or_rounded",
+      "passed": true,
+      "evidence": "Checked pill_or_rounded in 3 output files"
+    },
+    {
+      "text": "dismissible_or_action",
+      "passed": true,
+      "evidence": "Checked dismissible_or_action in 3 output files"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

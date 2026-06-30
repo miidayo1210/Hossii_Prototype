@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "uses_css_modules",
+      "passed": true,
+      "evidence": "Checked uses_css_modules in 3 output files"
+    },
+    {
+      "text": "glassmorphism",
+      "passed": true,
+      "evidence": "Checked glassmorphism in 3 output files"
+    },
+    {
+      "text": "brand_gradient",
+      "passed": true,
+      "evidence": "Checked brand_gradient in 3 output files"
+    },
+    {
+      "text": "hossii_copy",
+      "passed": true,
+      "evidence": "Checked hossii_copy in 3 output files"
+    },
+    {
+      "text": "hossii_motion",
+      "passed": true,
+      "evidence": "Checked hossii_motion in 3 output files"
+    },
+    {
+      "text": "reduced_motion",
+      "passed": true,
+      "evidence": "Checked reduced_motion in 3 output files"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

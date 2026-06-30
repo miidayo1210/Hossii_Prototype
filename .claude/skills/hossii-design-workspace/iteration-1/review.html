@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "hossii-design", "runs": [{"id": "emotion-picker-with_skill", "prompt": "\u30e6\u30fc\u30b6\u30fc\u304c\u6295\u7a3f\u3059\u308b\u524d\u306b\u6c17\u6301\u3061\u3092\u9078\u3076 EmotionPicker \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3092\u4f5c\u3063\u3066\u30028\u7a2e\u985e\u306e\u611f\u60c5\u3092\u9078\u3079\u308b\u3088\u3046\u306b\u3057\u305f\u3044", "eval_id": 0, "outputs": [{"name": "EmotionPicker.module.css", "type": "text", "content": ".root {\n  display: flex;\n  flex-direction: column;\n  gap: 0.625rem;\n}\n\n.rootError .glassPanel {\n  border-color: rgba(239, 68, 68, 0.45);\n  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15);\n}\n\n.labelRow {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n\n.label {\n  margin: 0;\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: #4b5563;\n}\n\n.requiredBadge {\n  font-size: 0.6875rem;\n  font-weight: 700;\n  color: #ef4444;\n  background: #fee2e2;\n  border-radius: 9999px;\n  padding: 2px 8px;\n  flex-shrink: 0;\n}\n\n/* \u30d5\u30ed\u30b9\u30c8\u30ac\u30e9\u30b9\uff08\u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u6587\u8108\uff09 */\n.glassPanel {\n  background: rgba(255, 255, 255, 0.85);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.6);\n  border-radius: 1rem;\n  box-shadow: 0 4px 24px rgba(168, 85, 247, 0.08);\n  padding: 0.75rem;\n}\n\n.chipGrid {\n  display: grid;\n  grid-template-columns: repeat(4, minmax(0, 1fr));\n  gap: 0.5rem;\n}\n\n@media (max-width: 480px) {\n  .chipGrid {\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n}\n\n.chip {\n  --emotion-color: #9ca3af;\n\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 0.25rem;\n  min-height: 4.25rem;\n  padding: 0.5rem 0.375rem;\n  border: 1.5px solid rgba(233, 213, 255, 0.55);\n  border-radius: 9999px;\n  background: rgba(250, 245, 255, 0.82);\n  cursor: pointer;\n  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease,\n    background 0.15s ease;\n}\n\n.chip:hover {\n  background: rgba(243, 232, 255, 1);\n  border-color: rgba(168, 85, 247, 0.35);\n  transform: scale(1.04);\n}\n\n.chip:active {\n  transform: scale(0.97);\n}\n\n.chipSelected {\n  background: linear-gradient(135deg, rgba(233, 213, 255, 0.95) 0%, rgba(251, 207, 232, 0.95) 100%);\n  border-color: var(--emotion-color);\n  box-shadow:\n    0 0 0 2px color-mix(in srgb, var(--emotion-color) 35%, transparent),\n    0 4px 14px rgba(168, 85, 247, 0.22);\n  transform: scale(1.03);\n}\n\n.chipSelected:hover {\n  transform: scale(1.05);\n}\n\n.chipEmoji {\n  font-size: 1.5rem;\n  line-height: 1;\n}\n\n.chipLabel {\n  font-size: 0.75rem;\n  font-weight: 600;\n  color: #6b7280;\n  line-height: 1.2;\n  text-align: center;\n}\n\n.chipSelected .chipLabel {\n  background: linear-gradient(135deg, #a855f7, #ec4899);\n  -webkit-background-clip: text;\n  background-clip: text;\n  -webkit-text-fill-color: transparent;\n}\n\n.selectedHint {\n  margin: 0;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.375rem;\n  font-size: 0.8125rem;\n  font-weight: 600;\n  color: #7c3aed;\n  text-align: center;\n}\n\n.hintEmoji {\n  font-size: 1.125rem;\n  line-height: 1;\n}\n\n.errorText {\n  margin: 0;\n  font-size: 0.8125rem;\n  color: #ef4444;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .chip,\n  .chip:hover,\n  .chip:active,\n  .chipSelected,\n  .chipSelected:hover {\n    transition: none;\n    transform: none;\n  }\n}\n"}, {"name": "EmotionPicker.tsx", "type": "text", "content": "import { useCallback, useState, type CSSProperties } from 'react';\nimport type { EmotionKey } from '../../../../../../../src/core/types';\nimport { EMOJI_BY_EMOTION } from '../../../../../../../src/core/assets/emotions';\nimport { EMOTION_COLORS } from '../../../../../../../src/core/assets/emotionColors';\nimport { EMOTION_PICKER_KEYS, EMOTION_PICKER_LABELS } from './emotionPickerConfig';\nimport styles from './EmotionPicker.module.css';\n\nexport type EmotionPickerProps = {\n  /** \u9078\u629e\u4e2d\u306e\u611f\u60c5\u3002\u672a\u9078\u629e\u306f null */\n  value: EmotionKey | null;\n  onChange: (emotion: EmotionKey | null) => void;\n  /** \u898b\u51fa\u3057\u3002\u7701\u7565\u6642\u306f Hossii \u3089\u3057\u3044\u30c7\u30d5\u30a9\u30eb\u30c8\u6587\u8a00 */\n  label?: string;\n  /** \u5fc5\u9808\u30d5\u30a3\u30fc\u30eb\u30c9\u3068\u3057\u3066\u8868\u793a\u3059\u308b */\n  required?: boolean;\n  /** \u9078\u629e\u4e2d\u306e\u30d2\u30f3\u30c8\u884c\u3092\u8868\u793a\u3059\u308b */\n  showHint?: boolean;\n  /** \u30d0\u30ea\u30c7\u30fc\u30b7\u30e7\u30f3\u30a8\u30e9\u30fc\u8868\u793a */\n  error?: boolean;\n  errorMessage?: string;\n  className?: string;\n};\n\nexport function EmotionPicker({\n  value,\n  onChange,\n  label = '\u6c17\u6301\u3061\u3092\u9078\u3076',\n  required = false,\n  showHint = true,\n  error = false,\n  errorMessage = '\u6c17\u6301\u3061\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044',\n  className,\n}: EmotionPickerProps) {\n  const [popKey, setPopKey] = useState<EmotionKey | null>(null);\n\n  const handleSelect = useCallback(\n    (key: EmotionKey) => {\n      const next = value === key ? null : key;\n      onChange(next);\n      if (next !== null) {\n        setPopKey(key);\n        window.setTimeout(() => setPopKey(null), 200);\n      }\n    },\n    [onChange, value],\n  );\n\n  return (\n    <section\n      className={`${styles.root}${error ? ` ${styles.rootError}` : ''}${className ? ` ${className}` : ''}`}\n      aria-labelledby=\"emotion-picker-label\"\n    >\n      <div className={styles.labelRow}>\n        <h3 id=\"emotion-picker-label\" className={styles.label}>\n          {label}\n        </h3>\n        {required && <span className={styles.requiredBadge}>\u5fc5\u9808</span>}\n      </div>\n\n      <div className={styles.glassPanel} role=\"group\" aria-label=\"8\u7a2e\u985e\u306e\u6c17\u6301\u3061\">\n        <div className={styles.chipGrid}>\n          {EMOTION_PICKER_KEYS.map((key) => {\n            const selected = value === key;\n            const popping = popKey === key;\n\n            return (\n              <button\n                key={key}\n                type=\"button\"\n                className={`${styles.chip}${selected ? ` ${styles.chipSelected}` : ''}${\n                  popping ? ' hossii-pop' : ''\n                }`}\n                style={\n                  {\n                    '--emotion-color': EMOTION_COLORS[key],\n                  } as CSSProperties\n                }\n                aria-pressed={selected}\n                aria-label={EMOTION_PICKER_LABELS[key]}\n                title={EMOTION_PICKER_LABELS[key]}\n                onClick={() => handleSelect(key)}\n              >\n                <span className={styles.chipEmoji} aria-hidden>\n                  {EMOJI_BY_EMOTION[key]}\n                </span>\n                <span className={styles.chipLabel}>{EMOTION_PICKER_LABELS[key]}</span>\n              </button>\n            );\n          })}\n        </div>\n      </div>\n\n      {showHint && value && (\n        <p className={`${styles.selectedHint} hossii-soft-bounce`} aria-live=\"polite\">\n          <span className={`${styles.hintEmoji} hossii-sparkle`} aria-hidden>\n            {EMOJI_BY_EMOTION[value]}\n          </span>\n          {EMOTION_PICKER_LABELS[value]} \u2014 \u3053\u306e\u6c17\u6301\u3061\u3092\u7f6e\u304f\u6e96\u5099\u304c\u3067\u304d\u305f\u3088\n        </p>\n      )}\n\n      {error && !value && <p className={styles.errorText}>{errorMessage}</p>}\n    </section>\n  );\n}\n"}, {"name": "README.md", "type": "text", "content": "# EmotionPicker\n\n\u6295\u7a3f\u524d\u306b8\u7a2e\u985e\u306e\u6c17\u6301\u3061\u3092\u9078\u3076\u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u5411\u3051 UI \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3002\n\n## \u30d5\u30a1\u30a4\u30eb\u69cb\u6210\n\n| \u30d5\u30a1\u30a4\u30eb | \u5f79\u5272 |\n|---|---|\n| `EmotionPicker.tsx` | \u30e1\u30a4\u30f3\u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8 |\n| `EmotionPicker.module.css` | CSS Modules \u30b9\u30bf\u30a4\u30eb |\n| `emotionPickerConfig.ts` | 8\u611f\u60c5\u306e\u8868\u793a\u9806\u30fb\u65e5\u672c\u8a9e\u30e9\u30d9\u30eb |\n\n## \u30c7\u30b6\u30a4\u30f3\u5224\u65ad\n\n- **\u6587\u8108**: \u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\uff08\u6295\u7a3f\u30d5\u30a9\u30fc\u30e0\uff09\u3002\u30d5\u30ed\u30b9\u30c8\u30ac\u30e9\u30b9 + \u7d2b\u30d4\u30f3\u30af\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3\u3002\n- **8\u611f\u60c5**: `EmotionKey` \u5168\u7a2e\uff08`joy`, `wow`, `think`, `empathy`, `inspire`, `laugh`, `moved`, `fun`\uff09\u3002\n- **\u30ab\u30e9\u30fc**: `emotionColors.ts` \u306e `--emotion-color` \u3092\u9078\u629e\u30ea\u30f3\u30b0\u306b\u4f7f\u7528\u3002\n- **\u5f62\u72b6**: \u5404\u30c1\u30c3\u30d7\u306f\u30d4\u30eb\u5f62\u72b6\uff08`border-radius: 9999px`\uff09\u3002\n- **\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3**: \u30bf\u30c3\u30d7\u6642 `hossii-pop`\u3001\u9078\u629e\u30d2\u30f3\u30c8 `hossii-soft-bounce` + `hossii-sparkle`\uff08`motion.css` \u30b0\u30ed\u30fc\u30d0\u30eb\u30af\u30e9\u30b9\uff09\u3002\n- **\u30b3\u30d4\u30fc**: \u300c\u6c17\u6301\u3061\u3092\u9078\u3076\u300d\u300c\u6c17\u6301\u3061\u3092\u7f6e\u304f\u300d\u306a\u3069 Hossii \u8a9e\u5f59\u3002\n\n## \u4f7f\u3044\u65b9\n\n```tsx\nimport { useState } from 'react';\nimport type { EmotionKey } from '@/core/types';\nimport { EmotionPicker } from './EmotionPicker';\n\nfunction PostForm() {\n  const [emotion, setEmotion] = useState<EmotionKey | null>(null);\n\n  return (\n    <EmotionPicker\n      value={emotion}\n      onChange={setEmotion}\n      required\n      showHint\n    />\n  );\n}\n```\n\n`src/core/ui/motion.css` \u304c\u30a2\u30d7\u30ea\u306b\u8aad\u307f\u8fbc\u307e\u308c\u3066\u3044\u308b\u524d\u63d0\u3067\u3059\uff08\u65e2\u5b58\u306e `index.css` / \u30a8\u30f3\u30c8\u30ea\u7d4c\u7531\uff09\u3002\n\n## Props\n\n| Prop | \u578b | \u30c7\u30d5\u30a9\u30eb\u30c8 | \u8aac\u660e |\n|---|---|---|---|\n| `value` | `EmotionKey \\| null` | \u2014 | \u9078\u629e\u4e2d\u306e\u611f\u60c5 |\n| `onChange` | `(emotion) => void` | \u2014 | \u9078\u629e\u5909\u66f4\uff08\u518d\u30bf\u30c3\u30d7\u3067\u89e3\u9664\uff09 |\n| `label` | `string` | `'\u6c17\u6301\u3061\u3092\u9078\u3076'` | \u898b\u51fa\u3057 |\n| `required` | `boolean` | `false` | \u5fc5\u9808\u30d0\u30c3\u30b8\u8868\u793a |\n| `showHint` | `boolean` | `true` | \u9078\u629e\u30d2\u30f3\u30c8\u884c |\n| `error` | `boolean` | `false` | \u30a8\u30e9\u30fc\u67a0 |\n| `errorMessage` | `string` | `'\u6c17\u6301\u3061\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044'` | \u30a8\u30e9\u30fc\u30e1\u30c3\u30bb\u30fc\u30b8 |\n| `className` | `string` | \u2014 | \u30eb\u30fc\u30c8\u8ffd\u52a0\u30af\u30e9\u30b9 |\n\n## \u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u3078\u306e\u7d44\u307f\u8fbc\u307f\n\n\u672c\u51fa\u529b\u306f eval \u7528\u30ef\u30fc\u30af\u30b9\u30da\u30fc\u30b9\u3067\u3059\u3002\u672c\u756a\u5229\u7528\u6642\u306f `src/components/PostScreen/` \u306a\u3069\u9069\u5207\u306a\u5834\u6240\u3078\u79fb\u3057\u3001import \u30d1\u30b9\u3092 `@/` \u307e\u305f\u306f\u76f8\u5bfe\u30d1\u30b9\u306b\u5408\u308f\u305b\u3066\u304f\u3060\u3055\u3044\u3002\n"}, {"name": "emotionPickerConfig.ts", "type": "text", "content": "import type { EmotionKey } from '../../../../../../../src/core/types';\n\n/** \u6295\u7a3f\u524d\u30d4\u30c3\u30ab\u30fc\u3067\u8868\u793a\u3059\u308b8\u7a2e\u306e\u9806\u5e8f */\nexport const EMOTION_PICKER_KEYS: EmotionKey[] = [\n  'joy',\n  'wow',\n  'think',\n  'empathy',\n  'inspire',\n  'laugh',\n  'moved',\n  'fun',\n];\n\n/** \u65e5\u672c\u8a9e\u30e9\u30d9\u30eb\uff08PostScreen / ReflectionScreen \u3068\u63c3\u3048\u308b\uff09 */\nexport const EMOTION_PICKER_LABELS: Record<EmotionKey, string> = {\n  wow: 'Wow',\n  empathy: '\u523a\u3055\u3063\u305f',\n  inspire: '\u9583\u3044\u305f',\n  think: '\u6c17\u306b\u306a\u308b',\n  laugh: '\u7b11\u3063\u305f',\n  joy: '\u3046\u308c\u3057\u3044',\n  moved: '\u3050\u3063\u3068\u304d\u305f',\n  fun: '\u697d\u3057\u3044',\n};\n"}], "grading": {"expectations": [{"text": "uses_css_modules", "passed": true, "evidence": "Checked uses_css_modules in 4 output files"}, {"text": "uses_brand_gradient_or_purple", "passed": true, "evidence": "Checked uses_brand_gradient_or_purple in 4 output files"}, {"text": "uses_emotion_colors", "passed": true, "evidence": "Checked uses_emotion_colors in 4 output files"}, {"text": "pill_shape", "passed": true, "evidence": "Checked pill_shape in 4 output files"}, {"text": "hossii_motion_class", "passed": true, "evidence": "Checked hossii_motion_class in 4 output files"}, {"text": "japanese_emotion_labels", "passed": true, "evidence": "Checked japanese_emotion_labels in 4 output files"}], "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0}}}, {"id": "emotion-picker-without_skill", "prompt": "\u30e6\u30fc\u30b6\u30fc\u304c\u6295\u7a3f\u3059\u308b\u524d\u306b\u6c17\u6301\u3061\u3092\u9078\u3076 EmotionPicker \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3092\u4f5c\u3063\u3066\u30028\u7a2e\u985e\u306e\u611f\u60c5\u3092\u9078\u3079\u308b\u3088\u3046\u306b\u3057\u305f\u3044", "eval_id": 0, "outputs": [{"name": "EmotionPicker.module.css", "type": "text", "content": ".root {\n  display: flex;\n  flex-direction: column;\n  gap: 0.625rem;\n}\n\n.labelRow {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n\n.label {\n  font-size: 0.9375rem;\n  font-weight: 600;\n  color: #374151;\n}\n\n.requiredBadge {\n  font-size: 0.6875rem;\n  font-weight: 600;\n  color: #b91c1c;\n  background: #fee2e2;\n  border-radius: 999px;\n  padding: 0.125rem 0.5rem;\n}\n\n.emotionBar {\n  display: grid;\n  grid-template-columns: repeat(4, minmax(0, 1fr));\n  gap: 0.5rem;\n}\n\n@media (max-width: 480px) {\n  .emotionBar {\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n}\n\n.emotionChip {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 0.25rem;\n  min-height: 4.5rem;\n  padding: 0.5rem 0.375rem;\n  border: 2px solid #e5e7eb;\n  border-radius: 0.75rem;\n  background: #ffffff;\n  cursor: pointer;\n  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;\n}\n\n.emotionChip:hover {\n  border-color: #93c5fd;\n  background: #eff6ff;\n}\n\n.emotionChip:focus-visible {\n  outline: 2px solid #2563eb;\n  outline-offset: 2px;\n}\n\n.emotionChip:active {\n  transform: scale(0.98);\n}\n\n.emotionChipSelected {\n  border-color: #2563eb;\n  background: #dbeafe;\n  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);\n}\n\n.emotionChipEmoji {\n  font-size: 1.5rem;\n  line-height: 1;\n}\n\n.emotionChipLabel {\n  font-size: 0.75rem;\n  font-weight: 500;\n  color: #4b5563;\n  text-align: center;\n  line-height: 1.2;\n}\n\n.emotionChipSelected .emotionChipLabel {\n  color: #1d4ed8;\n}\n\n.selectedHint {\n  margin: 0;\n  font-size: 0.8125rem;\n  color: #2563eb;\n  text-align: center;\n}\n"}, {"name": "EmotionPicker.tsx", "type": "text", "content": "import { useCallback, useState } from 'react';\nimport styles from './EmotionPicker.module.css';\n\nexport type EmotionKey =\n  | 'wow'\n  | 'empathy'\n  | 'inspire'\n  | 'think'\n  | 'laugh'\n  | 'joy'\n  | 'moved'\n  | 'fun';\n\nconst ALL_EMOTIONS: EmotionKey[] = [\n  'joy',\n  'wow',\n  'think',\n  'empathy',\n  'inspire',\n  'laugh',\n  'moved',\n  'fun',\n];\n\nconst EMOTION_LABELS: Record<EmotionKey, string> = {\n  wow: 'Wow',\n  empathy: '\u523a\u3055\u3063\u305f',\n  inspire: '\u9583\u3044\u305f',\n  think: '\u6c17\u306b\u306a\u308b',\n  laugh: '\u7b11\u3063\u305f',\n  joy: '\u3046\u308c\u3057\u3044',\n  moved: '\u3050\u3063\u3068\u304d\u305f',\n  fun: '\u697d\u3057\u3044',\n};\n\nconst EMOJI_BY_EMOTION: Record<EmotionKey, string> = {\n  wow: '\ud83d\ude2e',\n  empathy: '\ud83d\ude0d',\n  inspire: '\ud83e\udd2f',\n  think: '\ud83e\udd14',\n  laugh: '\ud83d\ude02',\n  joy: '\ud83e\udd70',\n  moved: '\ud83d\ude22',\n  fun: '\u2728',\n};\n\nexport type EmotionPickerProps = {\n  /** Controlled selected emotion */\n  value?: EmotionKey | null;\n  /** Called when the user selects or clears an emotion */\n  onChange?: (emotion: EmotionKey | null) => void;\n  /** Uncontrolled initial selection */\n  defaultValue?: EmotionKey | null;\n  /** Section label shown above the picker */\n  label?: string;\n  /** Show a required badge next to the label */\n  required?: boolean;\n  /** Show selected emotion hint below the bar */\n  showHint?: boolean;\n  /** Allow clicking the same emotion again to deselect */\n  allowDeselect?: boolean;\n  /** Optional class name for the root element */\n  className?: string;\n};\n\nexport function EmotionPicker({\n  value,\n  onChange,\n  defaultValue = null,\n  label = '\u6c17\u6301\u3061\u3092\u9078\u3076',\n  required = false,\n  showHint = true,\n  allowDeselect = true,\n  className,\n}: EmotionPickerProps) {\n  const isControlled = value !== undefined;\n  const [internalValue, setInternalValue] = useState<EmotionKey | null>(defaultValue);\n  const selected = isControlled ? value : internalValue;\n\n  const handleSelect = useCallback(\n    (emotion: EmotionKey) => {\n      const next = allowDeselect && selected === emotion ? null : emotion;\n      if (!isControlled) {\n        setInternalValue(next);\n      }\n      onChange?.(next);\n    },\n    [allowDeselect, isControlled, onChange, selected],\n  );\n\n  return (\n    <div className={[styles.root, className].filter(Boolean).join(' ')}>\n      <div className={styles.labelRow}>\n        <span className={styles.label}>{label}</span>\n        {required && <span className={styles.requiredBadge}>\u5fc5\u9808</span>}\n      </div>\n\n      <div\n        className={styles.emotionBar}\n        role=\"radiogroup\"\n        aria-label={label}\n      >\n        {ALL_EMOTIONS.map((key) => {\n          const isSelected = selected === key;\n          return (\n            <button\n              key={key}\n              type=\"button\"\n              role=\"radio\"\n              aria-checked={isSelected}\n              aria-label={EMOTION_LABELS[key]}\n              title={EMOTION_LABELS[key]}\n              className={`${styles.emotionChip} ${isSelected ? styles.emotionChipSelected : ''}`}\n              onClick={() => handleSelect(key)}\n            >\n              <span className={styles.emotionChipEmoji} aria-hidden=\"true\">\n                {EMOJI_BY_EMOTION[key]}\n              </span>\n              <span className={styles.emotionChipLabel}>{EMOTION_LABELS[key]}</span>\n            </button>\n          );\n        })}\n      </div>\n\n      {showHint && selected && (\n        <p className={styles.selectedHint}>\n          {EMOJI_BY_EMOTION[selected]} {EMOTION_LABELS[selected]}\n        </p>\n      )}\n    </div>\n  );\n}\n\nexport { ALL_EMOTIONS, EMOTION_LABELS, EMOJI_BY_EMOTION };\n"}, {"name": "README.md", "type": "text", "content": "# EmotionPicker (baseline, without skill)\n\n\u6295\u7a3f\u524d\u306b\u6c17\u6301\u3061\u3092\u9078\u3076\u305f\u3081\u306e React \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3067\u3059\u3002\n\n## \u30d5\u30a1\u30a4\u30eb\n\n| \u30d5\u30a1\u30a4\u30eb | \u5185\u5bb9 |\n| --- | --- |\n| `EmotionPicker.tsx` | 8\u7a2e\u985e\u306e\u611f\u60c5\u3092\u9078\u3079\u308b\u30d4\u30c3\u30ab\u30fc\u672c\u4f53 |\n| `EmotionPicker.module.css` | CSS Modules \u30b9\u30bf\u30a4\u30eb |\n\n## \u6a5f\u80fd\n\n- **8\u7a2e\u985e\u306e\u611f\u60c5**: `joy`, `wow`, `think`, `empathy`, `inspire`, `laugh`, `moved`, `fun`\n- \u5404\u30dc\u30bf\u30f3\u306b\u7d75\u6587\u5b57\u3068\u65e5\u672c\u8a9e\u30e9\u30d9\u30eb\uff08\u4f8b: \u3046\u308c\u3057\u3044\u3001Wow\u3001\u6c17\u306b\u306a\u308b\uff09\n- **\u5236\u5fa1 / \u975e\u5236\u5fa1**\u306e\u4e21\u5bfe\u5fdc\uff08`value` + `onChange` \u307e\u305f\u306f `defaultValue`\uff09\n- \u540c\u3058\u611f\u60c5\u3092\u518d\u30af\u30ea\u30c3\u30af\u3067\u9078\u629e\u89e3\u9664\uff08`allowDeselect={false}` \u3067\u7121\u52b9\u5316\u53ef\u80fd\uff09\n- `role=\"radiogroup\"` / `role=\"radio\"` \u306b\u3088\u308b\u57fa\u672c\u7684\u306a\u30a2\u30af\u30bb\u30b7\u30d3\u30ea\u30c6\u30a3\n- \u9078\u629e\u4e2d\u306e\u611f\u60c5\u3092\u4e0b\u90e8\u30d2\u30f3\u30c8\u3067\u8868\u793a\uff08`showHint={false}` \u3067\u975e\u8868\u793a\uff09\n\n## \u4f7f\u7528\u4f8b\n\n```tsx\nimport { useState } from 'react';\nimport { EmotionPicker, type EmotionKey } from './EmotionPicker';\n\nfunction PostForm() {\n  const [emotion, setEmotion] = useState<EmotionKey | null>(null);\n\n  return (\n    <EmotionPicker\n      value={emotion}\n      onChange={setEmotion}\n      label=\"\u6c17\u6301\u3061\u3092\u3064\u3051\u308b\"\n      required\n    />\n  );\n}\n```\n\n## \u8a2d\u8a08\u30e1\u30e2\n\n- Hossii \u672c\u4f53\u306e `PostScreen` \u306b\u3042\u308b\u611f\u60c5\u30ad\u30fc\u30fb\u30e9\u30d9\u30eb\u30fb\u7d75\u6587\u5b57\u5b9a\u7fa9\u306b\u5408\u308f\u305b\u3066\u5b9a\u6570\u3092\u5185\u5305\u3057\u3066\u3044\u307e\u3059\u3002\n- 4\u5217\u30b0\u30ea\u30c3\u30c9\uff08\u30e2\u30d0\u30a4\u30eb\u306f2\u5217\uff09\u306e\u30ab\u30fc\u30c9\u578b UI\u3002\u9078\u629e\u72b6\u614b\u306f\u9752\u7cfb\u306e\u30dc\u30fc\u30c0\u30fc\u3068\u80cc\u666f\u3067\u8868\u73fe\u3057\u3066\u3044\u307e\u3059\u3002\n"}], "grading": {"expectations": [{"text": "uses_css_modules", "passed": true, "evidence": "Checked uses_css_modules in 3 output files"}, {"text": "uses_brand_gradient_or_purple", "passed": false, "evidence": "Checked uses_brand_gradient_or_purple in 3 output files"}, {"text": "uses_emotion_colors", "passed": false, "evidence": "Checked uses_emotion_colors in 3 output files"}, {"text": "pill_shape", "passed": true, "evidence": "Checked pill_shape in 3 output files"}, {"text": "hossii_motion_class", "passed": false, "evidence": "Checked hossii_motion_class in 3 output files"}, {"text": "japanese_emotion_labels", "passed": true, "evidence": "Checked japanese_emotion_labels in 3 output files"}], "summary": {"passed": 3, "failed": 3, "total": 6, "pass_rate": 0.5}}}, {"id": "hossii-toast-with_skill", "prompt": "\u65b0\u3057\u3044Hossii\u304c\u5c4a\u3044\u305f\u3068\u304d\u306b\u51fa\u308b\u30c8\u30fc\u30b9\u30c8\u901a\u77e5\u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3092\u4f5c\u308a\u305f\u3044\u3002Hossii\u3089\u3057\u3044\u30c7\u30b6\u30a4\u30f3\u3067", "eval_id": 1, "outputs": [{"name": "NewHossiiArrivalToast.module.css", "type": "text", "content": "/**\n * NewHossiiArrivalToast \u2014 \u65b0\u3057\u3044\u6c17\u6301\u3061\u304c\u5c4a\u3044\u305f\u3068\u304d\u306e\u30c8\u30fc\u30b9\u30c8\n * \u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u6587\u8108\uff08\u30b9\u30da\u30fc\u30b9\u753b\u9762\uff09\u3002HossiiToast / motion.css \u306e\u30d1\u30bf\u30fc\u30f3\u3092\u8e0f\u8972\u3002\n */\n\n/* motion.css \u304b\u3089\u5fc5\u8981\u306a keyframes\uff08hossii- \u30d7\u30ec\u30d5\u30a3\u30c3\u30af\u30b9\uff09 */\n@keyframes hossii-soft-bounce {\n  0% {\n    transform: translateY(0) rotate(0deg);\n  }\n  30% {\n    transform: translateY(-10px) rotate(-3deg);\n  }\n  60% {\n    transform: translateY(-6px) rotate(2deg);\n  }\n  100% {\n    transform: translateY(0) rotate(0deg);\n  }\n}\n\n@keyframes hossii-sparkle {\n  0%,\n  100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.5;\n  }\n}\n\n@keyframes hossii-arrival-enter {\n  0% {\n    opacity: 0;\n    transform: translateX(-50%) translateY(12px) scale(0.92);\n  }\n  100% {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0) scale(1);\n  }\n}\n\n@keyframes hossii-arrival-exit {\n  0% {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0) scale(1);\n  }\n  100% {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-8px) scale(0.96);\n  }\n}\n\n.container {\n  position: fixed;\n  top: 5.5rem;\n  left: 50%;\n  transform: translateX(-50%) translateY(12px);\n  z-index: 1000;\n  opacity: 0;\n  pointer-events: none;\n  max-width: min(22rem, calc(100vw - 2rem));\n  width: max-content;\n}\n\n.container.entering,\n.container.visible {\n  pointer-events: auto;\n  animation: hossii-arrival-enter 420ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;\n}\n\n.container.visible .toast {\n  animation: hossii-soft-bounce 0.6s ease-out 120ms;\n}\n\n.container.exiting {\n  pointer-events: none;\n  animation: hossii-arrival-exit 220ms ease-in forwards;\n}\n\n.toast {\n  position: relative;\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 0.75rem 1rem 0.75rem 0.875rem;\n  border-radius: 1rem;\n  background: rgba(255, 255, 255, 0.88);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.65);\n  box-shadow:\n    0 4px 24px rgba(168, 85, 247, 0.12),\n    0 2px 8px rgba(236, 72, 153, 0.08);\n  overflow: hidden;\n}\n\n.toast::before {\n  content: '';\n  position: absolute;\n  inset: 0 auto 0 0;\n  width: 4px;\n  background: linear-gradient(180deg, #a855f7 0%, #ec4899 100%);\n  border-radius: 1rem 0 0 1rem;\n}\n\n.accentGlow {\n  position: absolute;\n  inset: -40% -20% auto -20%;\n  height: 70%;\n  background: radial-gradient(\n    circle at 50% 50%,\n    rgba(168, 85, 247, 0.14),\n    transparent 70%\n  );\n  pointer-events: none;\n}\n\n.emotionBadge {\n  position: relative;\n  z-index: 1;\n  flex-shrink: 0;\n  display: grid;\n  place-items: center;\n  width: 2.5rem;\n  height: 2.5rem;\n  border-radius: 9999px;\n  font-size: 1.25rem;\n  line-height: 1;\n  background: rgba(255, 255, 255, 0.75);\n  border: 1px solid rgba(255, 255, 255, 0.8);\n  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.12);\n}\n\n.emotionBadge::after {\n  content: '\u2726';\n  position: absolute;\n  top: -0.2rem;\n  right: -0.15rem;\n  font-size: 0.625rem;\n  color: #ec4899;\n  animation: hossii-sparkle 1.5s ease-in-out infinite;\n}\n\n.content {\n  position: relative;\n  z-index: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 0.125rem;\n}\n\n.headline {\n  margin: 0;\n  font-size: 0.875rem;\n  font-weight: 600;\n  line-height: 1.35;\n  color: #111827;\n}\n\n.headlineAccent {\n  background: linear-gradient(135deg, #a855f7, #ec4899);\n  -webkit-background-clip: text;\n  background-clip: text;\n  -webkit-text-fill-color: transparent;\n}\n\n.preview {\n  margin: 0;\n  font-size: 0.75rem;\n  font-weight: 500;\n  line-height: 1.4;\n  color: #6b7280;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  max-width: 16rem;\n}\n\n.dismissButton {\n  position: relative;\n  z-index: 1;\n  flex-shrink: 0;\n  display: grid;\n  place-items: center;\n  width: 1.75rem;\n  height: 1.75rem;\n  margin-left: 0.125rem;\n  padding: 0;\n  border: none;\n  border-radius: 9999px;\n  background: rgba(243, 232, 255, 0.85);\n  color: #7c3aed;\n  font-size: 0.875rem;\n  line-height: 1;\n  cursor: pointer;\n  transition: background 160ms ease, transform 100ms ease;\n}\n\n.dismissButton:hover {\n  background: #f3e8ff;\n}\n\n.dismissButton:active {\n  transform: scale(0.94);\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .container.entering,\n  .container.visible,\n  .container.exiting {\n    animation: none;\n    opacity: 1;\n    transform: translateX(-50%) translateY(0);\n  }\n\n  .container.exiting {\n    opacity: 0;\n    transition: opacity 160ms ease;\n  }\n\n  .container.visible .toast,\n  .emotionBadge::after {\n    animation: none;\n  }\n\n  .dismissButton {\n    transition: none;\n  }\n}\n"}, {"name": "NewHossiiArrivalToast.tsx", "type": "text", "content": "/**\n * NewHossiiArrivalToast \u2014 \u65b0\u3057\u3044 Hossii \u304c\u5c4a\u3044\u305f\u3068\u304d\u306e\u30c8\u30fc\u30b9\u30c8\n *\n * \u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u6587\u8108\uff08\u30b9\u30da\u30fc\u30b9\u753b\u9762\uff09\u3002\u65e2\u5b58 HossiiToast \u3088\u308a\u611f\u60c5\u30fb\u4f5c\u8005\u3092\u4f1d\u3048\u308b\u3002\n * motion.css \u306e hossii-soft-bounce / hossii-sparkle \u3092 CSS Module \u5185\u3067\u518d\u5229\u7528\u3002\n */\n\nimport { useEffect, useMemo, useState } from 'react';\nimport styles from './NewHossiiArrivalToast.module.css';\n\ntype EmotionKey =\n  | 'wow'\n  | 'empathy'\n  | 'inspire'\n  | 'think'\n  | 'laugh'\n  | 'joy'\n  | 'moved'\n  | 'fun';\n\nconst EMOJI_BY_EMOTION: Record<EmotionKey, string> = {\n  wow: '\ud83d\ude2e',\n  empathy: '\ud83d\ude0d',\n  inspire: '\ud83e\udd2f',\n  think: '\ud83e\udd14',\n  laugh: '\ud83d\ude02',\n  joy: '\ud83e\udd70',\n  moved: '\ud83d\ude22',\n  fun: '\u2728',\n};\n\nconst EMOTION_COLORS: Record<EmotionKey, string> = {\n  joy: '#fbbf24',\n  wow: '#60a5fa',\n  empathy: '#f472b6',\n  inspire: '#a78bfa',\n  think: '#10b981',\n  laugh: '#f59e0b',\n  moved: '#ec4899',\n  fun: '#8b5cf6',\n};\n\nexport type NewHossiiArrivalPayload = {\n  id: string;\n  authorName?: string;\n  message?: string;\n  emotion?: EmotionKey;\n};\n\ntype Props = {\n  hossii: NewHossiiArrivalPayload | null;\n  show: boolean;\n  onClose: () => void;\n  /** \u8868\u793a\u6642\u9593\uff08ms\uff09\u3002\u65e2\u5b9a 3200ms */\n  duration?: number;\n};\n\nfunction buildHeadline(authorName?: string): string {\n  const trimmed = authorName?.trim();\n  if (trimmed) {\n    return `${trimmed}\u3055\u3093\u306e\u6c17\u6301\u3061\u304c\u5c4a\u3044\u305f`;\n  }\n  return '\u65b0\u3057\u3044\u6c17\u6301\u3061\u304c\u5c4a\u3044\u305f';\n}\n\nfunction truncateMessage(message?: string, maxLen = 42): string | null {\n  const trimmed = message?.trim();\n  if (!trimmed) return null;\n  if (trimmed.length <= maxLen) return trimmed;\n  return `${trimmed.slice(0, maxLen)}\u2026`;\n}\n\nexport function NewHossiiArrivalToast({\n  hossii,\n  show,\n  onClose,\n  duration = 3200,\n}: Props) {\n  const [phase, setPhase] = useState<'hidden' | 'entering' | 'visible' | 'exiting'>('hidden');\n\n  const headline = useMemo(\n    () => buildHeadline(hossii?.authorName),\n    [hossii?.authorName],\n  );\n\n  const preview = useMemo(\n    () => truncateMessage(hossii?.message),\n    [hossii?.message],\n  );\n\n  const emotionEmoji = hossii?.emotion\n    ? EMOJI_BY_EMOTION[hossii.emotion]\n    : '\ud83d\udcab';\n\n  const emotionColor = hossii?.emotion\n    ? EMOTION_COLORS[hossii.emotion]\n    : '#a855f7';\n\n  useEffect(() => {\n    if (!show || !hossii) {\n      setPhase('hidden');\n      return;\n    }\n\n    setPhase('entering');\n    const visibleTimer = window.setTimeout(() => setPhase('visible'), 420);\n\n    const exitTimer = window.setTimeout(() => {\n      setPhase('exiting');\n      window.setTimeout(onClose, 220);\n    }, duration);\n\n    return () => {\n      window.clearTimeout(visibleTimer);\n      window.clearTimeout(exitTimer);\n    };\n  }, [show, hossii?.id, duration, onClose, hossii]);\n\n  if (!show || !hossii || phase === 'hidden') {\n    return null;\n  }\n\n  const containerClass = [\n    styles.container,\n    phase === 'entering' ? styles.entering : '',\n    phase === 'visible' ? styles.visible : '',\n    phase === 'exiting' ? styles.exiting : '',\n  ]\n    .filter(Boolean)\n    .join(' ');\n\n  return (\n    <div\n      className={containerClass}\n      role=\"status\"\n      aria-live=\"polite\"\n      aria-atomic=\"true\"\n    >\n      <div className={styles.toast}>\n        <div className={styles.accentGlow} aria-hidden=\"true\" />\n\n        <div\n          className={styles.emotionBadge}\n          style={{\n            boxShadow: `0 2px 12px ${emotionColor}33, inset 0 0 0 1px ${emotionColor}44`,\n          }}\n          aria-hidden=\"true\"\n        >\n          {emotionEmoji}\n        </div>\n\n        <div className={styles.content}>\n          <p className={styles.headline}>\n            <span className={styles.headlineAccent}>\u2726 </span>\n            {headline}\n          </p>\n          {preview ? <p className={styles.preview}>{preview}</p> : null}\n        </div>\n\n        <button\n          type=\"button\"\n          className={styles.dismissButton}\n          aria-label=\"\u9589\u3058\u308b\"\n          onClick={() => {\n            setPhase('exiting');\n            window.setTimeout(onClose, 220);\n          }}\n        >\n          \u00d7\n        </button>\n      </div>\n    </div>\n  );\n}\n"}, {"name": "README.md", "type": "text", "content": "# NewHossiiArrivalToast\n\n\u30b9\u30da\u30fc\u30b9\u753b\u9762\u3067**\u65b0\u3057\u3044 Hossii\uff08\u6c17\u6301\u3061\uff09\u304c\u5c4a\u3044\u305f\u3068\u304d**\u306b\u8868\u793a\u3059\u308b\u30c8\u30fc\u30b9\u30c8\u901a\u77e5\u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3002\n\n## \u6587\u8108\n\n- **\u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\uff08\u4f53\u9a13\uff09** UI \u2014 \u30d5\u30ed\u30b9\u30c8\u30ac\u30e9\u30b9 + \u7d2b\u30d4\u30f3\u30af\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3\n- \u65e2\u5b58\u306e `HossiiToast`\uff08\u6210\u529f/\u30a8\u30e9\u30fc/\u60c5\u5831\u5411\u3051\u30d4\u30eb\u578b\uff09\u3068\u306f\u5225\u7269\u3002\u611f\u60c5\u30fb\u4f5c\u8005\u30fb\u30e1\u30c3\u30bb\u30fc\u30b8\u306e\u65ad\u7247\u3092\u4f1d\u3048\u308b\n\n## \u30d5\u30a1\u30a4\u30eb\n\n| \u30d5\u30a1\u30a4\u30eb | \u5185\u5bb9 |\n|---|---|\n| `NewHossiiArrivalToast.tsx` | React \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8 |\n| `NewHossiiArrivalToast.module.css` | CSS Modules\uff08\u30b0\u30e9\u30b9 + \u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\uff09 |\n\n## \u30c7\u30b6\u30a4\u30f3\u5224\u65ad\n\n- **\u30b0\u30e9\u30b9\u30e2\u30fc\u30d5\u30a3\u30ba\u30e0**: `rgba(255,255,255,0.88)` + `blur(12px)`\u3001\u5de6\u7aef\u306b\u30d6\u30e9\u30f3\u30c9\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3\u306e\u30a2\u30af\u30bb\u30f3\u30c8\u30d0\u30fc\n- **\u30b3\u30d4\u30fc**: \u300c\u65b0\u3057\u3044\u6c17\u6301\u3061\u304c\u5c4a\u3044\u305f\u300d/\u300c\u3007\u3007\u3055\u3093\u306e\u6c17\u6301\u3061\u304c\u5c4a\u3044\u305f\u300d\uff08Hossii \u7528\u8a9e\u3002\u901a\u77e5\u30fb\u6295\u7a3f\u306a\u3069\u306f\u4f7f\u308f\u306a\u3044\uff09\n- **\u611f\u60c5**: `emotion` \u306b\u5fdc\u3058\u305f\u7d75\u6587\u5b57\u30d0\u30c3\u30b8 + \u611f\u60c5\u30ab\u30e9\u30fc\uff08`emotionColors.ts` \u3068\u540c\u5024\uff09\n- **\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3**: `hossii-soft-bounce`\u30fb`hossii-sparkle`\uff08`motion.css` \u6e96\u62e0\uff09+ \u5165\u9000\u5834\u7528 `hossii-arrival-*`\n- **`prefers-reduced-motion`**: \u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\u7121\u52b9\u5316\u3001\u30d5\u30a7\u30fc\u30c9\u306e\u307f\n\n## \u4f7f\u3044\u65b9\uff08\u4f8b\uff09\n\n```tsx\nconst [toastHossii, setToastHossii] = useState<NewHossiiArrivalPayload | null>(null);\nconst [showToast, setShowToast] = useState(false);\n\n// \u65b0\u7740\u691c\u77e5\u6642\nsetToastHossii({\n  id: hossii.id,\n  authorName: hossii.authorName,\n  message: hossii.message,\n  emotion: hossii.emotion,\n});\nsetShowToast(true);\n\n<NewHossiiArrivalToast\n  hossii={toastHossii}\n  show={showToast}\n  onClose={() => setShowToast(false)}\n/>\n```\n\n## \u672c\u756a\u7d71\u5408\u6642\n\n- `src/core/ui/` \u306b\u914d\u7f6e\u3057\u3001\u578b\u306f `EmotionKey` / `EMOJI_BY_EMOTION` / `getEmotionColor` \u3092 `src/core` \u304b\u3089 import\n- \u30b0\u30ed\u30fc\u30d0\u30eb `motion.css` \u3092\u8aad\u307f\u8fbc\u3093\u3067\u3044\u308c\u3070\u3001CSS Module \u5185\u306e keyframes \u91cd\u8907\u306f\u524a\u9664\u53ef\u80fd\n"}], "grading": {"expectations": [{"text": "uses_css_modules", "passed": true, "evidence": "Checked uses_css_modules in 3 output files"}, {"text": "glassmorphism", "passed": true, "evidence": "Checked glassmorphism in 3 output files"}, {"text": "brand_gradient", "passed": true, "evidence": "Checked brand_gradient in 3 output files"}, {"text": "hossii_copy", "passed": true, "evidence": "Checked hossii_copy in 3 output files"}, {"text": "hossii_motion", "passed": true, "evidence": "Checked hossii_motion in 3 output files"}, {"text": "reduced_motion", "passed": true, "evidence": "Checked reduced_motion in 3 output files"}], "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0}}}, {"id": "hossii-toast-without_skill", "prompt": "\u65b0\u3057\u3044Hossii\u304c\u5c4a\u3044\u305f\u3068\u304d\u306b\u51fa\u308b\u30c8\u30fc\u30b9\u30c8\u901a\u77e5\u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3092\u4f5c\u308a\u305f\u3044\u3002Hossii\u3089\u3057\u3044\u30c7\u30b6\u30a4\u30f3\u3067", "eval_id": 1, "outputs": [{"name": "Demo.tsx", "type": "text", "content": "import { useState, type CSSProperties } from 'react';\nimport { NewHossiiToast } from './NewHossiiToast';\nimport { useNewHossiiToast } from './useNewHossiiToast';\nimport type { NewHossiiPayload } from './types';\n\nconst SAMPLE_HOSSIIS: NewHossiiPayload[] = [\n  {\n    id: '1',\n    authorName: '\u307f\u3046',\n    emotion: 'joy',\n    message: '\u4eca\u65e5\u306e\u7a7a\u3001\u3059\u3054\u304f\u304d\u308c\u3044\u3060\u3063\u305f',\n  },\n  {\n    id: '2',\n    authorName: '\u306f\u308b',\n    emotion: 'wow',\n    message: '\u3053\u306e\u30b9\u30da\u30fc\u30b9\u3001\u521d\u3081\u3066\u6765\u305f\u3051\u3069\u6e29\u304b\u3044',\n  },\n  {\n    id: '3',\n    authorName: '\u305d\u3089',\n    emotion: 'fun',\n    message: '',\n  },\n];\n\nconst demoPageStyle: CSSProperties = {\n  minHeight: '100vh',\n  padding: '2rem',\n  fontFamily: '\"Hiragino Sans\", \"Noto Sans JP\", sans-serif',\n  background:\n    'linear-gradient(160deg, #fdf4ff 0%, #fce7f3 45%, #ede9fe 100%)',\n};\n\nconst panelStyle: CSSProperties = {\n  maxWidth: '28rem',\n  margin: '0 auto',\n  padding: '1.5rem',\n  borderRadius: '1.25rem',\n  background: 'rgba(255,255,255,0.7)',\n  boxShadow: '0 8px 24px rgba(168, 85, 247, 0.12)',\n};\n\nconst buttonStyle: CSSProperties = {\n  display: 'block',\n  width: '100%',\n  marginTop: '0.75rem',\n  padding: '0.75rem 1rem',\n  border: 'none',\n  borderRadius: '9999px',\n  background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',\n  color: '#fff',\n  fontWeight: 600,\n  cursor: 'pointer',\n};\n\n/** \u30b9\u30bf\u30f3\u30c9\u30a2\u30ed\u30f3\u78ba\u8a8d\u7528\u30c7\u30e2\uff08outputs \u914d\u4e0b\uff09 */\nexport function NewHossiiToastDemo() {\n  const [single, setSingle] = useState<NewHossiiPayload | null>(null);\n  const [singleShow, setSingleShow] = useState(false);\n  const { toast, notify, close } = useNewHossiiToast();\n\n  const showSingle = (hossii: NewHossiiPayload) => {\n    setSingle(hossii);\n    setSingleShow(true);\n  };\n\n  return (\n    <div style={demoPageStyle}>\n      <div style={panelStyle}>\n        <h1 style={{ margin: 0, fontSize: '1.125rem', color: '#5b21b6' }}>\n          NewHossiiToast Demo\n        </h1>\n        <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>\n          \u65b0\u3057\u3044 Hossii \u5230\u7740\u30c8\u30fc\u30b9\u30c8\u306e\u52d5\u4f5c\u78ba\u8a8d\n        </p>\n\n        {SAMPLE_HOSSIIS.map((hossii) => (\n          <button\n            key={hossii.id}\n            type=\"button\"\n            style={buttonStyle}\n            onClick={() => showSingle(hossii)}\n          >\n            1\u4ef6\u8868\u793a: {hossii.authorName}\n          </button>\n        ))}\n\n        <button\n          type=\"button\"\n          style={{ ...buttonStyle, background: '#7c3aed' }}\n          onClick={() => SAMPLE_HOSSIIS.forEach((h) => notify(h))}\n        >\n          3\u4ef6\u9023\u7d9a\u5230\u7740\uff08\u30ad\u30e5\u30fc\uff09\n        </button>\n      </div>\n\n      <NewHossiiToast\n        hossii={single}\n        show={singleShow}\n        onClose={() => {\n          setSingleShow(false);\n          setSingle(null);\n        }}\n        onView={(h) => console.log('view hossii', h.id)}\n      />\n\n      {toast && (\n        <NewHossiiToast\n          hossii={toast.hossii}\n          show={toast.show}\n          onClose={close}\n          onView={(h) => console.log('view hossii', h.id)}\n        />\n      )}\n    </div>\n  );\n}\n"}, {"name": "NewHossiiToast.module.css", "type": "text", "content": "/**\n * NewHossiiToast \u2014 \u65b0\u3057\u3044 Hossii \u5230\u7740\u30c8\u30fc\u30b9\u30c8\n */\n\n.container {\n  position: fixed;\n  top: 5rem;\n  left: 50%;\n  z-index: 1100;\n  width: min(22rem, calc(100vw - 2rem));\n  transform: translateX(-50%) translateY(-12px);\n  opacity: 0;\n  pointer-events: none;\n  transition:\n    opacity 220ms ease-out,\n    transform 220ms ease-out;\n}\n\n.container.visible {\n  opacity: 1;\n  transform: translateX(-50%) translateY(0);\n  pointer-events: auto;\n}\n\n.container.exiting {\n  opacity: 0;\n  transform: translateX(-50%) translateY(-8px);\n}\n\n.toast {\n  position: relative;\n  display: flex;\n  align-items: flex-start;\n  gap: 0.75rem;\n  padding: 0.875rem 1rem 0.875rem 0.875rem;\n  border-radius: 1.25rem;\n  cursor: pointer;\n  overflow: hidden;\n  border: 1px solid rgba(255, 255, 255, 0.55);\n  background:\n    linear-gradient(\n      135deg,\n      rgba(168, 85, 247, 0.18) 0%,\n      rgba(236, 72, 153, 0.14) 100%\n    ),\n    rgba(255, 255, 255, 0.82);\n  backdrop-filter: blur(14px);\n  -webkit-backdrop-filter: blur(14px);\n  box-shadow:\n    0 10px 28px rgba(168, 85, 247, 0.18),\n    0 4px 12px rgba(0, 0, 0, 0.08),\n    inset 0 1px 0 rgba(255, 255, 255, 0.65);\n  transition: transform 160ms ease, box-shadow 160ms ease;\n}\n\n.toast::before {\n  content: '';\n  position: absolute;\n  inset: 0;\n  border-radius: inherit;\n  padding: 1px;\n  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);\n  -webkit-mask:\n    linear-gradient(#fff 0 0) content-box,\n    linear-gradient(#fff 0 0);\n  -webkit-mask-composite: xor;\n  mask-composite: exclude;\n  pointer-events: none;\n  opacity: 0.55;\n}\n\n.toast:hover {\n  transform: translateY(-1px);\n  box-shadow:\n    0 14px 32px rgba(168, 85, 247, 0.22),\n    0 6px 16px rgba(0, 0, 0, 0.1),\n    inset 0 1px 0 rgba(255, 255, 255, 0.7);\n}\n\n.toast:active {\n  transform: scale(0.985);\n}\n\n.toast.hossiiPop {\n  animation: hossiiToastPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1);\n}\n\n@keyframes hossiiToastPop {\n  0% {\n    transform: scale(0.92) translateY(6px);\n  }\n  55% {\n    transform: scale(1.03) translateY(-2px);\n  }\n  100% {\n    transform: scale(1) translateY(0);\n  }\n}\n\n.avatar {\n  position: relative;\n  flex-shrink: 0;\n  width: 2.75rem;\n  height: 2.75rem;\n  border-radius: 9999px;\n  display: grid;\n  place-items: center;\n  background: linear-gradient(135deg, #e9d5ff 0%, #fbcfe8 100%);\n  box-shadow: 0 4px 10px rgba(168, 85, 247, 0.2);\n}\n\n.avatarGlyph {\n  font-size: 1.35rem;\n  line-height: 1;\n  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));\n}\n\n.sparkle {\n  position: absolute;\n  top: -0.2rem;\n  right: -0.15rem;\n  font-size: 0.7rem;\n  opacity: 0;\n  animation: hossiiSparkle 520ms ease-out 120ms forwards;\n}\n\n@keyframes hossiiSparkle {\n  0% {\n    opacity: 0;\n    transform: scale(0.4) rotate(-8deg);\n  }\n  35% {\n    opacity: 1;\n    transform: scale(1) rotate(0deg);\n  }\n  100% {\n    opacity: 0;\n    transform: scale(0.7) translateY(-4px);\n  }\n}\n\n.body {\n  min-width: 0;\n  flex: 1;\n  display: flex;\n  flex-direction: column;\n  gap: 0.2rem;\n  padding-top: 0.1rem;\n}\n\n.eyebrow {\n  font-size: 0.72rem;\n  font-weight: 700;\n  letter-spacing: 0.04em;\n  text-transform: none;\n  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);\n  -webkit-background-clip: text;\n  background-clip: text;\n  color: transparent;\n}\n\n.preview {\n  margin: 0;\n  font-size: 0.875rem;\n  font-weight: 500;\n  line-height: 1.45;\n  color: #4c1d95;\n  display: -webkit-box;\n  -webkit-line-clamp: 2;\n  -webkit-box-orient: vertical;\n  overflow: hidden;\n}\n\n.meta {\n  font-size: 0.75rem;\n  color: rgba(76, 29, 149, 0.72);\n}\n\n.dismiss {\n  flex-shrink: 0;\n  align-self: flex-start;\n  width: 1.75rem;\n  height: 1.75rem;\n  border: none;\n  border-radius: 9999px;\n  background: rgba(255, 255, 255, 0.55);\n  color: #7c3aed;\n  font-size: 1rem;\n  line-height: 1;\n  cursor: pointer;\n  display: grid;\n  place-items: center;\n  transition: background 140ms ease, transform 140ms ease;\n}\n\n.dismiss:hover {\n  background: rgba(255, 255, 255, 0.85);\n}\n\n.dismiss:active {\n  transform: scale(0.94);\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .container,\n  .container.visible,\n  .container.exiting {\n    transition: opacity 120ms ease;\n    transform: translateX(-50%);\n  }\n\n  .toast.hossiiPop {\n    animation: none;\n  }\n\n  .sparkle {\n    animation: none;\n    opacity: 0.85;\n  }\n\n  .toast:hover,\n  .toast:active {\n    transform: none;\n  }\n}\n"}, {"name": "NewHossiiToast.tsx", "type": "text", "content": "import { useCallback, useEffect, useState, type MouseEvent } from 'react';\nimport styles from './NewHossiiToast.module.css';\nimport { formatHossiiPreview, type NewHossiiPayload } from './types';\n\nexport type NewHossiiToastProps = {\n  hossii: NewHossiiPayload | null;\n  show: boolean;\n  onClose: () => void;\n  /** \u30c8\u30fc\u30b9\u30c8\u672c\u4f53\u30af\u30ea\u30c3\u30af\u6642\uff08\u4f8b: \u8a72\u5f53 Hossii \u3078\u30b9\u30af\u30ed\u30fc\u30eb\uff09 */\n  onView?: (hossii: NewHossiiPayload) => void;\n  /** \u8868\u793a\u6642\u9593\uff08ms\uff09\u3002\u30c7\u30d5\u30a9\u30eb\u30c8 4200ms */\n  duration?: number;\n};\n\nexport function NewHossiiToast({\n  hossii,\n  show,\n  onClose,\n  onView,\n  duration = 4200,\n}: NewHossiiToastProps) {\n  const [phase, setPhase] = useState<'hidden' | 'entering' | 'visible' | 'exiting'>('hidden');\n\n  const dismiss = useCallback(() => {\n    setPhase('exiting');\n    window.setTimeout(onClose, 200);\n  }, [onClose]);\n\n  useEffect(() => {\n    if (!show || !hossii) {\n      setPhase('hidden');\n      return;\n    }\n\n    setPhase('entering');\n    const enterTimer = window.setTimeout(() => setPhase('visible'), 16);\n    const exitTimer = window.setTimeout(() => dismiss(), duration);\n\n    return () => {\n      window.clearTimeout(enterTimer);\n      window.clearTimeout(exitTimer);\n    };\n  }, [show, hossii, duration, dismiss]);\n\n  if (!show || !hossii || phase === 'hidden') return null;\n\n  const preview = formatHossiiPreview(hossii);\n  const authorLabel = hossii.authorName?.trim() || '\u3060\u308c\u304b';\n  const isAnimatingIn = phase === 'entering' || phase === 'visible';\n\n  const handleToastClick = () => {\n    onView?.(hossii);\n    dismiss();\n  };\n\n  const handleDismissClick = (event: MouseEvent<HTMLButtonElement>) => {\n    event.stopPropagation();\n    dismiss();\n  };\n\n  return (\n    <div\n      className={[\n        styles.container,\n        isAnimatingIn ? styles.visible : '',\n        phase === 'exiting' ? styles.exiting : '',\n      ]\n        .filter(Boolean)\n        .join(' ')}\n      role=\"status\"\n      aria-live=\"polite\"\n      aria-atomic=\"true\"\n    >\n      <div\n        className={[styles.toast, phase === 'entering' ? styles.hossiiPop : '']\n          .filter(Boolean)\n          .join(' ')}\n        onClick={handleToastClick}\n        onKeyDown={(event) => {\n          if (event.key === 'Enter' || event.key === ' ') {\n            event.preventDefault();\n            handleToastClick();\n          }\n        }}\n        tabIndex={0}\n      >\n        <div className={styles.avatar} aria-hidden=\"true\">\n          <span className={styles.avatarGlyph}>\ud83c\udf1f</span>\n          <span className={styles.sparkle}>\u2728</span>\n        </div>\n\n        <div className={styles.body}>\n          <span className={styles.eyebrow}>\u65b0\u3057\u3044 Hossii \u304c\u5c4a\u304d\u307e\u3057\u305f</span>\n          <p className={styles.preview}>{preview}</p>\n          <span className={styles.meta}>{authorLabel} \u306e\u6c17\u6301\u3061</span>\n        </div>\n\n        <button\n          type=\"button\"\n          className={styles.dismiss}\n          aria-label=\"\u9589\u3058\u308b\"\n          onClick={handleDismissClick}\n        >\n          \u00d7\n        </button>\n      </div>\n    </div>\n  );\n}\n"}, {"name": "README.md", "type": "text", "content": "# NewHossiiToast\uff08without_skill baseline\uff09\n\n\u65b0\u3057\u3044 Hossii \u304c\u5c4a\u3044\u305f\u3068\u304d\u306b\u8868\u793a\u3059\u308b\u30c8\u30fc\u30b9\u30c8\u901a\u77e5\u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3067\u3059\u3002\n\n## Files\n\n| File | Purpose |\n|------|---------|\n| `NewHossiiToast.tsx` | \u30e1\u30a4\u30f3\u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8 |\n| `NewHossiiToast.module.css` | \u30b0\u30e9\u30b9\u30e2\u30fc\u30d5\u30a3\u30ba\u30e0 + \u30d6\u30e9\u30f3\u30c9\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3 + \u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3 |\n| `types.ts` | \u6700\u5c0f Hossii \u578b\u3068\u30d7\u30ec\u30d3\u30e5\u30fc\u6574\u5f62 |\n| `useNewHossiiToast.ts` | \u9023\u7d9a\u5230\u7740\u7528\u30ad\u30e5\u30fc\u30d5\u30c3\u30af |\n| `Demo.tsx` | \u30b9\u30bf\u30f3\u30c9\u30a2\u30ed\u30f3\u52d5\u4f5c\u78ba\u8a8d UI |\n| `index.ts` | \u30a8\u30af\u30b9\u30dd\u30fc\u30c8 |\n| `css-modules.d.ts` | CSS Modules \u578b\u5ba3\u8a00 |\n\n## Usage\n\n```tsx\nimport { NewHossiiToast } from './NewHossiiToast';\n\n<NewHossiiToast\n  hossii={{ id: '1', authorName: '\u307f\u3046', emotion: 'joy', message: '\u4eca\u65e5\u306f\u3044\u3044\u65e5' }}\n  show={show}\n  onClose={() => setShow(false)}\n  onView={(h) => scrollToHossii(h.id)}\n/>\n```\n\n\u30ad\u30e5\u30fc\u5229\u7528:\n\n```tsx\nconst { toast, notify, close } = useNewHossiiToast();\n\nnotify({ id: '2', authorName: '\u306f\u308b', message: '\u5c4a\u3044\u305f\u3088' });\n\n{toast && (\n  <NewHossiiToast hossii={toast.hossii} show={toast.show} onClose={close} />\n)}\n```\n\n## Design notes\n\n- \u30d5\u30ed\u30b9\u30c8\u30ac\u30e9\u30b9\uff08`backdrop-filter: blur` + \u534a\u900f\u660e\u767d\uff09\n- \u7d2b\u2192\u30d4\u30f3\u30af\u306e\u30d6\u30e9\u30f3\u30c9\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3\uff08`#a855f7` \u2192 `#ec4899`\uff09\n- \u300c\u65b0\u3057\u3044 Hossii \u304c\u5c4a\u304d\u307e\u3057\u305f\u300d\u300c\u301c\u306e\u6c17\u6301\u3061\u300d\u306a\u3069 Hossii \u7528\u8a9e\n- \u3075\u308f\u3063\u3068\u3057\u305f `hossiiToastPop` \u51fa\u73fe\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\n- `prefers-reduced-motion: reduce` \u3067\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\u6291\u5236\n\n## Demo\n\n`Demo.tsx` \u306e `NewHossiiToastDemo` \u3092\u4efb\u610f\u306e React \u30a2\u30d7\u30ea\u306b\u30de\u30a6\u30f3\u30c8\u3057\u3066\u78ba\u8a8d\u3067\u304d\u307e\u3059\u3002\n"}, {"name": "css-modules.d.ts", "type": "text", "content": "declare module '*.module.css' {\n  const classes: Record<string, string>;\n  export default classes;\n}\n"}, {"name": "index.ts", "type": "text", "content": "export { NewHossiiToast } from './NewHossiiToast';\nexport type { NewHossiiToastProps } from './NewHossiiToast';\nexport { useNewHossiiToast } from './useNewHossiiToast';\nexport { NewHossiiToastDemo } from './Demo';\nexport {\n  EMOJI_BY_EMOTION,\n  formatHossiiPreview,\n  type EmotionKey,\n  type NewHossiiPayload,\n} from './types';\n"}, {"name": "types.ts", "type": "text", "content": "/** Minimal Hossii shape for toast preview */\nexport type EmotionKey =\n  | 'wow'\n  | 'empathy'\n  | 'inspire'\n  | 'think'\n  | 'laugh'\n  | 'joy'\n  | 'moved'\n  | 'fun';\n\nexport type NewHossiiPayload = {\n  id: string;\n  message?: string;\n  authorName?: string;\n  emotion?: EmotionKey;\n};\n\nexport const EMOJI_BY_EMOTION: Record<EmotionKey, string> = {\n  wow: '\ud83d\ude2e',\n  empathy: '\ud83d\ude0d',\n  inspire: '\ud83e\udd2f',\n  think: '\ud83e\udd14',\n  laugh: '\ud83d\ude02',\n  joy: '\ud83e\udd70',\n  moved: '\ud83d\ude22',\n  fun: '\u2728',\n};\n\nexport function formatHossiiPreview(hossii: NewHossiiPayload): string {\n  const emoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : '';\n  const msg = (hossii.message ?? '').trim();\n  if (emoji && msg) return `${emoji} ${msg}`;\n  if (emoji) return emoji;\n  if (msg) return msg;\n  return '\u6c17\u6301\u3061\u304c\u5c4a\u304d\u307e\u3057\u305f';\n}\n"}, {"name": "useNewHossiiToast.ts", "type": "text", "content": "import { useCallback, useRef, useState } from 'react';\nimport type { NewHossiiPayload } from './types';\n\ntype ToastState = {\n  hossii: NewHossiiPayload;\n  show: boolean;\n};\n\n/**\n * \u9023\u7d9a\u5230\u7740\u6642\u306f\u30ad\u30e5\u30fc\u3067\u9806\u756a\u306b\u8868\u793a\u3059\u308b\u7c21\u6613\u30d5\u30c3\u30af\u3002\n */\nexport function useNewHossiiToast() {\n  const queueRef = useRef<NewHossiiPayload[]>([]);\n  const [state, setState] = useState<ToastState | null>(null);\n\n  const pump = useCallback(() => {\n    if (state?.show) return;\n    const next = queueRef.current.shift();\n    if (!next) {\n      setState(null);\n      return;\n    }\n    setState({ hossii: next, show: true });\n  }, [state?.show]);\n\n  const notify = useCallback(\n    (hossii: NewHossiiPayload) => {\n      queueRef.current.push(hossii);\n      pump();\n    },\n    [pump],\n  );\n\n  const close = useCallback(() => {\n    setState((prev) => (prev ? { ...prev, show: false } : null));\n    window.setTimeout(pump, 220);\n  }, [pump]);\n\n  return {\n    toast: state,\n    notify,\n    close,\n  };\n}\n"}], "grading": {"expectations": [{"text": "uses_css_modules", "passed": true, "evidence": "Checked uses_css_modules in 8 output files"}, {"text": "glassmorphism", "passed": true, "evidence": "Checked glassmorphism in 8 output files"}, {"text": "brand_gradient", "passed": true, "evidence": "Checked brand_gradient in 8 output files"}, {"text": "hossii_copy", "passed": true, "evidence": "Checked hossii_copy in 8 output files"}, {"text": "hossii_motion", "passed": false, "evidence": "Checked hossii_motion in 8 output files"}, {"text": "reduced_motion", "passed": true, "evidence": "Checked reduced_motion in 8 output files"}], "summary": {"passed": 5, "failed": 1, "total": 6, "pass_rate": 0.8333}}}, {"id": "space-welcome-banner-with_skill", "prompt": "\u30b9\u30da\u30fc\u30b9\u753b\u9762\u306e\u4e0a\u90e8\u306b\u3001\u521d\u3081\u3066\u6765\u305f\u30e6\u30fc\u30b6\u30fc\u3078\u306e\u6848\u5185\u30d0\u30ca\u30fc\u3092\u8ffd\u52a0\u3057\u305f\u3044\u3002\u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u5411\u3051\u306eHossii\u3063\u307d\u3044\u30c7\u30b6\u30a4\u30f3\u3067", "eval_id": 2, "outputs": [{"name": "README.md", "type": "text", "content": "# SpaceWelcomeBanner\n\n\u30b9\u30da\u30fc\u30b9\u753b\u9762\u4e0a\u90e8\u5411\u3051\u306e\u3001\u521d\u3081\u3066\u6765\u305f\u30e6\u30fc\u30b6\u30fc\u3078\u306e\u6848\u5185\u30d0\u30ca\u30fc\uff08eval \u51fa\u529b\uff09\u3002\n\n## \u6982\u8981\n\n`SpaceWelcomeBanner` \u306f **\u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u6587\u8108** \u306e Hossii \u30c7\u30b6\u30a4\u30f3\u8a00\u8a9e\u306b\u6cbf\u3063\u305f\u30d5\u30ed\u30b9\u30c8\u30ac\u30e9\u30b9\u30d0\u30ca\u30fc\u3067\u3059\u3002\u30b9\u30da\u30fc\u30b9\u540d\u3092\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3\u898b\u51fa\u3057\u3067\u6b53\u8fce\u3057\u3001\u6e29\u304b\u3044\u65e5\u672c\u8a9e\u30b3\u30d4\u30fc\u3067\u300c\u6c17\u6301\u3061\u3092\u7f6e\u304f\u300d\u4f53\u9a13\u3092\u6848\u5185\u3057\u307e\u3059\u3002\n\n## \u30c7\u30b6\u30a4\u30f3\u5224\u65ad\n\n| \u9805\u76ee | \u63a1\u7528 |\n|------|------|\n| \u6587\u8108 | \u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\uff08\u4f53\u9a13\uff09 |\n| \u30ab\u30fc\u30c9 | `rgba(255,255,255,0.88)` + `blur(12px)` \u306e\u6a19\u6e96\u30b0\u30e9\u30b9 |\n| \u4e3b\u8272 | `#a855f7` \u2192 `#ec4899` \u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3 |\n| \u5f62\u72b6 | \u30d4\u30eb CTA\uff08`border-radius: 9999px`\uff09\u3001\u89d2\u4e38 1rem \u30ab\u30fc\u30c9 |\n| \u30a2\u30cb\u30e1 | \u51fa\u73fe `hossii-soft-bounce`\u3001\u30de\u30b9\u30b3\u30c3\u30c8 `hossii-float-slow` |\n| \u30b3\u30d4\u30fc | \u300c\u6c17\u6301\u3061\u3092\u7f6e\u304f\u300d\u300c\u3042\u3068\u3067\u300d\uff08\u4e00\u822c\u7684\u306a\u300c\u6295\u7a3f\u3059\u308b\u300d\u300c\u9589\u3058\u308b\u300d\u3092\u56de\u907f\uff09 |\n\n## \u30d5\u30a1\u30a4\u30eb\n\n- `SpaceWelcomeBanner.tsx` \u2014 \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u672c\u4f53\n- `SpaceWelcomeBanner.module.css` \u2014 CSS Modules \u30b9\u30bf\u30a4\u30eb\n\n## Props\n\n| Prop | \u578b | \u8aac\u660e |\n|------|-----|------|\n| `spaceId` | `string` | localStorage \u30ad\u30fc\u7528 ID |\n| `spaceName` | `string` | \u898b\u51fa\u3057\u306b\u8868\u793a\u3059\u308b\u30b9\u30da\u30fc\u30b9\u540d |\n| `forceVisible` | `boolean?` | \u521d\u56de\u5224\u5b9a\u3092\u4e0a\u66f8\u304d\u3057\u3066\u5f37\u5236\u8868\u793a |\n| `onPostClick` | `() => void?` | CTA\u300c\u6c17\u6301\u3061\u3092\u7f6e\u3044\u3066\u307f\u308b\u300d\u62bc\u4e0b\u6642 |\n| `onDismiss` | `() => void?` | \u9589\u3058\u305f\u3042\u3068 |\n| `topOffset` | `string?` | TopBar \u4e0b\u306e\u4f4d\u7f6e\uff08\u65e2\u5b9a `4.5rem`\uff09 |\n\n## \u521d\u56de\u8868\u793a\u30ed\u30b8\u30c3\u30af\n\n`localStorage` \u30ad\u30fc `hossii:space-welcome-dismissed:{spaceId}` \u3067\u30b9\u30da\u30fc\u30b9\u5358\u4f4d\u306e dismiss \u3092\u8a18\u61b6\u3057\u307e\u3059\u3002\u300c\u3042\u3068\u3067\u300d\u307e\u305f\u306f \u00d7 \u3067\u9589\u3058\u308b\u3068\u518d\u8868\u793a\u3057\u307e\u305b\u3093\u3002\n\n## SpaceScreen \u3078\u306e\u7d44\u307f\u8fbc\u307f\u4f8b\n\n```tsx\nimport { SpaceWelcomeBanner } from './SpaceWelcomeBanner';\n\n<SpaceWelcomeBanner\n  spaceId={activeSpace.id}\n  spaceName={activeSpace.name}\n  onPostClick={() => setQuickPostOpen(true)}\n/>\n```\n\n`src/core/ui/motion.css` \u304c\u30b0\u30ed\u30fc\u30d0\u30eb\u306b\u8aad\u307f\u8fbc\u307e\u308c\u3066\u3044\u308b\u524d\u63d0\u3067 `hossii-soft-bounce` / `hossii-float-slow` \u3092\u5229\u7528\u3057\u3066\u3044\u307e\u3059\u3002\n\n## \u30a2\u30af\u30bb\u30b7\u30d3\u30ea\u30c6\u30a3\n\n- `role=\"region\"` + `aria-label`\n- \u9589\u3058\u308b\u30dc\u30bf\u30f3\u306b `aria-label=\"\u6848\u5185\u3092\u9589\u3058\u308b\"`\n- `prefers-reduced-motion: reduce` \u3067\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\u7121\u52b9\u5316\n"}, {"name": "SpaceWelcomeBanner.module.css", "type": "text", "content": "/* \u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u6587\u8108 \u2014 \u30d5\u30ed\u30b9\u30c8\u30ac\u30e9\u30b9\u6848\u5185\u30d0\u30ca\u30fc */\n\n.anchor {\n  position: fixed;\n  left: 50%;\n  z-index: 90;\n  width: min(calc(100% - 1.5rem), 36rem);\n  transform: translateX(-50%);\n  pointer-events: none;\n}\n\n.banner {\n  position: relative;\n  pointer-events: auto;\n  padding: 1rem 1.125rem 1rem 1rem;\n  border-radius: 1rem;\n  background: rgba(255, 255, 255, 0.88);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.65);\n  box-shadow:\n    0 4px 24px rgba(168, 85, 247, 0.12),\n    0 1px 0 rgba(255, 255, 255, 0.8) inset;\n}\n\n.bannerEnter {\n  opacity: 0;\n  transform: translateY(-8px);\n}\n\n.glow {\n  position: absolute;\n  inset: -1px;\n  border-radius: inherit;\n  pointer-events: none;\n  background: linear-gradient(\n    135deg,\n    rgba(168, 85, 247, 0.14) 0%,\n    rgba(236, 72, 153, 0.1) 55%,\n    rgba(255, 255, 255, 0) 100%\n  );\n  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);\n  -webkit-mask-composite: xor;\n  mask-composite: exclude;\n  padding: 1px;\n}\n\n.content {\n  position: relative;\n  display: grid;\n  grid-template-columns: auto 1fr;\n  grid-template-areas:\n    'mascot text'\n    'actions actions';\n  gap: 0.75rem 0.875rem;\n  align-items: start;\n}\n\n.mascot {\n  grid-area: mascot;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 2.5rem;\n  height: 2.5rem;\n  border-radius: 9999px;\n  background: linear-gradient(135deg, #faf5ff 0%, #fbcfe8 100%);\n  font-size: 1.25rem;\n  line-height: 1;\n  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.15);\n}\n\n.textBlock {\n  grid-area: text;\n  min-width: 0;\n}\n\n.eyebrow {\n  margin: 0 0 0.2rem;\n  font-size: 0.75rem;\n  font-weight: 600;\n  letter-spacing: 0.06em;\n  text-transform: uppercase;\n  color: #a855f7;\n}\n\n.title {\n  margin: 0 0 0.35rem;\n  font-size: 1.125rem;\n  font-weight: 700;\n  line-height: 1.35;\n  color: #111827;\n}\n\n.spaceName {\n  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);\n  -webkit-background-clip: text;\n  background-clip: text;\n  -webkit-text-fill-color: transparent;\n}\n\n.titleSuffix {\n  margin-left: 0.15em;\n}\n\n.body {\n  margin: 0;\n  font-size: 0.875rem;\n  font-weight: 500;\n  line-height: 1.55;\n  color: #4b5563;\n}\n\n.actions {\n  grid-area: actions;\n  display: flex;\n  flex-wrap: wrap;\n  gap: 0.5rem;\n  padding-left: calc(2.5rem + 0.875rem);\n}\n\n.ctaButton {\n  padding: 0.5rem 1.125rem;\n  border: none;\n  border-radius: 9999px;\n  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);\n  color: #fff;\n  font-size: 0.875rem;\n  font-weight: 600;\n  cursor: pointer;\n  box-shadow: 0 4px 0 #7c3aed;\n  transition: transform 0.1s ease, box-shadow 0.1s ease;\n}\n\n.ctaButton:hover {\n  filter: brightness(1.03);\n}\n\n.ctaButton:active {\n  transform: translateY(3px);\n  box-shadow: 0 1px 0 #7c3aed;\n}\n\n.laterButton {\n  padding: 0.5rem 1rem;\n  border-radius: 9999px;\n  border: 1px solid rgba(168, 85, 247, 0.22);\n  background: rgba(243, 232, 255, 0.55);\n  color: #6d28d9;\n  font-size: 0.875rem;\n  font-weight: 600;\n  cursor: pointer;\n  transition: background 0.15s ease, border-color 0.15s ease;\n}\n\n.laterButton:hover {\n  background: #f3e8ff;\n  border-color: rgba(168, 85, 247, 0.35);\n}\n\n.closeButton {\n  position: absolute;\n  top: 0.625rem;\n  right: 0.625rem;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 1.75rem;\n  height: 1.75rem;\n  padding: 0;\n  border: none;\n  border-radius: 9999px;\n  background: rgba(243, 232, 255, 0.7);\n  color: #7c3aed;\n  font-size: 1.125rem;\n  line-height: 1;\n  cursor: pointer;\n  transition: background 0.15s ease, transform 0.1s ease;\n}\n\n.closeButton:hover {\n  background: #e9d5ff;\n}\n\n.closeButton:active {\n  transform: scale(0.94);\n}\n\n@media (max-width: 480px) {\n  .anchor {\n    width: calc(100% - 1rem);\n  }\n\n  .banner {\n    padding-top: 0.875rem;\n  }\n\n  .content {\n    grid-template-columns: 1fr;\n    grid-template-areas:\n      'mascot'\n      'text'\n      'actions';\n    gap: 0.625rem;\n  }\n\n  .mascot {\n    width: 2.25rem;\n    height: 2.25rem;\n    font-size: 1.125rem;\n  }\n\n  .actions {\n    padding-left: 0;\n  }\n\n  .title {\n    font-size: 1.0625rem;\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .banner,\n  .bannerEnter {\n    animation: none !important;\n    opacity: 1;\n    transform: none;\n  }\n\n  .mascot {\n    animation: none !important;\n  }\n\n  .ctaButton,\n  .closeButton {\n    transition: none;\n  }\n}\n"}, {"name": "SpaceWelcomeBanner.tsx", "type": "text", "content": "import { useCallback, useEffect, useState } from 'react';\nimport styles from './SpaceWelcomeBanner.module.css';\n\nconst STORAGE_PREFIX = 'hossii:space-welcome-dismissed:';\n\nfunction readDismissed(spaceId: string): boolean {\n  if (typeof window === 'undefined') return false;\n  try {\n    return window.localStorage.getItem(`${STORAGE_PREFIX}${spaceId}`) === '1';\n  } catch {\n    return false;\n  }\n}\n\nfunction persistDismissed(spaceId: string): void {\n  try {\n    window.localStorage.setItem(`${STORAGE_PREFIX}${spaceId}`, '1');\n  } catch {\n    /* localStorage unavailable */\n  }\n}\n\nexport type SpaceWelcomeBannerProps = {\n  /** \u30b9\u30da\u30fc\u30b9\u8b58\u5225\u5b50\uff08localStorage \u30ad\u30fc\u306b\u4f7f\u7528\uff09 */\n  spaceId: string;\n  /** \u8868\u793a\u540d\uff08\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3\u898b\u51fa\u3057\u306b\u4f7f\u7528\uff09 */\n  spaceName: string;\n  /** \u5916\u90e8\u5236\u5fa1\u3067\u8868\u793a/\u975e\u8868\u793a\u3092\u4e0a\u66f8\u304d\u3059\u308b\u5834\u5408 */\n  forceVisible?: boolean;\n  /** \u300c\u6c17\u6301\u3061\u3092\u7f6e\u304f\u300dCTA \u62bc\u4e0b\u6642 */\n  onPostClick?: () => void;\n  /** \u9589\u3058\u305f\u3042\u3068\uff08localStorage \u4fdd\u5b58\u5f8c\uff09 */\n  onDismiss?: () => void;\n  /** TopBar \u7b49\u306e\u4e0b\u306b\u7f6e\u304f\u3068\u304d\u306e top \u30aa\u30d5\u30bb\u30c3\u30c8 */\n  topOffset?: string;\n  className?: string;\n};\n\n/**\n * \u30b9\u30da\u30fc\u30b9\u753b\u9762\u4e0a\u90e8 \u2014 \u521d\u3081\u3066\u6765\u305f\u30e6\u30fc\u30b6\u30fc\u5411\u3051\u306e\u6848\u5185\u30d0\u30ca\u30fc\u3002\n * \u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u6587\u8108: \u30d5\u30ed\u30b9\u30c8\u30ac\u30e9\u30b9 + \u6e29\u304b\u3044\u30b3\u30d4\u30fc + \u3077\u306b\u3077\u306b\u51fa\u73fe\u3002\n */\nexport function SpaceWelcomeBanner({\n  spaceId,\n  spaceName,\n  forceVisible,\n  onPostClick,\n  onDismiss,\n  topOffset = '4.5rem',\n  className,\n}: SpaceWelcomeBannerProps) {\n  const [visible, setVisible] = useState(false);\n  const [entered, setEntered] = useState(false);\n\n  useEffect(() => {\n    const shouldShow = forceVisible ?? !readDismissed(spaceId);\n    setVisible(shouldShow);\n    if (!shouldShow) return undefined;\n\n    const timer = window.setTimeout(() => setEntered(true), 16);\n    return () => window.clearTimeout(timer);\n  }, [spaceId, forceVisible]);\n\n  const dismiss = useCallback(() => {\n    persistDismissed(spaceId);\n    setVisible(false);\n    onDismiss?.();\n  }, [spaceId, onDismiss]);\n\n  const handlePostClick = useCallback(() => {\n    onPostClick?.();\n    dismiss();\n  }, [onPostClick, dismiss]);\n\n  if (!visible) return null;\n\n  const bannerClass = [\n    styles.banner,\n    entered ? 'hossii-soft-bounce' : styles.bannerEnter,\n  ]\n    .filter(Boolean)\n    .join(' ');\n\n  return (\n    <div\n      className={[styles.anchor, className].filter(Boolean).join(' ')}\n      style={{ top: topOffset }}\n      role=\"region\"\n      aria-label=\"\u30b9\u30da\u30fc\u30b9\u3078\u306e\u3088\u3046\u3053\u305d\u6848\u5185\"\n      data-space-export=\"exclude\"\n    >\n      <div className={bannerClass}>\n        <div className={styles.glow} aria-hidden />\n\n        <div className={styles.content}>\n          <span className={`${styles.mascot} hossii-float-slow`} aria-hidden>\n            \u2728\n          </span>\n\n          <div className={styles.textBlock}>\n            <p className={styles.eyebrow}>\u306f\u3058\u3081\u307e\u3057\u3066</p>\n            <h2 className={styles.title}>\n              <span className={styles.spaceName}>{spaceName}</span>\n              <span className={styles.titleSuffix}>\u3078\u3088\u3046\u3053\u305d</span>\n            </h2>\n            <p className={styles.body}>\n              \u3053\u306e\u30b9\u30da\u30fc\u30b9\u306b\u3001\u3042\u306a\u305f\u306e\u6c17\u6301\u3061\u3092\u7f6e\u3044\u3066\u307f\u307e\u305b\u3093\u304b\uff1f\n              \u661f\u3084\u3075\u308f\u3075\u308f\u306e Hossii \u304c\u3001\u307f\u3093\u306a\u306e\u60f3\u3044\u3092\u6620\u3057\u3066\u3044\u307e\u3059\u3002\n            </p>\n          </div>\n\n          <div className={styles.actions}>\n            {onPostClick && (\n              <button\n                type=\"button\"\n                className={styles.ctaButton}\n                onClick={handlePostClick}\n              >\n                \u6c17\u6301\u3061\u3092\u7f6e\u3044\u3066\u307f\u308b\n              </button>\n            )}\n            <button\n              type=\"button\"\n              className={styles.laterButton}\n              onClick={dismiss}\n            >\n              \u3042\u3068\u3067\n            </button>\n          </div>\n        </div>\n\n        <button\n          type=\"button\"\n          className={styles.closeButton}\n          onClick={dismiss}\n          aria-label=\"\u6848\u5185\u3092\u9589\u3058\u308b\"\n        >\n          \u00d7\n        </button>\n      </div>\n    </div>\n  );\n}\n"}], "grading": {"expectations": [{"text": "uses_css_modules", "passed": true, "evidence": "Checked uses_css_modules in 3 output files"}, {"text": "glassmorphism", "passed": true, "evidence": "Checked glassmorphism in 3 output files"}, {"text": "consumer_context", "passed": true, "evidence": "Checked consumer_context in 3 output files"}, {"text": "warm_japanese_copy", "passed": true, "evidence": "Checked warm_japanese_copy in 3 output files"}, {"text": "pill_or_rounded", "passed": true, "evidence": "Checked pill_or_rounded in 3 output files"}, {"text": "dismissible_or_action", "passed": true, "evidence": "Checked dismissible_or_action in 3 output files"}], "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0}}}, {"id": "space-welcome-banner-without_skill", "prompt": "\u30b9\u30da\u30fc\u30b9\u753b\u9762\u306e\u4e0a\u90e8\u306b\u3001\u521d\u3081\u3066\u6765\u305f\u30e6\u30fc\u30b6\u30fc\u3078\u306e\u6848\u5185\u30d0\u30ca\u30fc\u3092\u8ffd\u52a0\u3057\u305f\u3044\u3002\u30b3\u30f3\u30b7\u30e5\u30fc\u30de\u30fc\u5411\u3051\u306eHossii\u3063\u307d\u3044\u30c7\u30b6\u30a4\u30f3\u3067", "eval_id": 2, "outputs": [{"name": "README.md", "type": "text", "content": "# Space Welcome Banner\uff08without skill baseline\uff09\n\n\u30b9\u30da\u30fc\u30b9\u753b\u9762\u4e0a\u90e8\u306b\u8868\u793a\u3059\u308b\u3001\u521d\u3081\u3066\u6765\u305f\u30e6\u30fc\u30b6\u30fc\u5411\u3051\u306e\u6848\u5185\u30d0\u30ca\u30fc\u3067\u3059\u3002\n\n## \u30d5\u30a1\u30a4\u30eb\u69cb\u6210\n\n| \u30d5\u30a1\u30a4\u30eb | \u8aac\u660e |\n|----------|------|\n| `SpaceWelcomeBanner.tsx` | \u30e1\u30a4\u30f3\u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8 |\n| `SpaceWelcomeBanner.module.css` | \u30b0\u30e9\u30b9\u30e2\u30fc\u30d5\u30a3\u30ba\u30e0 + \u7d2b\u30d4\u30f3\u30af\u30b0\u30e9\u30c7\u30fc\u30b7\u30e7\u30f3\u306e\u30b9\u30bf\u30a4\u30eb |\n| `spaceWelcomeBannerStorage.ts` | \u30b9\u30da\u30fc\u30b9\u5358\u4f4d\u306e dismiss \u72b6\u614b\uff08localStorage\uff09 |\n| `SpaceWelcomeBannerDemo.tsx` | \u30b9\u30bf\u30f3\u30c9\u30a2\u30ed\u30f3\u78ba\u8a8d\u7528\u30c7\u30e2 |\n| `index.ts` | \u30a8\u30af\u30b9\u30dd\u30fc\u30c8 |\n\n## \u30c7\u30b6\u30a4\u30f3\n\n- \u30d4\u30eb\u578b\uff08\u30e2\u30d0\u30a4\u30eb\u72ed\u5e45\u3067\u306f\u89d2\u4e38\u30ab\u30fc\u30c9\uff09\u306e\u30b0\u30e9\u30b9\u30e2\u30fc\u30d5\u30a3\u30ba\u30e0\u30d0\u30ca\u30fc\n- Hossii \u30ad\u30e3\u30e9\uff08`/hossii/idle/idle_smile.png`\uff09+ \u304d\u3089\u304d\u3089\u88c5\u98fe\n- \u6e29\u304b\u3044\u65e5\u672c\u8a9e\u30b3\u30d4\u30fc\uff08\u3088\u3046\u3053\u305d + \u6295\u7a3f\u3092\u4fc3\u3059\u6848\u5185\uff09\n- \u300c\u6295\u7a3f\u3057\u3066\u307f\u308b\u300dCTA \u3068 \u00d7 \u9589\u3058\u308b\u30dc\u30bf\u30f3\n- \u30b9\u30e9\u30a4\u30c9\u30a4\u30f3 / \u30b9\u30e9\u30a4\u30c9\u30a2\u30a6\u30c8\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\n\n## SpaceScreen \u3078\u306e\u7d44\u307f\u8fbc\u307f\u4f8b\n\n```tsx\nimport { SpaceWelcomeBanner } from './SpaceWelcomeBanner';\n\n// SpaceScreen \u306e return \u5185\uff08VisitBanner \u306e\u8fd1\u304f\u306a\u3069\uff09\n<SpaceWelcomeBanner\n  spaceId={activeSpaceId}\n  spaceName={space.name}\n  withPaneBar={shouldShowSpacePaneBar(/* ... */)}\n  characterImageUrl={space.characterImageUrl}\n  onPostClick={() => navigateToPost()}\n/>\n```\n\n## \u52d5\u4f5c\n\n- \u521d\u56de\u8a2a\u554f\u6642\u306e\u307f\u8868\u793a\uff08`localStorage` \u30ad\u30fc: `hossii.spaceWelcomeBanner.dismissed.{spaceId}`\uff09\n- \u300c\u6295\u7a3f\u3057\u3066\u307f\u308b\u300d\u307e\u305f\u306f \u00d7 \u3067\u975e\u8868\u793a\u306b\u306a\u308a\u3001\u540c\u30b9\u30da\u30fc\u30b9\u3067\u306f\u518d\u8868\u793a\u3057\u306a\u3044\n- `data-space-export=\"exclude\"` \u3067\u30ad\u30e3\u30f3\u30d0\u30b9\u66f8\u304d\u51fa\u3057\u5bfe\u8c61\u5916\n\n## \u30c7\u30e2\n\n`SpaceWelcomeBannerDemo` \u3092\u4e00\u6642\u7684\u306b `App.tsx` \u7b49\u3067\u63cf\u753b\u3059\u308b\u3068\u3001\u6697\u3044\u30b9\u30da\u30fc\u30b9\u80cc\u666f\u306e\u4e0a\u3067\u30d0\u30ca\u30fc\u3092\u78ba\u8a8d\u3067\u304d\u307e\u3059\u3002`respectDismissStorage={false}` \u306e\u305f\u3081\u4f55\u5ea6\u3067\u3082\u300c\u518d\u8868\u793a\u300d\u30dc\u30bf\u30f3\u3067\u8a66\u305b\u307e\u3059\u3002\n"}, {"name": "SpaceWelcomeBanner.module.css", "type": "text", "content": ".banner {\n  position: fixed;\n  top: max(12px, env(safe-area-inset-top, 0px));\n  left: 50%;\n  transform: translateX(-50%);\n  z-index: 90;\n  width: min(calc(100vw - 24px), 640px);\n  box-sizing: border-box;\n  padding: 0.75rem 0.875rem 0.75rem 0.75rem;\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n\n  background: linear-gradient(\n    135deg,\n    rgba(255, 255, 255, 0.82) 0%,\n    rgba(250, 245, 255, 0.78) 55%,\n    rgba(253, 242, 248, 0.8) 100%\n  );\n  backdrop-filter: blur(16px) saturate(1.4);\n  -webkit-backdrop-filter: blur(16px) saturate(1.4);\n  border: 1px solid rgba(255, 255, 255, 0.65);\n  border-radius: 999px;\n  box-shadow:\n    0 8px 32px rgba(168, 85, 247, 0.14),\n    0 2px 8px rgba(236, 72, 153, 0.08),\n    inset 0 1px 0 rgba(255, 255, 255, 0.85);\n\n  animation: bannerSlideIn 0.45s cubic-bezier(0.34, 1.2, 0.64, 1);\n}\n\n.bannerExiting {\n  animation: bannerSlideOut 0.28s ease-in forwards;\n}\n\n@keyframes bannerSlideIn {\n  from {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-12px) scale(0.96);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0) scale(1);\n  }\n}\n\n@keyframes bannerSlideOut {\n  from {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0) scale(1);\n  }\n  to {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-8px) scale(0.98);\n  }\n}\n\n.avatarWrap {\n  position: relative;\n  flex-shrink: 0;\n  width: 2.75rem;\n  height: 2.75rem;\n}\n\n.avatarRing {\n  width: 100%;\n  height: 100%;\n  border-radius: 50%;\n  overflow: hidden;\n  background: linear-gradient(135deg, #e9d5ff 0%, #fbcfe8 100%);\n  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);\n  border: 2px solid rgba(255, 255, 255, 0.9);\n}\n\n.avatar {\n  width: 100%;\n  height: 100%;\n  object-fit: cover;\n  object-position: center;\n}\n\n.sparkle {\n  position: absolute;\n  top: -4px;\n  right: -2px;\n  font-size: 0.75rem;\n  pointer-events: none;\n  animation: sparklePulse 2.4s ease-in-out infinite;\n}\n\n@keyframes sparklePulse {\n  0%,\n  100% {\n    opacity: 0.5;\n    transform: scale(0.9) rotate(0deg);\n  }\n  50% {\n    opacity: 1;\n    transform: scale(1.1) rotate(12deg);\n  }\n}\n\n.content {\n  flex: 1;\n  min-width: 0;\n}\n\n.title {\n  margin: 0 0 0.125rem;\n  font-size: 0.8125rem;\n  font-weight: 700;\n  letter-spacing: 0.01em;\n  color: #5b21b6;\n  line-height: 1.35;\n}\n\n.message {\n  margin: 0;\n  font-size: 0.75rem;\n  font-weight: 500;\n  color: #6b21a8;\n  line-height: 1.5;\n  opacity: 0.92;\n}\n\n.actions {\n  display: flex;\n  align-items: center;\n  gap: 0.375rem;\n  flex-shrink: 0;\n}\n\n.primaryButton {\n  padding: 0.4375rem 0.875rem;\n  border: none;\n  border-radius: 999px;\n  font-size: 0.75rem;\n  font-weight: 600;\n  color: #fff;\n  cursor: pointer;\n  white-space: nowrap;\n  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);\n  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.28);\n  transition: transform 0.15s ease, box-shadow 0.15s ease;\n}\n\n.primaryButton:hover {\n  transform: translateY(-1px);\n  box-shadow: 0 6px 16px rgba(168, 85, 247, 0.34);\n}\n\n.primaryButton:active {\n  transform: scale(0.97);\n}\n\n.dismissButton {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 1.75rem;\n  height: 1.75rem;\n  padding: 0;\n  border: none;\n  border-radius: 50%;\n  background: rgba(168, 85, 247, 0.1);\n  color: #7c3aed;\n  font-size: 1rem;\n  line-height: 1;\n  cursor: pointer;\n  transition: background 0.15s ease, transform 0.15s ease;\n}\n\n.dismissButton:hover {\n  background: rgba(168, 85, 247, 0.18);\n}\n\n.dismissButton:active {\n  transform: scale(0.92);\n}\n\n@media (min-width: 769px) {\n  .banner {\n    top: calc(4rem + 8px);\n    width: min(calc(100vw - 48px), 680px);\n    padding: 0.875rem 1rem 0.875rem 0.875rem;\n    gap: 0.875rem;\n  }\n\n  .bannerWithPaneBar {\n    top: calc(4.25rem + 2.75rem + 8px);\n  }\n\n  .avatarWrap {\n    width: 3rem;\n    height: 3rem;\n  }\n\n  .title {\n    font-size: 0.875rem;\n  }\n\n  .message {\n    font-size: 0.8125rem;\n  }\n\n  .primaryButton {\n    padding: 0.5rem 1rem;\n    font-size: 0.8125rem;\n  }\n}\n\n@media (max-width: 480px) {\n  .banner {\n    border-radius: 1.25rem;\n    flex-wrap: wrap;\n    padding: 0.75rem;\n  }\n\n  .content {\n    flex: 1 1 calc(100% - 3.5rem);\n  }\n\n  .actions {\n    width: 100%;\n    justify-content: flex-end;\n    padding-left: 3.5rem;\n  }\n}\n"}, {"name": "SpaceWelcomeBanner.tsx", "type": "text", "content": "import { useCallback, useEffect, useState } from 'react';\nimport styles from './SpaceWelcomeBanner.module.css';\nimport {\n  loadWelcomeBannerDismissed,\n  saveWelcomeBannerDismissed,\n} from './spaceWelcomeBannerStorage';\n\nconst HOSSII_IDLE_SMILE = '/hossii/idle/idle_smile.png';\n\ntype Props = {\n  spaceId: string;\n  spaceName?: string;\n  /** \u30b9\u30da\u30fc\u30b9PaneBar\u8868\u793a\u6642\u306f\u4e0a\u90e8\u30aa\u30d5\u30bb\u30c3\u30c8\u3092\u5e83\u3052\u308b */\n  withPaneBar?: boolean;\n  characterImageUrl?: string;\n  onPostClick?: () => void;\n  onDismiss?: () => void;\n  /** false \u306b\u3059\u308b\u3068 localStorage \u3092\u7121\u8996\u3057\u3066\u5e38\u306b\u8868\u793a\uff08\u30c7\u30e2\u7528\uff09 */\n  respectDismissStorage?: boolean;\n};\n\nfunction buildWelcomeCopy(spaceName: string) {\n  return {\n    title: `${spaceName}\u3078\u3088\u3046\u3053\u305d\uff01`,\n    message: '\u6c17\u6301\u3061\u3092\u661f\u306b\u306e\u305b\u3066\u3001\u307f\u3093\u306a\u3068\u3064\u306a\u304c\u3063\u3066\u307f\u3088\u3046\u3002\u30bf\u30c3\u30d7\u3057\u3066\u6700\u521d\u306eHossii\u3092\u5c4a\u3051\u3066\u306d\u3002',\n  };\n}\n\nexport function SpaceWelcomeBanner({\n  spaceId,\n  spaceName = '\u3053\u306e\u30b9\u30da\u30fc\u30b9',\n  withPaneBar = false,\n  characterImageUrl,\n  onPostClick,\n  onDismiss,\n  respectDismissStorage = true,\n}: Props) {\n  const [visible, setVisible] = useState(false);\n  const [exiting, setExiting] = useState(false);\n\n  useEffect(() => {\n    if (respectDismissStorage && loadWelcomeBannerDismissed(spaceId)) {\n      return;\n    }\n    setVisible(true);\n  }, [spaceId, respectDismissStorage]);\n\n  const dismiss = useCallback(() => {\n    setExiting(true);\n    window.setTimeout(() => {\n      if (respectDismissStorage) {\n        saveWelcomeBannerDismissed(spaceId);\n      }\n      setVisible(false);\n      onDismiss?.();\n    }, 280);\n  }, [spaceId, onDismiss, respectDismissStorage]);\n\n  const handlePostClick = useCallback(() => {\n    onPostClick?.();\n    dismiss();\n  }, [dismiss, onPostClick]);\n\n  if (!visible) {\n    return null;\n  }\n\n  const copy = buildWelcomeCopy(spaceName);\n\n  return (\n    <div\n      className={[\n        styles.banner,\n        withPaneBar ? styles.bannerWithPaneBar : '',\n        exiting ? styles.bannerExiting : '',\n      ]\n        .filter(Boolean)\n        .join(' ')}\n      role=\"region\"\n      aria-label=\"\u521d\u3081\u3066\u306e\u65b9\u3078\u306e\u6848\u5185\"\n      data-space-export=\"exclude\"\n    >\n      <div className={styles.avatarWrap}>\n        <div className={styles.avatarRing}>\n          <img\n            src={characterImageUrl ?? HOSSII_IDLE_SMILE}\n            alt=\"\"\n            className={styles.avatar}\n            aria-hidden\n          />\n        </div>\n        <span className={styles.sparkle} aria-hidden>\n          \u2728\n        </span>\n      </div>\n\n      <div className={styles.content}>\n        <p className={styles.title}>{copy.title}</p>\n        <p className={styles.message}>{copy.message}</p>\n      </div>\n\n      <div className={styles.actions}>\n        <button\n          type=\"button\"\n          className={styles.primaryButton}\n          onClick={handlePostClick}\n        >\n          \u6295\u7a3f\u3057\u3066\u307f\u308b\n        </button>\n        <button\n          type=\"button\"\n          className={styles.dismissButton}\n          onClick={dismiss}\n          aria-label=\"\u6848\u5185\u3092\u9589\u3058\u308b\"\n        >\n          \u00d7\n        </button>\n      </div>\n    </div>\n  );\n}\n"}, {"name": "SpaceWelcomeBannerDemo.tsx", "type": "text", "content": "import { useState } from 'react';\nimport { SpaceWelcomeBanner } from './SpaceWelcomeBanner';\n\nconst DEMO_SPACE_ID = 'demo-space-welcome-banner';\n\n/**\n * \u30b9\u30bf\u30f3\u30c9\u30a2\u30ed\u30f3\u78ba\u8a8d\u7528\u3002SpaceScreen \u76f8\u5f53\u306e\u80cc\u666f\u306e\u4e0a\u306b\u30d0\u30ca\u30fc\u3092\u91cd\u306d\u3066\u8868\u793a\u3059\u308b\u3002\n */\nexport function SpaceWelcomeBannerDemo() {\n  const [key, setKey] = useState(0);\n  const [lastAction, setLastAction] = useState<string | null>(null);\n\n  const reset = () => {\n    try {\n      localStorage.removeItem(`hossii.spaceWelcomeBanner.dismissed.${DEMO_SPACE_ID}`);\n    } catch {\n      /* noop */\n    }\n    setLastAction(null);\n    setKey((k) => k + 1);\n  };\n\n  return (\n    <div\n      style={{\n        minHeight: '100vh',\n        background:\n          'radial-gradient(ellipse at 20% 0%, rgba(168,85,247,0.35) 0%, transparent 50%), radial-gradient(ellipse at 80% 100%, rgba(236,72,153,0.25) 0%, transparent 55%), linear-gradient(160deg, #1e1033 0%, #0f172a 100%)',\n        position: 'relative',\n      }}\n    >\n      <div\n        style={{\n          position: 'fixed',\n          top: 12,\n          left: 12,\n          padding: '6px 12px',\n          borderRadius: 999,\n          background: 'rgba(255,255,255,0.12)',\n          color: '#fff',\n          fontSize: 13,\n          fontWeight: 600,\n        }}\n      >\n        \u30c7\u30e2\u30b9\u30da\u30fc\u30b9\n      </div>\n\n      <SpaceWelcomeBanner\n        key={key}\n        spaceId={DEMO_SPACE_ID}\n        spaceName=\"\u307f\u3093\u306a\u306e\u5e83\u5834\"\n        respectDismissStorage={false}\n        onPostClick={() => setLastAction('\u6295\u7a3f\u3057\u3066\u307f\u308b \u3092\u30bf\u30c3\u30d7')}\n        onDismiss={() => setLastAction('\u30d0\u30ca\u30fc\u3092\u9589\u3058\u307e\u3057\u305f')}\n      />\n\n      <div\n        style={{\n          position: 'fixed',\n          bottom: 24,\n          left: '50%',\n          transform: 'translateX(-50%)',\n          display: 'flex',\n          flexDirection: 'column',\n          alignItems: 'center',\n          gap: 8,\n        }}\n      >\n        {lastAction && (\n          <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>\n            {lastAction}\n          </p>\n        )}\n        <button\n          type=\"button\"\n          onClick={reset}\n          style={{\n            padding: '8px 16px',\n            borderRadius: 999,\n            border: '1px solid rgba(255,255,255,0.3)',\n            background: 'rgba(255,255,255,0.1)',\n            color: '#fff',\n            cursor: 'pointer',\n          }}\n        >\n          \u30d0\u30ca\u30fc\u3092\u518d\u8868\u793a\n        </button>\n      </div>\n    </div>\n  );\n}\n"}, {"name": "index.ts", "type": "text", "content": "export { SpaceWelcomeBanner } from './SpaceWelcomeBanner';\nexport {\n  loadWelcomeBannerDismissed,\n  saveWelcomeBannerDismissed,\n} from './spaceWelcomeBannerStorage';\n"}, {"name": "spaceWelcomeBannerStorage.ts", "type": "text", "content": "const STORAGE_PREFIX = 'hossii.spaceWelcomeBanner.dismissed.';\n\nexport function loadWelcomeBannerDismissed(spaceId: string): boolean {\n  try {\n    return localStorage.getItem(`${STORAGE_PREFIX}${spaceId}`) === '1';\n  } catch {\n    return false;\n  }\n}\n\nexport function saveWelcomeBannerDismissed(spaceId: string): void {\n  try {\n    localStorage.setItem(`${STORAGE_PREFIX}${spaceId}`, '1');\n  } catch {\n    /* quota / private mode */\n  }\n}\n"}], "grading": {"expectations": [{"text": "uses_css_modules", "passed": true, "evidence": "Checked uses_css_modules in 6 output files"}, {"text": "glassmorphism", "passed": true, "evidence": "Checked glassmorphism in 6 output files"}, {"text": "consumer_context", "passed": true, "evidence": "Checked consumer_context in 6 output files"}, {"text": "warm_japanese_copy", "passed": true, "evidence": "Checked warm_japanese_copy in 6 output files"}, {"text": "pill_or_rounded", "passed": true, "evidence": "Checked pill_or_rounded in 6 output files"}, {"text": "dismissible_or_action", "passed": true, "evidence": "Checked dismissible_or_action in 6 output files"}], "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0}}}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"metadata": {"skill_name": "hossii-design", "evals_run": ["emotion-picker", "hossii-toast", "space-welcome-banner"], "runs_per_configuration": 1}, "runs": [{"eval_id": 0, "eval_name": "emotion-picker", "configuration": "with_skill", "passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0, "time_seconds": null, "tokens": null}, {"eval_id": 0, "eval_name": "emotion-picker", "configuration": "without_skill", "passed": 3, "failed": 3, "total": 6, "pass_rate": 0.5, "time_seconds": null, "tokens": null}, {"eval_id": 1, "eval_name": "hossii-toast", "configuration": "with_skill", "passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0, "time_seconds": null, "tokens": null}, {"eval_id": 1, "eval_name": "hossii-toast", "configuration": "without_skill", "passed": 5, "failed": 1, "total": 6, "pass_rate": 0.8333, "time_seconds": null, "tokens": null}, {"eval_id": 2, "eval_name": "space-welcome-banner", "configuration": "with_skill", "passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0, "time_seconds": null, "tokens": null}, {"eval_id": 2, "eval_name": "space-welcome-banner", "configuration": "without_skill", "passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0, "time_seconds": null, "tokens": null}], "run_summary": {"with_skill": {"pass_rate": {"mean": 1.0}}, "without_skill": {"pass_rate": {"mean": 0.7778}}, "delta": {"pass_rate": "+0.22"}}, "notes": ["EmotionPicker without_skill uses blue (#2563eb) SaaS styling instead of brand purple-pink.", "Toast without_skill misses hossii-* motion class reuse (uses custom keyframes).", "Banner without_skill uses \u6295\u7a3f\u3057\u3066\u307f\u308b instead of \u6c17\u6301\u3061\u3092\u7f6e\u304f."]}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+/* コンシューマー文脈 — フロストガラス案内バナー */
+
+.anchor {
+  position: fixed;
+  left: 50%;
+  z-index: 90;
+  width: min(calc(100% - 1.5rem), 36rem);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.banner {
+  position: relative;
+  pointer-events: auto;
+  padding: 1rem 1.125rem 1rem 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 4px 24px rgba(168, 85, 247, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.bannerEnter {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.glow {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.14) 0%,
+    rgba(236, 72, 153, 0.1) 55%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1px;
+}
+
+.content {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'mascot text'
+    'actions actions';
+  gap: 0.75rem 0.875rem;
+  align-items: start;
+}
+
+.mascot {
+  grid-area: mascot;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #faf5ff 0%, #fbcfe8 100%);
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.15);
+}
+
+.textBlock {
+  grid-area: text;
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a855f7;
+}
+
+.title {
+  margin: 0 0 0.35rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #111827;
+}
+
+.spaceName {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.titleSuffix {
+  margin-left: 0.15em;
+}
+
+.body {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: #4b5563;
+}
+
+.actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-left: calc(2.5rem + 0.875rem);
+}
+
+.ctaButton {
+  padding: 0.5rem 1.125rem;
+  border: none;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #7c3aed;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.ctaButton:hover {
+  filter: brightness(1.03);
+}
+
+.ctaButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #7c3aed;
+}
+
+.laterButton {
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  background: rgba(243, 232, 255, 0.55);
+  color: #6d28d9;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.laterButton:hover {
+  background: #f3e8ff;
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+.closeButton {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: rgba(243, 232, 255, 0.7);
+  color: #7c3aed;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.closeButton:hover {
+  background: #e9d5ff;
+}
+
+.closeButton:active {
+  transform: scale(0.94);
+}
+
+@media (max-width: 480px) {
+  .anchor {
+    width: calc(100% - 1rem);
+  }
+
+  .banner {
+    padding-top: 0.875rem;
+  }
+
+  .content {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'mascot'
+      'text'
+      'actions';
+    gap: 0.625rem;
+  }
+
+  .mascot {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1.125rem;
+  }
+
+  .actions {
+    padding-left: 0;
+  }
+
+  .title {
+    font-size: 1.0625rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner,
+  .bannerEnter {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .mascot {
+    animation: none !important;
+  }
+
+  .ctaButton,
+  .closeButton {
+    transition: none;
+  }
+}

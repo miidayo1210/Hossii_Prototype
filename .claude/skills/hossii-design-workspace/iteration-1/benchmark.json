@@ -1,0 +1,99 @@
+{
+  "metadata": {
+    "skill_name": "hossii-design",
+    "evals_run": [
+      "emotion-picker",
+      "hossii-toast",
+      "space-welcome-banner"
+    ],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "eval_name": "emotion-picker",
+      "configuration": "with_skill",
+      "passed": 6,
+      "failed": 0,
+      "total": 6,
+      "pass_rate": 1.0,
+      "time_seconds": null,
+      "tokens": null
+    },
+    {
+      "eval_id": 0,
+      "eval_name": "emotion-picker",
+      "configuration": "without_skill",
+      "passed": 3,
+      "failed": 3,
+      "total": 6,
+      "pass_rate": 0.5,
+      "time_seconds": null,
+      "tokens": null
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "hossii-toast",
+      "configuration": "with_skill",
+      "passed": 6,
+      "failed": 0,
+      "total": 6,
+      "pass_rate": 1.0,
+      "time_seconds": null,
+      "tokens": null
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "hossii-toast",
+      "configuration": "without_skill",
+      "passed": 5,
+      "failed": 1,
+      "total": 6,
+      "pass_rate": 0.8333,
+      "time_seconds": null,
+      "tokens": null
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "space-welcome-banner",
+      "configuration": "with_skill",
+      "passed": 6,
+      "failed": 0,
+      "total": 6,
+      "pass_rate": 1.0,
+      "time_seconds": null,
+      "tokens": null
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "space-welcome-banner",
+      "configuration": "without_skill",
+      "passed": 6,
+      "failed": 0,
+      "total": 6,
+      "pass_rate": 1.0,
+      "time_seconds": null,
+      "tokens": null
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.7778
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.22"
+    }
+  },
+  "notes": [
+    "EmotionPicker without_skill uses blue (#2563eb) SaaS styling instead of brand purple-pink.",
+    "Toast without_skill misses hossii-* motion class reuse (uses custom keyframes).",
+    "Banner without_skill uses 投稿してみる instead of 気持ちを置く."
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "uses_css_modules",
+      "passed": true,
+      "evidence": "Checked uses_css_modules in 3 output files"
+    },
+    {
+      "text": "uses_brand_gradient_or_purple",
+      "passed": false,
+      "evidence": "Checked uses_brand_gradient_or_purple in 3 output files"
+    },
+    {
+      "text": "uses_emotion_colors",
+      "passed": false,
+      "evidence": "Checked uses_emotion_colors in 3 output files"
+    },
+    {
+      "text": "pill_shape",
+      "passed": true,
+      "evidence": "Checked pill_shape in 3 output files"
+    },
+    {
+      "text": "hossii_motion_class",
+      "passed": false,
+      "evidence": "Checked hossii_motion_class in 3 output files"
+    },
+    {
+      "text": "japanese_emotion_labels",
+      "passed": true,
+      "evidence": "Checked japanese_emotion_labels in 3 output files"
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 3,
+    "total": 6,
+    "pass_rate": 0.5
+  }
+}

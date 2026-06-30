@@ -1,0 +1,101 @@
+{
+  "skill_name": "hossii-design",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "ユーザーが投稿する前に気持ちを選ぶ EmotionPicker コンポーネントを作って。8種類の感情を選べるようにしたい",
+      "expected_output": "Hossiiの8感情カラー・ピル形状・CSS Modules・hossii-pop等を使ったEmotionPicker.tsx + .module.css",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_css_modules",
+          "description": "EmotionPicker.module.css が存在し、CSS Modules パターンを使っている"
+        },
+        {
+          "name": "uses_brand_gradient_or_purple",
+          "description": "アクティブ状態に #a855f7 / #ec4899 グラデーションまたはブランド紫を使用"
+        },
+        {
+          "name": "uses_emotion_colors",
+          "description": "emotionColors.ts を参照するか、8感情の定義色を使っている"
+        },
+        {
+          "name": "pill_shape",
+          "description": "border-radius: 9999px 等のピル形状を使用"
+        },
+        {
+          "name": "hossii_motion_class",
+          "description": "hossii-pop または hossii-soft-bounce 等の motion.css クラスを使用"
+        },
+        {
+          "name": "japanese_emotion_labels",
+          "description": "Wow/刺さった/閃いた等の日本語感情ラベルを使用（Post/Submit等の一般語を避ける）"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "新しいHossiiが届いたときに出るトースト通知コンポーネントを作りたい。Hossiiらしいデザインで",
+      "expected_output": "グラスモーフィズム・紫ピンクグラデーション・Hossiiコピーのトーストコンポーネント",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_css_modules",
+          "description": "CSS Modules パターン（.module.css）を使用"
+        },
+        {
+          "name": "glassmorphism",
+          "description": "backdrop-filter: blur と rgba 半透明背景を使用"
+        },
+        {
+          "name": "brand_gradient",
+          "description": "#a855f7 と #ec4899 のブランドグラデーションを含む"
+        },
+        {
+          "name": "hossii_copy",
+          "description": "「Hossii」「気持ち」等のHossii用語を使用し、一般的な「通知」「メッセージ」だけにしない"
+        },
+        {
+          "name": "hossii_motion",
+          "description": "hossii-* アニメーションクラスまたは同等のふわっとした出現アニメーション"
+        },
+        {
+          "name": "reduced_motion",
+          "description": "prefers-reduced-motion への対応がある"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "スペース画面の上部に、初めて来たユーザーへの案内バナーを追加したい。コンシューマー向けのHossiiっぽいデザインで",
+      "expected_output": "フロストガラス・グラデーション背景上に浮く案内バナー。温かい日本語コピー",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_css_modules",
+          "description": "CSS Modules パターンを使用"
+        },
+        {
+          "name": "glassmorphism",
+          "description": "フロストガラス（backdrop-filter + 半透明白）を使用"
+        },
+        {
+          "name": "consumer_context",
+          "description": "管理画面色（#4f46e5, #f5f6fa）ではなくコンシューマー向け紫ピンク系"
+        },
+        {
+          "name": "warm_japanese_copy",
+          "description": "「気持ちを置く」等の温かい日本語案内コピー"
+        },
+        {
+          "name": "pill_or_rounded",
+          "description": "ピル形状または大きな border-radius（1rem以上）"
+        },
+        {
+          "name": "dismissible_or_action",
+          "description": "閉じるボタンまたは次のアクション（案内として機能するUI）"
+        }
+      ]
+    }
+  ]
+}
