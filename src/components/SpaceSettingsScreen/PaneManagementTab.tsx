@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Link2, Plus, QrCode } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Link2, Plus, QrCode, Trash2 } from 'lucide-react';
 import type { SpacePane } from '../../core/types/spacePane';
 import { isSupabaseConfigured } from '../../core/supabase';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import {
   applySpacePaneSortOrders,
+  deleteSpacePane,
   setSpacePaneVisible,
   updateSpacePane,
 } from '../../core/utils/spacePanesApi';
@@ -12,6 +13,7 @@ import {
   MAX_PANE_NAME_LEN,
   MAX_SPACE_PANES,
   canCreatePane,
+  canDeletePane,
   canHidePane,
   computeReorderUpdates,
   paneLimitMessage,
@@ -36,7 +38,7 @@ function showToast(setter: (msg: string | null) => void, message: string) {
 }
 
 export function PaneManagementTab({ spaceId, spaceURL }: Props) {
-  const { panes, reloadPanesAndSyncActive, setActivePaneById } = useSpacePane();
+  const { panes, defaultPane, reloadPanesAndSyncActive, setActivePaneById } = useSpacePane();
   const [toast, setToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -133,6 +135,31 @@ export function PaneManagementTab({ spaceId, spaceURL }: Props) {
     await reloadPanesAndSyncActive();
     setActivePaneById(pane.id);
     showToast(setToast, 'タブを追加しました');
+  };
+
+  const handleDelete = async (pane: SpacePane) => {
+    if (!canDeletePane(pane)) return;
+
+    const confirmed = window.confirm(
+      `「${pane.name}」タブを削除しますか？\n\nこのタブに紐づく投稿はメインタブ側に表示されなくなります（投稿データ自体は残ります）。\nこの操作は取り消せません。`,
+    );
+    if (!confirmed) return;
+
+    setBusyId(pane.id);
+    try {
+      const result = await deleteSpacePane(pane);
+      if (!result.ok) {
+        handleError(result.error);
+        return;
+      }
+      await reloadPanesAndSyncActive();
+      if (defaultPane) {
+        setActivePaneById(defaultPane.id);
+      }
+      showToast(setToast, 'タブを削除しました');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   if (!isSupabaseConfigured) {
@@ -306,6 +333,18 @@ export function PaneManagementTab({ spaceId, spaceURL }: Props) {
                       onClick={() => void handleVisibility(pane, true)}
                     >
                       <Eye size={16} />
+                    </button>
+                  )}
+                  {canDeletePane(pane) && (
+                    <button
+                      type="button"
+                      className={`${styles.iconButton} ${styles.deleteButton}`}
+                      disabled={isBusy}
+                      aria-label="タブを削除"
+                      title="タブを削除"
+                      onClick={() => void handleDelete(pane)}
+                    >
+                      <Trash2 size={16} />
                     </button>
                   )}
                 </div>

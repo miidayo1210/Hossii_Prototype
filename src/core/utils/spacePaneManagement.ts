@@ -16,6 +16,10 @@ export function canHidePane(pane: SpacePane): boolean {
   return !pane.isDefault;
 }
 
+export function canDeletePane(pane: SpacePane): boolean {
+  return !pane.isDefault;
+}
+
 export function validatePaneName(name: string): string | null {
   const trimmed = name.trim();
   if (!trimmed) return 'タブ名を入力してください';

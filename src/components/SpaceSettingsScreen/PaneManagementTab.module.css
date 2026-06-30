@@ -180,6 +180,16 @@
   color: #7c3aed;
 }
 
+.deleteButton {
+  color: #b91c1c;
+}
+
+.deleteButton:hover:not(:disabled) {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
 .iconButton:disabled {
   opacity: 0.4;
   cursor: not-allowed;

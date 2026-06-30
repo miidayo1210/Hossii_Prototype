@@ -41,11 +41,35 @@ export function loadDemoSpacePanesForSpace(spaceId: string): SpacePane[] {
   }
 }
 
+export function saveDemoSpacePanesForSpace(spaceId: string, panes: SpacePane[]): void {
+  if (panes.length === 0) {
+    localStorage.removeItem(`${STORAGE_PREFIX}${spaceId}`);
+    return;
+  }
+  localStorage.setItem(
+    `${STORAGE_PREFIX}${spaceId}`,
+    JSON.stringify(panes.map(serialize)),
+  );
+}
+
 export function appendDemoSpacePane(pane: SpacePane): void {
   const existing = loadDemoSpacePanesForSpace(pane.spaceId);
   const next = [...existing.filter((p) => p.id !== pane.id), pane];
   localStorage.setItem(
     `${STORAGE_PREFIX}${pane.spaceId}`,
+    JSON.stringify(next.map(serialize)),
+  );
+}
+
+export function removeDemoSpacePane(spaceId: string, paneId: string): void {
+  const existing = loadDemoSpacePanesForSpace(spaceId);
+  const next = existing.filter((p) => p.id !== paneId);
+  if (next.length === 0) {
+    localStorage.removeItem(`${STORAGE_PREFIX}${spaceId}`);
+    return;
+  }
+  localStorage.setItem(
+    `${STORAGE_PREFIX}${spaceId}`,
     JSON.stringify(next.map(serialize)),
   );
 }

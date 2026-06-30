@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
-import { appendDemoSpacePane } from './demoSpacePanesStorage';
+import { appendDemoSpacePane, removeDemoSpacePane } from './demoSpacePanesStorage';
+import { canDeletePane } from './spacePaneManagement';
 import type { Hossii } from '../types';
 import type {
   CreateSpacePaneInput,
@@ -340,6 +341,35 @@ export async function applySpacePaneSortOrders(
   }
 
   return true;
+}
+
+function formatSpacePaneDeleteError(error: { message: string; code?: string }): string {
+  if (error.code === '42501') {
+    return 'タブの削除にはコミュニティ管理者またはスーパー管理者としてのログインが必要です';
+  }
+  return `タブの削除に失敗しました（${error.message}）`;
+}
+
+export async function deleteSpacePane(
+  pane: SpacePane,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!canDeletePane(pane)) {
+    return { ok: false, error: 'メインタブは削除できません' };
+  }
+
+  if (!isSupabaseConfigured) {
+    removeDemoSpacePane(pane.spaceId, pane.id);
+    return { ok: true };
+  }
+
+  const { error } = await supabase.from('space_panes').delete().eq('id', pane.id);
+
+  if (error) {
+    console.error('[spacePanesApi] deleteSpacePane error:', error.message);
+    return { ok: false, error: formatSpacePaneDeleteError(error) };
+  }
+
+  return { ok: true };
 }
 
 export type { SpaceDecoration, CustomEmotion };
