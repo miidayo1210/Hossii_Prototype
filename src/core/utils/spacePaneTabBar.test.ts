@@ -91,10 +91,11 @@ describe('splitPanesByTabBarGroup', () => {
   });
 });
 
-describe('buildTabBarGroupPatch', () => {
-  it('sets basket group in settings', () => {
+describe('buildTabBarGroupPatch (deprecated wrapper)', () => {
+  it('maps basket → folder group (via DEFAULT_FOLDER_ID)', () => {
     const p = pane({ id: 'x', settings: { postFields: { message: { visible: true } } } });
-    expect(buildTabBarGroupPatch(p, 'basket').settings?.tabBar?.group).toBe('basket');
+    // buildTabBarGroupPatch now delegates to buildTabFolderPatch which writes group:'folder'
+    expect(buildTabBarGroupPatch(p, 'basket').settings?.tabBar?.group).toBe('folder');
   });
 
   it('clears tabBar when returning to bar', () => {

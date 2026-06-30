@@ -2,8 +2,14 @@ import type { CustomEmotion, SpaceBackground, SpaceDecoration } from './space';
 import type { PostFieldSettings, PostingSettings } from './settings';
 
 export type SpacePaneTabBarSettings = {
-  /** Omitted or 'bar' — shown on tab bar. 'basket' — tucked in 🧺. */
-  group?: 'bar' | 'basket';
+  /**
+   * 'bar' (default/omitted) — shown on tab bar.
+   * 'basket' — legacy 100B value; maps to default folder.
+   * 'folder' — placed in a named tab folder (100C).
+   */
+  group?: 'bar' | 'basket' | 'folder';
+  /** Required when group === 'folder'. Falls back to DEFAULT_FOLDER_ID if missing. */
+  folderId?: string;
 };
 
 /** Pane-level override stored in space_panes.settings JSON (Phase 7). */

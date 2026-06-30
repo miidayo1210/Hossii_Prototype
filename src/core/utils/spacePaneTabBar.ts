@@ -3,11 +3,15 @@ import type { TabBarGroup } from '../types/spacePaneTabBar';
 import type { UpdateSpacePanePatch } from '../types/spacePane';
 import type { PaneSortOrderUpdate } from './spacePaneManagement';
 import { sortPanesForDisplay } from './spacePaneManagement';
+import { DEFAULT_FOLDER_ID } from './tabFolderStorage';
 
 export type { TabBarGroup };
 
+// ─── 100B compat (kept for any remaining callers) ────────────────────────────
+
 export function resolveTabBarGroup(pane: SpacePane): TabBarGroup {
-  return pane.settings?.tabBar?.group === 'basket' ? 'basket' : 'bar';
+  const g = pane.settings?.tabBar?.group;
+  return g === 'basket' || g === 'folder' ? 'basket' : 'bar';
 }
 
 export function splitPanesByTabBarGroup(visiblePanes: SpacePane[]): {
@@ -16,20 +20,68 @@ export function splitPanesByTabBarGroup(visiblePanes: SpacePane[]): {
 } {
   const sorted = sortPanesForDisplay(visiblePanes);
   return {
-    barPanes: sorted.filter((pane) => resolveTabBarGroup(pane) === 'bar'),
-    basketPanes: sorted.filter((pane) => resolveTabBarGroup(pane) === 'basket'),
+    barPanes: sorted.filter((p) => resolveTabBarGroup(p) === 'bar'),
+    basketPanes: sorted.filter((p) => resolveTabBarGroup(p) === 'basket'),
   };
 }
 
+/** Returns true when the pane can be moved into a folder. */
 export function canMovePaneToBasket(pane: SpacePane): boolean {
   return !pane.isDefault;
 }
 
+/** @deprecated Use buildTabFolderPatch */
 export function buildTabBarGroupPatch(
   pane: SpacePane,
   group: TabBarGroup,
 ): UpdateSpacePanePatch {
-  if (group === 'bar') {
+  return buildTabFolderPatch(pane, group === 'basket' ? DEFAULT_FOLDER_ID : null);
+}
+
+// ─── 100C: folder-aware helpers ──────────────────────────────────────────────
+
+/**
+ * Returns the folder id this pane belongs to, or null for bar panes.
+ * Maps legacy 'basket' group to DEFAULT_FOLDER_ID.
+ */
+export function resolvePaneFolderId(pane: SpacePane): string | null {
+  const g = pane.settings?.tabBar?.group;
+  if (g === 'basket') return DEFAULT_FOLDER_ID;
+  if (g === 'folder') return pane.settings?.tabBar?.folderId ?? DEFAULT_FOLDER_ID;
+  return null;
+}
+
+/** Splits visible panes into bar panes and a folderId → panes map. */
+export function splitPanesByFolders(visiblePanes: SpacePane[]): {
+  barPanes: SpacePane[];
+  folderMap: Map<string, SpacePane[]>;
+} {
+  const sorted = sortPanesForDisplay(visiblePanes);
+  const barPanes: SpacePane[] = [];
+  const folderMap = new Map<string, SpacePane[]>();
+
+  for (const pane of sorted) {
+    const folderId = resolvePaneFolderId(pane);
+    if (folderId === null) {
+      barPanes.push(pane);
+    } else {
+      if (!folderMap.has(folderId)) folderMap.set(folderId, []);
+      folderMap.get(folderId)!.push(pane);
+    }
+  }
+
+  return { barPanes, folderMap };
+}
+
+/**
+ * Builds a settings patch that places a pane in a folder (folderId != null)
+ * or returns it to the bar (folderId === null).
+ */
+export function buildTabFolderPatch(
+  pane: SpacePane,
+  folderId: string | null,
+): UpdateSpacePanePatch {
+  if (folderId === null) {
     const next = { ...(pane.settings ?? {}) };
     delete next.tabBar;
     const hasOther =
@@ -41,7 +93,7 @@ export function buildTabBarGroupPatch(
   return {
     settings: {
       ...(pane.settings ?? {}),
-      tabBar: { group: 'basket' },
+      tabBar: { group: 'folder' as const, folderId },
     },
   };
 }

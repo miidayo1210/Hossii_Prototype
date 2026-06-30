@@ -72,11 +72,18 @@ import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace'
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
-  buildTabBarGroupPatch,
+  buildTabFolderPatch,
   computeVisiblePaneReorderUpdates,
-  splitPanesByTabBarGroup,
+  resolvePaneFolderId,
+  splitPanesByFolders,
 } from '../../core/utils/spacePaneTabBar';
-import type { TabBarGroup } from '../../core/types/spacePaneTabBar';
+import {
+  DEFAULT_FOLDER,
+  DEFAULT_FOLDER_ID,
+  type TabFolder,
+  loadTabFolders,
+  saveTabFolders,
+} from '../../core/utils/tabFolderStorage';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { VoiceConsentModal } from '../VoiceConsentModal/VoiceConsentModal';
@@ -357,6 +364,29 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [paneReorderBusy, setPaneReorderBusy] = useState(false);
   const prevActivePaneIdRef = useRef<string | null>(null);
 
+  // ── 100C: tab folder state ────────────────────────────────────────────────
+  const [tabFolders, setTabFolders] = useState<TabFolder[]>(() =>
+    activeSpaceId ? loadTabFolders(activeSpaceId) : [],
+  );
+
+  useEffect(() => {
+    setTabFolders(activeSpaceId ? loadTabFolders(activeSpaceId) : []);
+  }, [activeSpaceId]);
+
+  const effectiveFolders = useMemo((): TabFolder[] => {
+    const { folderMap } = splitPanesByFolders(visiblePanes);
+    const hasDefaultPanes = (folderMap.get(DEFAULT_FOLDER_ID) ?? []).length > 0;
+    const hasDefaultInStored = tabFolders.some((f) => f.id === DEFAULT_FOLDER_ID);
+
+    const result: TabFolder[] = [];
+    if ((isAdmin || hasDefaultPanes) && !hasDefaultInStored) {
+      result.push(DEFAULT_FOLDER);
+    }
+    result.push(...tabFolders);
+
+    return result.sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [isAdmin, tabFolders, visiblePanes]);
+
   const handleShowPostCountBadgeToggle = useCallback(() => {
     setShowPostCountBadge((v) => {
       const next = !v;
@@ -415,15 +445,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const handlePaneReorder = useCallback(
-    async (draggedId: string, insertBeforeVisibleIndex: number, group: TabBarGroup) => {
-      const { barPanes, basketPanes } = splitPanesByTabBarGroup(visiblePanes);
-      const stripPanes = group === 'basket' ? basketPanes : barPanes;
-      const updates = computeVisiblePaneReorderUpdates(
-        panes,
-        stripPanes,
-        draggedId,
-        insertBeforeVisibleIndex,
-      );
+    async (draggedId: string, insertBeforeIndex: number, stripId: string) => {
+      const { barPanes, folderMap } = splitPanesByFolders(visiblePanes);
+      const stripPanes = stripId === 'bar' ? barPanes : (folderMap.get(stripId) ?? []);
+      const updates = computeVisiblePaneReorderUpdates(panes, stripPanes, draggedId, insertBeforeIndex);
       if (updates.length === 0) return;
 
       setPaneReorderBusy(true);
@@ -442,14 +467,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     [panes, visiblePanes, reloadPanesAndSyncActive, showPaneToast],
   );
 
-  const handleMoveTabBarGroup = useCallback(
-    async (paneId: string, group: TabBarGroup, insertBeforeBarIndex?: number) => {
+  const handleMoveToFolder = useCallback(
+    async (paneId: string, folderId: string | null, insertBeforeBarIndex?: number) => {
       const pane = panes.find((p) => p.id === paneId);
       if (!pane) return;
 
       setPaneReorderBusy(true);
       try {
-        const patch = buildTabBarGroupPatch(pane, group);
+        const patch = buildTabFolderPatch(pane, folderId);
         const updated = await updateSpacePane(paneId, patch, { allPanes: panes });
         if (!updated) {
           showPaneToast('タブの移動に失敗しました', 'error');
@@ -457,18 +482,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           return;
         }
 
-        if (group === 'bar' && insertBeforeBarIndex != null) {
+        if (folderId === null && insertBeforeBarIndex != null) {
           const nextPanes = panes.map((p) => (p.id === paneId ? updated : p));
           const nextVisible = nextPanes.filter((p) => p.isVisible);
-          const { barPanes } = splitPanesByTabBarGroup(nextVisible);
-          const updates = computeVisiblePaneReorderUpdates(
+          const { barPanes } = splitPanesByFolders(nextVisible);
+          const reorderUpdates = computeVisiblePaneReorderUpdates(
             nextPanes,
             barPanes,
             paneId,
             insertBeforeBarIndex,
           );
-          if (updates.length > 0) {
-            const ok = await applySpacePaneSortOrders(updates, { allPanes: nextPanes });
+          if (reorderUpdates.length > 0) {
+            const ok = await applySpacePaneSortOrders(reorderUpdates, { allPanes: nextPanes });
             if (!ok) {
               showPaneToast('並び替えに失敗しました', 'error');
               await reloadPanesAndSyncActive();
@@ -482,7 +507,58 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         setPaneReorderBusy(false);
       }
     },
-    [panes, visiblePanes, reloadPanesAndSyncActive, showPaneToast],
+    [panes, reloadPanesAndSyncActive, showPaneToast],
+  );
+
+  const handleAddFolder = useCallback((): string => {
+    if (!activeSpaceId) return '';
+    const id = `f${Date.now().toString(36)}`;
+    const newFolder: TabFolder = { id, name: 'フォルダ', sortOrder: tabFolders.length };
+    const next = [...tabFolders, newFolder];
+    saveTabFolders(activeSpaceId, next);
+    setTabFolders(next);
+    return id;
+  }, [activeSpaceId, tabFolders]);
+
+  const handleRenameFolder = useCallback(
+    (folderId: string, name: string) => {
+      if (!activeSpaceId) return;
+      const isDefault = folderId === DEFAULT_FOLDER_ID;
+      const existing = tabFolders.find((f) => f.id === folderId);
+      if (isDefault && !existing) {
+        const next = [{ ...DEFAULT_FOLDER, name }, ...tabFolders];
+        saveTabFolders(activeSpaceId, next);
+        setTabFolders(next);
+      } else {
+        const next = tabFolders.map((f) => (f.id === folderId ? { ...f, name } : f));
+        saveTabFolders(activeSpaceId, next);
+        setTabFolders(next);
+      }
+    },
+    [activeSpaceId, tabFolders],
+  );
+
+  const handleDeleteFolder = useCallback(
+    async (folderId: string) => {
+      if (!activeSpaceId) return;
+      // Move panes inside this folder back to bar
+      const folderPanes = panes.filter((p) => resolvePaneFolderId(p) === folderId);
+      if (folderPanes.length > 0) {
+        setPaneReorderBusy(true);
+        try {
+          for (const pane of folderPanes) {
+            await updateSpacePane(pane.id, buildTabFolderPatch(pane, null), { allPanes: panes });
+          }
+          await reloadPanesAndSyncActive();
+        } finally {
+          setPaneReorderBusy(false);
+        }
+      }
+      const next = tabFolders.filter((f) => f.id !== folderId);
+      saveTabFolders(activeSpaceId, next);
+      setTabFolders(next);
+    },
+    [activeSpaceId, panes, tabFolders, reloadPanesAndSyncActive],
   );
 
   useEffect(() => {
@@ -1946,14 +2022,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         <SpacePaneBar
           spaceId={activeSpaceId ?? ''}
           variant="mobile"
+          folders={effectiveFolders}
           visiblePanes={visiblePanes}
           activePaneId={contextActivePaneId}
           isAdmin={isAdmin}
           disabled={postSending || paneReorderBusy}
           onSelect={handlePaneSelect}
           onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
+          onAddFolder={isAdmin ? handleAddFolder : undefined}
+          onRenameFolder={isAdmin ? handleRenameFolder : undefined}
+          onDeleteFolder={isAdmin ? handleDeleteFolder : undefined}
           onReorder={isAdmin ? handlePaneReorder : undefined}
-          onMoveTabBarGroup={isAdmin ? handleMoveTabBarGroup : undefined}
+          onMoveToFolder={isAdmin ? handleMoveToFolder : undefined}
         />
       )}
 
@@ -2291,14 +2371,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             <SpacePaneBar
               spaceId={activeSpaceId ?? ''}
               variant="desktop"
+              folders={effectiveFolders}
               visiblePanes={visiblePanes}
               activePaneId={contextActivePaneId}
               isAdmin={isAdmin}
               disabled={postSending || paneReorderBusy}
               onSelect={handlePaneSelect}
               onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
+              onAddFolder={isAdmin ? handleAddFolder : undefined}
+              onRenameFolder={isAdmin ? handleRenameFolder : undefined}
+              onDeleteFolder={isAdmin ? handleDeleteFolder : undefined}
               onReorder={isAdmin ? handlePaneReorder : undefined}
-              onMoveTabBarGroup={isAdmin ? handleMoveTabBarGroup : undefined}
+              onMoveToFolder={isAdmin ? handleMoveToFolder : undefined}
             />
           )}
           <TopRightMenu onPostClick={handleTopRightPostClick} />

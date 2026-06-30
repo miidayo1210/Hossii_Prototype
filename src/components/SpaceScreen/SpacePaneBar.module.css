@@ -144,7 +144,9 @@
   box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.25);
 }
 
-.basketCluster {
+/* ── Folder cluster ─────────────────────────────────────────── */
+
+.folderCluster {
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -152,14 +154,22 @@
   min-height: 44px;
 }
 
-.basketChip {
+/* Wrapper holds chip + hover-reveal action buttons */
+.folderChipWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
+}
+
+.folderChip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   min-height: 44px;
   min-width: 44px;
-  padding: 8px 12px;
+  max-width: 130px;
+  padding: 6px 12px;
   border: 1px solid rgba(168, 85, 247, 0.22);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.95);
@@ -173,40 +183,133 @@
     box-shadow 0.15s ease;
 }
 
-.basketChip:hover:not(:disabled) {
+.folderChip:hover:not(:disabled) {
   background: rgba(168, 85, 247, 0.08);
   border-color: rgba(168, 85, 247, 0.45);
 }
 
-.basketChipOpen {
+.folderChipOpen {
   background: rgba(168, 85, 247, 0.1);
   border-color: rgba(168, 85, 247, 0.45);
   box-shadow: inset 0 -2px 0 #a855f7;
 }
 
-.basketChipDropTarget {
+.folderChipDropTarget {
   background: rgba(168, 85, 247, 0.16);
   border-color: #a855f7;
   box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
 }
 
-.basketChip:disabled {
+.folderChip:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.basketIcon {
-  font-size: 1rem;
+.folderIcon {
+  font-size: 0.9rem;
   line-height: 1;
+  flex-shrink: 0;
 }
 
-.basketCount {
+.folderName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.folderCount {
+  flex-shrink: 0;
   min-width: 1.1rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  opacity: 0.75;
 }
 
-.basketTray {
+/* Hover-reveal action buttons (✏️ × ) */
+.folderActions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(168, 85, 247, 0.18);
+  border-radius: 999px;
+  padding: 2px 4px;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+}
+
+.folderChipWrapper:hover .folderActions,
+.folderChipWrapper:focus-within .folderActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.folderActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #7c3aed;
+  transition: background 0.12s;
+}
+
+.folderActionBtn:hover {
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.folderActionDelete {
+  color: #dc2626;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.folderActionDelete:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* Inline rename input replaces folder chip */
+.folderChipEditing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1.5px solid #a855f7;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.06);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.12);
+  flex-shrink: 0;
+}
+
+.folderNameInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #7c3aed;
+  width: 80px;
+  min-width: 40px;
+  padding: 0;
+}
+
+/* Folder tray (animated slide-in, like 100B basket tray) */
+.folderTray {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -218,7 +321,7 @@
     opacity 220ms ease-out;
 }
 
-.basketTrayOpen {
+.folderTrayOpen {
   max-width: min(50vw, 320px);
   opacity: 1;
   overflow-x: auto;
@@ -229,12 +332,43 @@
   padding-right: 2px;
 }
 
-.basketTrayOpen::-webkit-scrollbar {
+.folderTrayOpen::-webkit-scrollbar {
   display: none;
 }
 
+/* Add folder button */
+.addFolderButton {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px dashed rgba(168, 85, 247, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #9333ea;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.addFolderButton:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: #a855f7;
+}
+
+.addFolderButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .basketTray {
+  .folderTray {
     transition: none;
   }
 }
+
+/* ── Legacy basket aliases (kept for any remaining references) ── */
+.basketCluster { display: flex; align-items: center; flex-shrink: 0; gap: 2px; min-height: 44px; }
+.basketChip { display: none; }
+.basketTray { display: none; }

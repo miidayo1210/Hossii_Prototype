@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import type { SpacePane } from '../../core/types/spacePane';
-import type { TabBarGroup } from '../../core/types/spacePaneTabBar';
+import type { TabFolder } from '../../core/utils/tabFolderStorage';
 import {
   canMovePaneToBasket,
   isPointInRect,
+  resolvePaneFolderId,
   resolveInsertBeforeVisibleIndex,
-  resolveTabBarGroup,
-  splitPanesByTabBarGroup,
+  splitPanesByFolders,
 } from '../../core/utils/spacePaneTabBar';
-import { loadTabBasketOpen, saveTabBasketOpen } from '../../core/utils/tabBasketOpenStorage';
+import { loadTabFolderOpen, saveTabFolderOpen } from '../../core/utils/tabFolderStorage';
 import styles from './SpacePaneBar.module.css';
 
 const DRAG_THRESHOLD_PX = 6;
@@ -16,11 +23,13 @@ const LONG_PRESS_MS = 300;
 
 type DropTarget =
   | { zone: 'bar'; insertBeforeIndex: number }
-  | { zone: 'basket-chip' }
-  | { zone: 'basket-tabs'; insertBeforeIndex: number };
+  | { zone: 'folder-chip'; folderId: string }
+  | { zone: 'folder-tabs'; folderId: string; insertBeforeIndex: number };
 
 type Props = {
   spaceId: string;
+  /** Ordered list of folders to display (including default folder when applicable). */
+  folders: TabFolder[];
   visiblePanes: SpacePane[];
   activePaneId: string | null;
   isAdmin: boolean;
@@ -28,23 +37,160 @@ type Props = {
   variant: 'desktop' | 'mobile';
   onSelect: (paneId: string) => void;
   onAddPane?: () => void;
-  onReorder?: (draggedId: string, insertBeforeIndex: number, group: TabBarGroup) => void;
-  onMoveTabBarGroup?: (
-    paneId: string,
-    group: TabBarGroup,
-    insertBeforeBarIndex?: number,
-  ) => void;
+  /** Create a new folder; returns the new folder id for immediate inline rename. */
+  onAddFolder?: () => string;
+  onRenameFolder?: (folderId: string, name: string) => void;
+  onDeleteFolder?: (folderId: string) => void;
+  /** Reorder within the same strip ('bar' or a folderId). */
+  onReorder?: (draggedId: string, insertBeforeIndex: number, stripId: string) => void;
+  /** Move a pane to a folder (folderId) or back to bar (null). */
+  onMoveToFolder?: (paneId: string, folderId: string | null, insertBeforeBarIndex?: number) => void;
 };
 
 type DragState = {
   paneId: string;
-  sourceGroup: TabBarGroup;
+  sourceFolderId: string | null;
   pointerId: number;
   startX: number;
   startY: number;
   armed: boolean;
   dragging: boolean;
 };
+
+// ─── FolderChip sub-component ────────────────────────────────────────────────
+
+function FolderChip({
+  folder,
+  count,
+  isOpen,
+  isDropTarget,
+  isEditing,
+  disabled,
+  isAdmin,
+  chipRef,
+  onToggle,
+  onRenameStart,
+  onRenameEnd,
+  onDelete,
+}: {
+  folder: TabFolder;
+  count: number;
+  isOpen: boolean;
+  isDropTarget: boolean;
+  isEditing: boolean;
+  disabled: boolean;
+  isAdmin: boolean;
+  chipRef: (el: HTMLButtonElement | null) => void;
+  onToggle: () => void;
+  onRenameStart: () => void;
+  onRenameEnd: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const [editValue, setEditValue] = useState(folder.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      setEditValue(folder.name);
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
+    }
+  }, [isEditing, folder.name]);
+
+  const commit = useCallback(() => {
+    const trimmed = editValue.trim();
+    onRenameEnd(trimmed || folder.name);
+  }, [editValue, folder.name, onRenameEnd]);
+
+  if (isEditing) {
+    return (
+      <div className={styles.folderChipEditing}>
+        <span className={styles.folderIcon} aria-hidden>
+          📁
+        </span>
+        <input
+          ref={inputRef}
+          className={styles.folderNameInput}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === 'Escape') {
+              onRenameEnd(folder.name);
+            }
+          }}
+          maxLength={20}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.folderChipWrapper}>
+      <button
+        ref={chipRef}
+        type="button"
+        className={`${styles.folderChip} ${isOpen ? styles.folderChipOpen : ''} ${
+          isDropTarget ? styles.folderChipDropTarget : ''
+        }`}
+        aria-expanded={isOpen}
+        aria-label={`フォルダ「${folder.name}」${count > 0 ? `（${count}件）` : ''}`}
+        disabled={disabled}
+        onClick={onToggle}
+      >
+        <span className={styles.folderIcon} aria-hidden>
+          📁
+        </span>
+        <span className={styles.folderName}>{folder.name}</span>
+        {count > 0 && <span className={styles.folderCount}>{count}</span>}
+      </button>
+      {isAdmin && (
+        <div className={styles.folderActions}>
+          <button
+            type="button"
+            className={styles.folderActionBtn}
+            aria-label={`「${folder.name}」の名前を変更`}
+            tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRenameStart();
+            }}
+          >
+            ✏️
+          </button>
+          <button
+            type="button"
+            className={`${styles.folderActionBtn} ${styles.folderActionDelete}`}
+            aria-label={`「${folder.name}」を削除`}
+            tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TabButton sub-component ─────────────────────────────────────────────────
 
 function TabButton({
   pane,
@@ -96,8 +242,11 @@ function TabButton({
   );
 }
 
+// ─── SpacePaneBar ─────────────────────────────────────────────────────────────
+
 export function SpacePaneBar({
   spaceId,
+  folders,
   visiblePanes,
   activePaneId,
   isAdmin,
@@ -105,36 +254,56 @@ export function SpacePaneBar({
   variant,
   onSelect,
   onAddPane,
+  onAddFolder,
+  onRenameFolder,
+  onDeleteFolder,
   onReorder,
-  onMoveTabBarGroup,
+  onMoveToFolder,
 }: Props) {
-  const { barPanes, basketPanes } = useMemo(
-    () => splitPanesByTabBarGroup(visiblePanes),
+  const { barPanes, folderMap } = useMemo(
+    () => splitPanesByFolders(visiblePanes),
     [visiblePanes],
   );
 
-  const showBasket = isAdmin || basketPanes.length > 0;
-  const canManageTabs = isAdmin && !disabled && (!!onReorder || !!onMoveTabBarGroup);
+  const canManageTabs = isAdmin && !disabled && (!!onReorder || !!onMoveToFolder);
 
+  // refs
   const barTabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const basketTabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const basketChipRef = useRef<HTMLButtonElement>(null);
+  const folderTabRefs = useRef<Map<string, HTMLButtonElement>>(new Map()); // paneId → el (flat)
+  const folderChipRefs = useRef<Map<string, HTMLButtonElement>>(new Map()); // folderId → el
   const dragRef = useRef<DragState | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClickRef = useRef(false);
 
-  const [basketOpen, setBasketOpen] = useState(() => loadTabBasketOpen(spaceId));
+  // open/close state per folder
+  const [openFolderIds, setOpenFolderIds] = useState<Set<string>>(() => {
+    const s = new Set<string>();
+    for (const f of folders) {
+      if (loadTabFolderOpen(spaceId, f.id)) s.add(f.id);
+    }
+    return s;
+  });
+
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
 
   const barClass =
     variant === 'desktop'
       ? `${styles.spacePaneBar} ${styles.spacePaneBarDesktop}`
       : `${styles.spacePaneBar} ${styles.spacePaneBarMobile}`;
 
+  // Sync open state when space changes
   useEffect(() => {
-    setBasketOpen(loadTabBasketOpen(spaceId));
-  }, [spaceId]);
+    const s = new Set<string>();
+    for (const f of folders) {
+      if (loadTabFolderOpen(spaceId, f.id)) s.add(f.id);
+    }
+    setOpenFolderIds(s);
+    setEditingFolderId(null);
+  }, [spaceId, folders]);
+
+  // ── drag helpers ────────────────────────────────────────────────────────────
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -150,39 +319,35 @@ export function SpacePaneBar({
     setDraggingPaneId(null);
   }, [clearLongPressTimer]);
 
-  const getBarTabRects = useCallback((): Map<string, DOMRect> => {
-    const rects = new Map<string, DOMRect>();
-    for (const pane of barPanes) {
-      const el = barTabRefs.current.get(pane.id);
-      if (el) rects.set(pane.id, el.getBoundingClientRect());
-    }
-    return rects;
-  }, [barPanes]);
-
-  const getBasketTabRects = useCallback((): Map<string, DOMRect> => {
-    const rects = new Map<string, DOMRect>();
-    for (const pane of basketPanes) {
-      const el = basketTabRefs.current.get(pane.id);
-      if (el) rects.set(pane.id, el.getBoundingClientRect());
-    }
-    return rects;
-  }, [basketPanes]);
+  const getTabRects = useCallback(
+    (panes: SpacePane[], refMap: Map<string, HTMLButtonElement>): Map<string, DOMRect> => {
+      const rects = new Map<string, DOMRect>();
+      for (const pane of panes) {
+        const el = refMap.get(pane.id);
+        if (el) rects.set(pane.id, el.getBoundingClientRect());
+      }
+      return rects;
+    },
+    [],
+  );
 
   const resolveDropTarget = useCallback(
-    (clientX: number, clientY: number, draggedPaneId: string): DropTarget | null => {
-      const draggedPane = visiblePanes.find((p) => p.id === draggedPaneId);
+    (clientX: number, clientY: number, paneId: string): DropTarget | null => {
+      const draggedPane = visiblePanes.find((p) => p.id === paneId);
       if (!draggedPane) return null;
-      const sourceGroup = resolveTabBarGroup(draggedPane);
 
-      if (basketOpen) {
-        for (const pane of basketPanes) {
-          const rect = basketTabRefs.current.get(pane.id)?.getBoundingClientRect();
+      // Check open folder trays first
+      for (const [folderId, panes] of folderMap) {
+        if (!openFolderIds.has(folderId)) continue;
+        for (const pane of panes) {
+          const rect = folderTabRefs.current.get(pane.id)?.getBoundingClientRect();
           if (rect && isPointInRect(clientX, clientY, rect)) {
             return {
-              zone: 'basket-tabs',
+              zone: 'folder-tabs',
+              folderId,
               insertBeforeIndex: resolveInsertBeforeVisibleIndex(
-                basketPanes,
-                getBasketTabRects(),
+                panes,
+                getTabRects(panes, folderTabRefs.current),
                 clientX,
               ),
             };
@@ -190,17 +355,20 @@ export function SpacePaneBar({
         }
       }
 
-      const chipRect = basketChipRef.current?.getBoundingClientRect();
-      if (
-        showBasket &&
-        chipRect &&
-        isPointInRect(clientX, clientY, chipRect) &&
-        sourceGroup === 'bar' &&
-        canMovePaneToBasket(draggedPane)
-      ) {
-        return { zone: 'basket-chip' };
+      // Check folder chips
+      const sourceFolderId = resolvePaneFolderId(draggedPane);
+      for (const folder of folders) {
+        const chipRect = folderChipRefs.current.get(folder.id)?.getBoundingClientRect();
+        if (
+          chipRect &&
+          isPointInRect(clientX, clientY, chipRect) &&
+          canMovePaneToBasket(draggedPane)
+        ) {
+          return { zone: 'folder-chip', folderId: folder.id };
+        }
       }
 
+      // Check bar tabs
       for (const pane of barPanes) {
         const rect = barTabRefs.current.get(pane.id)?.getBoundingClientRect();
         if (rect && isPointInRect(clientX, clientY, rect)) {
@@ -208,46 +376,41 @@ export function SpacePaneBar({
             zone: 'bar',
             insertBeforeIndex: resolveInsertBeforeVisibleIndex(
               barPanes,
-              getBarTabRects(),
+              getTabRects(barPanes, barTabRefs.current),
               clientX,
             ),
           };
         }
       }
 
-      if (sourceGroup === 'basket') {
-        const scrollRect = basketChipRef.current?.parentElement?.getBoundingClientRect();
-        if (scrollRect && clientX > (chipRect?.right ?? scrollRect.left)) {
-          return { zone: 'bar', insertBeforeIndex: barPanes.length };
-        }
+      // Folder tab dropped past the bar → move to bar at end
+      if (sourceFolderId !== null) {
+        return { zone: 'bar', insertBeforeIndex: barPanes.length };
       }
 
       return null;
     },
-    [
-      barPanes,
-      basketOpen,
-      basketPanes,
-      getBarTabRects,
-      getBasketTabRects,
-      showBasket,
-      visiblePanes,
-    ],
+    [barPanes, folderMap, folders, getTabRects, openFolderIds, visiblePanes],
   );
 
   const commitDrop = useCallback(
     (drag: DragState, target: DropTarget) => {
-      const { paneId, sourceGroup } = drag;
+      const { paneId, sourceFolderId } = drag;
 
-      if (target.zone === 'basket-chip') {
-        onMoveTabBarGroup?.(paneId, 'basket');
-      } else if (target.zone === 'basket-tabs') {
-        if (sourceGroup === 'basket') {
-          onReorder?.(paneId, target.insertBeforeIndex, 'basket');
+      if (target.zone === 'folder-chip') {
+        if (sourceFolderId !== target.folderId) {
+          onMoveToFolder?.(paneId, target.folderId);
+        }
+      } else if (target.zone === 'folder-tabs') {
+        if (sourceFolderId === target.folderId) {
+          onReorder?.(paneId, target.insertBeforeIndex, target.folderId);
+        } else {
+          // Cross-folder or bar→folder move
+          onMoveToFolder?.(paneId, target.folderId);
         }
       } else if (target.zone === 'bar') {
-        if (sourceGroup === 'basket') {
-          onMoveTabBarGroup?.(paneId, 'bar', target.insertBeforeIndex);
+        if (sourceFolderId !== null) {
+          onMoveToFolder?.(paneId, null, target.insertBeforeIndex);
         } else {
           onReorder?.(paneId, target.insertBeforeIndex, 'bar');
         }
@@ -258,17 +421,16 @@ export function SpacePaneBar({
         suppressClickRef.current = false;
       }, 0);
     },
-    [onMoveTabBarGroup, onReorder],
+    [onMoveToFolder, onReorder],
   );
 
   const canDragPane = useCallback(
-    (pane: SpacePane) => {
+    (_pane: SpacePane): boolean => {
       if (!canManageTabs) return false;
-      const group = resolveTabBarGroup(pane);
-      if (group === 'bar') return barPanes.length > 1 || basketPanes.length > 0;
-      return basketPanes.length > 1 || barPanes.length > 0;
+      const totalPanes = barPanes.length + [...folderMap.values()].reduce((s, a) => s + a.length, 0);
+      return totalPanes > 1;
     },
-    [barPanes.length, basketPanes.length, canManageTabs],
+    [barPanes.length, canManageTabs, folderMap],
   );
 
   const handlePointerDown = useCallback(
@@ -278,7 +440,7 @@ export function SpacePaneBar({
       clearLongPressTimer();
       dragRef.current = {
         paneId: pane.id,
-        sourceGroup: resolveTabBarGroup(pane),
+        sourceFolderId: resolvePaneFolderId(pane),
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
@@ -304,9 +466,9 @@ export function SpacePaneBar({
       const drag = dragRef.current;
       if (!drag || drag.paneId !== pane.id || drag.pointerId !== event.pointerId) return;
 
-      const deltaX = Math.abs(event.clientX - drag.startX);
-      const deltaY = Math.abs(event.clientY - drag.startY);
-      if (!drag.armed && (deltaX >= DRAG_THRESHOLD_PX || deltaY >= DRAG_THRESHOLD_PX)) {
+      const dx = Math.abs(event.clientX - drag.startX);
+      const dy = Math.abs(event.clientY - drag.startY);
+      if (!drag.armed && (dx >= DRAG_THRESHOLD_PX || dy >= DRAG_THRESHOLD_PX)) {
         drag.armed = true;
         clearLongPressTimer();
       }
@@ -335,8 +497,7 @@ export function SpacePaneBar({
       }
 
       if (drag.dragging) {
-        const target =
-          dropTarget ?? resolveDropTarget(event.clientX, event.clientY, pane.id);
+        const target = dropTarget ?? resolveDropTarget(event.clientX, event.clientY, pane.id);
         if (target) commitDrop(drag, target);
       }
 
@@ -351,9 +512,7 @@ export function SpacePaneBar({
     [clearLongPressTimer, commitDrop, dropTarget, resetDrag, resolveDropTarget],
   );
 
-  const handlePointerCancel = useCallback(() => {
-    resetDrag();
-  }, [resetDrag]);
+  const handlePointerCancel = useCallback(() => resetDrag(), [resetDrag]);
 
   useEffect(() => resetDrag, [visiblePanes, resetDrag]);
 
@@ -365,24 +524,77 @@ export function SpacePaneBar({
     [onSelect],
   );
 
-  const toggleBasket = useCallback(() => {
-    setBasketOpen((open) => {
-      const next = !open;
-      saveTabBasketOpen(spaceId, next);
-      return next;
-    });
-  }, [spaceId]);
+  // ── folder open/close ───────────────────────────────────────────────────────
 
-  const handleBasketChipClick = useCallback(() => {
-    if (suppressClickRef.current) return;
-    toggleBasket();
-  }, [toggleBasket]);
+  const toggleFolder = useCallback(
+    (folderId: string) => {
+      setOpenFolderIds((prev) => {
+        const next = new Set(prev);
+        const open = !prev.has(folderId);
+        if (open) next.add(folderId);
+        else next.delete(folderId);
+        saveTabFolderOpen(spaceId, folderId, open);
+        return next;
+      });
+    },
+    [spaceId],
+  );
+
+  // ── folder management ───────────────────────────────────────────────────────
+
+  const handleAddFolderClick = useCallback(() => {
+    const newId = onAddFolder?.();
+    if (newId) {
+      // Auto-open and start editing the new folder
+      setOpenFolderIds((prev) => new Set([...prev, newId]));
+      setEditingFolderId(newId);
+    }
+  }, [onAddFolder]);
+
+  const handleRenameEnd = useCallback(
+    (folderId: string, name: string) => {
+      setEditingFolderId(null);
+      onRenameFolder?.(folderId, name);
+    },
+    [onRenameFolder],
+  );
+
+  const handleDeleteFolder = useCallback(
+    (folder: TabFolder) => {
+      const paneCount = (folderMap.get(folder.id) ?? []).length;
+      const confirmed =
+        paneCount === 0 ||
+        window.confirm(
+          `「${folder.name}」を削除しますか？\n中のタブ（${paneCount}件）はバーに戻ります。`,
+        );
+      if (confirmed) onDeleteFolder?.(folder.id);
+    },
+    [folderMap, onDeleteFolder],
+  );
+
+  // ── render helpers ──────────────────────────────────────────────────────────
 
   const renderDropIndicator = (show: boolean) =>
     show ? <span className={styles.dropIndicator} aria-hidden /> : null;
 
-  const basketDropActive = dropTarget?.zone === 'basket-chip';
-  const basketTrayOpen = basketOpen && (basketPanes.length > 0 || draggingPaneId != null);
+  const makeTabProps = (pane: SpacePane, refMap: Map<string, HTMLButtonElement>) => ({
+    pane,
+    isActive: pane.id === activePaneId,
+    isDragging: pane.id === draggingPaneId,
+    canDrag: canDragPane(pane),
+    disabled,
+    onSelect: () => handleTabClick(pane.id),
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => handlePointerDown(pane, e),
+    onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => handlePointerMove(pane, e),
+    onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => handlePointerUp(pane, e),
+    onPointerCancel: handlePointerCancel,
+    setTabRef: (el: HTMLButtonElement | null) => {
+      if (el) refMap.set(pane.id, el);
+      else refMap.delete(pane.id);
+    },
+  });
+
+  // ── render ──────────────────────────────────────────────────────────────────
 
   return (
     <nav
@@ -394,31 +606,14 @@ export function SpacePaneBar({
         className={`${styles.scroll} ${draggingPaneId ? styles.scrollDragging : ''}`}
         role="tablist"
       >
+        {/* Bar tabs */}
         {barPanes.map((pane, index) => {
-          const isActive = pane.id === activePaneId;
-          const isDragging = pane.id === draggingPaneId;
           const showIndicatorBefore =
             dropTarget?.zone === 'bar' && dropTarget.insertBeforeIndex === index;
-
           return (
             <div key={pane.id} className={styles.tabSlot}>
               {renderDropIndicator(showIndicatorBefore)}
-              <TabButton
-                pane={pane}
-                isActive={isActive}
-                isDragging={isDragging}
-                canDrag={canDragPane(pane)}
-                disabled={disabled}
-                onSelect={() => handleTabClick(pane.id)}
-                onPointerDown={(e) => handlePointerDown(pane, e)}
-                onPointerMove={(e) => handlePointerMove(pane, e)}
-                onPointerUp={(e) => handlePointerUp(pane, e)}
-                onPointerCancel={handlePointerCancel}
-                setTabRef={(el) => {
-                  if (el) barTabRefs.current.set(pane.id, el);
-                  else barTabRefs.current.delete(pane.id);
-                }}
-              />
+              <TabButton {...makeTabProps(pane, barTabRefs.current)} />
             </div>
           );
         })}
@@ -427,71 +622,74 @@ export function SpacePaneBar({
           draggingPaneId != null &&
           renderDropIndicator(true)}
 
-        {showBasket && (
-          <>
-            <div className={styles.basketCluster}>
-              <button
-                ref={basketChipRef}
-                type="button"
-                className={`${styles.basketChip} ${basketOpen ? styles.basketChipOpen : ''} ${
-                  basketDropActive ? styles.basketChipDropTarget : ''
-                }`}
-                aria-label={`タブカゴ${basketPanes.length > 0 ? `（${basketPanes.length}件）` : ''}`}
-                aria-expanded={basketOpen}
+        {/* Folder clusters */}
+        {folders.map((folder) => {
+          const folderPanes = folderMap.get(folder.id) ?? [];
+          const isOpen = openFolderIds.has(folder.id);
+          const isDropTarget = dropTarget?.zone === 'folder-chip' && dropTarget.folderId === folder.id;
+          const trayVisible = isOpen && (folderPanes.length > 0 || draggingPaneId != null);
+
+          return (
+            <div key={folder.id} className={styles.folderCluster}>
+              <FolderChip
+                folder={folder}
+                count={folderPanes.length}
+                isOpen={isOpen}
+                isDropTarget={isDropTarget}
+                isEditing={editingFolderId === folder.id}
                 disabled={disabled}
-                onClick={handleBasketChipClick}
-              >
-                <span className={styles.basketIcon} aria-hidden>
-                  🧺
-                </span>
-                {basketPanes.length > 0 && (
-                  <span className={styles.basketCount}>{basketPanes.length}</span>
-                )}
-              </button>
+                isAdmin={isAdmin}
+                chipRef={(el) => {
+                  if (el) folderChipRefs.current.set(folder.id, el);
+                  else folderChipRefs.current.delete(folder.id);
+                }}
+                onToggle={() => toggleFolder(folder.id)}
+                onRenameStart={() => setEditingFolderId(folder.id)}
+                onRenameEnd={(name) => handleRenameEnd(folder.id, name)}
+                onDelete={() => handleDeleteFolder(folder)}
+              />
 
               <div
-                className={`${styles.basketTray} ${basketTrayOpen ? styles.basketTrayOpen : ''}`}
-                aria-hidden={!basketTrayOpen}
+                className={`${styles.folderTray} ${trayVisible ? styles.folderTrayOpen : ''}`}
+                aria-hidden={!trayVisible}
               >
-                {basketOpen &&
-                  basketPanes.map((pane, index) => {
-                    const isActive = pane.id === activePaneId;
-                    const isDragging = pane.id === draggingPaneId;
+                {isOpen &&
+                  folderPanes.map((pane, index) => {
                     const showIndicatorBefore =
-                      dropTarget?.zone === 'basket-tabs' &&
+                      dropTarget?.zone === 'folder-tabs' &&
+                      dropTarget.folderId === folder.id &&
                       dropTarget.insertBeforeIndex === index;
-
                     return (
                       <div key={pane.id} className={styles.tabSlot}>
                         {renderDropIndicator(showIndicatorBefore)}
-                        <TabButton
-                          pane={pane}
-                          isActive={isActive}
-                          isDragging={isDragging}
-                          canDrag={canDragPane(pane)}
-                          disabled={disabled}
-                          onSelect={() => handleTabClick(pane.id)}
-                          onPointerDown={(e) => handlePointerDown(pane, e)}
-                          onPointerMove={(e) => handlePointerMove(pane, e)}
-                          onPointerUp={(e) => handlePointerUp(pane, e)}
-                          onPointerCancel={handlePointerCancel}
-                          setTabRef={(el) => {
-                            if (el) basketTabRefs.current.set(pane.id, el);
-                            else basketTabRefs.current.delete(pane.id);
-                          }}
-                        />
+                        <TabButton {...makeTabProps(pane, folderTabRefs.current)} />
                       </div>
                     );
                   })}
-                {dropTarget?.zone === 'basket-tabs' &&
-                  dropTarget.insertBeforeIndex === basketPanes.length &&
+                {dropTarget?.zone === 'folder-tabs' &&
+                  dropTarget.folderId === folder.id &&
+                  dropTarget.insertBeforeIndex === folderPanes.length &&
                   draggingPaneId != null &&
                   renderDropIndicator(true)}
               </div>
             </div>
-          </>
+          );
+        })}
+
+        {/* Add folder button (admin only) */}
+        {isAdmin && onAddFolder && (
+          <button
+            type="button"
+            className={styles.addFolderButton}
+            aria-label="フォルダを追加"
+            disabled={disabled}
+            onClick={handleAddFolderClick}
+          >
+            📁＋
+          </button>
         )}
 
+        {/* Add pane button (admin only) */}
         {isAdmin && onAddPane && (
           <button
             type="button"
