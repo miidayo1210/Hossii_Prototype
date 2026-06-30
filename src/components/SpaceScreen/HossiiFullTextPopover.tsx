@@ -1,60 +1,65 @@
 import { createPortal } from 'react-dom';
+import type { CSSProperties } from 'react';
 import type { Hossii } from '../../core/types';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getHossiiBubbleFullText } from '../../core/utils/bubbleTextTruncation';
-import { PinButton } from './PinButton';
-import styles from './StarHoverPreview.module.css';
+import styles from './HossiiFullTextPopover.module.css';
+
+export type FullTextPopoverVariant = 'bubble' | 'star';
 
 type Props = {
   hossii: Hossii;
   anchorRect: DOMRect;
-  isPinned?: boolean;
-  onPinToggle?: (id: string) => void;
-  showPinUi?: boolean;
+  variant?: FullTextPopoverVariant;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
 };
 
-const GAP = 12;
-const MAX_W = 380;
+const WIDTH: Record<FullTextPopoverVariant, number> = {
+  bubble: 360,
+  star: 380,
+};
 
-export function StarHoverPreview({
+const GAP = 12;
+
+function clampHorizontal(left: number, width: number): number {
+  return Math.max(8, Math.min(left, window.innerWidth - width - 8));
+}
+
+export function HossiiFullTextPopover({
   hossii,
   anchorRect,
-  isPinned = false,
-  onPinToggle,
-  showPinUi = false,
+  variant = 'bubble',
   onMouseEnter,
   onMouseLeave,
 }: Props) {
+  const width = Math.min(
+    WIDTH[variant],
+    variant === 'bubble' ? window.innerWidth * 0.32 : window.innerWidth * 0.34,
+  );
   const centerX = anchorRect.left + anchorRect.width / 2;
-  const width = Math.min(MAX_W, window.innerWidth * 0.34);
-  let left = centerX - width / 2;
-  left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+  const left = clampHorizontal(centerX - width / 2, width);
 
-  const bottom = window.innerHeight - anchorRect.top + GAP;
+  const spaceAbove = anchorRect.top;
+  const spaceBelow = window.innerHeight - anchorRect.bottom;
+  const preferAbove = spaceAbove >= spaceBelow;
+  const style: CSSProperties = preferAbove
+    ? { left, width, bottom: window.innerHeight - anchorRect.top + GAP }
+    : { left, width, top: anchorRect.bottom + GAP };
 
-  const message = getHossiiBubbleFullText(hossii) || null;
+  const message = getHossiiBubbleFullText(hossii);
   const author = hossii.authorName?.trim() || '—';
   const emotionEmoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : null;
 
   return createPortal(
     <div
-      className={styles.card}
-      style={{ left, bottom, width }}
+      className={`${styles.card} ${preferAbove ? styles.cardAbove : styles.cardBelow}`}
+      style={style}
       role="tooltip"
       aria-label="投稿全文"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      {showPinUi && onPinToggle && (
-        <PinButton
-          className={styles.pinButton}
-          isPinned={isPinned}
-          visible
-          onToggle={() => onPinToggle(hossii.id)}
-        />
-      )}
       {hossii.imageUrl && (
         <img src={hossii.imageUrl} alt="" className={styles.thumb} />
       )}

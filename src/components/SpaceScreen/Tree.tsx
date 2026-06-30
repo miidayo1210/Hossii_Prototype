@@ -1,12 +1,19 @@
 import { useRef, useEffect, useLayoutEffect, useState, memo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { Hossii } from '../../core/types';
-import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
+import { EMOJI_BY_EMOTION } from '../../core/utils/render';
 import type { ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { AnimationLevel } from '../../core/utils/animationLevel';
 import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
 import { PinButton } from './PinButton';
+import { HossiiFullTextPopover } from './HossiiFullTextPopover';
 import { BUBBLE_INLINE_EDIT_COLORS } from '../../core/utils/bubbleColorPalettes';
+import {
+  getHossiiBubbleFullText,
+  isHossiiTextTruncated,
+  MAX_BUBBLE_TEXT_LENGTH,
+  truncateBubbleDisplayText,
+} from '../../core/utils/bubbleTextTruncation';
 import { withBubbleAlpha, BUBBLE_BG_ALPHA, BUBBLE_BG_ALPHA_HOVER } from '../../core/utils/bubbleColorAlpha';
 import styles from './SpaceScreen.module.css';
 
@@ -24,12 +31,6 @@ function getRelativeTime(date: Date): string {
   if (diffHour < 24) return `${diffHour}時間前`;
 
   return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
-}
-
-const MAX_BUBBLE_TEXT_LENGTH = 120;
-function truncateText(text: string): string {
-  if (text.length <= MAX_BUBBLE_TEXT_LENGTH) return text;
-  return text.slice(0, MAX_BUBBLE_TEXT_LENGTH) + '…';
 }
 
 // BubbleEditMode は外部で参照されないが後方互換のため残す
@@ -127,6 +128,12 @@ export function BubbleInner({
   const [isBouncing, setIsBouncing] = useState(false);
   // 案A: 吹き出しホバー中フラグ（0件時はホバーでのみいいねバッジを表示）
   const [isBubbleHovered, setIsBubbleHovered] = useState(false);
+  /** リサイズ Phase A: 切り詰め解除して全文を吹き出し内に表示 */
+  const [contentExpanded, setContentExpanded] = useState(false);
+  const [showFullTextPopover, setShowFullTextPopover] = useState(false);
+  const [fullTextAnchorRect, setFullTextAnchorRect] = useState<DOMRect | null>(null);
+  const bubbleTextRef = useRef<HTMLParagraphElement>(null);
+  const fullTextLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   type LikeParticle = { id: string; emoji: string; tx: number };
   const [likeParticles, setLikeParticles] = useState<LikeParticle[]>([]);
@@ -220,6 +227,19 @@ export function BubbleInner({
         startScale: hossiiRef.current.scale ?? 1.0,
         moved: false,
       };
+
+      if (isResizeHandle) {
+        const full = getHossiiBubbleFullText(hossiiRef.current);
+        const displayed = truncateBubbleDisplayText(full, MAX_BUBBLE_TEXT_LENGTH);
+        const truncated = isHossiiTextTruncated(
+          full,
+          displayed,
+          bubbleTextRef.current,
+        );
+        if (truncated) {
+          setContentExpanded(true);
+        }
+      }
     };
 
     el.addEventListener('pointerdown', onPointerDown);
@@ -287,6 +307,7 @@ export function BubbleInner({
       setDragPos(null);
       setDragScale(null);
       setIsDragging(false);
+      setContentExpanded(false);
     };
 
     document.addEventListener('pointermove', onPointerMove);
@@ -297,9 +318,42 @@ export function BubbleInner({
     };
   }, [hossii.id]);
 
-  const displayText = renderHossiiText(hossii);
+  const fullText = getHossiiBubbleFullText(hossii);
   const isLaughter = hossii.autoType === 'laughter';
   const isCanvasPost = hossii.postKind === 'canvas' && !!hossii.imageUrl;
+
+  const bubbleText = isLaughter
+    ? ''
+    : contentExpanded
+      ? fullText
+      : truncateBubbleDisplayText(fullText, MAX_BUBBLE_TEXT_LENGTH);
+
+  const scheduleHideFullText = useCallback(() => {
+    if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    fullTextLeaveTimerRef.current = setTimeout(() => {
+      setShowFullTextPopover(false);
+      setFullTextAnchorRect(null);
+    }, 100);
+  }, []);
+
+  const showFullTextIfTruncated = useCallback(() => {
+    if (!containerRef.current || !fullText || contentExpanded) return;
+    const truncated = isHossiiTextTruncated(
+      fullText,
+      bubbleText,
+      bubbleTextRef.current,
+    );
+    if (!truncated) return;
+    if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    setFullTextAnchorRect(containerRef.current.getBoundingClientRect());
+    setShowFullTextPopover(true);
+  }, [fullText, bubbleText, contentExpanded]);
+
+  useEffect(() => {
+    return () => {
+      if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    };
+  }, []);
 
   const emoji = isLaughter
     ? '😂'
@@ -308,13 +362,6 @@ export function BubbleInner({
       : hossii.emotion
         ? EMOJI_BY_EMOTION[hossii.emotion]
         : '🌟';
-
-  // bubbleEmoji スパンが絵文字を表示するため、bubbleText は emoji を含まない message のみ使用
-  const bubbleText = isLaughter
-    ? ''
-    : hossii.logType === 'speech' || hossii.autoType === 'speech'
-      ? truncateText(displayText)
-      : truncateText((hossii.message ?? '').trim());
 
   const relativeTime = getRelativeTime(hossii.createdAt);
   const authorName = hossii.authorName;
@@ -435,6 +482,12 @@ export function BubbleInner({
           isCanvasPost ? styles.bubbleInnerCanvas : '',
           !isCanvasPost ? styles.bubbleInnerV2 : '',
         ].filter(Boolean).join(' ')}
+        onMouseEnter={() => {
+          showFullTextIfTruncated();
+        }}
+        onMouseLeave={() => {
+          scheduleHideFullText();
+        }}
       >
         {isCanvasPost ? (
           viewMode === 'image' ? (
@@ -525,7 +578,17 @@ export function BubbleInner({
             </div>
             {/* コメント本文 */}
             {bubbleText && (
-              <p className={`${styles.bubbleText} ${viewMode === 'bubble' ? styles.bubbleTextClamp2 : styles.bubbleTextClamp3}`}>
+              <p
+                ref={bubbleTextRef}
+                className={[
+                  styles.bubbleText,
+                  contentExpanded
+                    ? styles.bubbleTextExpanded
+                    : viewMode === 'bubble'
+                      ? styles.bubbleTextClamp2
+                      : styles.bubbleTextClamp3,
+                ].filter(Boolean).join(' ')}
+              >
                 {bubbleText}
               </p>
             )}
@@ -666,6 +729,18 @@ export function BubbleInner({
         >✕</button>
       </div>,
       document.body
+    )}
+
+    {showFullTextPopover && fullTextAnchorRect && (
+      <HossiiFullTextPopover
+        hossii={hossii}
+        anchorRect={fullTextAnchorRect}
+        variant="bubble"
+        onMouseEnter={() => {
+          if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+        }}
+        onMouseLeave={scheduleHideFullText}
+      />
     )}
     </>
   );

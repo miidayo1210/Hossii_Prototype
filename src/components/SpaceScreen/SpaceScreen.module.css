@@ -1016,6 +1016,13 @@
   -webkit-line-clamp: 3;
 }
 
+.bubbleTextExpanded {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  display: block;
+  max-width: min(420px, 90vw);
+}
+
 /* v2: フッターメタ行（日時 + タグ） */
 .bubbleFooterMeta {
   display: flex;

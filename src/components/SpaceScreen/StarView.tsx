@@ -1,10 +1,16 @@
-import { memo, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Hossii } from '../../core/types';
 import type { AnimationLevel } from '../../core/utils/animationLevel';
 import type { StarMarkerType } from '../../core/types/settings';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
+import {
+  getHossiiBubbleFullText,
+  isHossiiTextTruncated,
+  truncateStarPreviewText,
+} from '../../core/utils/bubbleTextTruncation';
 import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
+import { HossiiFullTextPopover } from './HossiiFullTextPopover';
 import { PinButton } from './PinButton';
 import styles from './StarView.module.css';
 
@@ -26,8 +32,6 @@ type Props = {
   onPinToggle?: (id: string) => void;
   showPinUi?: boolean;
 };
-
-const MAX_PREVIEW_TEXT = 60;
 
 const MARKER_CHAR: Record<StarMarkerType, string> = {
   star: '★',
@@ -55,6 +59,13 @@ function StarViewInner({
   showPinUi = false,
 }: Props) {
   const [isStarHovered, setIsStarHovered] = useState(false);
+  const [showFullTextPopover, setShowFullTextPopover] = useState(false);
+  const [fullTextAnchorRect, setFullTextAnchorRect] = useState<DOMRect | null>(null);
+  const [isPreviewTruncated, setIsPreviewTruncated] = useState(false);
+  const previewBubbleRef = useRef<HTMLDivElement>(null);
+  const previewTextRef = useRef<HTMLParagraphElement>(null);
+  const fullTextLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const previewInteractive = showPreview && (isPinned || isStarHovered);
 
   const { ref: visibilityRef, level: visibleLevel } = useVisibleAnimationLevel(
@@ -72,11 +83,68 @@ function StarViewInner({
 
   const previewSide = x > 60 ? 'left' : 'right';
 
-  const previewText = hossii.message
-    ? hossii.message.slice(0, MAX_PREVIEW_TEXT) + (hossii.message.length > MAX_PREVIEW_TEXT ? '…' : '')
-    : null;
+  const fullText = getHossiiBubbleFullText(hossii);
+  const previewText = fullText ? truncateStarPreviewText(fullText) : null;
+
+  useLayoutEffect(() => {
+    if (!fullText || !showPreview) {
+      setIsPreviewTruncated(false);
+      return;
+    }
+    const truncated = isHossiiTextTruncated(
+      fullText,
+      previewText ?? '',
+      previewTextRef.current,
+    );
+    setIsPreviewTruncated(truncated);
+  }, [fullText, previewText, showPreview]);
+
+  useEffect(() => {
+    const el = previewTextRef.current;
+    if (!el || !fullText || !showPreview) return;
+    const update = () => {
+      setIsPreviewTruncated(
+        isHossiiTextTruncated(fullText, previewText ?? '', el),
+      );
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fullText, previewText, showPreview]);
+
+  const scheduleHideFullText = useCallback(() => {
+    if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    fullTextLeaveTimerRef.current = setTimeout(() => {
+      setShowFullTextPopover(false);
+      setFullTextAnchorRect(null);
+    }, 100);
+  }, []);
+
+  const showInlineFullText = useCallback(() => {
+    if (!showPreview || !previewInteractive || !isPreviewTruncated) return;
+    const rect = previewBubbleRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    setFullTextAnchorRect(rect);
+    setShowFullTextPopover(true);
+  }, [showPreview, previewInteractive, isPreviewTruncated]);
+
+  useEffect(() => {
+    if (previewInteractive && isPreviewTruncated) {
+      showInlineFullText();
+    } else if (!previewInteractive) {
+      scheduleHideFullText();
+    }
+  }, [previewInteractive, isPreviewTruncated, showInlineFullText, scheduleHideFullText]);
+
+  useEffect(() => {
+    return () => {
+      if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    };
+  }, []);
 
   return (
+    <>
     <button
       ref={visibilityRef}
       type="button"
@@ -114,6 +182,7 @@ function StarViewInner({
 
       {showPreview && (previewText || hossii.imageUrl || hossii.authorName) && (
         <div
+          ref={previewBubbleRef}
           className={[
             styles.previewBubble,
             previewSide === 'left' ? styles.previewLeft : styles.previewRight,
@@ -123,6 +192,8 @@ function StarViewInner({
             .join(' ')}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
+          onMouseEnter={showInlineFullText}
+          onMouseLeave={scheduleHideFullText}
         >
           {hossii.imageUrl && (
             <img
@@ -134,7 +205,7 @@ function StarViewInner({
             />
           )}
           {previewText && (
-            <p className={styles.previewText}>{previewText}</p>
+            <p ref={previewTextRef} className={styles.previewText}>{previewText}</p>
           )}
           {hossii.authorName && (
             <span className={styles.previewAuthorLine}>
@@ -157,6 +228,19 @@ function StarViewInner({
         </div>
       )}
     </button>
+
+    {showFullTextPopover && fullTextAnchorRect && (
+      <HossiiFullTextPopover
+        hossii={hossii}
+        anchorRect={fullTextAnchorRect}
+        variant="star"
+        onMouseEnter={() => {
+          if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+        }}
+        onMouseLeave={scheduleHideFullText}
+      />
+    )}
+    </>
   );
 }
 
