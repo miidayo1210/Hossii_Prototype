@@ -68,37 +68,77 @@ export async function compressImage(file: File): Promise<Blob> {
   });
 }
 
+export type BackgroundUploadResult =
+  | { ok: true; publicUrl: string }
+  | { ok: false; reason: string; details?: unknown };
+
 /** Supabase Storage にスペース背景画像をアップロードして公開 URL を返す */
 export async function uploadBackgroundImage(
   spaceId: string,
-  file: File
-): Promise<string | null> {
-  if (!isSupabaseConfigured) return null;
+  file: File,
+): Promise<BackgroundUploadResult> {
+  if (!isSupabaseConfigured) {
+    console.error('[BackgroundUpload] Supabase 未設定');
+    return { ok: false, reason: 'Supabase 未設定' };
+  }
 
-  validateImageFile(file);
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('[BackgroundUpload] セッション取得失敗:', sessionError);
+    return { ok: false, reason: 'セッション取得失敗', details: sessionError };
+  }
+  if (!sessionData.session) {
+    console.error('[BackgroundUpload] 未ログイン — Storage RLS (authenticated) によりアップロード不可');
+    return { ok: false, reason: '未ログイン（ログインが必要です）' };
+  }
+
+  console.info('[BackgroundUpload] start', {
+    spaceId,
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+    userId: sessionData.session.user.id,
+  });
+
+  try {
+    validateImageFile(file);
+  } catch (err) {
+    console.error('[BackgroundUpload] ファイル形式エラー:', err);
+    return { ok: false, reason: err instanceof Error ? err.message : 'ファイル形式エラー', details: err };
+  }
 
   let blob: Blob;
   try {
     blob = await compressImage(file);
-  } catch {
+    console.info('[BackgroundUpload] 圧縮完了', { size: blob.size });
+  } catch (err) {
+    console.warn('[BackgroundUpload] 圧縮失敗、元ファイルを使用:', err);
     blob = file;
   }
 
-  // タイムスタンプで一意なファイル名を生成（同スペースに複数枚保存可能）
   const timestamp = Date.now();
   const path = `backgrounds/${spaceId}/${timestamp}.jpg`;
+  console.info('[BackgroundUpload] uploading', { bucket: BUCKET, path });
 
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
 
   if (error) {
-    console.error('[imageStorageApi] uploadBackgroundImage error:', error.message);
-    return null;
+    console.error('[BackgroundUpload] Storage upload 失敗:', {
+      message: error.message,
+      name: error.name,
+      path,
+      spaceId,
+      statusCode: (error as { statusCode?: string }).statusCode,
+      error,
+    });
+    return { ok: false, reason: error.message, details: error };
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  console.info('[BackgroundUpload] 成功:', data.publicUrl);
+  return { ok: true, publicUrl: data.publicUrl };
 }
 
 /** Supabase Storage から背景画像を削除する */

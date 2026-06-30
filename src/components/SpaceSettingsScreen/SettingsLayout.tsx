@@ -42,7 +42,9 @@ export const SettingsLayout = ({
         <SettingsNav activeScreen={activeScreen} onNavigate={onNavigate} isAdmin={isAdmin} />
       </aside>
       <main className={shellStyles.main}>
-        {PANE_OVERRIDE_SCREENS.has(activeScreen) && <SettingsPaneSelector />}
+        {PANE_OVERRIDE_SCREENS.has(activeScreen) && activeScreen !== 'background' && (
+          <SettingsPaneSelector />
+        )}
         {children}
       </main>
     </div>

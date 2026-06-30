@@ -40,9 +40,14 @@ describe('resolvePaneBackground', () => {
     expect(resolvePaneBackground(pane, baseSpace)).toEqual(spaceBg);
   });
 
-  it('returns pane override for non-default pane', () => {
-    const pane = { ...extraPane, background: paneBg };
-    expect(resolvePaneBackground(pane, baseSpace)).toEqual(paneBg);
+  it('returns pane override for non-default pane with pool image', () => {
+    const poolUrl = 'https://example.com/pool.jpg';
+    const space = { ...baseSpace, savedBackgroundImages: [poolUrl] };
+    const pane = {
+      ...extraPane,
+      background: { kind: 'image' as const, value: poolUrl, source: 'cloud' as const },
+    };
+    expect(resolvePaneBackground(pane, space)).toEqual(pane.background);
   });
 
   it('falls back to space background when extra pane has null background', () => {
@@ -56,5 +61,22 @@ describe('resolvePaneBackground', () => {
 
   it('returns space background when pane is null', () => {
     expect(resolvePaneBackground(null, baseSpace)).toEqual(spaceBg);
+  });
+
+  it('falls back to space background when extra pane has non-image override', () => {
+    const pane = { ...extraPane, background: paneBg };
+    expect(resolvePaneBackground(pane, baseSpace)).toEqual(spaceBg);
+  });
+
+  it('falls back to space background when image URL is not in pool', () => {
+    const pane = {
+      ...extraPane,
+      background: {
+        kind: 'image' as const,
+        value: 'https://example.com/removed.jpg',
+        source: 'cloud' as const,
+      },
+    };
+    expect(resolvePaneBackground(pane, baseSpace)).toEqual(spaceBg);
   });
 });

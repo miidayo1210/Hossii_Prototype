@@ -1,0 +1,23 @@
+.preview {
+  flex-shrink: 0;
+  width: 5.5rem;
+  aspect-ratio: 16 / 9;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid #e4e7ed;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

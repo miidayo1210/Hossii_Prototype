@@ -4,6 +4,7 @@ import { MAX_BACKGROUND_IMAGES } from '../../core/types/space';
 import { isSupabaseConfigured } from '../../core/supabase';
 import { COLOR_PRESETS, PATTERN_PRESETS, THEME_PRESETS, createBackgroundFromPreset } from '../../core/utils/backgroundPresets';
 import { uploadBackgroundImage, deleteBackgroundImage } from '../../core/utils/imageStorageApi';
+import { appendSavedBackgroundUrl } from '../../core/utils/backgroundGallery';
 import styles from './BackgroundSelector.module.css';
 
 type BackgroundSelectorProps = {
@@ -13,6 +14,11 @@ type BackgroundSelectorProps = {
   spaceId?: string;
   savedBackgroundImages?: string[];
   onUpdateSavedImages?: (urls: string[]) => void;
+  /** ギャラリー追加と背景選択を原子的に反映する（BackgroundTab 向け） */
+  onImageUploaded?: (params: {
+    savedUrls: string[];
+    background: SpaceBackground;
+  }) => void;
 };
 
 export const BackgroundSelector = ({
@@ -22,9 +28,11 @@ export const BackgroundSelector = ({
   spaceId,
   savedBackgroundImages = [],
   onUpdateSavedImages,
+  onImageUploaded,
 }: BackgroundSelectorProps) => {
   const [activeTab, setActiveTab] = useState<'color' | 'pattern' | 'theme' | 'image'>('pattern');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isSelected = (kind: string, value: string): boolean => {
@@ -53,12 +61,15 @@ export const BackgroundSelector = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadError(null);
+
     if (!file.type.startsWith('image/')) {
-      alert('画像ファイルを選択してください');
+      const msg = '画像ファイルを選択してください';
+      console.error('[BackgroundSelector] 非画像ファイル:', file.type);
+      setUploadError(msg);
       return;
     }
 
-    // 古い一時画像の objectURL を解放
     if (
       currentBackground?.kind === 'image' &&
       currentBackground.source === 'temp' &&
@@ -71,21 +82,46 @@ export const BackgroundSelector = ({
       fileInputRef.current.value = '';
     }
 
-    // Supabase が設定されており spaceId があればクラウドへアップロード
     if (isSupabaseConfigured && spaceId) {
       setIsUploading(true);
-      const publicUrl = await uploadBackgroundImage(spaceId, file);
-      setIsUploading(false);
+      try {
+        const result = await uploadBackgroundImage(spaceId, file);
+        if (result.ok) {
+          const next = appendSavedBackgroundUrl(savedBackgroundImages, result.publicUrl);
+          const background: SpaceBackground = {
+            kind: 'image',
+            value: result.publicUrl,
+            source: 'cloud',
+          };
+          if (onImageUploaded) {
+            onImageUploaded({ savedUrls: next, background });
+          } else {
+            onUpdateSavedImages?.(next);
+            onSelect(background);
+          }
+          return;
+        }
 
-      if (publicUrl) {
-        const next = [...savedBackgroundImages, publicUrl];
-        onUpdateSavedImages?.(next);
-        onSelect({ kind: 'image', value: publicUrl, source: 'cloud' });
-        return;
+        console.error('[BackgroundSelector] アップロード失敗:', result.reason, result.details);
+        setUploadError(`アップロード失敗: ${result.reason}`);
+      } catch (err) {
+        console.error('[BackgroundSelector] 予期しないエラー:', err);
+        setUploadError('アップロード中にエラーが発生しました');
+      } finally {
+        setIsUploading(false);
       }
+      return;
     }
 
-    // Supabase 未設定 or アップロード失敗: objectURL で一時保存（ギャラリーには追加しない）
+    if (!isSupabaseConfigured) {
+      console.warn('[BackgroundSelector] Supabase 未設定 — 一時プレビューのみ');
+    }
+    if (!spaceId) {
+      console.error('[BackgroundSelector] spaceId なし — ギャラリーに追加できません');
+      setUploadError('スペース ID が取得できません');
+      return;
+    }
+
     const objectURL = URL.createObjectURL(file);
     onSelect({ kind: 'image', value: objectURL, source: 'temp' });
   };
@@ -201,6 +237,12 @@ export const BackgroundSelector = ({
                 <span className={styles.noteText}>
                   Supabase 未設定のため画像は一時的です。リロードすると消えます。
                 </span>
+              </div>
+            )}
+
+            {uploadError && (
+              <div className={styles.uploadError} role="alert">
+                {uploadError}
               </div>
             )}
 

@@ -1,0 +1,164 @@
+.poolGallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  align-items: center;
+}
+
+.poolCount {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0.5rem 0 0;
+}
+
+.quickActions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quickButton {
+  flex-shrink: 0;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.quickButton:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.quickButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paneRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.paneRowHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.paneRowTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.paneRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+.paneRowStatus {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.mainRowBody {
+  margin-top: 0.25rem;
+}
+
+.segmentGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.segmentButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.segmentButton:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.segmentButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.segmentButtonSelected {
+  color: #ffffff;
+  background: #4f46e5;
+  border-color: #4f46e5;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+}
+
+.segmentButtonSelected:hover:not(:disabled) {
+  background: #4338ca;
+  border-color: #4338ca;
+}
+
+.segmentThumb {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.25rem;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.defaultBadge {
+  display: inline-block;
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #4f46e5;
+  background: #eef2ff;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+@media (max-width: 640px) {
+  .paneRowHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .segmentGroup {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 0.25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .segmentButton {
+    flex-shrink: 0;
+  }
+}
