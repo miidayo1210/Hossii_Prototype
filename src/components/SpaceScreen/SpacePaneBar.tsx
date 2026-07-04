@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type Ref,
 } from 'react';
 import type { SpacePane } from '../../core/types/spacePane';
 import type { TabFolder } from '../../core/utils/tabFolderStorage';
@@ -47,6 +48,8 @@ type Props = {
   onMoveToFolder?: (paneId: string, folderId: string | null, insertBeforeBarIndex?: number) => void;
   /** Reorder folder chips among themselves. */
   onReorderFolder?: (draggedId: string, insertBeforeIndex: number) => void;
+  /** モバイルバーの DOM 参照（ヒント配置など） */
+  rootRef?: Ref<HTMLElement>;
 };
 
 type DragState = {
@@ -292,6 +295,7 @@ export function SpacePaneBar({
   onReorder,
   onMoveToFolder,
   onReorderFolder,
+  rootRef,
 }: Props) {
   const { barPanes, folderMap } = useMemo(
     () => splitPanesByFolders(visiblePanes),
@@ -751,6 +755,7 @@ export function SpacePaneBar({
 
   return (
     <nav
+      ref={rootRef}
       className={barClass}
       aria-label="スペース内タブ"
       data-space-export="exclude"

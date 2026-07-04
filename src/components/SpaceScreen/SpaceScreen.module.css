@@ -1793,12 +1793,11 @@
   box-shadow: 0 -4px 24px rgba(14, 165, 233, 0.12);
 }
 
-/* ダブルタップ投稿ヒント: レターボックス帯など画像外（座標は TS で portal + inline 指定） */
+/* ダブルタップ投稿ヒント: 16:9 上レターボックス内・左寄せ（bubbleArea 内 absolute） */
 .doubleTapHint {
-  position: fixed;
-  z-index: 400;
+  position: absolute;
+  z-index: 12;
   pointer-events: none;
-  max-width: min(240px, calc(100vw - 24px));
 
   padding: 6px 10px;
   border-radius: 8px;

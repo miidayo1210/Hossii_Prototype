@@ -14,11 +14,8 @@ type BackgroundSelectorProps = {
   spaceId?: string;
   savedBackgroundImages?: string[];
   onUpdateSavedImages?: (urls: string[]) => void;
-  /** ギャラリー追加と背景選択を原子的に反映する（BackgroundTab 向け） */
-  onImageUploaded?: (params: {
-    savedUrls: string[];
-    background: SpaceBackground;
-  }) => void;
+  /** ギャラリー追加時に savedUrls を原子的に反映（背景の選択は変更しない） */
+  onImageUploaded?: (params: { savedUrls: string[] }) => void;
 };
 
 export const BackgroundSelector = ({
@@ -88,16 +85,10 @@ export const BackgroundSelector = ({
         const result = await uploadBackgroundImage(spaceId, file);
         if (result.ok) {
           const next = appendSavedBackgroundUrl(savedBackgroundImages, result.publicUrl);
-          const background: SpaceBackground = {
-            kind: 'image',
-            value: result.publicUrl,
-            source: 'cloud',
-          };
           if (onImageUploaded) {
-            onImageUploaded({ savedUrls: next, background });
+            onImageUploaded({ savedUrls: next });
           } else {
             onUpdateSavedImages?.(next);
-            onSelect(background);
           }
           return;
         }

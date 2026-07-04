@@ -83,17 +83,10 @@ function SinglePaneBackgroundTab({
     setDraft((prev) => ({ ...prev, background }));
   };
 
-  const handleImageUploaded = (params: {
-    savedUrls: string[];
-    background: Space['background'];
-  }) => {
-    if (params.background?.kind === 'image' && params.background.source === 'temp') {
-      objectURLsRef.current.add(params.background.value);
-    }
+  const handleImageUploaded = (params: { savedUrls: string[] }) => {
     setDraft((prev) => ({
       ...prev,
       savedBackgroundImages: params.savedUrls,
-      background: params.background,
     }));
   };
 

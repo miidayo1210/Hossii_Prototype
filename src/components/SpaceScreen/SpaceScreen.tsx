@@ -1261,6 +1261,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const spaceExportRootRef = useRef<HTMLDivElement>(null);
   const bubbleAreaRef = useRef<HTMLDivElement | null>(null);
+  const spaceTitleRowRef = useRef<HTMLDivElement>(null);
+  const mobilePaneBarRef = useRef<HTMLElement>(null);
   const { containerW, containerH, sharpRect, observeRef: observeBubbleArea } = useSharpContentRect();
   const mergeBubbleAreaRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -1600,79 +1602,74 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !quickPostOpen &&
     viewMode !== 'slideshow';
 
-  const [doubleTapHintCoords, setDoubleTapHintCoords] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  /** タイトル行・タブバーの下端（bubbleArea 基準 px）。ヒントを上バーと被らせない */
+  const [minHintTopPx, setMinHintTopPx] = useState(100);
 
   useLayoutEffect(() => {
-    if (!showDoubleTapHint) {
-      setDoubleTapHintCoords(null);
-      return;
+    if (!showDoubleTapHint) return;
+
+    const measure = () => {
+      const areaTop = bubbleAreaRef.current?.getBoundingClientRect().top ?? 0;
+      let chromeBottom = 0;
+
+      const title = spaceTitleRowRef.current;
+      if (title) {
+        chromeBottom = Math.max(chromeBottom, title.getBoundingClientRect().bottom - areaTop);
+      }
+      const bar = mobilePaneBarRef.current;
+      if (bar) {
+        chromeBottom = Math.max(chromeBottom, bar.getBoundingClientRect().bottom - areaTop);
+      }
+
+      setMinHintTopPx(chromeBottom > 0 ? chromeBottom + 8 : 100);
+    };
+
+    measure();
+    window.addEventListener('resize', measure);
+    const ro = new ResizeObserver(measure);
+    for (const el of [bubbleAreaRef.current, spaceTitleRowRef.current, mobilePaneBarRef.current]) {
+      if (el) ro.observe(el);
     }
+    return () => {
+      window.removeEventListener('resize', measure);
+      ro.disconnect();
+    };
+  }, [showDoubleTapHint, showPaneBar, effectiveFolders.length, hasDescription]);
+
+  const doubleTapHintStyle = useMemo((): CSSProperties | null => {
+    if (!showDoubleTapHint || containerW <= 0 || containerH <= 0) return null;
 
     const margin = 12;
     const hintH = 40;
-    const belowTitleTop = 48;
+    const hasSharp = shouldMapToSharp && sharpRect.width > 0 && sharpRect.height > 0;
 
-    const update = () => {
-      const el = bubbleAreaRef.current;
-      if (!el) {
-        setDoubleTapHintCoords({ top: belowTitleTop, left: margin });
-        return;
-      }
-      const area = el.getBoundingClientRect();
+    if (hasSharp) {
+      const imageTop = sharpRect.y;
+      const letterboxBand = imageTop - minHintTopPx;
+      // 上レターボックス（画像外・左上の上）に収まらなければ非表示
+      if (letterboxBand < hintH + 4) return null;
 
-      if (shouldMapToSharp && sharpRect.width > 0 && sharpRect.height > 0) {
-        const letterboxTop = sharpRect.y;
-        const letterboxBottom = containerH - sharpRect.y - sharpRect.height;
+      const topPx = minHintTopPx + (letterboxBand - hintH) / 2;
+      return {
+        left: `${((sharpRect.x + margin) / containerW) * 100}%`,
+        top: `${(topPx / containerH) * 100}%`,
+        maxWidth: sharpRect.width - margin * 2,
+      };
+    }
 
-        // 16:9 画像の上ではなく、上下レターボックス内に置き Hossii 丸と被らないようにする
-        if (letterboxTop >= hintH + 8) {
-          setDoubleTapHintCoords({
-            top: area.top + letterboxTop / 2 - hintH / 2,
-            left: area.left + sharpRect.x + margin,
-          });
-          return;
-        }
-        if (letterboxBottom >= hintH + 8) {
-          setDoubleTapHintCoords({
-            top:
-              area.top +
-              sharpRect.y +
-              sharpRect.height +
-              letterboxBottom / 2 -
-              hintH / 2,
-            left: area.left + sharpRect.x + margin,
-          });
-          return;
-        }
-      }
-
-      // 壁紙なし・レターボックスが狭いときはタイトル直下の左
-      setDoubleTapHintCoords({
-        top: Math.max(area.top + 8, belowTitleTop),
-        left: area.left + margin,
-      });
+    return {
+      left: margin,
+      top: minHintTopPx,
+      maxWidth: 'min(240px, calc(100% - 24px))',
     };
-
-    update();
-    window.addEventListener('resize', update);
-    const ro = new ResizeObserver(update);
-    if (bubbleAreaRef.current) ro.observe(bubbleAreaRef.current);
-    return () => {
-      window.removeEventListener('resize', update);
-      ro.disconnect();
-    };
-  }, [showDoubleTapHint, sharpRect, shouldMapToSharp, containerW, containerH]);
-
-  const doubleTapHintStyle: CSSProperties | undefined = doubleTapHintCoords
-    ? {
-        top: doubleTapHintCoords.top,
-        left: doubleTapHintCoords.left,
-        right: 'auto',
-      }
-    : undefined;
+  }, [
+    showDoubleTapHint,
+    shouldMapToSharp,
+    sharpRect,
+    containerW,
+    containerH,
+    minHintTopPx,
+  ]);
 
   const scaledUp = displayScale > 1;
   /** スマホ縦: 16:9 スペース上 + 固定投稿ドック下 */
@@ -1900,6 +1897,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               </div>
             );
           })}
+        {showDoubleTapHint && doubleTapHintStyle && (
+          <div
+            className={styles.doubleTapHint}
+            style={doubleTapHintStyle}
+            role="status"
+            data-space-export="exclude"
+          >
+            ダブルタップしたところに投稿できるよ
+          </div>
+        )}
         {backgroundPeekMode && isMobilePortrait && (
           <div className={styles.backgroundPeekHint} data-space-export="exclude" aria-live="polite">
             背景を表示中 — もう一度タップで戻る
@@ -2055,7 +2062,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       )}
 
       {/* スペースタイトル pill バッジ（モバイル専用・書き出し対象外） */}
-      <div className={styles.spaceTitleRow} data-space-export="exclude">
+      <div ref={spaceTitleRowRef} className={styles.spaceTitleRow} data-space-export="exclude">
         <div className={styles.spaceTitle}>
           <span className={styles.spaceTitleDot} />
           <span className={styles.spaceTitleText}>{spaceForVisual?.name ?? 'My Space'}</span>
@@ -2070,6 +2077,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
       {showPaneBar && (
         <SpacePaneBar
+          rootRef={mobilePaneBarRef}
           spaceId={activeSpaceId ?? ''}
           variant="mobile"
           folders={effectiveFolders}
@@ -2321,19 +2329,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         />
       )}
       </ScaledContent>
-
-      {showDoubleTapHint &&
-        doubleTapHintCoords &&
-        createPortal(
-          <div
-            className={styles.doubleTapHint}
-            style={doubleTapHintStyle}
-            role="status"
-          >
-            ダブルタップしたところに投稿できるよ
-          </div>,
-          speechPanelPortalEl ?? document.body,
-        )}
 
       {/* 音声パネル（スペースルートへ portal — zoom 対象の ScaledContent の外かつ Fullscreen API 内） */}
       {speechPanelOpen &&

@@ -152,17 +152,12 @@ export function TabBackgroundBoard({ space, panes, onUpdateSpace, onDirtyChange 
     }));
   };
 
-  const handleMainImageUploaded = (params: {
-    savedUrls: string[];
-    background: SpaceBackground;
-  }) => {
-    trackTempUrl(params.background);
+  const handleGalleryImageAdded = (savedUrls: string[]) => {
     setDraft((prev) => ({
       ...prev,
       main: {
         ...prev.main,
-        savedBackgroundImages: params.savedUrls,
-        background: params.background,
+        savedBackgroundImages: savedUrls,
       },
     }));
   };
@@ -198,10 +193,7 @@ export function TabBackgroundBoard({ space, panes, onUpdateSpace, onDirtyChange 
         return;
       }
       const next = appendSavedBackgroundUrl(pool, result.publicUrl);
-      handleMainImageUploaded({
-        savedUrls: next,
-        background: poolImageBackground(result.publicUrl),
-      });
+      handleGalleryImageAdded(next);
     } catch (err) {
       console.error('[TabBackgroundBoard] pool upload failed', err);
       setPoolUploadError('アップロード中にエラーが発生しました');
@@ -259,7 +251,7 @@ export function TabBackgroundBoard({ space, panes, onUpdateSpace, onDirtyChange 
                 <BackgroundSelector
                   currentBackground={draft.main.background}
                   onSelect={handleMainSelect}
-                  onImageUploaded={handleMainImageUploaded}
+                  onImageUploaded={({ savedUrls }) => handleGalleryImageAdded(savedUrls)}
                   onImageURLRevoke={(url) => {
                     URL.revokeObjectURL(url);
                     objectURLsRef.current.delete(url);
