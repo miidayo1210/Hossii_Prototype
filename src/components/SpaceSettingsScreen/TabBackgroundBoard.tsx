@@ -21,6 +21,7 @@ import {
   setPaneAssignment,
   type BackgroundBoardDraft,
   type PaneAssignmentSelection,
+  type PoolSlotIndex,
 } from '../../core/utils/backgroundBoard';
 import {
   PaneOverrideSaveError,
@@ -43,7 +44,10 @@ type Props = {
   onDirtyChange: (dirty: boolean) => void;
 };
 
-const POOL_SLOT_LABELS = ['画像1', '画像2', '画像3'] as const;
+const POOL_SLOT_LABELS = Array.from(
+  { length: MAX_BACKGROUND_IMAGES },
+  (_, i) => `画像${i + 1}`,
+);
 
 function PaneSegmentButtons({
   pane,
@@ -70,7 +74,7 @@ function PaneSegmentButtons({
       </button>
       {POOL_SLOT_LABELS.map((label, index) => {
         const url = pool[index];
-        const slot = index as 0 | 1 | 2;
+        const slot = index as PoolSlotIndex;
         const isSelected = selected === slot;
         return (
           <button
@@ -275,7 +279,7 @@ export function TabBackgroundBoard({ space, panes, onUpdateSpace, onDirtyChange 
         )}
 
         <SettingsSection
-          title="共通プール（最大 3 枚）"
+          title={`共通プール（最大 ${MAX_BACKGROUND_IMAGES} 枚）`}
           description="追加タブに割り当てる画像を登録します。サムネイルをクリックするとメインタブの背景画像として選択されます。"
         >
           <div className={boardStyles.poolGallery}>

@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 import type { Space, SpaceId } from '../types/space';
 import type { EmotionKey } from '../types';
 import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from './spaceDecorations';
+import { parseTabFolders } from './tabFolderStorage';
 import { ensureDefaultSpacePane } from './ensureDefaultSpacePane';
 
 // Supabase の行型（snake_case）
@@ -23,6 +24,7 @@ type SpaceRow = {
   character_image_url?: string | null;
   custom_emotions?: unknown;
   bubble_shape_png?: string | null;
+  tab_folders?: unknown;
 };
 
 // SpaceRow → Space（camelCase）
@@ -50,6 +52,10 @@ function rowToSpace(row: SpaceRow): Space {
     })(),
     characterImageUrl: row.character_image_url ?? undefined,
     bubbleShapePng: row.bubble_shape_png ?? undefined,
+    tabFolders: (() => {
+      if (!('tab_folders' in row)) return undefined;
+      return parseTabFolders(row.tab_folders);
+    })(),
   };
 }
 
@@ -71,6 +77,7 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
     character_image_url: space.characterImageUrl ?? null,
     custom_emotions: space.customEmotions ?? [],
     bubble_shape_png: space.bubbleShapePng ?? null,
+    tab_folders: space.tabFolders?.length ? space.tabFolders : null,
   };
 }
 
@@ -133,6 +140,9 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   if (patch.characterImageUrl !== undefined) updateObj.character_image_url = patch.characterImageUrl ?? null;
   if (patch.customEmotions !== undefined) updateObj.custom_emotions = patch.customEmotions;
   if (patch.bubbleShapePng !== undefined) updateObj.bubble_shape_png = patch.bubbleShapePng ?? null;
+  if (patch.tabFolders !== undefined) {
+    updateObj.tab_folders = patch.tabFolders?.length ? patch.tabFolders : null;
+  }
 
   if (Object.keys(updateObj).length === 0) return;
 

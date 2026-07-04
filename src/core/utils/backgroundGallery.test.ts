@@ -12,8 +12,8 @@ describe('appendSavedBackgroundUrl', () => {
   });
 
   it('respects max count', () => {
-    const full = ['a', 'b', 'c'];
-    expect(appendSavedBackgroundUrl(full, 'd', MAX_BACKGROUND_IMAGES)).toEqual(full);
+    const full = ['a', 'b', 'c', 'd', 'e'];
+    expect(appendSavedBackgroundUrl(full, 'f', MAX_BACKGROUND_IMAGES)).toEqual(full);
   });
 
   it('handles undefined initial list', () => {

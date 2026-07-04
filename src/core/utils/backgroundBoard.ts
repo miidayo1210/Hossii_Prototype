@@ -18,7 +18,8 @@ export type BackgroundBoardDraft = {
   paneOverrides: Record<string, SpaceBackground | null>;
 };
 
-export type PaneAssignmentSelection = 'main' | 0 | 1 | 2;
+export type PoolSlotIndex = 0 | 1 | 2 | 3 | 4;
+export type PaneAssignmentSelection = 'main' | PoolSlotIndex;
 
 function normalizePaneOverride(
   override: SpaceBackground | null | undefined,
@@ -73,7 +74,7 @@ export function getPaneAssignment(
   if (override.kind === 'image') {
     const idx = (draft.main.savedBackgroundImages ?? []).indexOf(override.value);
     if (idx >= 0 && idx < MAX_BACKGROUND_IMAGES) {
-      return idx as 0 | 1 | 2;
+      return idx as PoolSlotIndex;
     }
   }
   return 'main';

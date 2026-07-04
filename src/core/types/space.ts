@@ -1,4 +1,7 @@
 import type { EmotionKey } from './index';
+import type { TabFolder } from '../utils/tabFolderStorage';
+
+export type { TabFolder };
 
 // Space ID
 export type SpaceId = string;
@@ -79,10 +82,12 @@ export type Space = {
   presetTags?: string[];
   welcomeMessage?: string;  // 入室時ウェルカムメッセージ（未設定時はデフォルト文言）
   description?: string;     // スペースの一行説明（最大50文字、未設定時は説明 UI 非表示）
+  /** Tab bar folder definitions (100C). Synced via DB / local spaces cache. */
+  tabFolders?: TabFolder[];
 };
 
 // 背景画像の保存上限
-export const MAX_BACKGROUND_IMAGES = 3;
+export const MAX_BACKGROUND_IMAGES = 5;
 
 // デフォルトのクイックボタン感情（8種）
 export const DEFAULT_QUICK_EMOTIONS: EmotionKey[] = [

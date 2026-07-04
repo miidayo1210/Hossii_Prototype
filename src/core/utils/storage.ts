@@ -22,6 +22,7 @@ function serializeSpace(f: Space): Record<string, unknown> {
   if (f.decorations?.length) base.decorations = f.decorations;
   if (f.bubbleShapePng) base.bubbleShapePng = f.bubbleShapePng;
   if (f.savedBackgroundImages?.length) base.savedBackgroundImages = f.savedBackgroundImages;
+  if (f.tabFolders?.length) base.tabFolders = f.tabFolders;
   return base;
 }
 

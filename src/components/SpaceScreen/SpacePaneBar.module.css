@@ -200,6 +200,19 @@
   box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
 }
 
+.folderChipDraggable {
+  cursor: grab;
+}
+
+.folderChipDraggable:active {
+  cursor: grabbing;
+}
+
+.folderChipDragging {
+  opacity: 0.45;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.18);
+}
+
 .folderChip:disabled {
   opacity: 0.5;
   cursor: not-allowed;

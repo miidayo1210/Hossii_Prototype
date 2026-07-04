@@ -14,3 +14,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const isSupabaseConfigured =
   typeof supabaseUrl === 'string' && supabaseUrl.startsWith('https://') &&
   typeof supabaseAnonKey === 'string' && supabaseAnonKey.length > 0;
+
+/** DB 接続先の比較用（local dev と deploy が同じ Supabase か確認） */
+export function getSupabaseProjectHost(): string | null {
+  if (!isSupabaseConfigured) return null;
+  try {
+    return new URL(supabaseUrl).host;
+  } catch {
+    return null;
+  }
+}

@@ -24,6 +24,7 @@ import {
   saveHossiis,
 } from '../utils/storage';
 import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from '../utils/spaceDecorations';
+import { parseTabFolders } from '../utils/tabFolderStorage';
 import { persistHossiisLocal } from '../utils/hossiiPersistence';
 import {
   applyFetchResult,
@@ -189,6 +190,10 @@ const normalizeSpace = (f: unknown): Space => {
   const bubbleShapePng = typeof raw.bubbleShapePng === 'string' ? raw.bubbleShapePng : undefined;
   const decorations = parseDecorationsFromJson(raw.decorations);
   const customEmotions = parseCustomEmotionsFromJson(raw.customEmotions);
+  const tabFolders = (() => {
+    const folders = parseTabFolders(raw.tabFolders);
+    return folders.length > 0 ? folders : undefined;
+  })();
 
   return {
     id,
@@ -207,6 +212,7 @@ const normalizeSpace = (f: unknown): Space => {
     customEmotions: customEmotions.length > 0 ? customEmotions : undefined,
     decorations: decorations.length > 0 ? decorations : undefined,
     bubbleShapePng,
+    tabFolders,
   };
 };
 
@@ -471,6 +477,7 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
           return {
             ...space,
             presetTags: space.presetTags ?? existing?.presetTags,
+            tabFolders: space.tabFolders ?? existing?.tabFolders,
           };
         });
         // Supabase fetch 中に ADD_SPACE で追加されたスペース（insert が in-flight）を保持する。
@@ -479,7 +486,7 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
           const supabaseIds = new Set(action.payload.map((s) => s.id));
           const pendingSpaces = state.spaces
             .filter((s) => action.preserveIds!.has(s.id) && !supabaseIds.has(s.id))
-            .map((s) => ({ ...s, presetTags: s.presetTags }));
+            .map((s) => ({ ...s, presetTags: s.presetTags, tabFolders: s.tabFolders }));
           mergedSpaces.push(...pendingSpaces);
         }
         saveSpaces(mergedSpaces);
