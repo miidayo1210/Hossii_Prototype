@@ -22,6 +22,7 @@ import { DecorationTab } from './DecorationTab';
 import { ModerationTab } from './ModerationTab';
 import { ExportRecordTab } from './ExportRecordTab';
 import { NeighborsTab } from './NeighborsTab';
+import { ParticipantAccountsTab } from './ParticipantAccountsTab';
 import { PaneManagementTab } from './PaneManagementTab';
 import { SettingsEditPaneProvider } from './SettingsEditPaneContext';
 import {
@@ -255,6 +256,8 @@ export const SpaceSettingsScreen = () => {
             communitySpaces={state.spaces}
           />
         );
+      case 'participantAccounts':
+        return <ParticipantAccountsTab space={activeSpace} />;
       default:
         return null;
     }

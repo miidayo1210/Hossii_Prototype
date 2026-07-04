@@ -5,6 +5,10 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 import { getAdminCommunity, createCommunity } from '../utils/communitiesApi';
 import type { CommunityStatus } from '../utils/communitiesApi';
 import { upsertUserProfile, fetchUserProfile } from '../utils/userProfilesApi';
+import {
+  resolveParticipantLogin,
+  markParticipantFirstLogin,
+} from '../utils/participantAccountsApi';
 import { AuthContext } from './useAuth';
 
 export type AppUser = {
@@ -13,6 +17,7 @@ export type AppUser = {
   displayName: string | null;
   isAdmin: boolean;
   isSuperAdmin?: boolean;
+  isIssuedParticipant?: boolean;
   username?: string;
   communityId?: string;
   communityName?: string;
@@ -32,6 +37,7 @@ export type AuthContextType = {
     gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null
   ) => Promise<AppUser>;
   login: (email: string, password: string) => Promise<AppUser>;
+  loginParticipant: (spaceId: string, loginId: string, password: string) => Promise<AppUser>;
   adminLogin: (email: string, password: string) => Promise<AppUser>;
   adminSignUp: (email: string, password: string, communityName: string) => Promise<AppUser>;
   logout: () => Promise<void>;
@@ -51,6 +57,7 @@ type AuthProviderProps = {
  */
 async function resolveAppUser(user: User): Promise<AppUser> {
   const roleFromMetadata = user.app_metadata?.role as string | undefined;
+  const isIssuedParticipant = user.app_metadata?.participant === true;
   const displayName = user.user_metadata?.display_name as string | null ?? null;
 
   // スーパー管理者（Hossii 運営）の判定
@@ -88,7 +95,14 @@ async function resolveAppUser(user: User): Promise<AppUser> {
   }
 
   if (!community) {
-    return { uid: user.id, email: user.email ?? null, displayName, isAdmin: false, username };
+    return {
+      uid: user.id,
+      email: user.email ?? null,
+      displayName,
+      isAdmin: false,
+      username,
+      isIssuedParticipant,
+    };
   }
 
   return {
@@ -101,6 +115,7 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     communityName: community.name,
     communitySlug: community.slug ?? undefined,
     communityStatus: community.status,
+    isIssuedParticipant,
   };
 }
 
@@ -193,6 +208,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     await upsertUserProfile(data.user.id, username, birthdate, gender);
 
+    return resolveAppUser(data.user);
+  }, []);
+
+  // ===== 管理者発行参加者ログイン =====
+  const loginParticipant = useCallback(async (
+    spaceId: string,
+    loginId: string,
+    password: string
+  ): Promise<AppUser> => {
+    if (!isSupabaseConfigured) {
+      const user: AppUser = {
+        ...createMockUser(`${loginId}@participants.internal`, `participant-${loginId}`),
+        isIssuedParticipant: true,
+      };
+      setCurrentUser(user);
+      saveMockUser(user);
+      return user;
+    }
+
+    const authEmail = await resolveParticipantLogin(spaceId, loginId);
+    if (!authEmail) {
+      throw new Error('参加 ID またはパスワードが正しくありません');
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password,
+    });
+    if (error || !data.user) {
+      throw error ?? new Error('Login failed');
+    }
+
+    await markParticipantFirstLogin(data.user.id);
     return resolveAppUser(data.user);
   }, []);
 
@@ -337,6 +385,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isResolvingAuth,
     signUp,
     login,
+    loginParticipant,
     adminLogin,
     adminSignUp,
     logout,
@@ -349,6 +398,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isResolvingAuth,
     signUp,
     login,
+    loginParticipant,
     adminLogin,
     adminSignUp,
     logout,

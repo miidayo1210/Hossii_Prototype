@@ -25,6 +25,7 @@ import { NeighborsScreen } from './components/NeighborsScreen/NeighborsScreen';
 import { StartScreen } from './components/StartScreen/StartScreen';
 import { AdminLoginScreen } from './components/Auth/AdminLoginScreen';
 import { LoginScreen } from './components/Auth/LoginScreen';
+import { ParticipantLoginScreen } from './components/Auth/ParticipantLoginScreen';
 import { GuestEntryScreen } from './components/Auth/GuestEntryScreen';
 import { PrivateSpaceScreen } from './components/Auth/PrivateSpaceScreen';
 import { OnboardingModal } from './components/Auth/OnboardingModal';
@@ -86,6 +87,7 @@ const AppContent = () => {
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [pendingLoginSlug, setPendingLoginSlug] = useState<string | null>(null);
   const [pendingAuthMode, setPendingAuthMode] = useState<'login' | 'signup'>('login');
+  const [pendingParticipantSpaceId, setPendingParticipantSpaceId] = useState<string | null>(null);
 
   // ゲスト入室中に AccountScreen からログイン/新規登録を要求されたとき
   const handleGuestAuthRequested = (mode: 'login' | 'signup') => {
@@ -122,7 +124,7 @@ const AppContent = () => {
   // isResolvingAuth 中は onAuthStateChange の非同期解決が完了していないためスキップ
   useEffect(() => {
     if (isResolvingAuth) return;
-    if (currentUser && !currentUser.isAdmin && !userProfile && currentUser.communityStatus === undefined) {
+    if (currentUser && !currentUser.isAdmin && !currentUser.isIssuedParticipant && !userProfile && currentUser.communityStatus === undefined) {
       const hasProfile = localStorage.getItem(`profile_${currentUser.uid}`);
       if (!hasProfile) {
         setShowOnboarding(true);
@@ -132,6 +134,12 @@ const AppContent = () => {
       }
     }
   }, [currentUser, userProfile, isResolvingAuth]);
+
+  useEffect(() => {
+    if (currentUser && pendingParticipantSpaceId) {
+      setPendingParticipantSpaceId(null);
+    }
+  }, [currentUser, pendingParticipantSpaceId]);
 
   // ログイン/新規登録完了後にpendingLoginSlugへリダイレクト
   useEffect(() => {
@@ -227,6 +235,7 @@ const AppContent = () => {
         // 未ログイン: isPrivate なスペースはアクセス拒否
         if (!isGuestMode) {
           if (targetSpace.isPrivate) {
+            setGuestSpaceId(targetSpace.id);
             setGuestSpaceIsPrivate(true);
           } else if (hasNicknameForSpace(targetSpace.id)) {
             // 過去に入室済み（ニックネームが localStorage に保存されている）→ そのまま入室
@@ -467,6 +476,9 @@ const AppContent = () => {
       <PrivateSpaceScreen
         onLoginRequested={() => {
           setGuestSpaceIsPrivate(false);
+          if (guestSpaceId) {
+            setPendingParticipantSpaceId(guestSpaceId);
+          }
         }}
       />
     );
@@ -485,6 +497,16 @@ const AppContent = () => {
           window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}` : '/');
           navigate('screen');
         }}
+        onLoginRequested={() => setPendingParticipantSpaceId(guestSpaceId)}
+      />
+    );
+  }
+
+  if (!currentUser && pendingParticipantSpaceId) {
+    return (
+      <ParticipantLoginScreen
+        spaceId={pendingParticipantSpaceId}
+        onClose={() => setPendingParticipantSpaceId(null)}
       />
     );
   }

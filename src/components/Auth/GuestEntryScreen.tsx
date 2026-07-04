@@ -15,7 +15,7 @@ type Props = {
   onSignUpRequested?: () => void;
 };
 
-export const GuestEntryScreen = ({ spaceId, onEnterAsGuest }: Props) => {
+export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
   const [step, setStep] = useState<Step>('select');
   // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
@@ -57,17 +57,11 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest }: Props) => {
             </button>
             <button
               type="button"
-              className={`${styles.secondaryButton} ${styles.comingSoonButton}`}
-              disabled
-              aria-disabled="true"
+              className={styles.secondaryButton}
+              onClick={() => onLoginRequested?.()}
             >
-              <span>アカウントでログイン</span>
-              <span className={styles.comingSoonBadge}>Coming soon</span>
+              アカウントでログイン
             </button>
-            <div className={styles.comingSoonMuted} role="status" aria-label="新規登録は準備中です">
-              <span>新規登録の方はこちら</span>
-              <span className={styles.comingSoonBadge}>Coming soon</span>
-            </div>
           </div>
         )}
 

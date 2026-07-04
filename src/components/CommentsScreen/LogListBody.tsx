@@ -118,7 +118,7 @@ export function LogListBody({
   movePaneBusyId = null,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
-  const { state, hideHossii, getActiveNickname } = useHossiiStore();
+  const { state, hideHossii, getActiveNickname, getAuthorId } = useHossiiStore();
   const { profile } = state;
   const isAdmin = currentUser?.isAdmin ?? false;
   const space = useMemo(
@@ -168,20 +168,21 @@ export function LogListBody({
     [hossiis]
   );
 
+  const authorId = getAuthorId();
   const allCount = visibleHossiis.length;
   const mineCount = useMemo(
     () =>
-      profile?.id
-        ? visibleHossiis.filter((h) => h.authorId === profile.id).length
+      authorId
+        ? visibleHossiis.filter((h) => h.authorId === authorId).length
         : 0,
-    [visibleHossiis, profile?.id]
+    [visibleHossiis, authorId]
   );
 
   const scopedHossiis = useMemo(() => {
     if (logScope !== 'mine') return visibleHossiis;
-    if (!profile?.id) return [];
-    return visibleHossiis.filter((h) => h.authorId === profile.id);
-  }, [visibleHossiis, logScope, profile?.id]);
+    if (!authorId) return [];
+    return visibleHossiis.filter((h) => h.authorId === authorId);
+  }, [visibleHossiis, logScope, authorId]);
 
   const allTagCandidates = useMemo(() => {
     const set = new Set<string>(presetTags);

@@ -17,8 +17,9 @@ import styles from './MyLogsScreen.module.css';
 type FilterType = 'all' | 'current';
 
 export const MyLogsScreen = () => {
-  const { state, getActiveSpaceHossiis } = useHossiiStore();
-  const { hossiis, spaces, profile, activeSpaceId } = state;
+  const { state, getActiveSpaceHossiis, getAuthorId } = useHossiiStore();
+  const { hossiis, spaces, activeSpaceId } = state;
+  const authorId = getAuthorId();
   const { visiblePanes, defaultPane, activePane } = useSpacePane();
 
   const visiblePaneIds = useMemo(
@@ -83,12 +84,12 @@ export const MyLogsScreen = () => {
   }, [activeSpaceId, defaultPane, activePane, paneFilter]);
 
   const getPaneFilterCount = (mode: PaneFilterCountMode, paneId?: string): number => {
-    if (!activeSpaceId || !defaultPane || !profile?.id) return 0;
+    if (!activeSpaceId || !defaultPane || !authorId) return 0;
 
     const countVisible = (items: typeof hossiis) =>
       items.filter(
         (h) =>
-          h.authorId === profile.id &&
+          h.authorId === authorId &&
           h.spaceId === activeSpaceId &&
           !coerceIsHidden(h.isHidden),
       ).length;
@@ -122,9 +123,9 @@ export const MyLogsScreen = () => {
   };
 
   const myLogs = useMemo(() => {
-    if (!profile?.id) return [];
+    if (!authorId) return [];
 
-    let logs = hossiis.filter((h) => h.authorId === profile.id);
+    let logs = hossiis.filter((h) => h.authorId === authorId);
 
     if (filter === 'current') {
       logs = logs.filter((h) => h.spaceId === activeSpaceId);
@@ -140,7 +141,7 @@ export const MyLogsScreen = () => {
     );
   }, [
     hossiis,
-    profile,
+    authorId,
     filter,
     activeSpaceId,
     sortOrder,
@@ -215,7 +216,7 @@ export const MyLogsScreen = () => {
         <div className={styles.list}>
           {myLogs.length === 0 ? (
             <div className={styles.empty}>
-              {!profile?.id
+              {!authorId
                 ? 'まだ投稿がありません'
                 : filter === 'current'
                   ? 'このスペースへの投稿はまだありません'

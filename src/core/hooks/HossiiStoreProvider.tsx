@@ -89,6 +89,7 @@ import { insertModerationLog } from '../utils/moderationLogsApi';
 import {
   upsertProfile,
   upsertSpaceNickname,
+  fetchSpaceNicknames,
 } from '../utils/profilesApi';
 import { useAuth } from '../contexts/useAuth';
 import { useAdminNavigation } from '../contexts/useAdminNavigation';
@@ -317,6 +318,7 @@ type ExtendedHossiiAction =
   | { type: 'SET_PROFILE'; payload: UserProfile }
   | { type: 'SET_DEFAULT_NICKNAME'; payload: string }
   | { type: 'SET_SPACE_NICKNAME'; payload: { spaceId: string; nickname: string } }
+  | { type: 'SET_SPACE_NICKNAMES'; payload: SpaceNicknames }
   | { type: 'UPDATE_HOSSII_POSITION'; payload: { id: string; positionX: number; positionY: number } }
   | { type: 'UPDATE_HOSSII_SCALE'; payload: { id: string; scale: number } }
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
@@ -408,12 +410,13 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         }
 
         const authorName = action.payload.authorNameOverride ?? (getActiveNicknameFromState(state) || undefined);
+        const authorId = action.payload.authorNameOverride ? undefined : currentProfile.id;
         const newHossii: Hossii = {
           id: generateId(),
           message: msg,
           emotion: action.payload.emotion,
           spaceId: activeSpaceIdRef.current,
-          authorId: action.payload.authorNameOverride ? undefined : currentProfile.id,
+          authorId,
           authorName,
           createdAt: new Date(),
           logType: action.payload.logType,
@@ -620,6 +623,18 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         };
       }
 
+      case 'SET_SPACE_NICKNAMES': {
+        const merged = {
+          ...state.spaceNicknames,
+          ...action.payload,
+        };
+        saveSpaceNicknames(merged);
+        return {
+          ...state,
+          spaceNicknames: merged,
+        };
+      }
+
       case 'SET_VISITING_SPACE': {
         return { ...state, visitingSpaceId: action.payload };
       }
@@ -758,6 +773,7 @@ export type HossiiContextValue = {
   setDefaultNickname: (nickname: string) => void;
   setSpaceNickname: (spaceId: string, nickname: string) => void;
   getActiveNickname: () => string;
+  getAuthorId: () => string | undefined;
   hasNicknameForSpace: (spaceId: string) => boolean;
   setVisitingSpace: (spaceId: string | null) => void;
   updateHossiiColorAction: (id: string, color: string | null) => void;
@@ -800,9 +816,13 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const initialSpaceNicknames = useMemo(() => loadSpaceNicknames(), []);
 
   const activeSpaceIdRef = useMemo(() => ({ current: activeSpaceId }), [activeSpaceId]);
+  const authorProfileIdRef = useRef<string | undefined>(undefined);
   const spacePaneRuntimeRef = useRef({ ...EMPTY_SPACE_PANE_RUNTIME });
 
-  const reducer = useMemo(() => createReducer(activeSpaceIdRef), [activeSpaceIdRef]);
+  const reducer = useMemo(
+    () => createReducer(activeSpaceIdRef),
+    [activeSpaceIdRef],
+  );
 
   // Supabase が設定済みの場合は localStorage の古いデータを初期表示しない（フラッシュ防止）
   const initialHossiisFromStorage = useMemo(
@@ -842,6 +862,32 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   useLayoutEffect(() => {
     stateRef.current = state;
   });
+
+  useEffect(() => {
+    if (isResolvingAuth) return;
+
+    if (currentUser && !currentUser.isAdmin) {
+      authorProfileIdRef.current = currentUser.uid;
+      const existing = stateRef.current.profile;
+      const nextProfile: UserProfile = {
+        id: currentUser.uid,
+        defaultNickname: existing?.defaultNickname ?? currentUser.username ?? '',
+        createdAt: existing?.createdAt ?? new Date(),
+      };
+      dispatch({ type: 'SET_PROFILE', payload: nextProfile });
+
+      if (isSupabaseConfigured) {
+        void fetchSpaceNicknames(currentUser.uid).then((nicknames) => {
+          if (Object.keys(nicknames).length > 0) {
+            dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
+          }
+        });
+      }
+      return;
+    }
+
+    authorProfileIdRef.current = undefined;
+  }, [currentUser, isResolvingAuth]);
 
   useEffect(() => {
     setHossiiEntitiesSnapshot(state.entities.entitiesById);
@@ -1143,14 +1189,19 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     let profile = currentState.profile;
     if (!profile) {
       profile = {
-        id: generateId(),
+        id: authorProfileIdRef.current ?? generateId(),
         defaultNickname: '',
         createdAt: new Date(),
       };
       dispatch({ type: 'SET_PROFILE', payload: profile });
       saveProfile(profile);
+    } else if (authorProfileIdRef.current && profile.id !== authorProfileIdRef.current) {
+      profile = { ...profile, id: authorProfileIdRef.current };
+      dispatch({ type: 'SET_PROFILE', payload: profile });
+      saveProfile(profile);
     }
 
+    const authorId = input.authorNameOverride ? undefined : profile.id;
     const authorName =
       input.authorNameOverride ??
       (getActiveNicknameFromState(currentState) || undefined);
@@ -1166,7 +1217,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           message: msg,
           spaceId: activeSpaceId,
           spacePaneId: activePaneId,
-          authorId: input.authorNameOverride ? undefined : profile.id,
+          authorId,
           authorName,
           createdAt: new Date(),
           origin: input.origin ?? 'manual',
@@ -1185,7 +1236,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           emotion: input.emotion,
           spaceId: activeSpaceId,
           spacePaneId: activePaneId,
-          authorId: input.authorNameOverride ? undefined : profile.id,
+          authorId,
           authorName,
           createdAt: new Date(),
           logType: input.logType,
@@ -1340,6 +1391,13 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     return getActiveNicknameFromState(state);
   }, [state]);
 
+  const getAuthorId = useCallback((): string | undefined => {
+    if (currentUser && !currentUser.isAdmin) {
+      return currentUser.uid;
+    }
+    return state.profile?.id;
+  }, [currentUser, state.profile?.id]);
+
   const hasNicknameForSpace = useCallback((spaceId: string) => {
     return !!state.spaceNicknames[spaceId];
   }, [state.spaceNicknames]);
@@ -1444,6 +1502,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         setDefaultNickname,
         setSpaceNickname,
         getActiveNickname,
+        getAuthorId,
         hasNicknameForSpace,
         setVisitingSpace,
         updateHossiiColorAction,
@@ -1473,6 +1532,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           setDefaultNickname,
           setSpaceNickname,
           getActiveNickname,
+          getAuthorId,
           hasNicknameForSpace,
           setVisitingSpace,
           updateHossiiColorAction,

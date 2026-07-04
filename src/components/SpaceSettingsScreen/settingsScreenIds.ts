@@ -12,7 +12,8 @@ export type SettingsScreenId =
   | 'decoration'
   | 'moderation'
   | 'exportRecord'
-  | 'neighbors';
+  | 'neighbors'
+  | 'participantAccounts';
 
 export type NavItem = {
   id: SettingsScreenId;
@@ -59,6 +60,7 @@ export const SETTINGS_NAV_GROUPS: NavGroup[] = [
     heading: '運営',
     items: [
       { id: 'moderation', label: '投稿管理', adminOnly: true },
+      { id: 'participantAccounts', label: '参加者アカウント', adminOnly: true },
       { id: 'exportRecord', label: '出力・記録', adminOnly: true },
       { id: 'neighbors', label: '隣のスペース', adminOnly: true },
     ],
