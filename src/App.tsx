@@ -91,7 +91,8 @@ const AppContent = () => {
 
   // ゲスト入室中に AccountScreen から参加者ログインを要求されたとき
   const handleParticipantLoginRequested = () => {
-    const spaceId = state.activeSpaceId || guestSpaceId;
+    // URL 直リンクの guestSpaceId を優先（localStorage の activeSpaceId が別スペースのまま残ることがある）
+    const spaceId = guestSpaceId || state.activeSpaceId;
     if (spaceId) {
       setPendingParticipantSpaceId(spaceId);
     }
@@ -143,11 +144,20 @@ const AppContent = () => {
     }
   }, [currentUser, userProfile, isResolvingAuth]);
 
+  // 参加者ログイン成功後: ログイン対象スペースへ必ず入室する
   useEffect(() => {
-    if (currentUser && pendingParticipantSpaceId) {
-      setPendingParticipantSpaceId(null);
+    if (!currentUser || !pendingParticipantSpaceId) return;
+
+    const spaceId = pendingParticipantSpaceId;
+    setPendingParticipantSpaceId(null);
+    setIsGuestMode(false);
+    setActiveSpace(spaceId);
+    if (!hasNicknameForSpace(spaceId)) {
+      setPendingSpaceId(spaceId);
+      setShowNicknameModal(true);
     }
-  }, [currentUser, pendingParticipantSpaceId]);
+    navigate('screen');
+  }, [currentUser, pendingParticipantSpaceId, setActiveSpace, hasNicknameForSpace, navigate]);
 
   // ログイン/新規登録完了後にpendingLoginSlugへリダイレクト
   useEffect(() => {
