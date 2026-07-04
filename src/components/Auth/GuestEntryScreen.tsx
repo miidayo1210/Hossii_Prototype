@@ -9,7 +9,7 @@ type Step = 'select' | 'nickname';
 type Props = {
   spaceId: string;
   onEnterAsGuest: () => void;
-  /** 将来のログイン導線用（現状は Coming soon のため未使用） */
+  /** 参加者ログイン導線 */
   onLoginRequested?: () => void;
   /** 将来の新規登録導線用（現状は Coming soon のため未使用） */
   onSignUpRequested?: () => void;

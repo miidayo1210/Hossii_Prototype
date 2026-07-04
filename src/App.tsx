@@ -89,6 +89,14 @@ const AppContent = () => {
   const [pendingAuthMode, setPendingAuthMode] = useState<'login' | 'signup'>('login');
   const [pendingParticipantSpaceId, setPendingParticipantSpaceId] = useState<string | null>(null);
 
+  // ゲスト入室中に AccountScreen から参加者ログインを要求されたとき
+  const handleParticipantLoginRequested = () => {
+    const spaceId = state.activeSpaceId || guestSpaceId;
+    if (spaceId) {
+      setPendingParticipantSpaceId(spaceId);
+    }
+  };
+
   // ゲスト入室中に AccountScreen からログイン/新規登録を要求されたとき
   const handleGuestAuthRequested = (mode: 'login' | 'signup') => {
     const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
@@ -470,6 +478,16 @@ const AppContent = () => {
     );
   }
 
+  // 参加者ログイン画面（GuestEntryScreen より先に判定する）
+  if (!currentUser && pendingParticipantSpaceId) {
+    return (
+      <ParticipantLoginScreen
+        spaceId={pendingParticipantSpaceId}
+        onClose={() => setPendingParticipantSpaceId(null)}
+      />
+    );
+  }
+
   // /s/[slug] アクセス: 未ログインかつ isPrivate なスペース → アクセス拒否画面
   if (!currentUser && guestSpaceIsPrivate) {
     return (
@@ -498,15 +516,6 @@ const AppContent = () => {
           navigate('screen');
         }}
         onLoginRequested={() => setPendingParticipantSpaceId(guestSpaceId)}
-      />
-    );
-  }
-
-  if (!currentUser && pendingParticipantSpaceId) {
-    return (
-      <ParticipantLoginScreen
-        spaceId={pendingParticipantSpaceId}
-        onClose={() => setPendingParticipantSpaceId(null)}
       />
     );
   }
@@ -576,7 +585,7 @@ const AppContent = () => {
       case 'account':
         return (
           <AccountScreen
-            onLoginRequested={() => handleGuestAuthRequested('login')}
+            onLoginRequested={handleParticipantLoginRequested}
             onSignUpRequested={() => handleGuestAuthRequested('signup')}
           />
         );

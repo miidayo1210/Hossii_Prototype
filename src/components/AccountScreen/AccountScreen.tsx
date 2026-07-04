@@ -44,7 +44,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     setTimeout(() => setSavedSpace(false), 2000);
   };
 
-  const guestAuthLocked = !currentUser && ACCOUNT_AUTH_COMING_SOON;
+  const guestSignUpLocked = !currentUser && ACCOUNT_AUTH_COMING_SOON;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -105,24 +105,23 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               <p className={styles.guestDesc}>
                 アカウントを作成すると、複数の端末で同じ情報を使えます。
               </p>
-              {guestAuthLocked && (
+              {guestSignUpLocked && (
                 <p className={styles.comingSoonHint} role="status">
-                  ログイン・新規会員登録は Coming soon です。
+                  新規会員登録は Coming soon です。管理者から発行された参加 ID がある場合はログインできます。
                 </p>
               )}
               <div className={styles.guestActions}>
                 <button
                   type="button"
-                  className={`${styles.loginButton} ${guestAuthLocked ? styles.guestAuthLocked : ''}`}
-                  disabled={guestAuthLocked}
+                  className={styles.loginButton}
                   onClick={onLoginRequested}
                 >
                   アカウントでログイン
                 </button>
                 <button
                   type="button"
-                  className={`${styles.signUpButton} ${guestAuthLocked ? styles.guestAuthLocked : ''}`}
-                  disabled={guestAuthLocked}
+                  className={`${styles.signUpButton} ${guestSignUpLocked ? styles.guestAuthLocked : ''}`}
+                  disabled={guestSignUpLocked}
                   onClick={onSignUpRequested}
                 >
                   新規会員登録
