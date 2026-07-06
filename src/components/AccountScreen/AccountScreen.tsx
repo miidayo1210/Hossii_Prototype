@@ -5,6 +5,7 @@ import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
+import { MyHossiiSettingsSection } from './MyHossiiSettingsSection';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -129,6 +130,15 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               </div>
             </div>
           )}
+        </section>
+
+        {/* マイHossii */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>マイHossii</h2>
+          <p className={styles.sectionDesc}>
+            ログインアカウントに紐づく、あなたのHossiiを登録できます。
+          </p>
+          <MyHossiiSettingsSection currentUser={currentUser} />
         </section>
 
         {/* このスペースでのニックネーム */}
