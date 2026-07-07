@@ -94,6 +94,8 @@ import {
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { MyHossiiLayer } from '../MyHossii/MyHossiiLayer';
 import { fetchMyHossiiSettings, isMyHossiiRegistered } from '../../core/utils/userProfilesApi';
+import { fetchParticipantEligibility } from '../../core/utils/myHossiiParticipationApi';
+import type { ParticipantEligibility } from '../../core/utils/myHossiiAppearance';
 import { ListenConsentModal } from '../ListenConsentModal/ListenConsentModal';
 import { VoiceConsentModal } from '../VoiceConsentModal/VoiceConsentModal';
 import { StarLayer } from '../StarLayer/StarLayer';
@@ -327,6 +329,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedAuthorGroup, setSelectedAuthorGroup] = useState<AuthorPostGroup | null>(null);
   const [hasMyHossiiRegistered, setHasMyHossiiRegistered] = useState(false);
+  const [myHossiiParticipantEligibility, setMyHossiiParticipantEligibility] =
+    useState<ParticipantEligibility>('not_participant');
   const [expandedClusterKeys, setExpandedClusterKeys] = useState<Set<string>>(new Set());
   // 音声パネルの開閉と蓄積テキスト
   const [panelConfirmedText, setPanelConfirmedText] = useState('');
@@ -779,6 +783,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   useEffect(() => {
     if (!currentUser?.uid) {
       setHasMyHossiiRegistered(false);
+      setMyHossiiParticipantEligibility('not_participant');
       return;
     }
     let cancelled = false;
@@ -795,6 +800,24 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       cancelled = true;
     };
   }, [currentUser?.uid]);
+
+  useEffect(() => {
+    if (!currentUser?.uid || !activeSpace?.id) {
+      setMyHossiiParticipantEligibility('not_participant');
+      return;
+    }
+    let cancelled = false;
+    fetchParticipantEligibility(currentUser.uid, activeSpace.id)
+      .then((eligibility) => {
+        if (!cancelled) setMyHossiiParticipantEligibility(eligibility);
+      })
+      .catch(() => {
+        if (!cancelled) setMyHossiiParticipantEligibility('not_participant');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.uid, activeSpace?.id]);
 
   const resolvedBackground = useMemo(() => {
     if (isVisiting && visitingSpaceInfo) {
@@ -1981,6 +2004,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           currentUserId={currentUser?.uid ?? null}
           isAuthenticatedViewer={!!currentUser}
           hasMyHossiiRegistered={hasMyHossiiRegistered}
+          participantEligibility={myHossiiParticipantEligibility}
           prefersReducedMotion={prefersReducedMotion}
           onViewAuthorLogs={(group) => setSelectedAuthorGroup(group)}
         />

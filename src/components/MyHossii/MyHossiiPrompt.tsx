@@ -26,7 +26,7 @@ export const MyHossiiPrompt = ({ userId, spaceId }: Props) => {
   return (
     <div className={styles.prompt} role="status">
       <p className={styles.title}>マイHossiiを選ぼう</p>
-      <p className={styles.body}>あなたのHossiiを登録すると、このスペースに登場します。</p>
+      <p className={styles.body}>登録すると、このスペースに登場します。</p>
       <div className={styles.actions}>
         <button type="button" className={styles.primaryButton} onClick={handleGoAccount}>
           選びにいく

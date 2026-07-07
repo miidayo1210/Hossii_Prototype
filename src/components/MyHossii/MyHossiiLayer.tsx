@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Hossii } from '../../core/types';
 import type { MyHossiiLogVisibility, MyHossiiMotionMode, MyHossiiParticipant } from '../../core/types/myHossii';
+import type { ParticipantEligibility } from '../../core/utils/myHossiiAppearance';
+import { shouldShowSpaceRegistrationPrompt } from '../../core/utils/myHossiiAppearance';
 import type { AuthorPostGroup } from '../../core/utils/authorPostGroup';
 import { useMyHossiiParticipants } from '../../core/hooks/useMyHossiiParticipants';
 import { resolveMyHossiiAnimationTier } from '../../core/utils/myHossiiAnimationLevel';
@@ -31,6 +33,7 @@ type Props = {
   currentUserId: string | null;
   isAuthenticatedViewer: boolean;
   hasMyHossiiRegistered: boolean;
+  participantEligibility: ParticipantEligibility;
   prefersReducedMotion: boolean;
   onViewAuthorLogs: (group: AuthorPostGroup) => void;
 };
@@ -51,6 +54,7 @@ export const MyHossiiLayer = ({
   currentUserId,
   isAuthenticatedViewer,
   hasMyHossiiRegistered,
+  participantEligibility,
   prefersReducedMotion,
   onViewAuthorLogs,
 }: Props) => {
@@ -136,10 +140,12 @@ export const MyHossiiLayer = ({
   if (error) return null;
   if (isLoading && participants.length === 0) return null;
 
-  const showPrompt =
-    isAuthenticatedViewer &&
-    !!currentUserId &&
-    !hasMyHossiiRegistered;
+  const showPrompt = shouldShowSpaceRegistrationPrompt({
+    isAuthenticated: isAuthenticatedViewer,
+    spaceMyHossiiEnabled: enabled,
+    participantEligibility,
+    isRegistered: hasMyHossiiRegistered,
+  });
 
   const handleViewLogs = (userId: string) => {
     const group = findAuthorGroupForUser(hossiis, userId);

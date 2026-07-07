@@ -5,6 +5,20 @@ import {
   getHossiiPresetByKey,
   resolveHossiiPresetImagePath,
 } from '../../core/assets/hossiiPresets';
+import {
+  buildMyHossiiSpaceAppearanceInput,
+  getRegistrationSuccessMessage,
+  isAdminUser,
+  isVisibleInSpace,
+  resolveMyHossiiAccountUiState,
+  type MyHossiiSpaceAppearanceInput,
+  type ParticipantEligibility,
+} from '../../core/utils/myHossiiAppearance';
+import { fetchParticipantEligibility } from '../../core/utils/myHossiiParticipationApi';
+import {
+  fetchMyHossiiSpacePreference,
+  upsertMyHossiiSpacePreference,
+} from '../../core/utils/myHossiiSpacePreferencesApi';
 import { resolveMyHossiiImage } from '../../core/utils/resolveMyHossiiImage';
 import {
   fetchMyHossiiSettings,
@@ -17,6 +31,9 @@ import styles from './MyHossiiSettingsSection.module.css';
 
 type Props = {
   currentUser: AppUser | null;
+  activeSpaceId?: string | null;
+  activeSpaceName?: string | null;
+  spaceMyHossiiEnabled?: boolean;
 };
 
 const LOAD_ERROR_MESSAGE =
@@ -24,7 +41,12 @@ const LOAD_ERROR_MESSAGE =
 
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
-export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
+export const MyHossiiSettingsSection = ({
+  currentUser,
+  activeSpaceId,
+  activeSpaceName,
+  spaceMyHossiiEnabled = false,
+}: Props) => {
   const [savedSettings, setSavedSettings] = useState<MyHossiiSettings | null>(null);
   const [selectedPresetKey, setSelectedPresetKey] = useState<string | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
@@ -33,27 +55,80 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
+  const [participantEligibility, setParticipantEligibility] =
+    useState<ParticipantEligibility>('not_participant');
+  const [userPreferenceVisible, setUserPreferenceVisible] = useState(true);
+  const [isAppearanceLoading, setIsAppearanceLoading] = useState(false);
+  const [appearanceError, setAppearanceError] = useState<string | null>(null);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadSettings = useCallback(async (userId: string) => {
+  const loadAppearance = useCallback(
+    async (userId: string, spaceId: string | null | undefined, settings: MyHossiiSettings) => {
+      if (!spaceId) {
+        setParticipantEligibility('not_participant');
+        setUserPreferenceVisible(true);
+        return buildMyHossiiSpaceAppearanceInput({
+          myHossiiSettings: settings,
+          spaceMyHossiiEnabled: false,
+          participantEligibility: 'not_participant',
+          userPreferenceVisible: true,
+        });
+      }
+
+      setIsAppearanceLoading(true);
+      setAppearanceError(null);
+      try {
+        const [eligibility, preferenceVisible] = await Promise.all([
+          fetchParticipantEligibility(userId, spaceId),
+          fetchMyHossiiSpacePreference(userId, spaceId),
+        ]);
+        setParticipantEligibility(eligibility);
+        setUserPreferenceVisible(preferenceVisible);
+        return buildMyHossiiSpaceAppearanceInput({
+          myHossiiSettings: settings,
+          spaceMyHossiiEnabled,
+          participantEligibility: eligibility,
+          userPreferenceVisible: preferenceVisible,
+        });
+      } catch (error) {
+        console.error('[MyHossiiSettingsSection] appearance load error:', error);
+        setAppearanceError('登場状態を読み込めませんでした。');
+        return buildMyHossiiSpaceAppearanceInput({
+          myHossiiSettings: settings,
+          spaceMyHossiiEnabled,
+          participantEligibility: 'not_participant',
+          userPreferenceVisible: true,
+        });
+      } finally {
+        setIsAppearanceLoading(false);
+      }
+    },
+    [spaceMyHossiiEnabled],
+  );
+
+  const loadSettings = useCallback(async () => {
+    if (!currentUser) return;
+
     setIsLoading(true);
     setLoadError(null);
     setSaveError(null);
     try {
-      const settings = await fetchMyHossiiSettings(userId);
+      const settings = await fetchMyHossiiSettings(currentUser.uid);
       setSavedSettings(settings);
       setSelectedPresetKey(settings.sourceType === 'preset' ? settings.presetKey : null);
       setUploadPreviewUrl(null);
       setPendingUploadFile(null);
+      await loadAppearance(currentUser.uid, activeSpaceId, settings);
     } catch (error) {
       console.error('[MyHossiiSettingsSection] load error:', error);
       setLoadError(LOAD_ERROR_MESSAGE);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentUser, activeSpaceId, loadAppearance]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -63,19 +138,25 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
       setPendingUploadFile(null);
       setLoadError(null);
       setSaveError(null);
-      setSaveSuccess(false);
+      setRegistrationMessage(null);
       setIsLoading(false);
       return;
     }
-    void loadSettings(currentUser.uid);
+    void loadSettings();
   }, [currentUser, loadSettings]);
+
+  const handleRegistrationComplete = async (saved: MyHossiiSettings) => {
+    if (!currentUser) return;
+    const appearance = await loadAppearance(currentUser.uid, activeSpaceId, saved);
+    setRegistrationMessage(getRegistrationSuccessMessage(appearance, activeSpaceName));
+  };
 
   const handleSavePreset = async () => {
     if (!currentUser || !selectedPresetKey || isSaving) return;
 
     setIsSaving(true);
-    setSaveSuccess(false);
     setSaveError(null);
+    setRegistrationMessage(null);
 
     try {
       const saved = await saveMyHossiiPreset(currentUser.uid, selectedPresetKey);
@@ -83,8 +164,7 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
       setSelectedPresetKey(saved.presetKey);
       setUploadPreviewUrl(null);
       setPendingUploadFile(null);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      await handleRegistrationComplete(saved);
     } catch (error) {
       console.error('[MyHossiiSettingsSection] save error:', error);
       setSaveError('保存に失敗しました。もう一度お試しください。');
@@ -112,16 +192,15 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     if (!currentUser || !pendingUploadFile || isUploading) return;
 
     setIsUploading(true);
-    setSaveSuccess(false);
     setSaveError(null);
+    setRegistrationMessage(null);
 
     try {
       const saved = await saveMyHossiiUpload(currentUser.uid, pendingUploadFile);
       setSavedSettings(saved);
       setPendingUploadFile(null);
       setUploadPreviewUrl(null);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      await handleRegistrationComplete(saved);
     } catch (error) {
       console.error('[MyHossiiSettingsSection] upload error:', error);
       setSaveError(error instanceof Error ? error.message : 'アップロードに失敗しました');
@@ -135,6 +214,23 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     setUploadPreviewUrl(null);
     if (savedSettings?.sourceType === 'preset') {
       setSelectedPresetKey(savedSettings.presetKey);
+    }
+  };
+
+  const handleVisibilityToggle = async (nextVisible: boolean) => {
+    if (!currentUser || !activeSpaceId || isTogglingVisibility) return;
+
+    setIsTogglingVisibility(true);
+    setAppearanceError(null);
+    try {
+      await upsertMyHossiiSpacePreference(currentUser.uid, activeSpaceId, nextVisible);
+      setUserPreferenceVisible(nextVisible);
+      setRegistrationMessage(null);
+    } catch (error) {
+      console.error('[MyHossiiSettingsSection] visibility toggle error:', error);
+      setAppearanceError('登場設定の保存に失敗しました。');
+    } finally {
+      setIsTogglingVisibility(false);
     }
   };
 
@@ -165,7 +261,7 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
         <button
           type="button"
           className={styles.saveButton}
-          onClick={() => void loadSettings(currentUser.uid)}
+          onClick={() => void loadSettings()}
         >
           再読み込み
         </button>
@@ -173,7 +269,21 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     );
   }
 
+  const appearanceInput: MyHossiiSpaceAppearanceInput = buildMyHossiiSpaceAppearanceInput({
+    myHossiiSettings: savedSettings ?? {
+      sourceType: null,
+      presetKey: null,
+      imagePath: null,
+      updatedAt: null,
+    },
+    spaceMyHossiiEnabled,
+    participantEligibility,
+    userPreferenceVisible,
+  });
+
+  const uiState = resolveMyHossiiAccountUiState(appearanceInput);
   const isRegistered = savedSettings ? isMyHossiiRegistered(savedSettings) : false;
+  const currentlyVisible = isVisibleInSpace(appearanceInput);
 
   const previewImage = (() => {
     if (uploadPreviewUrl) return uploadPreviewUrl;
@@ -200,15 +310,114 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     !!selectedPresetKey && selectedPresetKey !== savedSettings?.presetKey;
   const canSavePreset = hasPresetChanges && !isSaving && !isUploading;
   const canSaveUpload = !!pendingUploadFile && !isUploading && !isSaving;
+  const canToggleVisibility =
+    uiState === 'registered_visible' || uiState === 'registered_hidden_by_user';
 
   return (
     <div className={styles.myHossiiSection}>
       {!isRegistered && (
         <div className={styles.promptCard} role="status">
-          <p className={styles.promptTitle}>あなたのHossiiをこの場所に登場させよう</p>
+          <p className={styles.promptTitle}>あなたのHossiiを登場させよう</p>
           <p className={styles.promptDesc}>
-            基本のHossiiから1体選ぶか、画像を登録できます。登録後は参加しているスペースに表示されます。
+            マイHossiiを登録すると、参加しているスペースに登場できます。
           </p>
+        </div>
+      )}
+
+      {activeSpaceId && (
+        <div className={styles.appearanceCard} aria-live="polite">
+          <p className={styles.appearanceTitle}>
+            {activeSpaceName ? `${activeSpaceName}での登場` : 'このスペースでの登場'}
+          </p>
+
+          {isAppearanceLoading ? (
+            <p className={styles.appearanceDesc}>登場状態を確認しています...</p>
+          ) : (
+            <>
+              {uiState === 'unregistered' && (
+                <p className={styles.appearanceDesc}>
+                  マイHossiiを登録すると、参加しているスペースに登場できます。
+                </p>
+              )}
+
+              {uiState === 'registered_visible' && (
+                <>
+                  <label className={styles.visibilityToggle}>
+                    <span>このスペースにマイHossiiを登場させる</span>
+                    <input
+                      type="checkbox"
+                      checked={userPreferenceVisible}
+                      disabled={isTogglingVisibility}
+                      onChange={(e) => void handleVisibilityToggle(e.target.checked)}
+                    />
+                    <span className={styles.toggleLabel}>{userPreferenceVisible ? 'ON' : 'OFF'}</span>
+                  </label>
+                  <p className={`${styles.appearanceStatus} ${styles.appearanceStatusPositive}`}>
+                    このスペースに登場しています。
+                  </p>
+                </>
+              )}
+
+              {uiState === 'registered_hidden_by_user' && (
+                <>
+                  <label className={styles.visibilityToggle}>
+                    <span>このスペースにマイHossiiを登場させる</span>
+                    <input
+                      type="checkbox"
+                      checked={userPreferenceVisible}
+                      disabled={isTogglingVisibility}
+                      onChange={(e) => void handleVisibilityToggle(e.target.checked)}
+                    />
+                    <span className={styles.toggleLabel}>{userPreferenceVisible ? 'ON' : 'OFF'}</span>
+                  </label>
+                  <p className={styles.appearanceStatus}>
+                    マイHossiiは登録されていますが、このスペースでは非表示です。
+                  </p>
+                </>
+              )}
+
+              {uiState === 'registered_space_off' && (
+                <p className={styles.appearanceStatus}>
+                  マイHossiiは登録されています。
+                  <br />
+                  このスペースでは、現在マイHossii機能が有効になっていません。
+                  管理者が機能をONにすると登場できます。
+                </p>
+              )}
+
+              {uiState === 'registered_not_participant' && (
+                <p className={styles.appearanceStatus}>
+                  マイHossiiは登録されていますが、
+                  このスペースの参加者として登録されていないため、現在は登場できません。
+                  {isAdminUser(currentUser) && (
+                    <>
+                      <br />
+                      管理者権限だけでは、スペースの参加者としては扱われません。
+                      このスペースで参加者ニックネームを設定すると、登場できるようになります。
+                    </>
+                  )}
+                </p>
+              )}
+
+              {uiState === 'registered_revoked' && (
+                <p className={styles.appearanceStatus}>
+                  現在、このスペースではマイHossiiを登場させることができません。
+                </p>
+              )}
+
+              {appearanceError && (
+                <p className={`${styles.statusMessage} ${styles.statusError}`} role="alert">
+                  {appearanceError}
+                </p>
+              )}
+
+              {canToggleVisibility && currentlyVisible && (
+                <p className={styles.appearanceHint}>
+                  OFFにすると、このスペースのHOMEからマイHossiiが消えます。登録内容は維持されます。
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -318,11 +527,16 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
           disabled={!canSavePreset}
           aria-busy={isSaving}
         >
-          {isSaving ? '保存中...' : saveSuccess && !pendingUploadFile ? '保存済み ✓' : 'プリセットを保存'}
+          {isSaving ? '保存中...' : 'プリセットを保存'}
         </button>
-        {saveSuccess && (
+        {registrationMessage && (
           <p className={`${styles.statusMessage} ${styles.statusSuccess}`} role="status">
-            マイHossiiを登録しました
+            {registrationMessage.split('\n').map((line, index) => (
+              <span key={`${line}-${index}`}>
+                {line}
+                {index < registrationMessage.split('\n').length - 1 && <br />}
+              </span>
+            ))}
           </p>
         )}
         {saveError && (

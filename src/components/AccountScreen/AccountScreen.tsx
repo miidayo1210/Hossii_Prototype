@@ -138,7 +138,12 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
           <p className={styles.sectionDesc}>
             ログインアカウントに紐づく、あなたのHossiiを登録できます。
           </p>
-          <MyHossiiSettingsSection currentUser={currentUser} />
+          <MyHossiiSettingsSection
+            currentUser={currentUser}
+            activeSpaceId={activeSpaceId}
+            activeSpaceName={activeSpace?.name ?? null}
+            spaceMyHossiiEnabled={activeSpace?.myHossiiEnabled ?? false}
+          />
         </section>
 
         {/* このスペースでのニックネーム */}
