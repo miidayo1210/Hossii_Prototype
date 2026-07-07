@@ -8,7 +8,8 @@ import { useMyHossiiParticipants } from '../../core/hooks/useMyHossiiParticipant
 import { resolveMyHossiiAnimationTier } from '../../core/utils/myHossiiAnimationLevel';
 import { computeMyHossiiPosition, resolveMyHossiiMotionMode } from '../../core/utils/myHossiiPosition';
 import { resolveMyHossiiImage } from '../../core/utils/resolveMyHossiiImage';
-import { deriveMyHossiiActivity, findAuthorGroupForUser } from '../../core/utils/myHossiiActivity';
+import { deriveMyHossiiActivity } from '../../core/utils/myHossiiActivity';
+import { resolveAuthorGroupForMyHossiiUser } from '../../core/utils/myHossiiAuthorLogs';
 import {
   deriveMyHossiiDisplayState,
   getMyHossiiStateLabel,
@@ -147,12 +148,14 @@ export const MyHossiiLayer = ({
     isRegistered: hasMyHossiiRegistered,
   });
 
-  const handleViewLogs = (userId: string) => {
-    const group = findAuthorGroupForUser(hossiis, userId);
-    if (group) {
-      onViewAuthorLogs(group);
-      setSelectedUserId(null);
-    }
+  const handleViewLogs = (userId: string, nickname: string) => {
+    const group = resolveAuthorGroupForMyHossiiUser(hossiis, {
+      userId,
+      nickname,
+      spaceId,
+    });
+    onViewAuthorLogs(group);
+    setSelectedUserId(null);
   };
 
   return (
@@ -198,7 +201,7 @@ type AvatarItemProps = {
   activeBubbles: ActiveBubble[];
   onSelect: (userId: string) => void;
   onDeselect: () => void;
-  onViewLogs: (userId: string) => void;
+  onViewLogs: (userId: string, nickname: string) => void;
 };
 
 function AvatarItem({
@@ -219,7 +222,10 @@ function AvatarItem({
 }: AvatarItemProps) {
   const position = computeMyHossiiPosition(participant.userId, spaceId, index);
   const imageSrc = resolveMyHossiiImage(participant);
-  const activity = deriveMyHossiiActivity(hossiis, participant.userId);
+  const activity = deriveMyHossiiActivity(hossiis, participant.userId, {
+    nickname: participant.nickname,
+    spaceId,
+  });
   const displayState = deriveMyHossiiDisplayState(activity);
   const stateLabel = getMyHossiiStateLabel(displayState);
   const activityScale = resolveActivityScale(activity.lastActivityAt);

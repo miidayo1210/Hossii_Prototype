@@ -24,7 +24,7 @@ export type MyHossiiAvatarProps = {
   isSelected: boolean;
   onSelect: (userId: string) => void;
   onDeselect: () => void;
-  onViewLogs: (userId: string) => void;
+  onViewLogs: (userId: string, nickname: string) => void;
 };
 
 export const MyHossiiAvatar = ({
@@ -105,7 +105,7 @@ export const MyHossiiAvatar = ({
           stateLabel={stateLabel}
           activity={activity}
           showLogs={showLogs}
-          onViewLogs={() => onViewLogs(userId)}
+          onViewLogs={() => onViewLogs(userId, nickname)}
           onClose={onDeselect}
         />
       )}

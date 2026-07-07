@@ -100,7 +100,14 @@ export const MyHossiiPopover = ({
             </p>
           )}
 
-          <button type="button" className={styles.viewLogsButton} onClick={onViewLogs}>
+          <button
+            type="button"
+            className={styles.viewLogsButton}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewLogs();
+            }}
+          >
             この人のログを見る
           </button>
         </>

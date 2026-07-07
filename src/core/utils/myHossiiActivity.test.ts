@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveMyHossiiActivity } from './myHossiiActivity';
+import { deriveMyHossiiActivity, findAuthorGroupForUser } from './myHossiiActivity';
 import type { Hossii } from '../types';
 
 function makeHossii(partial: Partial<Hossii> & Pick<Hossii, 'id' | 'createdAt'>): Hossii {
@@ -36,5 +36,49 @@ describe('deriveMyHossiiActivity', () => {
     const activity = deriveMyHossiiActivity(hossiis, userId);
     expect(activity.recentPosts).toHaveLength(1);
     expect(activity.recentPosts[0]?.id).toBe('2');
+  });
+});
+
+describe('findAuthorGroupForUser', () => {
+  it('always returns a group when spaceId is provided', () => {
+    const group = findAuthorGroupForUser([], 'auth-uid-1', 'しづる', 'space-1');
+    expect(group).not.toBeNull();
+    expect(group?.posts).toHaveLength(0);
+    expect(group?.authorId).toBe('auth-uid-1');
+  });
+
+  it('resolves legacy nickname posts when auth uid does not match', () => {
+    const hossiis = [
+      makeHossii({
+        id: 'p1',
+        authorId: 'legacy-profile-id',
+        authorName: 'しづる',
+        createdAt: new Date('2026-07-01'),
+      }),
+    ];
+    const group = findAuthorGroupForUser(hossiis, 'auth-uid-1', 'しづる', 'space-1');
+    expect(group?.posts).toHaveLength(1);
+  });
+});
+
+describe('findAuthorGroupForUser', () => {
+  it('always returns a group when spaceId is provided', () => {
+    const group = findAuthorGroupForUser([], 'auth-uid-1', 'しづる', 'space-1');
+    expect(group).not.toBeNull();
+    expect(group?.posts).toHaveLength(0);
+    expect(group?.authorId).toBe('auth-uid-1');
+  });
+
+  it('resolves legacy nickname posts when auth uid does not match', () => {
+    const hossiis = [
+      makeHossii({
+        id: 'p1',
+        authorId: 'legacy-profile-id',
+        authorName: 'しづる',
+        createdAt: new Date('2026-07-01'),
+      }),
+    ];
+    const group = findAuthorGroupForUser(hossiis, 'auth-uid-1', 'しづる', 'space-1');
+    expect(group?.posts).toHaveLength(1);
   });
 });
