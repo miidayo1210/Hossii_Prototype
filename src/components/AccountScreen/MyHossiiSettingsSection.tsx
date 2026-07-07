@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppUser } from '../../core/contexts/AuthContext';
 import {
   HOSSII_BASIC_PRESETS,
   getHossiiPresetByKey,
   resolveHossiiPresetImagePath,
 } from '../../core/assets/hossiiPresets';
+import { resolveMyHossiiImage } from '../../core/utils/resolveMyHossiiImage';
 import {
   fetchMyHossiiSettings,
+  isMyHossiiRegistered,
   saveMyHossiiPreset,
+  saveMyHossiiUpload,
   type MyHossiiSettings,
 } from '../../core/utils/userProfilesApi';
 import styles from './MyHossiiSettingsSection.module.css';
@@ -19,14 +22,20 @@ type Props = {
 const LOAD_ERROR_MESSAGE =
   'マイHossiiの設定を読み込めませんでした。時間をおいて、もう一度お試しください。';
 
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
 export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
   const [savedSettings, setSavedSettings] = useState<MyHossiiSettings | null>(null);
   const [selectedPresetKey, setSelectedPresetKey] = useState<string | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(() => currentUser !== null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadSettings = useCallback(async (userId: string) => {
     setIsLoading(true);
@@ -35,7 +44,9 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     try {
       const settings = await fetchMyHossiiSettings(userId);
       setSavedSettings(settings);
-      setSelectedPresetKey(settings.presetKey);
+      setSelectedPresetKey(settings.sourceType === 'preset' ? settings.presetKey : null);
+      setUploadPreviewUrl(null);
+      setPendingUploadFile(null);
     } catch (error) {
       console.error('[MyHossiiSettingsSection] load error:', error);
       setLoadError(LOAD_ERROR_MESSAGE);
@@ -48,6 +59,8 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     if (!currentUser) {
       setSavedSettings(null);
       setSelectedPresetKey(null);
+      setUploadPreviewUrl(null);
+      setPendingUploadFile(null);
       setLoadError(null);
       setSaveError(null);
       setSaveSuccess(false);
@@ -57,7 +70,7 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     void loadSettings(currentUser.uid);
   }, [currentUser, loadSettings]);
 
-  const handleSave = async () => {
+  const handleSavePreset = async () => {
     if (!currentUser || !selectedPresetKey || isSaving) return;
 
     setIsSaving(true);
@@ -68,6 +81,8 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
       const saved = await saveMyHossiiPreset(currentUser.uid, selectedPresetKey);
       setSavedSettings(saved);
       setSelectedPresetKey(saved.presetKey);
+      setUploadPreviewUrl(null);
+      setPendingUploadFile(null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (error) {
@@ -75,6 +90,51 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
       setSaveError('保存に失敗しました。もう一度お試しください。');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleFileSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setSaveError('画像ファイルを選択してください');
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setSaveError('ファイルサイズが2MBを超えています');
+      return;
+    }
+    setSaveError(null);
+    setPendingUploadFile(file);
+    setUploadPreviewUrl(URL.createObjectURL(file));
+    setSelectedPresetKey(null);
+  };
+
+  const handleUploadSave = async () => {
+    if (!currentUser || !pendingUploadFile || isUploading) return;
+
+    setIsUploading(true);
+    setSaveSuccess(false);
+    setSaveError(null);
+
+    try {
+      const saved = await saveMyHossiiUpload(currentUser.uid, pendingUploadFile);
+      setSavedSettings(saved);
+      setPendingUploadFile(null);
+      setUploadPreviewUrl(null);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (error) {
+      console.error('[MyHossiiSettingsSection] upload error:', error);
+      setSaveError(error instanceof Error ? error.message : 'アップロードに失敗しました');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCancelUpload = () => {
+    setPendingUploadFile(null);
+    setUploadPreviewUrl(null);
+    if (savedSettings?.sourceType === 'preset') {
+      setSelectedPresetKey(savedSettings.presetKey);
     }
   };
 
@@ -113,12 +173,32 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     );
   }
 
-  const isRegistered = savedSettings?.sourceType === 'preset' && !!savedSettings.presetKey;
-  const previewKey = selectedPresetKey ?? savedSettings?.presetKey;
-  const previewImage = resolveHossiiPresetImagePath(previewKey);
-  const previewLabel = previewKey ? getHossiiPresetByKey(previewKey)?.label : null;
-  const hasChanges = selectedPresetKey !== savedSettings?.presetKey;
-  const canSave = !!selectedPresetKey && hasChanges && !isSaving;
+  const isRegistered = savedSettings ? isMyHossiiRegistered(savedSettings) : false;
+
+  const previewImage = (() => {
+    if (uploadPreviewUrl) return uploadPreviewUrl;
+    if (savedSettings?.sourceType === 'upload' && savedSettings.imagePath) {
+      return resolveMyHossiiImage({
+        hossiiSourceType: 'upload',
+        hossiiPresetKey: null,
+        hossiiImagePath: savedSettings.imagePath,
+      });
+    }
+    const previewKey = selectedPresetKey ?? savedSettings?.presetKey;
+    return resolveHossiiPresetImagePath(previewKey);
+  })();
+
+  const previewLabel = (() => {
+    if (pendingUploadFile) return '画像プレビュー';
+    if (savedSettings?.sourceType === 'upload') return 'アップロード画像';
+    const previewKey = selectedPresetKey ?? savedSettings?.presetKey;
+    return previewKey ? getHossiiPresetByKey(previewKey)?.label : null;
+  })();
+
+  const hasPresetChanges =
+    !!selectedPresetKey && selectedPresetKey !== savedSettings?.presetKey;
+  const canSavePreset = hasPresetChanges && !isSaving && !isUploading;
+  const canSaveUpload = !!pendingUploadFile && !isUploading && !isSaving;
 
   return (
     <div className={styles.myHossiiSection}>
@@ -126,7 +206,7 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
         <div className={styles.promptCard} role="status">
           <p className={styles.promptTitle}>あなたのHossiiをこの場所に登場させよう</p>
           <p className={styles.promptDesc}>
-            基本のHossiiから1体選んで登録できます。登録後は参加しているスペースに表示されます。
+            基本のHossiiから1体選ぶか、画像を登録できます。登録後は参加しているスペースに表示されます。
           </p>
         </div>
       )}
@@ -157,7 +237,7 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
         className={styles.presetGrid}
       >
         {HOSSII_BASIC_PRESETS.map((preset) => {
-          const isSelected = selectedPresetKey === preset.key;
+          const isSelected = selectedPresetKey === preset.key && !pendingUploadFile;
           return (
             <button
               key={preset.key}
@@ -167,6 +247,8 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
               className={`${styles.presetOption} ${isSelected ? styles.presetOptionSelected : ''}`}
               onClick={() => {
                 setSelectedPresetKey(preset.key);
+                setPendingUploadFile(null);
+                setUploadPreviewUrl(null);
                 setSaveError(null);
               }}
             >
@@ -182,11 +264,45 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
         })}
       </div>
 
-      <div className={styles.comingSoonRow}>
-        <button type="button" className={styles.comingSoonButton} disabled aria-disabled="true">
+      <div className={styles.uploadRow}>
+        <button
+          type="button"
+          className={styles.uploadButton}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+        >
           画像から登録
-          <span className={styles.comingSoonBadge}>Coming soon</span>
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className={styles.hiddenInput}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) handleFileSelect(file);
+          }}
+        />
+        {pendingUploadFile && (
+          <div className={styles.uploadActions}>
+            <button
+              type="button"
+              className={styles.saveButton}
+              onClick={() => void handleUploadSave()}
+              disabled={!canSaveUpload}
+              aria-busy={isUploading}
+            >
+              {isUploading ? 'アップロード中...' : '画像を保存'}
+            </button>
+            <button type="button" className={styles.cancelButton} onClick={handleCancelUpload}>
+              キャンセル
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.comingSoonRow}>
         <button type="button" className={styles.comingSoonButton} disabled aria-disabled="true">
           カスタムして作る
           <span className={styles.comingSoonBadge}>Coming soon</span>
@@ -197,11 +313,11 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
         <button
           type="button"
           className={styles.saveButton}
-          onClick={() => void handleSave()}
-          disabled={!canSave}
+          onClick={() => void handleSavePreset()}
+          disabled={!canSavePreset}
           aria-busy={isSaving}
         >
-          {isSaving ? '保存中...' : saveSuccess ? '保存済み ✓' : '保存'}
+          {isSaving ? '保存中...' : saveSuccess && !pendingUploadFile ? '保存済み ✓' : 'プリセットを保存'}
         </button>
         {saveSuccess && (
           <p className={`${styles.statusMessage} ${styles.statusSuccess}`} role="status">

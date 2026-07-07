@@ -212,6 +212,49 @@
   color: #6b7280;
 }
 
+.uploadRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.uploadButton {
+  padding: 0.625rem 1rem;
+  border: 1px dashed rgba(168, 85, 247, 0.4);
+  border-radius: 0.75rem;
+  background: rgba(250, 245, 255, 0.6);
+  color: #7c3aed;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uploadButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.uploadActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cancelButton {
+  padding: 0.625rem 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.75rem;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.hiddenInput {
+  display: none;
+}
+
 @media (max-width: 480px) {
   .presetGrid {
     grid-template-columns: 1fr;

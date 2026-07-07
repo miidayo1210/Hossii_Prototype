@@ -224,3 +224,78 @@ export async function uploadCanvasPostImage(
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
+
+const MY_HOSSII_AVATAR_FILENAME = 'my-hossii.webp';
+
+export type MyHossiiUploadResult =
+  | { ok: true; storagePath: string; publicUrl: string }
+  | { ok: false; reason: string; details?: unknown };
+
+/** マイHossii用アバター画像をアップロード（本人の avatars/{uid}/ 配下のみ） */
+export async function uploadMyHossiiAvatar(
+  userId: string,
+  file: File,
+): Promise<MyHossiiUploadResult> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, reason: 'Supabase 未設定' };
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session) {
+    return { ok: false, reason: '未ログイン（ログインが必要です）' };
+  }
+
+  if (sessionData.session.user.id !== userId) {
+    return { ok: false, reason: '本人のみアップロードできます' };
+  }
+
+  try {
+    validateImageFile(file);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : 'ファイル形式エラー',
+      details: err,
+    };
+  }
+
+  let blob: Blob;
+  try {
+    blob = await compressImage(file);
+  } catch (err) {
+    console.warn('[imageStorageApi] uploadMyHossiiAvatar: compress failed, using original', err);
+    blob = file;
+  }
+
+  const path = `avatars/${userId}/${MY_HOSSII_AVATAR_FILENAME}`;
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, blob, { contentType: 'image/webp', upsert: true });
+
+  if (error) {
+    console.error('[imageStorageApi] uploadMyHossiiAvatar error:', error.message);
+    return { ok: false, reason: error.message, details: error };
+  }
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return { ok: true, storagePath: path, publicUrl: data.publicUrl };
+}
+
+/** Storage path からマイHossii画像を削除 */
+export async function deleteMyHossiiImageByPath(storagePath: string, userId: string): Promise<void> {
+  if (!isSupabaseConfigured || !storagePath) return;
+
+  const expectedPrefix = `avatars/${userId}/`;
+  if (!storagePath.startsWith(expectedPrefix)) {
+    console.warn('[imageStorageApi] deleteMyHossiiImageByPath: path does not belong to user', storagePath);
+    return;
+  }
+
+  const { error } = await supabase.storage.from(BUCKET).remove([storagePath]);
+  if (error) {
+    console.warn('[imageStorageApi] deleteMyHossiiImageByPath error:', error.message);
+  }
+}
+
+export { MY_HOSSII_AVATAR_FILENAME };

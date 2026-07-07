@@ -6,6 +6,11 @@ const supabaseMock = vi.hoisted(() => ({
   from: vi.fn(),
 }));
 
+vi.mock('./imageStorageApi', () => ({
+  uploadMyHossiiAvatar: vi.fn(),
+  deleteMyHossiiImageByPath: vi.fn(),
+}));
+
 vi.mock('../supabase', () => ({
   get isSupabaseConfigured() {
     return supabaseMock.configured;
@@ -96,6 +101,7 @@ describe('userProfilesApi myHossii parsing', () => {
     ).toEqual({
       sourceType: null,
       presetKey: null,
+      imagePath: null,
       updatedAt: null,
     });
   });
@@ -110,6 +116,7 @@ describe('userProfilesApi myHossii parsing', () => {
     ).toEqual({
       sourceType: 'preset',
       presetKey: 'idle_smile',
+      imagePath: null,
       updatedAt: '2026-07-06T00:00:00.000Z',
     });
   });
@@ -124,6 +131,7 @@ describe('userProfilesApi myHossii parsing', () => {
     ).toEqual({
       sourceType: null,
       presetKey: null,
+      imagePath: null,
       updatedAt: null,
     });
   });
@@ -138,6 +146,7 @@ describe('userProfilesApi myHossii parsing', () => {
     ).toEqual({
       sourceType: null,
       presetKey: null,
+      imagePath: null,
       updatedAt: null,
     });
   });
@@ -298,6 +307,7 @@ describe('saveMyHossiiPreset', () => {
         expect(row).toEqual({
           hossii_source_type: 'preset',
           hossii_preset_key: 'idle_smile',
+          hossii_image_path: null,
           hossii_updated_at: expect.any(String),
           updated_at: expect.any(String),
         });
@@ -316,6 +326,7 @@ describe('saveMyHossiiPreset', () => {
     expect(saved).toEqual({
       sourceType: 'preset',
       presetKey: 'idle_smile',
+      imagePath: null,
       updatedAt: expect.any(String),
     });
   });
@@ -353,11 +364,13 @@ describe('localStorage fallback (Supabase not configured)', () => {
     await expect(fetchMyHossiiSettings(userA)).resolves.toEqual({
       sourceType: 'preset',
       presetKey: 'idle_base',
+      imagePath: null,
       updatedAt: expect.any(String),
     });
     await expect(fetchMyHossiiSettings(userB)).resolves.toEqual({
       sourceType: 'preset',
       presetKey: 'idle_smile',
+      imagePath: null,
       updatedAt: expect.any(String),
     });
   });

@@ -1,9 +1,11 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { isValidHossiiPresetKey } from '../assets/hossiiPresets';
+import { deleteMyHossiiImageByPath, uploadMyHossiiAvatar } from './imageStorageApi';
 
 export type MyHossiiSettings = {
-  sourceType: 'preset' | null;
+  sourceType: 'preset' | 'upload' | null;
   presetKey: string | null;
+  imagePath: string | null;
   updatedAt: string | null;
 };
 
@@ -26,21 +28,33 @@ type UserProfileRow = {
   updated_at: string;
   hossii_source_type?: string | null;
   hossii_preset_key?: string | null;
+  hossii_image_path?: string | null;
   hossii_updated_at?: string | null;
 };
 
 const USER_PROFILE_SELECT =
-  'id, username, birthdate, gender, created_at, updated_at, hossii_source_type, hossii_preset_key, hossii_updated_at';
+  'id, username, birthdate, gender, created_at, updated_at, hossii_source_type, hossii_preset_key, hossii_image_path, hossii_updated_at';
 
 const MY_HOSSII_STORAGE_KEY = 'hossii.myHossiiSettings';
 
 const EMPTY_MY_HOSSII: MyHossiiSettings = {
   sourceType: null,
   presetKey: null,
+  imagePath: null,
   updatedAt: null,
 };
 
-function parseMyHossiiFromRow(row: Pick<UserProfileRow, 'hossii_source_type' | 'hossii_preset_key' | 'hossii_updated_at'>): MyHossiiSettings {
+function parseMyHossiiFromRow(
+  row: Pick<UserProfileRow, 'hossii_source_type' | 'hossii_preset_key' | 'hossii_image_path' | 'hossii_updated_at'>,
+): MyHossiiSettings {
+  if (row.hossii_source_type === 'upload' && row.hossii_image_path) {
+    return {
+      sourceType: 'upload',
+      presetKey: null,
+      imagePath: row.hossii_image_path,
+      updatedAt: row.hossii_updated_at ?? null,
+    };
+  }
   if (row.hossii_source_type !== 'preset' || !row.hossii_preset_key) {
     return EMPTY_MY_HOSSII;
   }
@@ -50,6 +64,7 @@ function parseMyHossiiFromRow(row: Pick<UserProfileRow, 'hossii_source_type' | '
   return {
     sourceType: 'preset',
     presetKey: row.hossii_preset_key,
+    imagePath: null,
     updatedAt: row.hossii_updated_at ?? null,
   };
 }
@@ -224,6 +239,7 @@ export async function saveMyHossiiPreset(userId: string, presetKey: string): Pro
   const saved: MyHossiiSettings = {
     sourceType: 'preset',
     presetKey,
+    imagePath: null,
     updatedAt: now,
   };
 
@@ -234,11 +250,16 @@ export async function saveMyHossiiPreset(userId: string, presetKey: string): Pro
 
   await ensureUserProfileExists(userId);
 
+  const existing = await fetchUserProfile(userId);
+  const oldImagePath =
+    existing?.myHossii.sourceType === 'upload' ? existing.myHossii.imagePath : null;
+
   const { error } = await supabase
     .from('user_profiles')
     .update({
       hossii_source_type: 'preset',
       hossii_preset_key: presetKey,
+      hossii_image_path: null,
       hossii_updated_at: now,
       updated_at: now,
     })
@@ -249,12 +270,104 @@ export async function saveMyHossiiPreset(userId: string, presetKey: string): Pro
     throw error;
   }
 
+  if (oldImagePath) {
+    void deleteMyHossiiImageByPath(oldImagePath, userId);
+  }
+
   return saved;
+}
+
+export async function saveMyHossiiUpload(userId: string, file: File): Promise<MyHossiiSettings> {
+  if (!isSupabaseConfigured) {
+    throw new Error('画像アップロードには Supabase 接続が必要です');
+  }
+
+  await ensureUserProfileExists(userId);
+  const existing = await fetchUserProfile(userId);
+  const oldImagePath =
+    existing?.myHossii.sourceType === 'upload' ? existing.myHossii.imagePath : null;
+
+  const uploadResult = await uploadMyHossiiAvatar(userId, file);
+  if (!uploadResult.ok) {
+    throw new Error(uploadResult.reason);
+  }
+
+  const now = new Date().toISOString();
+  const saved: MyHossiiSettings = {
+    sourceType: 'upload',
+    presetKey: null,
+    imagePath: uploadResult.storagePath,
+    updatedAt: now,
+  };
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({
+      hossii_source_type: 'upload',
+      hossii_preset_key: null,
+      hossii_image_path: uploadResult.storagePath,
+      hossii_updated_at: now,
+      updated_at: now,
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('[userProfilesApi] saveMyHossiiUpload DB error:', error.message);
+    await deleteMyHossiiImageByPath(uploadResult.storagePath, userId);
+    throw error;
+  }
+
+  if (oldImagePath && oldImagePath !== uploadResult.storagePath) {
+    void deleteMyHossiiImageByPath(oldImagePath, userId);
+  }
+
+  return saved;
+}
+
+export async function deleteMyHossiiImage(userId: string): Promise<MyHossiiSettings> {
+  if (!isSupabaseConfigured) {
+    const cleared = { ...EMPTY_MY_HOSSII };
+    saveMockMyHossii(userId, cleared);
+    return cleared;
+  }
+
+  const existing = await fetchUserProfile(userId);
+  const oldImagePath =
+    existing?.myHossii.sourceType === 'upload' ? existing.myHossii.imagePath : null;
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({
+      hossii_source_type: null,
+      hossii_preset_key: null,
+      hossii_image_path: null,
+      hossii_updated_at: null,
+      updated_at: now,
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('[userProfilesApi] deleteMyHossiiImage error:', error.message);
+    throw error;
+  }
+
+  if (oldImagePath) {
+    void deleteMyHossiiImageByPath(oldImagePath, userId);
+  }
+
+  return EMPTY_MY_HOSSII;
+}
+
+export function isMyHossiiRegistered(settings: MyHossiiSettings): boolean {
+  if (settings.sourceType === 'preset' && settings.presetKey) return true;
+  if (settings.sourceType === 'upload' && settings.imagePath) return true;
+  return false;
 }
 
 /** @internal テスト用 */
 export function parseMyHossiiRowForTest(
-  row: Pick<UserProfileRow, 'hossii_source_type' | 'hossii_preset_key' | 'hossii_updated_at'>,
+  row: Pick<UserProfileRow, 'hossii_source_type' | 'hossii_preset_key' | 'hossii_image_path' | 'hossii_updated_at'>,
 ): MyHossiiSettings {
   return parseMyHossiiFromRow(row);
 }
