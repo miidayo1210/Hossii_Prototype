@@ -9,7 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:target": "node scripts/check-supabase-target.mjs",
+    "db:push:dev": "node scripts/push-dev-migrations.mjs",
+    "db:push:prod": "node scripts/push-production-migrations.mjs",
+    "db:seed:dev": "node scripts/seed-development.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",

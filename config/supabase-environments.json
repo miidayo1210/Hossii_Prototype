@@ -1,0 +1,10 @@
+{
+  "production": {
+    "label": "Hossii Production",
+    "projectRef": "wzyoddyvfjkagqpnjejo"
+  },
+  "development": {
+    "label": "Hossii Development",
+    "projectRef": "uodaubhlcvvqlgsdxcdf"
+  }
+}
