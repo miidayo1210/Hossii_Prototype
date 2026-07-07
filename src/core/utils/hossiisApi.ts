@@ -43,6 +43,12 @@ export type HossiiRow = {
   post_kind?: string | null;
 };
 
+/** INSERT 用。未マイグレーション列（tags / post_kind）は含めない */
+export type HossiiInsertRow = Omit<HossiiRow, 'created_at' | 'post_kind' | 'tags'> & {
+  created_at: string;
+  space_pane_id?: string | null;
+};
+
 /**
  * is_hidden を厳密に boolean へ（PostgREST / 型ゆれで string や数値が来る場合がある）
  * 文字列 "false" は truthy なので、素の `!h.isHidden` だと一覧から全件消えることがある。
@@ -101,8 +107,8 @@ export function rowToHossii(row: HossiiRow): Hossii {
 
 // Hossii（camelCase）→ INSERT 用オブジェクト（snake_case）
 // post_kind は未マイグレーションの DB に列が無いと 400 になるため送らない（キャンバスは image_url パスで復元）
-function hossiiToInsertRow(hossii: Hossii): Omit<HossiiRow, 'created_at' | 'post_kind'> & { created_at: string } {
-  const row: Omit<HossiiRow, 'created_at' | 'post_kind'> & { created_at: string } = {
+function hossiiToInsertRow(hossii: Hossii): HossiiInsertRow {
+  const row: HossiiInsertRow = {
     id: hossii.id,
     message: hossii.message,
     emotion: hossii.emotion ?? null,
@@ -117,7 +123,6 @@ function hossiiToInsertRow(hossii: Hossii): Omit<HossiiRow, 'created_at' | 'post
     created_at: hossii.createdAt.toISOString(),
     bubble_color: hossii.bubbleColor ?? null,
     hashtags: hossii.hashtags ?? null,
-    tags: hossii.tags ?? null,
     image_url: hossii.imageUrl ?? null,
     position_x: hossii.positionX ?? null,
     position_y: hossii.positionY ?? null,
@@ -134,11 +139,13 @@ function hossiiToInsertRow(hossii: Hossii): Omit<HossiiRow, 'created_at' | 'post
     row.space_pane_id = hossii.spacePaneId;
   }
 
+  // preset tags (T02): hossiis.tags 列は未マイグレーションのため INSERT では送らない
+
   return row;
 }
 
 /** Exported for Phase 1 insert-payload regression tests. */
-export function buildHossiiInsertPayload(hossii: Hossii): ReturnType<typeof hossiiToInsertRow> {
+export function buildHossiiInsertPayload(hossii: Hossii): HossiiInsertRow {
   return hossiiToInsertRow(hossii);
 }
 

@@ -161,7 +161,16 @@ function userIdByEmail(users, email) {
 
 async function ensureAuthUser(definition, password, existingUsers) {
   const existing = existingUsers.find((user) => user.email === definition.email);
-  if (existing) return existing;
+  if (existing) {
+    const { error } = await admin.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+    });
+    if (error) {
+      throw new Error(`updateUser failed for ${definition.email}: ${error.message}`);
+    }
+    return existing;
+  }
 
   const { data, error } = await admin.auth.admin.createUser({
     email: definition.email,

@@ -107,7 +107,7 @@ import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import { LogListBody } from '../CommentsScreen/LogListBody';
 import { ScaledContent } from '../ScaledContent/ScaledContent';
 import { HossiiToast } from '../../core/ui/HossiiToast';
-import { POST_FAILURE_EVENT, type PostFailureDetail } from '../../core/utils/postFeedback';
+import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
 import { ActiveSpaceUnavailableBanner } from './ActiveSpaceUnavailableBanner';
 import {
   getDefaultQuickLogBottomRect,
@@ -466,7 +466,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     const onPostFailure = (event: Event) => {
       const detail = (event as CustomEvent<PostFailureDetail>).detail;
       if (detail?.message) {
-        showPaneToast(detail.message, 'error');
+        showPaneToast(formatPostFailureForDisplay(detail), 'error');
       }
     };
     window.addEventListener(POST_FAILURE_EVENT, onPostFailure);

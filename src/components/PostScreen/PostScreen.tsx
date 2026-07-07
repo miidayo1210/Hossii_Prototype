@@ -29,7 +29,7 @@ import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { HossiiMini } from '../Hossii/HossiiMini';
 import { DrawingModal } from '../DrawingModal/DrawingModal';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
-import { POST_FAILURE_EVENT, type PostFailureDetail } from '../../core/utils/postFeedback';
+import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { AddHossiiInput, EmotionKey, ToastState } from '../../core/types';
 import {
@@ -242,7 +242,7 @@ export const PostScreen = ({
     const onPostFailure = (event: Event) => {
       const detail = (event as CustomEvent<PostFailureDetail>).detail;
       if (detail?.message) {
-        setToast({ message: detail.message, type: 'error' });
+        setToast({ message: formatPostFailureForDisplay(detail), type: 'error' });
       }
     };
     window.addEventListener(POST_FAILURE_EVENT, onPostFailure);

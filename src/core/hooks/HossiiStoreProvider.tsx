@@ -17,7 +17,7 @@ import {
   buildAddHossiiBlockMessage,
   isKnownSpaceInState,
 } from '../utils/addHossiiGuard';
-import { emitPostFailure, formatInsertHossiiErrorMessage } from '../utils/postFeedback';
+import { emitPostFailure, formatInsertHossiiErrorMessage, mapInsertFailureReason } from '../utils/postFeedback';
 import { generateId } from '../utils';
 import { createBubblePositionFromId } from '../utils/bubblePosition';
 import {
@@ -1337,8 +1337,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           pendingOptimisticHossiiRef.current.delete(newHossii.id);
           dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
           emitPostFailure({
-            reason: 'insert_failed',
-            message: formatInsertHossiiErrorMessage(insertResult.message),
+            reason: mapInsertFailureReason(insertResult.message, insertResult.code),
+            code: insertResult.code,
+            message: formatInsertHossiiErrorMessage(insertResult.message, insertResult.code),
           });
           return false;
         }

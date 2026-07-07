@@ -51,6 +51,11 @@ describe('buildHossiiInsertPayload', () => {
     const payload = buildHossiiInsertPayload({ ...baseHossii, spacePaneId: paneId });
     expect(payload.space_pane_id).toBe(paneId);
   });
+
+  it('omits tags because hossiis.tags column is not migrated', () => {
+    const payload = buildHossiiInsertPayload({ ...baseHossii, tags: ['preset-a'] });
+    expect(payload).not.toHaveProperty('tags');
+  });
 });
 
 describe('rowToHossii spacePaneId mapping', () => {
