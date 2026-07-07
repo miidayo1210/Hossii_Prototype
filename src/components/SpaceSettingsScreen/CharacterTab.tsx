@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, X, Plus, Trash2 } from 'lucide-react';
 import { generateId } from '../../core/utils';
 import type { Space, CustomEmotion } from '../../core/types/space';
+import type { MyHossiiLogVisibility, MyHossiiMotionMode } from '../../core/types/myHossii';
+import {
+  DEFAULT_MY_HOSSII_LOG_VISIBILITY,
+  DEFAULT_MY_HOSSII_MOTION_MODE,
+} from '../../core/types/myHossii';
 import { resolvePaneCharacter } from '../../core/utils/resolvePaneCharacter';
 import {
   hasPaneColumnOverride,
@@ -26,6 +31,9 @@ type CharacterDraft = {
   characterName: string;
   characterImageUrl?: string;
   customEmotions: CustomEmotion[];
+  myHossiiEnabled: boolean;
+  myHossiiMotionMode: MyHossiiMotionMode;
+  myHossiiLogVisibility: MyHossiiLogVisibility;
 };
 
 type Props = {
@@ -42,6 +50,9 @@ function buildInitialDraft(space: Space, editPane: ReturnType<typeof useSettings
     characterName: resolved.characterName ?? '',
     characterImageUrl: resolved.characterImageUrl,
     customEmotions: resolved.customEmotions,
+    myHossiiEnabled: space.myHossiiEnabled ?? false,
+    myHossiiMotionMode: space.myHossiiMotionMode ?? DEFAULT_MY_HOSSII_MOTION_MODE,
+    myHossiiLogVisibility: space.myHossiiLogVisibility ?? DEFAULT_MY_HOSSII_LOG_VISIBILITY,
   };
 }
 
@@ -101,12 +112,18 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
         characterName: draft.characterName,
         characterImageUrl: draft.characterImageUrl,
         customEmotions: draft.customEmotions,
+        myHossiiEnabled: draft.myHossiiEnabled,
+        myHossiiMotionMode: draft.myHossiiMotionMode,
+        myHossiiLogVisibility: draft.myHossiiLogVisibility,
       });
       if (saveContext.editPane.isDefault) {
         onUpdateSpace({
           characterName: draft.characterName || undefined,
           characterImageUrl: draft.characterImageUrl,
           customEmotions: draft.customEmotions,
+          myHossiiEnabled: draft.myHossiiEnabled,
+          myHossiiMotionMode: draft.myHossiiMotionMode,
+          myHossiiLogVisibility: draft.myHossiiLogVisibility,
         });
       }
       commitSaved();
@@ -223,6 +240,60 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
             }}
           />
           {uploadError && <p className={styles.errorText}>{uploadError}</p>}
+        </SettingsSection>
+
+        <SettingsSection
+          title="マイHossiiを表示"
+          description="参加者が登録したマイHossiiを、スペースの景色に登場させます。OFFのときはスペースHossiiのみ表示されます。"
+        >
+          <label className={styles.myHossiiToggle}>
+            <input
+              type="checkbox"
+              checked={draft.myHossiiEnabled}
+              onChange={(e) => setDraft({ ...draft, myHossiiEnabled: e.target.checked })}
+            />
+            <span>マイHossiiを表示する</span>
+          </label>
+
+          {draft.myHossiiEnabled && (
+            <div className={styles.myHossiiOptions}>
+              <label className={styles.optionLabel}>
+                動き方
+                <select
+                  className={formStyles.nameInput}
+                  value={draft.myHossiiMotionMode}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      myHossiiMotionMode: e.target.value as MyHossiiMotionMode,
+                    })
+                  }
+                >
+                  <option value="auto">自動（投稿量・人数に応じて調整）</option>
+                  <option value="free">自由に浮遊</option>
+                  <option value="anchored">基本位置を固定して揺れる</option>
+                </select>
+              </label>
+
+              <label className={styles.optionLabel}>
+                ログ公開範囲
+                <select
+                  className={formStyles.nameInput}
+                  value={draft.myHossiiLogVisibility}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      myHossiiLogVisibility: e.target.value as MyHossiiLogVisibility,
+                    })
+                  }
+                >
+                  <option value="public">全員（ゲスト含む）</option>
+                  <option value="authenticated">ログインユーザーのみ</option>
+                  <option value="hidden">誰にも表示しない</option>
+                </select>
+              </label>
+            </div>
+          )}
         </SettingsSection>
 
         <SettingsSection title="表情" description="投稿への反応として使う表情パターンを登録できます（最大20件）">

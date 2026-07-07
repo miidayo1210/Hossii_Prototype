@@ -196,6 +196,18 @@ const normalizeSpace = (f: unknown): Space => {
     return folders.length > 0 ? folders : undefined;
   })();
 
+  const myHossiiEnabled = typeof raw.myHossiiEnabled === 'boolean' ? raw.myHossiiEnabled : undefined;
+  const myHossiiMotionMode =
+    raw.myHossiiMotionMode === 'free' || raw.myHossiiMotionMode === 'anchored' || raw.myHossiiMotionMode === 'auto'
+      ? raw.myHossiiMotionMode
+      : undefined;
+  const myHossiiLogVisibility =
+    raw.myHossiiLogVisibility === 'public' ||
+    raw.myHossiiLogVisibility === 'authenticated' ||
+    raw.myHossiiLogVisibility === 'hidden'
+      ? raw.myHossiiLogVisibility
+      : undefined;
+
   return {
     id,
     spaceURL,
@@ -214,6 +226,9 @@ const normalizeSpace = (f: unknown): Space => {
     decorations: decorations.length > 0 ? decorations : undefined,
     bubbleShapePng,
     tabFolders,
+    myHossiiEnabled,
+    myHossiiMotionMode,
+    myHossiiLogVisibility,
   };
 };
 

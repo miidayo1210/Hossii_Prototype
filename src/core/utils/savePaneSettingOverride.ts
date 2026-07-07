@@ -166,12 +166,18 @@ export async function savePaneCharacterOverride(
     characterName?: string;
     characterImageUrl?: string;
     customEmotions?: CustomEmotion[];
+    myHossiiEnabled?: boolean;
+    myHossiiMotionMode?: Space['myHossiiMotionMode'];
+    myHossiiLogVisibility?: Space['myHossiiLogVisibility'];
   },
 ): Promise<void> {
   const patch: Partial<Space> = {
     characterName: value.characterName || undefined,
     characterImageUrl: value.characterImageUrl,
     customEmotions: value.customEmotions,
+    ...(value.myHossiiEnabled !== undefined ? { myHossiiEnabled: value.myHossiiEnabled } : {}),
+    ...(value.myHossiiMotionMode !== undefined ? { myHossiiMotionMode: value.myHossiiMotionMode } : {}),
+    ...(value.myHossiiLogVisibility !== undefined ? { myHossiiLogVisibility: value.myHossiiLogVisibility } : {}),
   };
 
   if (isDefaultPane(ctx.editPane)) {

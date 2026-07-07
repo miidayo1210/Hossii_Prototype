@@ -1,0 +1,111 @@
+.avatarRoot {
+  position: absolute;
+  z-index: 92;
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -50%) scale(var(--activity-scale, 1));
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+@media (min-width: 769px) {
+  .avatarRoot {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 12px rgba(99, 102, 241, 0.2));
+}
+
+.avatarGlow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.isSelf .avatarGlow {
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.45), 0 0 18px rgba(236, 72, 153, 0.25);
+}
+
+.isSelected {
+  z-index: 96;
+}
+
+.motionFree {
+  animation: myHossiiFloat 8s ease-in-out infinite;
+}
+
+.motionAnchored {
+  animation: myHossiiSway 5s ease-in-out infinite;
+}
+
+.motionStatic {
+  animation: myHossiiSway 7s ease-in-out infinite;
+}
+
+.tierLight.motionFree {
+  animation-duration: 12s;
+}
+
+.tierLight.motionAnchored,
+.tierLight.motionStatic {
+  animation-duration: 9s;
+}
+
+.tierNone.motionFree,
+.tierNone.motionAnchored,
+.tierNone.motionStatic {
+  animation: myHossiiSway 10s ease-in-out infinite;
+}
+
+@keyframes myHossiiFloat {
+  0%, 100% { transform: translate(-50%, -50%) scale(var(--activity-scale, 1)) translate(0, 0); }
+  33% { transform: translate(-50%, -50%) scale(var(--activity-scale, 1)) translate(6px, -8px); }
+  66% { transform: translate(-50%, -50%) scale(var(--activity-scale, 1)) translate(-5px, 5px); }
+}
+
+@keyframes myHossiiSway {
+  0%, 100% { transform: translate(-50%, -50%) scale(var(--activity-scale, 1)) rotate(0deg); }
+  50% { transform: translate(-50%, -50%) scale(var(--activity-scale, 1)) rotate(2deg) translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motionFree,
+  .motionAnchored,
+  .motionStatic {
+    animation: none;
+  }
+}
+
+.speechBubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  max-width: 180px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 2;
+}

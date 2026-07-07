@@ -1,0 +1,88 @@
+.popover {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: 260px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.18);
+  z-index: 10;
+}
+
+.closeButton {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.nickname {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+  padding-right: 20px;
+}
+
+.stateLabel {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.logList {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.logItem {
+  font-size: 0.78rem;
+  color: #374151;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.logItem:last-child {
+  border-bottom: none;
+}
+
+.emptyLogs {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.lastActivity {
+  margin: 0 0 10px;
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+.viewLogsButton {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewLogsButton:hover {
+  opacity: 0.92;
+}
