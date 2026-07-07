@@ -1885,3 +1885,16 @@ nicknameProfileId = currentUser.uid ?? profile.id
 - myHossiiAppearance.test.ts
 - myHossiiSpacePreferencesApi.test.ts
 - myHossiiParticipationApi.test.ts
+
+### 36-9. 参加資格誤判定の修正（2026-07-07）
+
+**原因:** 旧実装で `space_nicknames.profile_id` が端末 `profiles.id` に保存されていた一方、参加資格 API は Auth UID のみ照会していた。加えて UI 状態解決で `not_participant` が `space_off` より先に評価され、機能 OFF 時にも「参加資格なし」案内が出ていた。
+
+**対応:**
+
+- `fetchParticipantEligibilityResult` で理由を区別（`space_nickname` / `issued_participant` / `legacy_space_nickname_migrated` / `default_nickname_only` / `no_space_nickname` / `error`）
+- 本人ログイン中に旧端末 ID 行を検出したら Auth UID 行へ自動移行（案 B）
+- API エラーは `not_participant` と混同しない
+- UI 状態は `space_off` を `not_participant` より優先
+- 理由別の案内文（共通ニックネームのみ / 参加資格なし / API エラー）
+- ニックネーム保存後に `refreshKey` で登場状態を再取得

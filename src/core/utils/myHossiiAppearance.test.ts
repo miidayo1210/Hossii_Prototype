@@ -110,6 +110,22 @@ describe('myHossiiAppearance', () => {
         participantEligibility: 'revoked',
       }),
     ).toBe('registered_revoked');
+    expect(
+      resolveMyHossiiAccountUiState({
+        ...eligibleVisibleInput,
+        participantEligibility: 'error',
+      }),
+    ).toBe('registered_appearance_error');
+  });
+
+  it('prioritizes space feature OFF over not_participant messaging state', () => {
+    expect(
+      resolveMyHossiiAccountUiState({
+        ...eligibleVisibleInput,
+        spaceMyHossiiEnabled: false,
+        participantEligibility: 'not_participant',
+      }),
+    ).toBe('registered_space_off');
   });
 
   it('returns contextual registration success messages', () => {

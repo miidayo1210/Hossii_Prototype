@@ -807,17 +807,20 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       return;
     }
     let cancelled = false;
-    fetchParticipantEligibility(currentUser.uid, activeSpace.id)
+    fetchParticipantEligibility(currentUser.uid, activeSpace.id, {
+      legacyProfileId: state.profile?.id,
+      defaultNickname: state.profile?.defaultNickname,
+    })
       .then((eligibility) => {
         if (!cancelled) setMyHossiiParticipantEligibility(eligibility);
       })
       .catch(() => {
-        if (!cancelled) setMyHossiiParticipantEligibility('not_participant');
+        if (!cancelled) setMyHossiiParticipantEligibility('error');
       });
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.uid, activeSpace?.id]);
+  }, [currentUser?.uid, activeSpace?.id, state.profile?.id, state.profile?.defaultNickname]);
 
   const resolvedBackground = useMemo(() => {
     if (isVisiting && visitingSpaceInfo) {

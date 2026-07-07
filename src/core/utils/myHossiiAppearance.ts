@@ -1,14 +1,15 @@
 import type { AppUser } from '../contexts/AuthContext';
+import type { ParticipantEligibility, ParticipantEligibilityReason } from './myHossiiParticipationApi';
 import type { MyHossiiSettings } from './userProfilesApi';
 import { isMyHossiiRegistered } from './userProfilesApi';
 
-/** 対象スペースでの参加者資格 */
-export type ParticipantEligibility = 'eligible' | 'not_participant' | 'revoked';
+export type { ParticipantEligibility, ParticipantEligibilityReason };
 
 export type MyHossiiSpaceAppearanceInput = {
   isRegistered: boolean;
   spaceMyHossiiEnabled: boolean;
   participantEligibility: ParticipantEligibility;
+  participantReason?: ParticipantEligibilityReason;
   /** 行なしは true（初期 ON） */
   userPreferenceVisible: boolean;
 };
@@ -36,7 +37,8 @@ export type MyHossiiAccountUiState =
   | 'registered_hidden_by_user'
   | 'registered_space_off'
   | 'registered_not_participant'
-  | 'registered_revoked';
+  | 'registered_revoked'
+  | 'registered_appearance_error';
 
 export function resolveMyHossiiAccountUiState(
   input: MyHossiiSpaceAppearanceInput,
@@ -44,8 +46,9 @@ export function resolveMyHossiiAccountUiState(
   if (!input.isRegistered) return 'unregistered';
 
   if (input.participantEligibility === 'revoked') return 'registered_revoked';
-  if (input.participantEligibility === 'not_participant') return 'registered_not_participant';
+  if (input.participantEligibility === 'error') return 'registered_appearance_error';
   if (!input.spaceMyHossiiEnabled) return 'registered_space_off';
+  if (input.participantEligibility === 'not_participant') return 'registered_not_participant';
   if (!input.userPreferenceVisible) return 'registered_hidden_by_user';
   return 'registered_visible';
 }
@@ -54,12 +57,14 @@ export function buildMyHossiiSpaceAppearanceInput(params: {
   myHossiiSettings: MyHossiiSettings;
   spaceMyHossiiEnabled: boolean;
   participantEligibility: ParticipantEligibility;
+  participantReason?: ParticipantEligibilityReason;
   userPreferenceVisible: boolean;
 }): MyHossiiSpaceAppearanceInput {
   return {
     isRegistered: isMyHossiiRegistered(params.myHossiiSettings),
     spaceMyHossiiEnabled: params.spaceMyHossiiEnabled,
     participantEligibility: params.participantEligibility,
+    participantReason: params.participantReason,
     userPreferenceVisible: params.userPreferenceVisible,
   };
 }
@@ -78,12 +83,19 @@ export function getRegistrationSuccessMessage(
     return `マイHossiiを登録しました。\n\n${spaceLabel}では現在、マイHossiiを登場させることができません。`;
   }
 
-  if (input.participantEligibility === 'not_participant') {
-    return `マイHossiiを登録しました。\n\n${spaceLabel}では参加者として認識されていないため、\n現在は登場できません。`;
+  if (input.participantEligibility === 'error') {
+    return `マイHossiiを登録しました。\n\n${spaceLabel}での登場状態を確認できませんでした。`;
   }
 
   if (!input.spaceMyHossiiEnabled) {
     return `マイHossiiを登録しました。\n\n${spaceLabel}では、管理者が機能をONにすると登場できます。`;
+  }
+
+  if (input.participantEligibility === 'not_participant') {
+    if (input.participantReason === 'default_nickname_only') {
+      return `マイHossiiを登録しました。\n\n${spaceLabel}で使うニックネームを設定すると登場できます。`;
+    }
+    return `マイHossiiを登録しました。\n\n${spaceLabel}では参加者として認識されていないため、\n現在は登場できません。`;
   }
 
   if (input.userPreferenceVisible) {

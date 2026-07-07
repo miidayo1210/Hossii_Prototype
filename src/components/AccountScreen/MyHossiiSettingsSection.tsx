@@ -13,8 +13,12 @@ import {
   resolveMyHossiiAccountUiState,
   type MyHossiiSpaceAppearanceInput,
   type ParticipantEligibility,
+  type ParticipantEligibilityReason,
 } from '../../core/utils/myHossiiAppearance';
-import { fetchParticipantEligibility } from '../../core/utils/myHossiiParticipationApi';
+import {
+  fetchParticipantEligibilityResult,
+  getParticipantEligibilityAppearanceMessage,
+} from '../../core/utils/myHossiiParticipationApi';
 import {
   fetchMyHossiiSpacePreference,
   upsertMyHossiiSpacePreference,
@@ -34,6 +38,10 @@ type Props = {
   activeSpaceId?: string | null;
   activeSpaceName?: string | null;
   spaceMyHossiiEnabled?: boolean;
+  deviceProfileId?: string | null;
+  defaultNickname?: string | null;
+  /** ニックネーム保存後など、登場状態を再取得するトリガー */
+  refreshKey?: number;
 };
 
 const LOAD_ERROR_MESSAGE =
@@ -46,6 +54,9 @@ export const MyHossiiSettingsSection = ({
   activeSpaceId,
   activeSpaceName,
   spaceMyHossiiEnabled = false,
+  deviceProfileId,
+  defaultNickname,
+  refreshKey = 0,
 }: Props) => {
   const [savedSettings, setSavedSettings] = useState<MyHossiiSettings | null>(null);
   const [selectedPresetKey, setSelectedPresetKey] = useState<string | null>(null);
@@ -59,6 +70,8 @@ export const MyHossiiSettingsSection = ({
   const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
   const [participantEligibility, setParticipantEligibility] =
     useState<ParticipantEligibility>('not_participant');
+  const [participantReason, setParticipantReason] =
+    useState<ParticipantEligibilityReason>('no_space_nickname');
   const [userPreferenceVisible, setUserPreferenceVisible] = useState(true);
   const [isAppearanceLoading, setIsAppearanceLoading] = useState(false);
   const [appearanceError, setAppearanceError] = useState<string | null>(null);
@@ -69,11 +82,13 @@ export const MyHossiiSettingsSection = ({
     async (userId: string, spaceId: string | null | undefined, settings: MyHossiiSettings) => {
       if (!spaceId) {
         setParticipantEligibility('not_participant');
+        setParticipantReason('no_space_nickname');
         setUserPreferenceVisible(true);
         return buildMyHossiiSpaceAppearanceInput({
           myHossiiSettings: settings,
           spaceMyHossiiEnabled: false,
           participantEligibility: 'not_participant',
+          participantReason: 'no_space_nickname',
           userPreferenceVisible: true,
         });
       }
@@ -81,32 +96,42 @@ export const MyHossiiSettingsSection = ({
       setIsAppearanceLoading(true);
       setAppearanceError(null);
       try {
-        const [eligibility, preferenceVisible] = await Promise.all([
-          fetchParticipantEligibility(userId, spaceId),
+        const [eligibilityResult, preferenceVisible] = await Promise.all([
+          fetchParticipantEligibilityResult(userId, spaceId, {
+            legacyProfileId: deviceProfileId,
+            defaultNickname,
+          }),
           fetchMyHossiiSpacePreference(userId, spaceId),
         ]);
-        setParticipantEligibility(eligibility);
+        setParticipantEligibility(eligibilityResult.eligibility);
+        setParticipantReason(eligibilityResult.reason);
         setUserPreferenceVisible(preferenceVisible);
         return buildMyHossiiSpaceAppearanceInput({
           myHossiiSettings: settings,
           spaceMyHossiiEnabled,
-          participantEligibility: eligibility,
+          participantEligibility: eligibilityResult.eligibility,
+          participantReason: eligibilityResult.reason,
           userPreferenceVisible: preferenceVisible,
         });
       } catch (error) {
         console.error('[MyHossiiSettingsSection] appearance load error:', error);
-        setAppearanceError('登場状態を読み込めませんでした。');
+        setParticipantEligibility('error');
+        setParticipantReason('error');
+        setAppearanceError(
+          'このスペースでの登場状態を確認できませんでした。時間をおいて、もう一度お試しください。',
+        );
         return buildMyHossiiSpaceAppearanceInput({
           myHossiiSettings: settings,
           spaceMyHossiiEnabled,
-          participantEligibility: 'not_participant',
+          participantEligibility: 'error',
+          participantReason: 'error',
           userPreferenceVisible: true,
         });
       } finally {
         setIsAppearanceLoading(false);
       }
     },
-    [spaceMyHossiiEnabled],
+    [spaceMyHossiiEnabled, deviceProfileId, defaultNickname],
   );
 
   const loadSettings = useCallback(async () => {
@@ -143,7 +168,7 @@ export const MyHossiiSettingsSection = ({
       return;
     }
     void loadSettings();
-  }, [currentUser, loadSettings]);
+  }, [currentUser, refreshKey, loadSettings]);
 
   const handleRegistrationComplete = async (saved: MyHossiiSettings) => {
     if (!currentUser) return;
@@ -278,12 +303,17 @@ export const MyHossiiSettingsSection = ({
     },
     spaceMyHossiiEnabled,
     participantEligibility,
+    participantReason,
     userPreferenceVisible,
   });
 
   const uiState = resolveMyHossiiAccountUiState(appearanceInput);
   const isRegistered = savedSettings ? isMyHossiiRegistered(savedSettings) : false;
   const currentlyVisible = isVisibleInSpace(appearanceInput);
+  const participationMessage = getParticipantEligibilityAppearanceMessage(
+    { eligibility: participantEligibility, reason: participantReason },
+    isAdminUser(currentUser),
+  );
 
   const previewImage = (() => {
     if (uploadPreviewUrl) return uploadPreviewUrl;
@@ -385,17 +415,21 @@ export const MyHossiiSettingsSection = ({
                 </p>
               )}
 
-              {uiState === 'registered_not_participant' && (
+              {uiState === 'registered_not_participant' && participationMessage && (
                 <p className={styles.appearanceStatus}>
-                  マイHossiiは登録されていますが、
-                  このスペースの参加者として登録されていないため、現在は登場できません。
-                  {isAdminUser(currentUser) && (
-                    <>
-                      <br />
-                      管理者権限だけでは、スペースの参加者としては扱われません。
-                      このスペースで参加者ニックネームを設定すると、登場できるようになります。
-                    </>
-                  )}
+                  {participationMessage.split('\n').map((line, index, lines) => (
+                    <span key={`${line}-${index}`}>
+                      {line}
+                      {index < lines.length - 1 && <br />}
+                    </span>
+                  ))}
+                </p>
+              )}
+
+              {uiState === 'registered_appearance_error' && (
+                <p className={`${styles.appearanceStatus} ${styles.statusError}`} role="alert">
+                  {appearanceError ??
+                    'このスペースでの登場状態を確認できませんでした。時間をおいて、もう一度お試しください。'}
                 </p>
               )}
 
@@ -405,7 +439,7 @@ export const MyHossiiSettingsSection = ({
                 </p>
               )}
 
-              {appearanceError && (
+              {appearanceError && uiState !== 'registered_appearance_error' && (
                 <p className={`${styles.statusMessage} ${styles.statusError}`} role="alert">
                   {appearanceError}
                 </p>

@@ -28,6 +28,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [savedDefault, setSavedDefault] = useState(false);
   const [savedSpace, setSavedSpace] = useState(false);
+  const [nicknameSaveRevision, setNicknameSaveRevision] = useState(0);
 
   const handleSaveDefaultNickname = () => {
     const trimmed = defaultNicknameInput.trim();
@@ -41,6 +42,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     const trimmed = spaceNicknameInput.trim();
     if (!trimmed) return;
     setSpaceNickname(activeSpaceId, trimmed);
+    setNicknameSaveRevision((revision) => revision + 1);
     setSavedSpace(true);
     setTimeout(() => setSavedSpace(false), 2000);
   };
@@ -143,6 +145,9 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
             activeSpaceId={activeSpaceId}
             activeSpaceName={activeSpace?.name ?? null}
             spaceMyHossiiEnabled={activeSpace?.myHossiiEnabled ?? false}
+            deviceProfileId={profile?.id ?? null}
+            defaultNickname={profile?.defaultNickname || currentUser?.username || null}
+            refreshKey={nicknameSaveRevision}
           />
         </section>
 
