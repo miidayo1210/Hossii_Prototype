@@ -6,6 +6,7 @@ import {
   getRegistrationSuccessMessage,
   isVisibleInSpace,
   resolveMyHossiiAccountUiState,
+  shouldShowMyHossiiLogButton,
   shouldShowSpaceRegistrationPrompt,
 } from './myHossiiAppearance';
 
@@ -13,6 +14,7 @@ const emptySettings = {
   sourceType: null,
   presetKey: null,
   imagePath: null,
+  customConfig: null,
   updatedAt: null,
 } as const;
 
@@ -20,6 +22,7 @@ const registeredPreset = {
   sourceType: 'preset' as const,
   presetKey: 'idle_base',
   imagePath: null,
+  customConfig: null,
   updatedAt: '2026-07-07T00:00:00Z',
 };
 
@@ -228,5 +231,24 @@ describe('registration eligibility by account type (logic only)', () => {
       userPreferenceVisible: true,
     });
     expect(isVisibleInSpace(input)).toBe(true);
+  });
+});
+
+describe('shouldShowMyHossiiLogButton', () => {
+  it('shows for public visibility to guests', () => {
+    expect(shouldShowMyHossiiLogButton('public', false)).toBe(true);
+  });
+
+  it('hides for authenticated visibility when guest', () => {
+    expect(shouldShowMyHossiiLogButton('authenticated', false)).toBe(false);
+  });
+
+  it('shows for authenticated visibility when logged in', () => {
+    expect(shouldShowMyHossiiLogButton('authenticated', true)).toBe(true);
+  });
+
+  it('hides for hidden visibility', () => {
+    expect(shouldShowMyHossiiLogButton('hidden', true)).toBe(false);
+    expect(shouldShowMyHossiiLogButton('hidden', false)).toBe(false);
   });
 });

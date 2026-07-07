@@ -156,7 +156,7 @@ export const AuthorTimelineModal = ({
             ))
           ) : (
             <p className={styles.emptyState}>
-              このスペースには、まだ表示できるログがありません。
+              {group.emptyMessage ?? 'このスペースには、まだ表示できるログがありません。'}
             </p>
           )}
         </div>

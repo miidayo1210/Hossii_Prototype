@@ -582,7 +582,7 @@ export const MyHossiiSettingsSection = ({
           onClick={() => setIsCustomEditorOpen(true)}
           disabled={isSaving || isUploading}
         >
-          カスタムして作る
+          ベースから作る
         </button>
       </div>
 

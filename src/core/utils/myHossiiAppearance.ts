@@ -1,3 +1,4 @@
+import type { MyHossiiLogVisibility } from '../types/myHossii';
 import type { AppUser } from '../contexts/AuthContext';
 import type { ParticipantEligibility, ParticipantEligibilityReason } from './myHossiiParticipationApi';
 import type { MyHossiiSettings } from './userProfilesApi';
@@ -121,6 +122,17 @@ export function shouldShowSpaceRegistrationPrompt(input: {
 
 export function isAdminUser(user: AppUser | null | undefined): boolean {
   return user?.isAdmin === true;
+}
+
+/** マイHossiiポップオーバー内「この人のログを見る」の表示可否 */
+export function shouldShowMyHossiiLogButton(
+  logVisibility: MyHossiiLogVisibility,
+  isAuthenticatedViewer: boolean,
+): boolean {
+  return (
+    logVisibility === 'public' ||
+    (logVisibility === 'authenticated' && isAuthenticatedViewer)
+  );
 }
 
 /** @internal テスト用 */

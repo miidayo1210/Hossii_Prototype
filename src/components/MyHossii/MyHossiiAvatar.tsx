@@ -4,6 +4,7 @@ import type { ResolvedMotionMode } from '../../core/utils/myHossiiPosition';
 import type { MyHossiiDisplayState } from '../../core/types/myHossii';
 import type { MyHossiiActivity } from '../../core/utils/myHossiiActivity';
 import type { MyHossiiLogVisibility } from '../../core/types/myHossii';
+import { shouldShowMyHossiiLogButton } from '../../core/utils/myHossiiAppearance';
 import { MyHossiiPopover } from './MyHossiiPopover';
 
 export type MyHossiiAvatarProps = {
@@ -47,9 +48,7 @@ export const MyHossiiAvatar = ({
   onDeselect,
   onViewLogs,
 }: MyHossiiAvatarProps) => {
-  const showLogs =
-    logVisibility === 'public' ||
-    (logVisibility === 'authenticated' && isAuthenticatedViewer);
+  const showLogs = shouldShowMyHossiiLogButton(logVisibility, isAuthenticatedViewer);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

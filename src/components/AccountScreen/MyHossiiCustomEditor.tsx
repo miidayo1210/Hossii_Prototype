@@ -80,10 +80,10 @@ export const MyHossiiCustomEditor = ({ initialConfig, onSave, onClose }: Props) 
         <header className={styles.header}>
           <div>
             <h2 id="my-hossii-custom-title" className={styles.title}>
-              マイHossiiをカスタム
+              ベースから作る（準備版）
             </h2>
             <p className={styles.subtitle}>
-              ベースを選んで保存できます。パーツの組み合わせは今後追加予定です。
+              ベースHossiiを3種類から選んで保存できます。目・口などのパーツは今後追加予定です。
             </p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="閉じる">
@@ -174,7 +174,7 @@ export const MyHossiiCustomEditor = ({ initialConfig, onSave, onClose }: Props) 
               disabled={isSaving}
               aria-busy={isSaving}
             >
-              {isSaving ? '保存中...' : 'カスタムを保存'}
+              {isSaving ? '保存中...' : 'ベースを保存'}
             </button>
           </div>
         </footer>

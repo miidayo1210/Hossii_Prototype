@@ -38,6 +38,7 @@ export function createDefaultMyHossiiCustomConfig(
 
 export function parseMyHossiiCustomConfig(raw: unknown): MyHossiiCustomConfig | null {
   if (!isPlainObject(raw)) return null;
+  if (JSON.stringify(raw).length > MY_HOSSII_CUSTOM_MAX_BYTES) return null;
   if (raw.version !== MY_HOSSII_CUSTOM_CONFIG_VERSION) return null;
 
   const baseKey = typeof raw.baseKey === 'string' ? raw.baseKey.trim() : '';

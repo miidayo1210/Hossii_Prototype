@@ -9,4 +9,6 @@ export type AuthorPostGroup = {
   latestPost: Hossii;
   /** latestPost.createdAt が現在時刻から 5分以内 */
   isRecent: boolean;
+  /** ログ0件時の表示メッセージ（省略時はデフォルト文言） */
+  emptyMessage?: string;
 };

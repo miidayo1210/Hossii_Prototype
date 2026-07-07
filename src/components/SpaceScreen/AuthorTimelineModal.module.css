@@ -232,4 +232,5 @@
   color: #6b7280;
   font-size: 0.875rem;
   line-height: 1.6;
+  white-space: pre-line;
 }
