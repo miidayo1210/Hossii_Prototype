@@ -1774,3 +1774,13 @@ hossii.myHossiiPromptDismissed.{userId}.{spaceId}
 - 追加タブ・ペインへのマイHossii表示は未対応。メイン HOME のみ
 - PC ホバーでの簡易プレビューは未実装。タップでポップオーバー表示
 - ブラウザ手動受入は開発環境で未実施項目あり
+
+### 35-13. セキュリティ修正（2026-07-07 監査）
+
+| 対策 | migration / ファイル |
+|---|---|
+| RPC: 非公開スペースは anon 拒否、存在しない space_id は空返却 | 20260707140000 |
+| DB CHECK: hossii_image_path は本人 avatars/{uid}/my-hossii.webp のみ | 20260707140000 |
+| TRIGGER: my_hossii スペース設定は community admin のみ UPDATE 可 | 20260707140000 |
+| 表示時パス検証 | myHossiiImagePath.ts, resolveMyHossiiImage.ts |
+| CharacterTab を adminOnly に変更 | settingsScreenIds.ts |
