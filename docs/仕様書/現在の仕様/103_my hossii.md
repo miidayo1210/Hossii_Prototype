@@ -157,7 +157,19 @@ Supabase Authのログインアカウントごとに、1体の「マイHossii」
 - メールアドレスとパスワードでログインするユーザー
 - OAuthでログインするユーザー
 - 管理者が発行した参加者IDとパスワードでログインするユーザー
-- 管理者アカウント
+- コミュニティ管理者
+- スーパー管理者
+
+ゲストは登録できない。
+
+### 6-1-1. 登録と登場の分離
+
+マイHossiiには次の2段階がある。
+
+1. **登録** — アカウント共通の見た目を `user_profiles` に保存する。認証済みユーザーなら誰でも可能。
+2. **登場** — スペースごとに、登録済みマイHossiiをHOMEへ表示するかを決める。無条件では全スペースへ出ない。
+
+登録だけではスペースHOMEに表示されない場合がある。`AccountScreen` で理由と次の操作を示す。
 
 ### 6-2. ゲストユーザー
 
@@ -207,6 +219,29 @@ Supabase Authのログインアカウントごとに、1体の「マイHossii」
 デフォルトは `false` とし、既存スペースの表示を変えない。
 
 設定UIは `CharacterTab` に配置する。
+
+管理者設定はスペース全体の機能ON/OFFであり、本人の登場ON/OFFとは別である。
+
+### 7-5. 本人のスペース別登場設定
+
+テーブル `space_my_hossii_preferences` に、本人のスペース別表示希望を保存する。
+
+- `is_visible = true` または行なし：登場資格を満たせば表示
+- `is_visible = false`：登録は維持するが、そのスペースでは非表示
+
+初期値は **ON**（行が存在しない場合も ON 扱い）。
+
+本人のみが自分の行を INSERT / UPDATE できる。管理者は本人の意思に反して ON に戻せない。
+
+最終表示条件:
+
+```text
+user_profiles に登録済み
+AND spaces.my_hossii_enabled = true
+AND 対象スペースの有効な参加者
+AND COALESCE(space_my_hossii_preferences.is_visible, true) = true
+AND revoked / 退出 / 無効ではない
+```
 
 ---
 
@@ -1784,3 +1819,69 @@ hossii.myHossiiPromptDismissed.{userId}.{spaceId}
 | TRIGGER: my_hossii スペース設定は community admin のみ UPDATE 可 | 20260707140000 |
 | 表示時パス検証 | myHossiiImagePath.ts, resolveMyHossiiImage.ts |
 | CharacterTab を adminOnly に変更 | settingsScreenIds.ts |
+
+---
+
+## 36. 登録・登場UX改善（2026-07-07）
+
+### 36-1. 目的
+
+登録後に「何も変わらない」ように見える問題を解消する。登録資格と登場資格をUI上で分離して示す。
+
+### 36-2. データモデル
+
+| テーブル | カラム | 用途 |
+|---|---|---|
+| space_my_hossii_preferences | space_id, user_id, is_visible | 本人のスペース別登場ON/OFF |
+
+migration: `20260707150000_space_my_hossii_preferences.sql`
+
+- 主キー: `(space_id, user_id)`
+- `user_id` は Auth UID
+- 行なしは `is_visible = true` 扱い
+- スペース削除時は CASCADE で削除
+
+### 36-3. 判定 util
+
+| 関数 | ファイル | 意味 |
+|---|---|---|
+| canAppearInSpace | myHossiiAppearance.ts | 登録済みかつ参加資格あり |
+| isVisibleInSpace | myHossiiAppearance.ts | 上記 + 管理者設定ON + 本人設定ON |
+| resolveMyHossiiAccountUiState | myHossiiAppearance.ts | AccountScreen の表示状態 |
+
+### 36-4. AccountScreen 状態
+
+| 状態 | 表示 |
+|---|---|
+| A 未登録 | 登録案内 + プリセット/画像UI |
+| B 登録済み・参加者・機能ON | 本人ON/OFFトグル + 「登場しています」 |
+| C 登録済み・参加者・機能OFF | トグルなし + 管理者がONにすると登場できる旨 |
+| D 登録済み・参加資格なし | トグルなし + 参加者登録が必要な旨（管理者向け補足あり） |
+| E 退出・無効化 | 登場不可の旨 |
+
+登録成功時は、上記状態に応じたメッセージを表示する（「保存しました」のみにしない）。
+
+### 36-5. RPC 変更
+
+`list_my_hossii_participants` に `space_my_hossii_preferences` を LEFT JOIN し、`COALESCE(is_visible, true) = false` のユーザーを返却対象から除外する。
+
+### 36-6. 認証ユーザーのスペースニックネーム
+
+`space_nicknames.profile_id` の読み書きは、認証済みユーザーでは Auth UID を使う。
+
+```text
+nicknameProfileId = currentUser.uid ?? profile.id
+```
+
+`profile.id` 全体の統一や投稿 `author_id` の変更は行わない。
+
+### 36-7. 初回案内（MyHossiiPrompt）
+
+- 参加資格があり、スペース機能ON、未登録のときのみ表示
+- 参加資格なし・機能OFFでは表示しない（不可能な動作を促さない）
+
+### 36-8. テスト追加
+
+- myHossiiAppearance.test.ts
+- myHossiiSpacePreferencesApi.test.ts
+- myHossiiParticipationApi.test.ts
