@@ -27,10 +27,12 @@ import { resolveMyHossiiImage } from '../../core/utils/resolveMyHossiiImage';
 import {
   fetchMyHossiiSettings,
   isMyHossiiRegistered,
+  saveMyHossiiCustom,
   saveMyHossiiPreset,
   saveMyHossiiUpload,
   type MyHossiiSettings,
 } from '../../core/utils/userProfilesApi';
+import { MyHossiiCustomEditor } from './MyHossiiCustomEditor';
 import styles from './MyHossiiSettingsSection.module.css';
 
 type Props = {
@@ -76,6 +78,7 @@ export const MyHossiiSettingsSection = ({
   const [isAppearanceLoading, setIsAppearanceLoading] = useState(false);
   const [appearanceError, setAppearanceError] = useState<string | null>(null);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  const [isCustomEditorOpen, setIsCustomEditorOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadAppearance = useCallback(
@@ -242,6 +245,19 @@ export const MyHossiiSettingsSection = ({
     }
   };
 
+  const handleCustomSave = async (config: NonNullable<MyHossiiSettings['customConfig']>) => {
+    if (!currentUser) return;
+
+    setSaveError(null);
+    setRegistrationMessage(null);
+    const saved = await saveMyHossiiCustom(currentUser.uid, config);
+    setSavedSettings(saved);
+    setSelectedPresetKey(null);
+    setUploadPreviewUrl(null);
+    setPendingUploadFile(null);
+    await handleRegistrationComplete(saved);
+  };
+
   const handleVisibilityToggle = async (nextVisible: boolean) => {
     if (!currentUser || !activeSpaceId || isTogglingVisibility) return;
 
@@ -299,6 +315,7 @@ export const MyHossiiSettingsSection = ({
       sourceType: null,
       presetKey: null,
       imagePath: null,
+      customConfig: null,
       updatedAt: null,
     },
     spaceMyHossiiEnabled,
@@ -325,6 +342,14 @@ export const MyHossiiSettingsSection = ({
         hossiiImagePath: savedSettings.imagePath,
       });
     }
+    if (savedSettings?.sourceType === 'custom' && savedSettings.customConfig?.baseKey) {
+      return resolveMyHossiiImage({
+        userId: currentUser.uid,
+        hossiiSourceType: 'custom',
+        hossiiPresetKey: savedSettings.customConfig.baseKey,
+        hossiiImagePath: null,
+      });
+    }
     const previewKey = selectedPresetKey ?? savedSettings?.presetKey;
     return resolveHossiiPresetImagePath(previewKey);
   })();
@@ -332,6 +357,10 @@ export const MyHossiiSettingsSection = ({
   const previewLabel = (() => {
     if (pendingUploadFile) return '画像プレビュー';
     if (savedSettings?.sourceType === 'upload') return 'アップロード画像';
+    if (savedSettings?.sourceType === 'custom') {
+      const baseKey = savedSettings.customConfig?.baseKey;
+      return baseKey ? `カスタム（${getHossiiPresetByKey(baseKey)?.label ?? baseKey}）` : 'カスタム';
+    }
     const previewKey = selectedPresetKey ?? savedSettings?.presetKey;
     return previewKey ? getHossiiPresetByKey(previewKey)?.label : null;
   })();
@@ -547,9 +576,13 @@ export const MyHossiiSettingsSection = ({
       </div>
 
       <div className={styles.comingSoonRow}>
-        <button type="button" className={styles.comingSoonButton} disabled aria-disabled="true">
+        <button
+          type="button"
+          className={styles.customButton}
+          onClick={() => setIsCustomEditorOpen(true)}
+          disabled={isSaving || isUploading}
+        >
           カスタムして作る
-          <span className={styles.comingSoonBadge}>Coming soon</span>
         </button>
       </div>
 
@@ -579,6 +612,14 @@ export const MyHossiiSettingsSection = ({
           </p>
         )}
       </div>
+
+      {isCustomEditorOpen && (
+        <MyHossiiCustomEditor
+          initialConfig={savedSettings?.customConfig ?? null}
+          onSave={handleCustomSave}
+          onClose={() => setIsCustomEditorOpen(false)}
+        />
+      )}
     </div>
   );
 };

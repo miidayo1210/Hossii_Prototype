@@ -139,6 +139,23 @@
   padding-top: 0.25rem;
 }
 
+.customButton {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 0.75rem;
+  background: rgba(250, 245, 255, 0.8);
+  color: #7c3aed;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.customButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .comingSoonButton {
   width: 100%;
   padding: 0.625rem 0.75rem;

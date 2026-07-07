@@ -1801,7 +1801,8 @@ hossii.myHossiiPromptDismissed.{userId}.{spaceId}
 | Phase 3 ポップオーバー・直近ログ | 実装済み |
 | Phase 4 表情・吹き出し連動 | 実装済み |
 | Phase 5 画像アップロード | 実装済み |
-| Phase 6 カスタム作成 | 未実装・仕様案のみ |
+| Phase 6A カスタム基盤 | 実装済み（ベース選択まで） |
+| Phase 6B パーツ導入 | 停止・アセット待ち |
 
 ### 35-12. 仕様との既知差分
 
@@ -1898,3 +1899,144 @@ nicknameProfileId = currentUser.uid ?? profile.id
 - UI 状態は `space_off` を `not_participant` より優先
 - 理由別の案内文（共通ニックネームのみ / 参加資格なし / API エラー）
 - ニックネーム保存後に `refreshKey` で登場状態を再取得
+
+---
+
+## 37. 「この人のログを見る」修正（2026-07-07）
+
+### 37-1. 原因
+
+`MyHossiiLayer.handleViewLogs` が `findAuthorGroupForUser` の戻り値 `null` のとき `onViewAuthorLogs` を呼ばず、無反応になっていた。
+
+主な `null` 要因:
+
+- マイHossii `user_id` は Auth UID だが、旧投稿の `author_id` が端末 `profile.id`
+- ニックネーム一致のフォールバックが未適用、または `spaceId` 未指定
+- ログ 0 件でもモーダルを開かない実装
+
+### 37-2. イベント経路（修正後）
+
+```text
+button onClick (stopPropagation)
+→ MyHossiiPopover.onViewLogs
+→ MyHossiiAvatar.onViewLogs(userId, nickname)
+→ MyHossiiLayer.handleViewLogs
+→ resolveAuthorGroupForMyHossiiUser（常に AuthorPostGroup を返す）
+→ SpaceScreen setSelectedAuthorGroup
+→ AuthorTimelineModal render（SpaceScreen 直下）
+```
+
+### 37-3. ID 解決
+
+| 順序 | 照合 |
+|---|---|
+| 1 | Auth UID = `group.authorId` |
+| 2 | ニックネーム一致（旧 profile ID 投稿の救済） |
+| 3 | 空グループ（0件でもモーダル表示） |
+
+投稿 `author_id` の一括 migration は行わない。
+
+### 37-4. 公開範囲
+
+| 設定 | ボタン | モーダル |
+|---|---|---|
+| public | 全員 | 公開ログのみ |
+| authenticated | ログインユーザーのみ | 公開ログのみ |
+| hidden | 非表示 | 開かない |
+
+### 37-5. ログ 0 件
+
+`AuthorTimelineModal` を空状態で開き、「このスペースには、まだ表示できるログがありません。」を表示する。
+
+### 37-6. 関連ファイル
+
+- `src/core/utils/myHossiiAuthorLogs.ts`
+- `src/components/MyHossii/MyHossiiLayer.tsx`
+- `src/components/SpaceScreen/AuthorTimelineModal.tsx`
+
+---
+
+## 38. Phase 6A｜カスタム機能の基盤（2026-07-07）
+
+### 38-1. 実装範囲
+
+| 項目 | 状態 |
+|---|---|
+| データモデル `hossii_custom_config` | 実装済み |
+| `hossii_source_type = 'custom'` | 実装済み |
+| 設定パース・検証 util | 実装済み |
+| AccountScreen カスタムエディター枠 | 実装済み |
+| ベース選択・プレビュー | 実装済み |
+| パーツ UI（目・口等） | Coming soon 表示のみ |
+| 保存・取消・初期状態に戻す | 実装済み |
+| Coming soon からの導線 | 実装済み |
+| スペース表示（baseKey → プリセット画像） | 実装済み |
+
+### 38-2. データモデル
+
+```sql
+user_profiles.hossii_source_type = 'custom'
+user_profiles.hossii_custom_config jsonb
+```
+
+設定例:
+
+```json
+{
+  "version": 1,
+  "baseKey": "idle_base",
+  "parts": {
+    "eyes": null,
+    "mouth": null,
+    "pattern": null,
+    "accessory": null
+  }
+}
+```
+
+制約:
+
+- `version` 必須（現行は 1 のみ）
+- 不明な `baseKey` / パーツ key は拒否
+- URL や HTML 相当文字はパーツ値として保存しない（null に正規化）
+- JSON サイズ上限 4096 バイト
+- 既存 preset / upload はそのまま動作
+
+migration: `20260707160000_add_my_hossii_custom_config.sql`
+
+### 38-3. 関連ファイル
+
+- `src/core/types/myHossiiCustom.ts`
+- `src/core/utils/myHossiiCustomConfig.ts`
+- `src/components/AccountScreen/MyHossiiCustomEditor.tsx`
+- `src/components/AccountScreen/MyHossiiSettingsSection.tsx`
+- `src/core/utils/userProfilesApi.ts`（`saveMyHossiiCustom`）
+
+---
+
+## 39. Phase 6B｜停止と必要アセット（2026-07-07）
+
+パーツ画像が存在しないため、Phase 6B の実装は停止する。
+
+### 39-1. 必要アセット一覧
+
+| カテゴリ | 必要物 | 現状 |
+|---|---|---|
+| ベース本体 | カスタム用ベース PNG（正面向き・透過） | idle プリセット 3 種のみ（Phase 6A でベース選択に流用） |
+| 目 | 複数バリエーション PNG + 重ね位置・サイズ定義 | **未存在** |
+| 口 | 複数バリエーション PNG + 重ね位置・サイズ定義 | **未存在** |
+| 表情 | 目口連動または差分 PNG | **未存在** |
+| 色 | パレット定義 or 着色方式 | **未決定** |
+| 模様 | オーバーレイ PNG | **未存在** |
+| アクセサリー | 帽子・装飾 PNG + 重ね順 | **未存在** |
+| 重ね順 | レイヤー順序仕様 | **未定** |
+| 商用条件 | 各アセットのライセンス | **未整理** |
+
+### 39-2. プロダクト判断が必要な項目
+
+- 合成結果を Storage に保存するか、クライアントで動的合成するか
+- Canvas / WebGL 等の新規レンダリング基盤が必要か
+- カスタム項目の正式な項目名・数・制限
+- UI デザイン（パーツ選択 UX）
+
+既存 emotion 画像を目・口パーツとして切り抜くことは行わない。

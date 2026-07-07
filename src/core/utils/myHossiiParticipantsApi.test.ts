@@ -27,4 +27,17 @@ describe('myHossiiParticipantsApi', () => {
     });
     expect(participant).toBeNull();
   });
+
+  it('parses custom participant row with base preset key', () => {
+    const participant = parseRpcRowForTest({
+      user_id: '11111111-1111-1111-1111-111111111111',
+      nickname: 'テスト',
+      hossii_source_type: 'custom',
+      hossii_preset_key: 'idle_smile',
+      hossii_image_path: null,
+      hossii_updated_at: '2026-07-07T00:00:00Z',
+    });
+    expect(participant?.hossiiSourceType).toBe('custom');
+    expect(participant?.hossiiPresetKey).toBe('idle_smile');
+  });
 });

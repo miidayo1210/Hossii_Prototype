@@ -102,6 +102,7 @@ describe('userProfilesApi myHossii parsing', () => {
       sourceType: null,
       presetKey: null,
       imagePath: null,
+      customConfig: null,
       updatedAt: null,
     });
   });
@@ -117,6 +118,7 @@ describe('userProfilesApi myHossii parsing', () => {
       sourceType: 'preset',
       presetKey: 'idle_smile',
       imagePath: null,
+      customConfig: null,
       updatedAt: '2026-07-06T00:00:00.000Z',
     });
   });
@@ -132,6 +134,7 @@ describe('userProfilesApi myHossii parsing', () => {
       sourceType: null,
       presetKey: null,
       imagePath: null,
+      customConfig: null,
       updatedAt: null,
     });
   });
@@ -147,7 +150,32 @@ describe('userProfilesApi myHossii parsing', () => {
       sourceType: null,
       presetKey: null,
       imagePath: null,
+      customConfig: null,
       updatedAt: null,
+    });
+  });
+
+  it('parses valid custom settings', () => {
+    expect(
+      parseMyHossiiRowForTest({
+        hossii_source_type: 'custom',
+        hossii_custom_config: {
+          version: 1,
+          baseKey: 'idle_base',
+          parts: { eyes: null, mouth: null, pattern: null, accessory: null },
+        },
+        hossii_updated_at: '2026-07-07T00:00:00.000Z',
+      }),
+    ).toEqual({
+      sourceType: 'custom',
+      presetKey: null,
+      imagePath: null,
+      customConfig: {
+        version: 1,
+        baseKey: 'idle_base',
+        parts: { eyes: null, mouth: null, pattern: null, accessory: null },
+      },
+      updatedAt: '2026-07-07T00:00:00.000Z',
     });
   });
 });
@@ -308,6 +336,7 @@ describe('saveMyHossiiPreset', () => {
           hossii_source_type: 'preset',
           hossii_preset_key: 'idle_smile',
           hossii_image_path: null,
+          hossii_custom_config: null,
           hossii_updated_at: expect.any(String),
           updated_at: expect.any(String),
         });
@@ -327,6 +356,7 @@ describe('saveMyHossiiPreset', () => {
       sourceType: 'preset',
       presetKey: 'idle_smile',
       imagePath: null,
+      customConfig: null,
       updatedAt: expect.any(String),
     });
   });
@@ -365,12 +395,14 @@ describe('localStorage fallback (Supabase not configured)', () => {
       sourceType: 'preset',
       presetKey: 'idle_base',
       imagePath: null,
+      customConfig: null,
       updatedAt: expect.any(String),
     });
     await expect(fetchMyHossiiSettings(userB)).resolves.toEqual({
       sourceType: 'preset',
       presetKey: 'idle_smile',
       imagePath: null,
+      customConfig: null,
       updatedAt: expect.any(String),
     });
   });

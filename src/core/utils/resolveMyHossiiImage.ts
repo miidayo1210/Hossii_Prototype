@@ -33,7 +33,10 @@ export function resolveMyHossiiImage(
   ) {
     return resolveUploadPublicUrl(participant.hossiiImagePath);
   }
-  if (participant.hossiiSourceType === 'preset' && participant.hossiiPresetKey) {
+  if (
+    (participant.hossiiSourceType === 'preset' || participant.hossiiSourceType === 'custom') &&
+    participant.hossiiPresetKey
+  ) {
     return resolveHossiiPresetImagePath(participant.hossiiPresetKey) ?? DEFAULT_MY_HOSSII_IMAGE;
   }
   return DEFAULT_MY_HOSSII_IMAGE;

@@ -11,7 +11,11 @@ type RpcRow = {
 };
 
 function rowToParticipant(row: RpcRow): MyHossiiParticipant | null {
-  if (row.hossii_source_type !== 'preset' && row.hossii_source_type !== 'upload') {
+  if (
+    row.hossii_source_type !== 'preset' &&
+    row.hossii_source_type !== 'upload' &&
+    row.hossii_source_type !== 'custom'
+  ) {
     return null;
   }
   return {

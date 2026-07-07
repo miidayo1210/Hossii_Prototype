@@ -43,4 +43,14 @@ describe('resolveMyHossiiImage', () => {
     });
     expect(src).toBe(HOSSII_IDLE.base);
   });
+
+  it('resolves custom base preset image path', () => {
+    const src = resolveMyHossiiImage({
+      userId: 'user-1',
+      hossiiSourceType: 'custom',
+      hossiiPresetKey: 'idle_closingeye',
+      hossiiImagePath: null,
+    });
+    expect(src).toBe('/hossii/idle/idle_closingeye.png');
+  });
 });

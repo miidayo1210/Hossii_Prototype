@@ -1,11 +1,14 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { isValidHossiiPresetKey } from '../assets/hossiiPresets';
+import type { MyHossiiCustomConfig } from '../types/myHossiiCustom';
+import { parseMyHossiiCustomConfig } from './myHossiiCustomConfig';
 import { deleteMyHossiiImageByPath, uploadMyHossiiAvatar } from './imageStorageApi';
 
 export type MyHossiiSettings = {
-  sourceType: 'preset' | 'upload' | null;
+  sourceType: 'preset' | 'upload' | 'custom' | null;
   presetKey: string | null;
   imagePath: string | null;
+  customConfig: MyHossiiCustomConfig | null;
   updatedAt: string | null;
 };
 
@@ -30,10 +33,11 @@ type UserProfileRow = {
   hossii_preset_key?: string | null;
   hossii_image_path?: string | null;
   hossii_updated_at?: string | null;
+  hossii_custom_config?: unknown;
 };
 
 const USER_PROFILE_SELECT =
-  'id, username, birthdate, gender, created_at, updated_at, hossii_source_type, hossii_preset_key, hossii_image_path, hossii_updated_at';
+  'id, username, birthdate, gender, created_at, updated_at, hossii_source_type, hossii_preset_key, hossii_image_path, hossii_updated_at, hossii_custom_config';
 
 const MY_HOSSII_STORAGE_KEY = 'hossii.myHossiiSettings';
 
@@ -41,19 +45,37 @@ const EMPTY_MY_HOSSII: MyHossiiSettings = {
   sourceType: null,
   presetKey: null,
   imagePath: null,
+  customConfig: null,
   updatedAt: null,
 };
 
 function parseMyHossiiFromRow(
-  row: Pick<UserProfileRow, 'hossii_source_type' | 'hossii_preset_key' | 'hossii_image_path' | 'hossii_updated_at'>,
+  row: Pick<
+    UserProfileRow,
+    'hossii_source_type' | 'hossii_preset_key' | 'hossii_image_path' | 'hossii_updated_at' | 'hossii_custom_config'
+  >,
 ): MyHossiiSettings {
   if (row.hossii_source_type === 'upload' && row.hossii_image_path) {
     return {
       sourceType: 'upload',
       presetKey: null,
       imagePath: row.hossii_image_path,
+      customConfig: null,
       updatedAt: row.hossii_updated_at ?? null,
     };
+  }
+  if (row.hossii_source_type === 'custom') {
+    const customConfig = parseMyHossiiCustomConfig(row.hossii_custom_config);
+    if (customConfig) {
+      return {
+        sourceType: 'custom',
+        presetKey: null,
+        imagePath: null,
+        customConfig,
+        updatedAt: row.hossii_updated_at ?? null,
+      };
+    }
+    return EMPTY_MY_HOSSII;
   }
   if (row.hossii_source_type !== 'preset' || !row.hossii_preset_key) {
     return EMPTY_MY_HOSSII;
@@ -65,6 +87,7 @@ function parseMyHossiiFromRow(
     sourceType: 'preset',
     presetKey: row.hossii_preset_key,
     imagePath: null,
+    customConfig: null,
     updatedAt: row.hossii_updated_at ?? null,
   };
 }
@@ -240,6 +263,7 @@ export async function saveMyHossiiPreset(userId: string, presetKey: string): Pro
     sourceType: 'preset',
     presetKey,
     imagePath: null,
+    customConfig: null,
     updatedAt: now,
   };
 
@@ -260,6 +284,7 @@ export async function saveMyHossiiPreset(userId: string, presetKey: string): Pro
       hossii_source_type: 'preset',
       hossii_preset_key: presetKey,
       hossii_image_path: null,
+      hossii_custom_config: null,
       hossii_updated_at: now,
       updated_at: now,
     })
@@ -297,6 +322,7 @@ export async function saveMyHossiiUpload(userId: string, file: File): Promise<My
     sourceType: 'upload',
     presetKey: null,
     imagePath: uploadResult.storagePath,
+    customConfig: null,
     updatedAt: now,
   };
 
@@ -306,6 +332,7 @@ export async function saveMyHossiiUpload(userId: string, file: File): Promise<My
       hossii_source_type: 'upload',
       hossii_preset_key: null,
       hossii_image_path: uploadResult.storagePath,
+      hossii_custom_config: null,
       hossii_updated_at: now,
       updated_at: now,
     })
@@ -342,6 +369,7 @@ export async function deleteMyHossiiImage(userId: string): Promise<MyHossiiSetti
       hossii_source_type: null,
       hossii_preset_key: null,
       hossii_image_path: null,
+      hossii_custom_config: null,
       hossii_updated_at: null,
       updated_at: now,
     })
@@ -362,12 +390,68 @@ export async function deleteMyHossiiImage(userId: string): Promise<MyHossiiSetti
 export function isMyHossiiRegistered(settings: MyHossiiSettings): boolean {
   if (settings.sourceType === 'preset' && settings.presetKey) return true;
   if (settings.sourceType === 'upload' && settings.imagePath) return true;
+  if (settings.sourceType === 'custom' && settings.customConfig?.baseKey) return true;
   return false;
+}
+
+export async function saveMyHossiiCustom(
+  userId: string,
+  config: MyHossiiCustomConfig,
+): Promise<MyHossiiSettings> {
+  const parsed = parseMyHossiiCustomConfig(config);
+  if (!parsed) {
+    throw new Error('無効なカスタム設定です');
+  }
+
+  const now = new Date().toISOString();
+  const saved: MyHossiiSettings = {
+    sourceType: 'custom',
+    presetKey: null,
+    imagePath: null,
+    customConfig: parsed,
+    updatedAt: now,
+  };
+
+  if (!isSupabaseConfigured) {
+    saveMockMyHossii(userId, saved);
+    return saved;
+  }
+
+  await ensureUserProfileExists(userId);
+  const existing = await fetchUserProfile(userId);
+  const oldImagePath =
+    existing?.myHossii.sourceType === 'upload' ? existing.myHossii.imagePath : null;
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({
+      hossii_source_type: 'custom',
+      hossii_preset_key: null,
+      hossii_image_path: null,
+      hossii_custom_config: parsed,
+      hossii_updated_at: now,
+      updated_at: now,
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('[userProfilesApi] saveMyHossiiCustom error:', error.message);
+    throw error;
+  }
+
+  if (oldImagePath) {
+    void deleteMyHossiiImageByPath(oldImagePath, userId);
+  }
+
+  return saved;
 }
 
 /** @internal テスト用 */
 export function parseMyHossiiRowForTest(
-  row: Pick<UserProfileRow, 'hossii_source_type' | 'hossii_preset_key' | 'hossii_image_path' | 'hossii_updated_at'>,
+  row: Pick<
+    UserProfileRow,
+    'hossii_source_type' | 'hossii_preset_key' | 'hossii_image_path' | 'hossii_updated_at' | 'hossii_custom_config'
+  >,
 ): MyHossiiSettings {
   return parseMyHossiiFromRow(row);
 }

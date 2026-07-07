@@ -7,7 +7,7 @@ export type MyHossiiAnimationTier = 'full' | 'light' | 'none';
 export type MyHossiiParticipant = {
   userId: string;
   nickname: string;
-  hossiiSourceType: 'preset' | 'upload';
+  hossiiSourceType: 'preset' | 'upload' | 'custom';
   hossiiPresetKey: string | null;
   hossiiImagePath: string | null;
   hossiiUpdatedAt: string | null;
