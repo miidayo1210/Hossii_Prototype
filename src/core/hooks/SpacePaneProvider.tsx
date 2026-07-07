@@ -157,6 +157,17 @@ export function SpacePaneProvider({ children }: { children: ReactNode }) {
         const loaded = await loadPanesForSpace(spaceId);
         if (reqId !== requestIdRef.current) return;
 
+        if (isSupabaseConfigured && loaded.length === 0) {
+          setError(new Error('スペースのタブを読み込めませんでした。'));
+          setActivePane(null);
+          runtimeRef.current = {
+            spaceId,
+            activePaneId: null,
+            defaultPaneId: null,
+          };
+          return;
+        }
+
         const def = pickDefaultPane(loaded, spaceId);
         const snapshot: PaneSnapshot = {
           panes: loaded,
@@ -169,6 +180,15 @@ export function SpacePaneProvider({ children }: { children: ReactNode }) {
         if (reqId !== requestIdRef.current) return;
         const message = err instanceof Error ? err : new Error(String(err));
         setError(message);
+        if (isSupabaseConfigured) {
+          setActivePane(null);
+          runtimeRef.current = {
+            spaceId,
+            activePaneId: null,
+            defaultPaneId: null,
+          };
+          return;
+        }
         const fallback = createDemoDefaultPane(spaceId);
         const snapshot: PaneSnapshot = {
           panes: [fallback],

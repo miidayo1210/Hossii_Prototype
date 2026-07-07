@@ -276,15 +276,19 @@ export async function fetchAllHossiisForModeration(spaceId: string): Promise<Hos
   return (data as HossiiRow[]).map(rowToHossii);
 }
 
-export async function insertHossii(hossii: Hossii): Promise<boolean> {
-  if (!isSupabaseConfigured) return false;
+export type InsertHossiiResult =
+  | { ok: true }
+  | { ok: false; message: string; code?: string };
+
+export async function insertHossii(hossii: Hossii): Promise<InsertHossiiResult> {
+  if (!isSupabaseConfigured) return { ok: false, message: 'Supabase is not configured' };
 
   const { error } = await supabase.from('hossiis').insert(hossiiToInsertRow(hossii));
   if (error) {
     console.error('[hossiisApi] insertHossii error:', error.message);
-    return false;
+    return { ok: false, message: error.message, code: error.code };
   }
-  return true;
+  return { ok: true };
 }
 
 export async function updateHossiiColor(id: string, color: string | null): Promise<void> {

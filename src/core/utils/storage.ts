@@ -1,5 +1,6 @@
 import type { Space, SpaceId } from '../types/space';
 import type { Hossii } from '../types';
+import { scopedStorageKey } from './storageScope';
 
 function serializeSpace(f: Space): Record<string, unknown> {
   const base: Record<string, unknown> = {
@@ -26,10 +27,10 @@ function serializeSpace(f: Space): Record<string, unknown> {
   return base;
 }
 
-// localStorage キー
-const SPACES_KEY = 'hossii.spaces';
-const ACTIVE_SPACE_ID_KEY = 'hossii.activeSpaceId';
-const HOSSIIS_KEY = 'hossii.hossiis';
+// localStorage キー（Project ref ごとにスコープ）
+const SPACES_KEY = scopedStorageKey('hossii.spaces');
+const ACTIVE_SPACE_ID_KEY = scopedStorageKey('hossii.activeSpaceId');
+const HOSSIIS_KEY = scopedStorageKey('hossii.hossiis');
 
 /**
  * スペースリストを読み込む（生データ）

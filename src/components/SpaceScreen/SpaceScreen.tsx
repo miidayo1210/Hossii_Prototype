@@ -107,6 +107,8 @@ import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import { LogListBody } from '../CommentsScreen/LogListBody';
 import { ScaledContent } from '../ScaledContent/ScaledContent';
 import { HossiiToast } from '../../core/ui/HossiiToast';
+import { POST_FAILURE_EVENT, type PostFailureDetail } from '../../core/utils/postFeedback';
+import { ActiveSpaceUnavailableBanner } from './ActiveSpaceUnavailableBanner';
 import {
   getDefaultQuickLogBottomRect,
   getDefaultQuickLogSideRect,
@@ -162,6 +164,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 ) {
   const {
     state,
+    spacesLoadedFromSupabase,
     hossiiLoadedFromSupabase,
     getActiveSpaceHossiis,
     getHossiisForQueryKey,
@@ -257,6 +260,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   });
 
   const activeSpace = getActiveSpace();
+  const showActiveSpaceUnavailableBanner =
+    isSupabaseConfigured &&
+    spacesLoadedFromSupabase &&
+    !!activeSpaceId &&
+    !activeSpace;
   const isVisiting = visitingSpaceId !== null;
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin ?? false;
@@ -453,6 +461,17 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     },
     [],
   );
+
+  useEffect(() => {
+    const onPostFailure = (event: Event) => {
+      const detail = (event as CustomEvent<PostFailureDetail>).detail;
+      if (detail?.message) {
+        showPaneToast(detail.message, 'error');
+      }
+    };
+    window.addEventListener(POST_FAILURE_EVENT, onPostFailure);
+    return () => window.removeEventListener(POST_FAILURE_EVENT, onPostFailure);
+  }, [showPaneToast]);
 
   const showPaneBar = shouldShowSpacePaneBar(
     isAdmin,
@@ -1764,6 +1783,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       <ScaledContent
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
       >
+      {showActiveSpaceUnavailableBanner && (
+        <ActiveSpaceUnavailableBanner
+          message="このスペースはDevelopment環境に存在しません。"
+          hint="Communities から Dev Community を開くか、/c/dev-community/s/dev-public など seed スペースへ移動してください。"
+        />
+      )}
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
         <SlideshowView

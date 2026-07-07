@@ -13,6 +13,11 @@ import type { Space, SpaceId, SpaceBackground } from '../types/space';
 import type { AppMode } from '../types/mode';
 import type { UserProfile, SpaceNicknames } from '../types/profile';
 import { DEFAULT_SPACE, DEFAULT_QUICK_EMOTIONS, DEFAULT_BACKGROUND } from '../types/space';
+import {
+  buildAddHossiiBlockMessage,
+  isKnownSpaceInState,
+} from '../utils/addHossiiGuard';
+import { emitPostFailure, formatInsertHossiiErrorMessage } from '../utils/postFeedback';
 import { generateId } from '../utils';
 import { createBubblePositionFromId } from '../utils/bubblePosition';
 import {
@@ -246,6 +251,16 @@ function isValidBackground(value: unknown): value is SpaceBackground {
 
 // 初期化: localStorage からスペースを読み込み、なければデフォルトスペースを作成
 function initializeSpaces(): { spaces: Space[]; activeSpaceId: SpaceId } {
+  if (isSupabaseConfigured) {
+    let activeSpaceId: SpaceId | null = null;
+    try {
+      activeSpaceId = loadActiveSpaceId();
+    } catch {
+      activeSpaceId = null;
+    }
+    return { spaces: [], activeSpaceId: activeSpaceId ?? '' };
+  }
+
   let spaces: Space[] = [];
 
   try {
@@ -774,7 +789,7 @@ export type HossiiContextValue = {
   spacesLoadedFromSupabase: boolean;
   hossiiLoadedFromSupabase: boolean;
   communitySlug: string | null | undefined;
-  addHossii: (input: AddHossiiInput) => void;
+  addHossii: (input: AddHossiiInput) => Promise<boolean>;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
   setActiveSpace: (id: SpaceId) => void;
@@ -881,15 +896,20 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   useEffect(() => {
     if (isResolvingAuth) return;
 
-    if (currentUser && !currentUser.isAdmin) {
+    if (currentUser?.uid) {
       authorProfileIdRef.current = currentUser.uid;
       const existing = stateRef.current.profile;
       const nextProfile: UserProfile = {
         id: currentUser.uid,
-        defaultNickname: existing?.defaultNickname ?? currentUser.username ?? '',
+        defaultNickname:
+          existing?.defaultNickname ??
+          currentUser.username ??
+          currentUser.displayName ??
+          '',
         createdAt: existing?.createdAt ?? new Date(),
       };
       dispatch({ type: 'SET_PROFILE', payload: nextProfile });
+      saveProfile(nextProfile);
     } else {
       authorProfileIdRef.current = undefined;
     }
@@ -1171,32 +1191,62 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, [activeSpaceIdRef]);
 
   // ===== addHossii: 楽観的更新 → Supabase INSERT =====
-  const addHossii = useCallback((input: AddHossiiInput) => {
+  const addHossii = useCallback(async (input: AddHossiiInput): Promise<boolean> => {
     const msg = (input.message ?? '').trim();
     const isLaughter = input.autoType === 'laughter';
     const hasImage = !!input.imageUrl;
     const hasNumber = input.numberValue != null;
     const isCanvas = input.postKind === 'canvas';
     if (isCanvas) {
-      if (!input.imageUrl) return;
+      if (!input.imageUrl) return false;
     } else if (!input.emotion && !msg && !isLaughter && !hasImage && !hasNumber) {
-      return;
+      return false;
     }
 
     const currentState = stateRef.current;
     const activeSpaceId = activeSpaceIdRef.current;
     const runtime = spacePaneRuntimeRef.current;
 
-    if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
+    if (
+      isSupabaseConfigured &&
+      !isKnownSpaceInState(
+        activeSpaceId,
+        currentState.spaces.map((space) => space.id),
+      )
+    ) {
+      emitPostFailure({
+        reason: 'space_unavailable',
+        message: buildAddHossiiBlockMessage('space_unavailable'),
+      });
+      return false;
+    }
+
+    if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) {
+      emitPostFailure({
+        reason: 'space_unavailable',
+        message: buildAddHossiiBlockMessage('space_unavailable'),
+      });
+      return false;
+    }
     const activePaneId = runtime.activePaneId;
-    if (activePaneId == null) return;
+    if (activePaneId == null) {
+      emitPostFailure({
+        reason: 'pane_unavailable',
+        message: buildAddHossiiBlockMessage('pane_unavailable'),
+      });
+      return false;
+    }
     if (
       !validateHossiiPaneSpaceMatch(
         { spaceId: activeSpaceId, spacePaneId: activePaneId },
         activeSpaceId,
       )
     ) {
-      return;
+      emitPostFailure({
+        reason: 'pane_space_mismatch',
+        message: buildAddHossiiBlockMessage('pane_space_mismatch'),
+      });
+      return false;
     }
 
     // プロフィールが無ければ作成
@@ -1274,29 +1324,38 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     dispatch({ type: 'ADD_HOSSII_FULL', payload: newHossii });
 
     // Supabase に非同期 INSERT
-    // hossiis.space_id は spaces.id の外部キーのため、スペース INSERT が
-    // 完了していない場合は待機してから実行する
     if (isSupabaseConfigured) {
       insertedHossiiIdsRef.current.add(newHossii.id);
       pendingOptimisticHossiiRef.current.set(newHossii.id, newHossii);
       const spacePending = pendingSpacePromises.current.get(newHossii.spaceId);
-      const insertPromise = spacePending
-        ? spacePending.then(() => insertHossii(newHossii))
-        : insertHossii(newHossii);
-      insertPromise
-        .then((ok) => {
-          if (ok === false) {
-            insertedHossiiIdsRef.current.delete(newHossii.id);
-            pendingOptimisticHossiiRef.current.delete(newHossii.id);
-            dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
-          }
-        })
-        .catch(() => {
+      try {
+        const insertResult = spacePending
+          ? await spacePending.then(() => insertHossii(newHossii))
+          : await insertHossii(newHossii);
+        if (!insertResult.ok) {
           insertedHossiiIdsRef.current.delete(newHossii.id);
           pendingOptimisticHossiiRef.current.delete(newHossii.id);
           dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
+          emitPostFailure({
+            reason: 'insert_failed',
+            message: formatInsertHossiiErrorMessage(insertResult.message),
+          });
+          return false;
+        }
+        return true;
+      } catch {
+        insertedHossiiIdsRef.current.delete(newHossii.id);
+        pendingOptimisticHossiiRef.current.delete(newHossii.id);
+        dispatch({ type: 'REMOVE_HOSSII', payload: newHossii.id });
+        emitPostFailure({
+          reason: 'insert_failed',
+          message: buildAddHossiiBlockMessage('pane_unavailable'),
         });
+        return false;
+      }
     }
+
+    return true;
   }, [activeSpaceIdRef]);
 
   const selectHossii = useCallback((id: string | null) => {
