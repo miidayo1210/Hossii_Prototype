@@ -1,21 +1,34 @@
-import { getProjectRefSuffix } from '../../core/supabaseEnvironment';
+import { createPortal } from 'react-dom';
 import { supabaseEnvironmentValidation } from '../../core/supabase';
+import {
+  DEVELOPMENT_BANNER_POINTER_EVENTS,
+  DEVELOPMENT_BANNER_Z_INDEX,
+  shouldRenderDevelopmentBanner,
+} from './developmentBannerLayer';
 import styles from './DevelopmentBanner.module.css';
 
 export function DevelopmentBanner() {
-  if (!supabaseEnvironmentValidation.shouldShowDevBanner) {
+  if (!shouldRenderDevelopmentBanner(supabaseEnvironmentValidation)) {
     return null;
   }
 
-  const suffix = getProjectRefSuffix(supabaseEnvironmentValidation.actualProjectRef);
+  if (typeof document === 'undefined') {
+    return null;
+  }
 
-  return (
+  return createPortal(
     <div
       className={styles.developmentBanner}
+      style={{
+        zIndex: DEVELOPMENT_BANNER_Z_INDEX,
+        pointerEvents: DEVELOPMENT_BANNER_POINTER_EVENTS,
+      }}
       aria-hidden="true"
-      title={suffix ? `Development ···${suffix}` : 'Development'}
+      title="Development environment"
+      data-development-banner=""
     >
       DEV
-    </div>
+    </div>,
+    document.body,
   );
 }

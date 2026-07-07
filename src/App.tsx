@@ -652,8 +652,6 @@ const App = () => {
 
   return (
     <AuthProvider>
-      <GlobalClickStarBurst />
-      <DevelopmentBanner />
       <AdminNavigationProvider>
         <DisplayPrefsProvider>
           <HossiiProvider initialHossiis={mockHossiis}>
@@ -663,6 +661,8 @@ const App = () => {
           </HossiiProvider>
         </DisplayPrefsProvider>
       </AdminNavigationProvider>
+      <GlobalClickStarBurst />
+      <DevelopmentBanner />
     </AuthProvider>
   );
 };
