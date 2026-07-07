@@ -92,7 +92,8 @@ export const AuthorTimelineModal = ({
   onLike,
   isMobilePortrait = false,
 }: Props) => {
-  const emotionColor = getEmotionColor(group.latestPost.emotion);
+  const hasPosts = group.posts.length > 0;
+  const emotionColor = hasPosts ? getEmotionColor(group.latestPost.emotion) : '#a78bfa';
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -136,20 +137,28 @@ export const AuthorTimelineModal = ({
               {group.authorName} の投稿
             </h2>
             <p className={styles.subtitle}>
-              全 {group.posts.length}件 · 最終 {formatTime(group.latestPost.createdAt)}
+              {hasPosts
+                ? `全 ${group.posts.length}件 · 最終 ${formatTime(group.latestPost.createdAt)}`
+                : '表示できるログはまだありません'}
             </p>
           </div>
         </header>
         <div className={styles.body}>
-          {group.posts.map((post) => (
-            <TimelinePostRow
-              key={`${post.id}-${post.likeCount ?? 0}`}
-              post={post}
-              likesEnabled={likesEnabled}
-              onLike={onLike}
-              onSelect={onSelectPost}
-            />
-          ))}
+          {hasPosts ? (
+            group.posts.map((post) => (
+              <TimelinePostRow
+                key={`${post.id}-${post.likeCount ?? 0}`}
+                post={post}
+                likesEnabled={likesEnabled}
+                onLike={onLike}
+                onSelect={onSelectPost}
+              />
+            ))
+          ) : (
+            <p className={styles.emptyState}>
+              {group.emptyMessage ?? 'このスペースには、まだ表示できるログがありません。'}
+            </p>
+          )}
         </div>
       </div>
     </div>

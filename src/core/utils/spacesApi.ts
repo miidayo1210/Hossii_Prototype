@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 import type { Space, SpaceId } from '../types/space';
 import type { EmotionKey } from '../types';
+import type { MyHossiiLogVisibility, MyHossiiMotionMode } from '../types/myHossii';
 import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from './spaceDecorations';
 import { parseTabFolders } from './tabFolderStorage';
 import { ensureDefaultSpacePane } from './ensureDefaultSpacePane';
@@ -25,6 +26,9 @@ type SpaceRow = {
   custom_emotions?: unknown;
   bubble_shape_png?: string | null;
   tab_folders?: unknown;
+  my_hossii_enabled?: boolean | null;
+  my_hossii_motion_mode?: string | null;
+  my_hossii_log_visibility?: string | null;
 };
 
 // SpaceRow → Space（camelCase）
@@ -56,7 +60,20 @@ function rowToSpace(row: SpaceRow): Space {
       if (!('tab_folders' in row)) return undefined;
       return parseTabFolders(row.tab_folders);
     })(),
+    myHossiiEnabled: row.my_hossii_enabled ?? false,
+    myHossiiMotionMode: parseMyHossiiMotionMode(row.my_hossii_motion_mode),
+    myHossiiLogVisibility: parseMyHossiiLogVisibility(row.my_hossii_log_visibility),
   };
+}
+
+function parseMyHossiiMotionMode(raw: string | null | undefined): MyHossiiMotionMode {
+  if (raw === 'free' || raw === 'anchored' || raw === 'auto') return raw;
+  return 'auto';
+}
+
+function parseMyHossiiLogVisibility(raw: string | null | undefined): MyHossiiLogVisibility {
+  if (raw === 'public' || raw === 'authenticated' || raw === 'hidden') return raw;
+  return 'public';
 }
 
 // Space（camelCase）→ INSERT/UPDATE 用オブジェクト（snake_case）
@@ -78,6 +95,9 @@ function spaceToRow(space: Space): Omit<SpaceRow, 'created_at'> & { created_at?:
     custom_emotions: space.customEmotions ?? [],
     bubble_shape_png: space.bubbleShapePng ?? null,
     tab_folders: space.tabFolders?.length ? space.tabFolders : null,
+    my_hossii_enabled: space.myHossiiEnabled ?? false,
+    my_hossii_motion_mode: space.myHossiiMotionMode ?? 'auto',
+    my_hossii_log_visibility: space.myHossiiLogVisibility ?? 'public',
   };
 }
 
@@ -143,6 +163,9 @@ export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promi
   if (patch.tabFolders !== undefined) {
     updateObj.tab_folders = patch.tabFolders?.length ? patch.tabFolders : null;
   }
+  if (patch.myHossiiEnabled !== undefined) updateObj.my_hossii_enabled = patch.myHossiiEnabled;
+  if (patch.myHossiiMotionMode !== undefined) updateObj.my_hossii_motion_mode = patch.myHossiiMotionMode;
+  if (patch.myHossiiLogVisibility !== undefined) updateObj.my_hossii_log_visibility = patch.myHossiiLogVisibility;
 
   if (Object.keys(updateObj).length === 0) return;
 

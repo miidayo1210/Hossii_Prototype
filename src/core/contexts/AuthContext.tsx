@@ -4,7 +4,11 @@ import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { getAdminCommunity, createCommunity } from '../utils/communitiesApi';
 import type { CommunityStatus } from '../utils/communitiesApi';
-import { upsertUserProfile, fetchUserProfile } from '../utils/userProfilesApi';
+import {
+  upsertUserProfile,
+  fetchUserProfile,
+  ensureUserProfileExists,
+} from '../utils/userProfilesApi';
 import {
   resolveParticipantLogin,
   markParticipantFirstLogin,
@@ -72,12 +76,24 @@ async function resolveAppUser(user: User): Promise<AppUser> {
   }
 
   // communities テーブルで communityId を取得（app_metadata.role = 'admin' でも必ず試みる）
-  const [community, userProfile] = await Promise.all([
+  const [community, userProfileResult] = await Promise.all([
     getAdminCommunity(user.id),
-    fetchUserProfile(user.id),
+    fetchUserProfile(user.id).catch((error) => {
+      console.error('[AuthContext] fetchUserProfile error:', error);
+      return null;
+    }),
   ]);
 
-  const username = userProfile?.username ?? undefined;
+  let resolvedProfile = userProfileResult;
+  if (!resolvedProfile && isIssuedParticipant) {
+    try {
+      resolvedProfile = await ensureUserProfileExists(user.id);
+    } catch (error) {
+      console.error('[AuthContext] ensureUserProfileExists error:', error);
+    }
+  }
+
+  const username = resolvedProfile?.username ?? undefined;
 
   // app_metadata.role = "admin" は承認済みとして扱う（communityId は取得できた場合のみ付与）
   if (roleFromMetadata === 'admin') {
@@ -241,6 +257,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
 
     await markParticipantFirstLogin(data.user.id);
+    try {
+      await ensureUserProfileExists(data.user.id);
+    } catch (error) {
+      console.error('[AuthContext] ensureUserProfileExists on participant login:', error);
+    }
     return resolveAppUser(data.user);
   }, []);
 

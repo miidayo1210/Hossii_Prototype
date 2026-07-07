@@ -5,6 +5,7 @@ import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
+import { MyHossiiSettingsSection } from './MyHossiiSettingsSection';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -27,6 +28,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [savedDefault, setSavedDefault] = useState(false);
   const [savedSpace, setSavedSpace] = useState(false);
+  const [nicknameSaveRevision, setNicknameSaveRevision] = useState(0);
 
   const handleSaveDefaultNickname = () => {
     const trimmed = defaultNicknameInput.trim();
@@ -40,6 +42,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     const trimmed = spaceNicknameInput.trim();
     if (!trimmed) return;
     setSpaceNickname(activeSpaceId, trimmed);
+    setNicknameSaveRevision((revision) => revision + 1);
     setSavedSpace(true);
     setTimeout(() => setSavedSpace(false), 2000);
   };
@@ -129,6 +132,23 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               </div>
             </div>
           )}
+        </section>
+
+        {/* マイHossii */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>マイHossii</h2>
+          <p className={styles.sectionDesc}>
+            ログインアカウントに紐づく、あなたのHossiiを登録できます。
+          </p>
+          <MyHossiiSettingsSection
+            currentUser={currentUser}
+            activeSpaceId={activeSpaceId}
+            activeSpaceName={activeSpace?.name ?? null}
+            spaceMyHossiiEnabled={activeSpace?.myHossiiEnabled ?? false}
+            deviceProfileId={profile?.id ?? null}
+            defaultNickname={profile?.defaultNickname || currentUser?.username || null}
+            refreshKey={nicknameSaveRevision}
+          />
         </section>
 
         {/* このスペースでのニックネーム */}

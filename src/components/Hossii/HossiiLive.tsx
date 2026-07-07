@@ -32,6 +32,8 @@ type Props = {
   decorative?: boolean;
   /** decorative 時: 待機デフォルトの代わりに表示する画像 URL（未指定は idle_base） */
   decorativeImageSrc?: string | null;
+  /** 泳ぎ・反応を維持したまま待機画像だけ差し替える（スペースキャラ設定用） */
+  idleImageOverride?: string | null;
 };
 
 /** Hossii のサイズ (CSS の width/height と一致させる) */
@@ -166,6 +168,7 @@ export function HossiiLive({
   onLikeTrigger,
   decorative = false,
   decorativeImageSrc,
+  idleImageOverride,
 }: Props) {
   // === State ===
   const [position, setPosition] = useState(getInitialPosition);
@@ -207,8 +210,9 @@ export function HossiiLive({
     if (interactionFace) return interactionFace;
     if (reactionFace) return reactionFace;
     if (isListening) return getListeningFace();
+    if (idleImageOverride) return idleImageOverride;
     return getDefaultIdle();
-  }, [decorative, decorativeImageSrc, interactionFace, reactionFace, isListening]);
+  }, [decorative, decorativeImageSrc, interactionFace, reactionFace, isListening, idleImageOverride]);
 
   // === Refs ===
   const prevTriggerIdRef = useRef<string | undefined>(undefined);

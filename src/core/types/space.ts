@@ -1,5 +1,6 @@
 import type { EmotionKey } from './index';
 import type { TabFolder } from '../utils/tabFolderStorage';
+import type { MyHossiiLogVisibility, MyHossiiMotionMode } from './myHossii';
 
 export type { TabFolder };
 
@@ -84,6 +85,12 @@ export type Space = {
   description?: string;     // スペースの一行説明（最大50文字、未設定時は説明 UI 非表示）
   /** Tab bar folder definitions (100C). Synced via DB / local spaces cache. */
   tabFolders?: TabFolder[];
+  /** マイHossii表示 ON/OFF（デフォルト false） */
+  myHossiiEnabled?: boolean;
+  /** マイHossiiの動き方（デフォルト auto） */
+  myHossiiMotionMode?: MyHossiiMotionMode;
+  /** マイHossiiログ公開範囲（デフォルト public） */
+  myHossiiLogVisibility?: MyHossiiLogVisibility;
 };
 
 // 背景画像の保存上限
