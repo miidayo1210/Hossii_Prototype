@@ -179,6 +179,7 @@ export const MyHossiiSettingsSection = ({ currentUser }: Props) => {
     if (uploadPreviewUrl) return uploadPreviewUrl;
     if (savedSettings?.sourceType === 'upload' && savedSettings.imagePath) {
       return resolveMyHossiiImage({
+        userId: currentUser.uid,
         hossiiSourceType: 'upload',
         hossiiPresetKey: null,
         hossiiImagePath: savedSettings.imagePath,

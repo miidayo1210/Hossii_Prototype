@@ -52,7 +52,7 @@ export const SETTINGS_NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'background', label: '背景' },
       { id: 'appearance', label: '投稿の見た目' },
-      { id: 'character', label: '中心キャラクター' },
+      { id: 'character', label: '中心キャラクター', adminOnly: true },
       { id: 'decoration', label: '装飾' },
     ],
   },

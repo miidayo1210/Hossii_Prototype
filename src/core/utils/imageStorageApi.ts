@@ -225,7 +225,7 @@ export async function uploadCanvasPostImage(
   return data.publicUrl;
 }
 
-const MY_HOSSII_AVATAR_FILENAME = 'my-hossii.webp';
+import { MY_HOSSII_AVATAR_FILENAME } from './myHossiiImagePath';
 
 export type MyHossiiUploadResult =
   | { ok: true; storagePath: string; publicUrl: string }
