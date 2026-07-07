@@ -890,18 +890,17 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         createdAt: existing?.createdAt ?? new Date(),
       };
       dispatch({ type: 'SET_PROFILE', payload: nextProfile });
-
-      if (isSupabaseConfigured) {
-        void fetchSpaceNicknames(currentUser.uid).then((nicknames) => {
-          if (Object.keys(nicknames).length > 0) {
-            dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
-          }
-        });
-      }
-      return;
+    } else {
+      authorProfileIdRef.current = undefined;
     }
 
-    authorProfileIdRef.current = undefined;
+    if (currentUser && isSupabaseConfigured) {
+      void fetchSpaceNicknames(currentUser.uid).then((nicknames) => {
+        if (Object.keys(nicknames).length > 0) {
+          dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
+        }
+      });
+    }
   }, [currentUser, isResolvingAuth]);
 
   useEffect(() => {
@@ -1393,14 +1392,22 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
   const setSpaceNickname = useCallback((spaceId: string, nickname: string) => {
     dispatch({ type: 'SET_SPACE_NICKNAME', payload: { spaceId, nickname } });
-    // ログイン済みの場合のみ Supabase に同期（認証実装後に条件追加）
     if (isSupabaseConfigured) {
       const profile = stateRef.current.profile;
-      if (profile) {
-        upsertSpaceNickname(profile.id, spaceId, nickname.trim());
+      const nicknameProfileId = currentUser?.uid ?? profile?.id;
+      if (!nicknameProfileId) return;
+
+      if (currentUser?.uid) {
+        void upsertProfile({
+          id: currentUser.uid,
+          defaultNickname: profile?.defaultNickname ?? currentUser.username ?? '',
+          createdAt: profile?.createdAt ?? new Date(),
+        });
       }
+
+      void upsertSpaceNickname(nicknameProfileId, spaceId, nickname.trim());
     }
-  }, []);
+  }, [currentUser?.uid, currentUser?.username]);
 
   const getActiveNickname = useCallback(() => {
     return getActiveNicknameFromState(state);
