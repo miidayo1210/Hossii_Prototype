@@ -5,7 +5,7 @@ import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { SpacePaneProvider } from './core/hooks/SpacePaneProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
-import { isSupabaseConfigured } from './core/supabase';
+import { isSupabaseConfigured, supabaseEnvironmentValidation } from './core/supabase';
 import { AuthProvider } from './core/contexts/AuthContext';
 import { useAuth } from './core/contexts/useAuth';
 import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
@@ -38,6 +38,8 @@ import styles from './App.module.css';
 import { ScaledContent } from './components/ScaledContent/ScaledContent';
 import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
 import { HossiiToast } from './core/ui/HossiiToast';
+import { DevelopmentBanner } from './components/DevelopmentBanner/DevelopmentBanner';
+import { SupabaseConfigError } from './components/SupabaseConfigError/SupabaseConfigError';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
 const URL_PATH_SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
@@ -644,9 +646,12 @@ const AppContent = () => {
 };
 
 const App = () => {
+  if (supabaseEnvironmentValidation.shouldBlockApp) {
+    return <SupabaseConfigError />;
+  }
+
   return (
     <AuthProvider>
-      <GlobalClickStarBurst />
       <AdminNavigationProvider>
         <DisplayPrefsProvider>
           <HossiiProvider initialHossiis={mockHossiis}>
@@ -656,6 +661,8 @@ const App = () => {
           </HossiiProvider>
         </DisplayPrefsProvider>
       </AdminNavigationProvider>
+      <GlobalClickStarBurst />
+      <DevelopmentBanner />
     </AuthProvider>
   );
 };

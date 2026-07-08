@@ -91,7 +91,8 @@ main
 - PR を作成すると Vercel が自動的に Preview 環境をビルド・デプロイします
 - Preview URL は PR の Checks タブか、Vercel の GitHub コメントから確認できます
 - Preview URL を PR 本文の「Preview URL」欄に貼ってください（確認した証跡にもなります）
-- Preview 環境は Supabase の本番DB に接続します（`VITE_SUPABASE_URL` が同じため）
+- Preview 環境は **Development Supabase** に接続します（`VITE_APP_ENV=development`）
+- 詳細は [supabase-environments.md](./supabase-environments.md) を参照
 
 ### Preview でのテスト手順
 

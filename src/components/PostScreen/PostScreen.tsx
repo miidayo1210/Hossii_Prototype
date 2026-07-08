@@ -29,6 +29,7 @@ import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { HossiiMini } from '../Hossii/HossiiMini';
 import { DrawingModal } from '../DrawingModal/DrawingModal';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
+import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { AddHossiiInput, EmotionKey, ToastState } from '../../core/types';
 import {
@@ -236,6 +237,17 @@ export const PostScreen = ({
       speechToFreePosterRef.current = undefined;
     };
   }, [speechToFreePosterRef]);
+
+  useEffect(() => {
+    const onPostFailure = (event: Event) => {
+      const detail = (event as CustomEvent<PostFailureDetail>).detail;
+      if (detail?.message) {
+        setToast({ message: formatPostFailureForDisplay(detail), type: 'error' });
+      }
+    };
+    window.addEventListener(POST_FAILURE_EVENT, onPostFailure);
+    return () => window.removeEventListener(POST_FAILURE_EVENT, onPostFailure);
+  }, []);
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
   const { activePaneId, activePane, isLoading: panesLoading } = useSpacePane();
@@ -520,9 +532,10 @@ export const PostScreen = ({
 
   /** 吹き出し投稿: 下書き色の保存 → addHossii → スタンプ・トースト（「気持ちを置く」と同じ核） */
   const submitBubbleHossii = useCallback(
-    (input: AddHossiiInput) => {
+    async (input: AddHossiiInput) => {
       savePostBubbleColorDraft(selectedPaletteId, selectedColor);
-      addHossii(input);
+      const accepted = await addHossii(input);
+      if (!accepted) return;
 
       if (!currentUser) return;
 

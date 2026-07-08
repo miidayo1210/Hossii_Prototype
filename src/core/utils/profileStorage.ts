@@ -1,7 +1,8 @@
 import type { UserProfile, SpaceNicknames } from '../types/profile';
+import { scopedStorageKey } from './storageScope';
 
-const PROFILE_KEY = 'hossii.profile';
-const SPACE_NICKNAMES_KEY = 'hossii.spaceNicknames';
+const PROFILE_KEY = scopedStorageKey('hossii.profile');
+const SPACE_NICKNAMES_KEY = scopedStorageKey('hossii.spaceNicknames');
 
 /**
  * プロフィールを読み込む
