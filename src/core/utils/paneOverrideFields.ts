@@ -149,3 +149,26 @@ export function buildPaneBubbleShapePatch(
 ): UpdateSpacePanePatch {
   return { bubbleShapePng };
 }
+
+export type BubbleShapePngPatch =
+  | { bubbleShapePng: string }
+  | { bubbleShapePng: null }
+  | Record<string, never>;
+
+/** Build a bubble-shape update only when the value actually changed. */
+export function buildBubbleShapePngPatch(
+  previous: string | null | undefined,
+  next: string | null,
+): BubbleShapePngPatch {
+  const prev = previous ?? null;
+  if (prev === next) return {};
+  if (next === null) return { bubbleShapePng: null };
+  return { bubbleShapePng: next };
+}
+
+export function bubbleShapePngPatchValue(
+  patch: BubbleShapePngPatch,
+): string | null | undefined {
+  if (!('bubbleShapePng' in patch)) return undefined;
+  return patch.bubbleShapePng;
+}

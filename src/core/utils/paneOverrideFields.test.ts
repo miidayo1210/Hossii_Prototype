@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { SpacePane } from '../types/spacePane';
 import {
+  buildBubbleShapePngPatch,
   buildPaneSettingsPatch,
+  bubbleShapePngPatchValue,
   hasPanePostFieldsOverride,
   mergePaneSettingsOverride,
 } from './paneOverrideFields';
@@ -41,5 +43,31 @@ describe('paneOverrideFields', () => {
         settings: { postFields: { message: { enabled: false, required: false } } },
       }),
     ).toBe(true);
+  });
+
+  it('buildBubbleShapePngPatch omits unchanged default shape', () => {
+    expect(buildBubbleShapePngPatch(null, null)).toEqual({});
+    expect(bubbleShapePngPatchValue(buildBubbleShapePngPatch(null, null))).toBeUndefined();
+  });
+
+  it('buildBubbleShapePngPatch sends null when reverting to default', () => {
+    const patch = buildBubbleShapePngPatch('/assets/bubble-shapes/speech.png', null);
+    expect(patch).toEqual({ bubbleShapePng: null });
+    expect(bubbleShapePngPatchValue(patch)).toBeNull();
+  });
+
+  it('buildBubbleShapePngPatch sends custom path when selected', () => {
+    const patch = buildBubbleShapePngPatch(null, '/assets/bubble-shapes/speech.png');
+    expect(patch).toEqual({ bubbleShapePng: '/assets/bubble-shapes/speech.png' });
+    expect(bubbleShapePngPatchValue(patch)).toBe('/assets/bubble-shapes/speech.png');
+  });
+
+  it('buildBubbleShapePngPatch omits field when shape unchanged', () => {
+    const patch = buildBubbleShapePngPatch(
+      '/assets/bubble-shapes/speech.png',
+      '/assets/bubble-shapes/speech.png',
+    );
+    expect(patch).toEqual({});
+    expect(bubbleShapePngPatchValue(patch)).toBeUndefined();
   });
 });

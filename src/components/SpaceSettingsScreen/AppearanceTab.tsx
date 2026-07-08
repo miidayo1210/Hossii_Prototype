@@ -5,12 +5,15 @@ import type { Space } from '../../core/types/space';
 import { BUBBLE_SHAPE_PRESETS } from '../../core/assets/bubbleShapes';
 import { saveSpaceSettings } from '../../core/utils/settingsStorage';
 import { upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
-import { updateSpaceInDb } from '../../core/utils/spacesApi';
 import {
   hasPaneBubbleShapeOverride,
   resolvePaneBubbleShapePng,
 } from '../../core/utils/resolvePaneBubbleShapePng';
-import { isAdditionalPane } from '../../core/utils/paneOverrideFields';
+import {
+  bubbleShapePngPatchValue,
+  buildBubbleShapePngPatch,
+  isAdditionalPane,
+} from '../../core/utils/paneOverrideFields';
 import {
   PaneOverrideSaveError,
   resetPaneBubbleShapeOverride,
@@ -42,7 +45,6 @@ export const AppearanceTab = ({
   space,
   settings,
   onUpdate,
-  onUpdateSpace,
   onDirtyChange,
 }: Props) => {
   const { editPane, saveContext } = useSettingsEditPane();
@@ -78,14 +80,14 @@ export const AppearanceTab = ({
       onUpdate(updatedSettings);
       saveSpaceSettings(updatedSettings);
       await upsertSpaceSettings(updatedSettings);
-      await savePaneBubbleShapeOverride(saveContext, draft.bubbleShapePng);
-      if (saveContext.editPane.isDefault) {
-        const bubblePatch = draft.bubbleShapePng
-          ? { bubbleShapePng: draft.bubbleShapePng }
-          : { bubbleShapePng: undefined };
-        onUpdateSpace(bubblePatch);
-        await updateSpaceInDb(space.id, bubblePatch);
-      }
+      const bubblePatch = buildBubbleShapePngPatch(
+        initial.bubbleShapePng,
+        draft.bubbleShapePng,
+      );
+      await savePaneBubbleShapeOverride(
+        saveContext,
+        bubbleShapePngPatchValue(bubblePatch),
+      );
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {

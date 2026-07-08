@@ -1,5 +1,11 @@
 import type { PostFieldSettings, SpaceSettings } from '../types/settings';
-import type { Space, SpaceBackground, SpaceDecoration, CustomEmotion } from '../types/space';
+import type {
+  CustomEmotion,
+  Space,
+  SpaceBackground,
+  SpaceDecoration,
+  SpaceUpdatePatch,
+} from '../types/space';
 import type { SpacePane } from '../types/spacePane';
 import { isSupabaseConfigured } from '../supabase';
 import { updateSpaceInDb } from './spacesApi';
@@ -22,7 +28,7 @@ export type PaneSettingSaveContext = {
   editPane: SpacePane;
   space: Space;
   settings: SpaceSettings;
-  onUpdateSpace: (patch: Partial<Space>) => void;
+  onUpdateSpace: (patch: SpaceUpdatePatch) => void;
   onUpdateSettings: (settings: SpaceSettings) => void;
   reloadPanesAndSyncActive: () => Promise<void>;
 };
@@ -212,13 +218,12 @@ export async function resetPaneCharacterOverride(
 
 export async function savePaneBubbleShapeOverride(
   ctx: PaneSettingSaveContext,
-  bubbleShapePng: string | null,
+  bubbleShapePng: string | null | undefined,
 ): Promise<void> {
-  const spacePatch = bubbleShapePng
-    ? { bubbleShapePng }
-    : { bubbleShapePng: undefined };
+  if (bubbleShapePng === undefined) return;
 
   if (isDefaultPane(ctx.editPane)) {
+    const spacePatch = { bubbleShapePng };
     ctx.onUpdateSpace(spacePatch);
     await updateSpaceInDb(ctx.space.id, spacePatch);
     return;

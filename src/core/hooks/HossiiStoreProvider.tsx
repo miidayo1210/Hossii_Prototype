@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
-import type { Space, SpaceId, SpaceBackground } from '../types/space';
+import type { Space, SpaceId, SpaceBackground, SpaceUpdatePatch } from '../types/space';
 import type { AppMode } from '../types/mode';
 import type { UserProfile, SpaceNicknames } from '../types/profile';
 import { DEFAULT_SPACE, DEFAULT_QUICK_EMOTIONS, DEFAULT_BACKGROUND } from '../types/space';
@@ -341,7 +341,7 @@ type ExtendedHossiiAction =
   | { type: 'SET_SPACES'; payload: Space[]; preserveIds?: Set<string> }
   | { type: 'ADD_SPACE'; payload: Space }
   | { type: 'MERGE_SPACE'; payload: Space }
-  | { type: 'UPDATE_SPACE'; payload: { id: SpaceId; patch: Partial<Space> } }
+  | { type: 'UPDATE_SPACE'; payload: { id: SpaceId; patch: SpaceUpdatePatch } }
   | { type: 'REMOVE_SPACE'; payload: SpaceId }
   | { type: 'SYNC_HOSSIIS'; payload: Hossii[] }
   | { type: 'SET_MODE'; payload: AppMode }
@@ -554,9 +554,16 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
 
       case 'UPDATE_SPACE': {
         const { id, patch } = action.payload;
-        const updatedSpaces = state.spaces.map((f) =>
-          f.id === id ? { ...f, ...patch } : f
-        );
+        const updatedSpaces = state.spaces.map((f) => {
+          if (f.id !== id) return f;
+          const next = { ...f, ...patch };
+          if ('bubbleShapePng' in patch && patch.bubbleShapePng === null) {
+            const rest = { ...next };
+            delete rest.bubbleShapePng;
+            return rest;
+          }
+          return next;
+        });
         saveSpaces(updatedSpaces);
         return {
           ...state,
@@ -797,7 +804,7 @@ export type HossiiContextValue = {
   getActiveSpaceHossiis: () => Hossii[];
   addSpace: (space: Space) => void;
   addSpaceLocal: (space: Space) => void;
-  updateSpace: (id: SpaceId, patch: Partial<Space>) => void;
+  updateSpace: (id: SpaceId, patch: SpaceUpdatePatch) => void;
   removeSpace: (id: SpaceId) => void;
   setMode: (mode: AppMode) => void;
   setDefaultNickname: (nickname: string) => void;
@@ -1412,7 +1419,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     dispatch({ type: 'MERGE_SPACE', payload: space });
   }, []);
 
-  const updateSpace = useCallback((id: SpaceId, patch: Partial<Space>) => {
+  const updateSpace = useCallback((id: SpaceId, patch: SpaceUpdatePatch) => {
     dispatch({ type: 'UPDATE_SPACE', payload: { id, patch } });
     if (isSupabaseConfigured) {
       updateSpaceInDb(id, patch).catch((err: unknown) => {

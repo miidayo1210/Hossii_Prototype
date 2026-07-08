@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
-import type { Space, SpaceId } from '../types/space';
+import type { Space, SpaceId, SpaceUpdatePatch } from '../types/space';
 import type { EmotionKey } from '../types';
 import type { MyHossiiLogVisibility, MyHossiiMotionMode } from '../types/myHossii';
 import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from './spaceDecorations';
@@ -142,7 +142,7 @@ export async function insertSpace(space: Space, communityId?: string): Promise<v
   }
 }
 
-export async function updateSpaceInDb(id: SpaceId, patch: Partial<Space>): Promise<void> {
+export async function updateSpaceInDb(id: SpaceId, patch: SpaceUpdatePatch): Promise<void> {
   if (!isSupabaseConfigured) return;
 
   const updateObj: Partial<SpaceRow> = {};

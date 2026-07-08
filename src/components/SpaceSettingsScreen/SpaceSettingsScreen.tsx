@@ -6,7 +6,7 @@ import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsS
 import { fetchSpaceSettings, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import type { SpaceSettings } from '../../core/types/settings';
 import { DEFAULT_STAR_MARKER, DEFAULT_SPACE_MODE_STATE } from '../../core/types/settings';
-import type { Space } from '../../core/types/space';
+import type { Space, SpaceUpdatePatch } from '../../core/types/space';
 import { refreshModeCustomization } from '../../core/utils/spaceModeCustomize';
 import { SettingsLayout } from './SettingsLayout';
 import { SpaceModeTab } from './SpaceModeTab';
@@ -92,7 +92,7 @@ export const SpaceSettingsScreen = () => {
   );
 
   const handleSpaceUpdate = useCallback(
-    (patch: Partial<Space>) => {
+    (patch: SpaceUpdatePatch) => {
       if (!activeSpace) return;
       updateSpace(activeSpace.id, patch);
       if (settings && patch.isPrivate !== undefined) {

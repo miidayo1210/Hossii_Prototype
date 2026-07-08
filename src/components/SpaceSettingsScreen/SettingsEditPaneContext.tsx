@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { SpacePane } from '../../core/types/spacePane';
 import type { SpaceSettings } from '../../core/types/settings';
-import type { Space } from '../../core/types/space';
+import type { Space, SpaceUpdatePatch } from '../../core/types/space';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import {
   loadSettingsEditPaneId,
@@ -31,7 +31,7 @@ type ProviderProps = {
   space: Space;
   settings: SpaceSettings;
   screenDirty: boolean;
-  onUpdateSpace: (patch: Partial<Space>) => void;
+  onUpdateSpace: (patch: SpaceUpdatePatch) => void;
   onUpdateSettings: (settings: SpaceSettings) => void;
   children: ReactNode;
 };

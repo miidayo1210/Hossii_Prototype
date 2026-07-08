@@ -93,6 +93,11 @@ export type Space = {
   myHossiiLogVisibility?: MyHossiiLogVisibility;
 };
 
+/** Partial update for Space; null clears nullable DB-backed fields. */
+export type SpaceUpdatePatch = Omit<Partial<Space>, 'bubbleShapePng'> & {
+  bubbleShapePng?: string | null;
+};
+
 // 背景画像の保存上限
 export const MAX_BACKGROUND_IMAGES = 5;
 
