@@ -1542,12 +1542,25 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return result;
   }, [filteredHossiis, authorGroups.length, layoutMode, shouldMapToSharp, orderedSortDirection]);
 
+  const awaitingFirstHossiis =
+    panesLoading || paneContext === null || !hossiiLoadedFromSupabase;
+
+  const showInitialLoadingOverlay =
+    filteredHossiis.length === 0 && awaitingFirstHossiis;
+
   const showByAuthorLoadingOverlay =
     layoutMode === 'byAuthor' &&
     displayLimit === 'unlimited' &&
     !fetchProgress.fetchComplete &&
     isSupabaseConfigured &&
-    !isVisiting;
+    !isVisiting &&
+    !showInitialLoadingOverlay;
+
+  const showFetchLoadingBadge =
+    fetchProgress.loading &&
+    displayLimit === 'unlimited' &&
+    !isVisiting &&
+    !showInitialLoadingOverlay;
 
   const toggleClusterExpand = useCallback((groupKey: string) => {
     setExpandedClusterKeys((prev) => {
@@ -2132,8 +2145,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         />
       )}
 
-      {/* Supabase から hossiis をロード中のオーバーレイ */}
-      {!hossiiLoadedFromSupabase && (
+      {/* 初回ロードで表示可能な投稿がまだないときだけ全面スピナー */}
+      {showInitialLoadingOverlay && (
         <div
           data-space-export="exclude"
           style={{
@@ -2230,7 +2243,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               <span className={styles.postCountBadgeUnit}>件</span>
             </div>
           )}
-          {fetchProgress.loading && displayLimit === 'unlimited' && !isVisiting && (
+          {showFetchLoadingBadge && (
             <div className={styles.fetchLoadingBadge} aria-live="polite">
               読み込み中… ({fetchProgress.loadedCount}件)
             </div>

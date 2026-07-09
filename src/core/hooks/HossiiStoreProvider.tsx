@@ -75,7 +75,7 @@ import {
   updateSpaceInDb,
   deleteSpaceFromDb,
 } from '../utils/spacesApi';
-import { ensureDefaultSpacePane, healDefaultSpacePanes } from '../utils/ensureDefaultSpacePane';
+import { ensureDefaultSpacePane } from '../utils/ensureDefaultSpacePane';
 import {
   insertHossii,
   updateHossiiColor,
@@ -554,13 +554,14 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
 
       case 'UPDATE_SPACE': {
         const { id, patch } = action.payload;
-        const updatedSpaces = state.spaces.map((f) => {
+        const updatedSpaces = state.spaces.map((f): Space => {
           if (f.id !== id) return f;
-          const next = { ...f, ...patch };
-          if ('bubbleShapePng' in patch && patch.bubbleShapePng === null) {
-            const rest = { ...next };
-            delete rest.bubbleShapePng;
-            return rest;
+          const { bubbleShapePng, ...patchRest } = patch;
+          const next: Space = { ...f, ...patchRest };
+          if (bubbleShapePng === null) {
+            delete next.bubbleShapePng;
+          } else if (bubbleShapePng !== undefined) {
+            next.bubbleShapePng = bubbleShapePng;
           }
           return next;
         });
@@ -1001,7 +1002,6 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
       if (supabaseSpaces !== null) {
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces, preserveIds });
-        healDefaultSpacePanes(supabaseSpaces.map((s) => s.id));
         lastScopedCommunityFetchKeyRef.current = effectiveId;
         const st = stateRef.current;
         if (

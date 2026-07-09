@@ -139,6 +139,13 @@ export function useSpaceHossiiFetch({
         let nextCursor = cursor;
         let deliveredCount = 0;
         let hasMore = true;
+        /** 全面スピナー解除: 初回ページ反映後（または既存表示分あり）に onLoadingChange(false) */
+        let initialBlockingReleased =
+          accumulated.filter((h) => h.spaceId === fetchSpaceId).length > 0;
+
+        if (initialBlockingReleased) {
+          onLoadingChangeRef.current(false);
+        }
 
         while (hasMore) {
           const page = await fetchHossiisPage({
@@ -153,6 +160,10 @@ export function useSpaceHossiiFetch({
           if (reqId !== requestIdRef.current) return;
 
           if (page.items.length === 0) {
+            if (!initialBlockingReleased) {
+              initialBlockingReleased = true;
+              onLoadingChangeRef.current(false);
+            }
             hasMore = false;
             break;
           }
@@ -169,6 +180,11 @@ export function useSpaceHossiiFetch({
             requestIdRef,
             deliveredCount,
           );
+
+          if (!initialBlockingReleased) {
+            initialBlockingReleased = true;
+            onLoadingChangeRef.current(false);
+          }
 
           nextCursor = page.nextCursor;
           hasMore = page.hasMore;
