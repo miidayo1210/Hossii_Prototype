@@ -13,6 +13,7 @@ import {
   isHossiiTextTruncated,
   MAX_BUBBLE_TEXT_LENGTH,
   truncateBubbleDisplayText,
+  bubbleLineClampForScale,
 } from '../../core/utils/bubbleTextTruncation';
 import { withBubbleAlpha, BUBBLE_BG_ALPHA, BUBBLE_BG_ALPHA_HOVER } from '../../core/utils/bubbleColorAlpha';
 import styles from './SpaceScreen.module.css';
@@ -406,8 +407,21 @@ export function BubbleInner({
     bubbleStyle.boxShadow = 'none';
   }
   if (displayScale !== 1.0) {
-    bubbleStyle.scale = String(displayScale);
+    if (isCanvasPost) {
+      bubbleStyle.maxWidth = `min(${200 * displayScale}px, ${30 * displayScale}vw)`;
+    } else if (bubbleShapePng) {
+      const size = 190 * displayScale;
+      bubbleStyle.width = `${size}px`;
+      bubbleStyle.maxWidth = `${size}px`;
+      bubbleStyle.minHeight = `${size}px`;
+    } else {
+      bubbleStyle.maxWidth = `${240 * displayScale}px`;
+    }
   }
+
+  const textLineClamp = contentExpanded
+    ? undefined
+    : bubbleLineClampForScale(viewMode, displayScale);
 
   const classNames = [
     styles.bubble,
@@ -582,12 +596,13 @@ export function BubbleInner({
                 ref={bubbleTextRef}
                 className={[
                   styles.bubbleText,
-                  contentExpanded
-                    ? styles.bubbleTextExpanded
-                    : viewMode === 'bubble'
-                      ? styles.bubbleTextClamp2
-                      : styles.bubbleTextClamp3,
+                  contentExpanded ? styles.bubbleTextExpanded : '',
                 ].filter(Boolean).join(' ')}
+                style={
+                  textLineClamp != null
+                    ? ({ WebkitLineClamp: textLineClamp } as React.CSSProperties)
+                    : undefined
+                }
               >
                 {bubbleText}
               </p>
@@ -736,10 +751,6 @@ export function BubbleInner({
         hossii={hossii}
         anchorRect={fullTextAnchorRect}
         variant="bubble"
-        onMouseEnter={() => {
-          if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
-        }}
-        onMouseLeave={scheduleHideFullText}
       />
     )}
     </>

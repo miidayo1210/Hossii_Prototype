@@ -1276,7 +1276,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const handleStarMouseEnter = useCallback(
-    (hossiiId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    (hossiiId: string, e: React.MouseEvent) => {
       if (!useStarView || hasInlineStarPreview(hossiiId)) return;
       const rect = e.currentTarget.getBoundingClientRect();
       if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current);
@@ -1316,8 +1316,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, []);
 
   const handleStarMouseEnterStable = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
-      const id = e.currentTarget.dataset.hossiiId;
+    (e: React.MouseEvent) => {
+      const id = (e.currentTarget as HTMLElement).dataset.hossiiId;
       if (id) handleStarMouseEnter(id, e);
     },
     [handleStarMouseEnter],

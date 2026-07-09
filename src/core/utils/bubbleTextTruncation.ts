@@ -50,3 +50,15 @@ export function isHossiiTextTruncated(
   if (isCharCountTruncated(fullText, displayedText)) return true;
   return isElementLineClamped(textEl);
 }
+
+const BASE_BUBBLE_LINE_CLAMP = 3;
+const BASE_BUBBLE_VIEW_LINE_CLAMP = 2;
+
+/** カスタムモード: 投稿スケールに応じた表示行数（文字サイズは固定） */
+export function bubbleLineClampForScale(
+  viewMode: 'full' | 'bubble' | 'image' | 'slideshow',
+  scale: number,
+): number {
+  const base = viewMode === 'bubble' ? BASE_BUBBLE_VIEW_LINE_CLAMP : BASE_BUBBLE_LINE_CLAMP;
+  return Math.max(2, Math.round(base * scale));
+}

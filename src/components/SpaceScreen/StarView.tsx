@@ -20,7 +20,7 @@ type Props = {
   y: number;
   anchor?: 'center' | 'topLeft';
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  onMouseEnter?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onMouseEnter?: (e: React.MouseEvent) => void;
   onMouseLeave?: () => void;
   showPreview?: boolean;
   isPcStarMode?: boolean;
@@ -40,6 +40,8 @@ const MARKER_CHAR: Record<StarMarkerType, string> = {
   person: '',
 };
 
+const FULL_TEXT_HIDE_DELAY_MS = 150;
+
 function StarViewInner({
   hossii,
   x,
@@ -58,19 +60,27 @@ function StarViewInner({
   onPinToggle,
   showPinUi = false,
 }: Props) {
-  const [isStarHovered, setIsStarHovered] = useState(false);
+  const [isZoneHovered, setIsZoneHovered] = useState(false);
   const [showFullTextPopover, setShowFullTextPopover] = useState(false);
   const [fullTextAnchorRect, setFullTextAnchorRect] = useState<DOMRect | null>(null);
   const [isPreviewTruncated, setIsPreviewTruncated] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const previewBubbleRef = useRef<HTMLDivElement>(null);
   const previewTextRef = useRef<HTMLParagraphElement>(null);
   const fullTextLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const previewInteractive = showPreview && (isPinned || isStarHovered);
+  const isZoneHoveredRef = useRef(false);
 
   const { ref: visibilityRef, level: visibleLevel } = useVisibleAnimationLevel(
     animationLevel,
     animationLevel !== 'none',
+  );
+
+  const mergeWrapperRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      wrapperRef.current = node;
+      visibilityRef(node);
+    },
+    [visibilityRef],
   );
 
   const isLaughter = hossii.autoType === 'laughter';
@@ -101,55 +111,96 @@ function StarViewInner({
   }, [fullText, previewText, showPreview]);
 
   useEffect(() => {
+    isZoneHoveredRef.current = isZoneHovered;
+  }, [isZoneHovered]);
+
+  useEffect(() => {
     const el = previewTextRef.current;
     if (!el || !fullText || !showPreview) return;
     const update = () => {
-      setIsPreviewTruncated(
-        isHossiiTextTruncated(fullText, previewText ?? '', el),
-      );
+      const truncated = isHossiiTextTruncated(fullText, previewText ?? '', el);
+      setIsPreviewTruncated(truncated);
+      if (truncated && isZoneHoveredRef.current) {
+        const rect =
+          previewBubbleRef.current?.getBoundingClientRect() ??
+          wrapperRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+        setFullTextAnchorRect(rect);
+        setShowFullTextPopover(true);
+      }
     };
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
   }, [fullText, previewText, showPreview]);
 
-  const scheduleHideFullText = useCallback(() => {
+  const cancelHideFullText = useCallback(() => {
     if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    fullTextLeaveTimerRef.current = null;
+  }, []);
+
+  const scheduleHideFullText = useCallback(() => {
+    cancelHideFullText();
     fullTextLeaveTimerRef.current = setTimeout(() => {
       setShowFullTextPopover(false);
       setFullTextAnchorRect(null);
-    }, 100);
-  }, []);
+      fullTextLeaveTimerRef.current = null;
+    }, FULL_TEXT_HIDE_DELAY_MS);
+  }, [cancelHideFullText]);
 
-  const showInlineFullText = useCallback(() => {
-    if (!showPreview || !previewInteractive || !isPreviewTruncated) return;
-    const rect = previewBubbleRef.current?.getBoundingClientRect();
+  const showFullTextIfTruncated = useCallback(() => {
+    if (!showPreview || !isPreviewTruncated) return;
+    const rect =
+      previewBubbleRef.current?.getBoundingClientRect() ??
+      wrapperRef.current?.getBoundingClientRect();
     if (!rect) return;
-    if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+    cancelHideFullText();
     setFullTextAnchorRect(rect);
     setShowFullTextPopover(true);
-  }, [showPreview, previewInteractive, isPreviewTruncated]);
+  }, [showPreview, isPreviewTruncated, cancelHideFullText]);
 
-  useEffect(() => {
-    if (previewInteractive && isPreviewTruncated) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- show popover when pin/hover makes preview interactive
-      showInlineFullText();
-    } else if (!previewInteractive) {
+  const isStillInsideHoverGroup = useCallback((target: EventTarget | null) => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper || !(target instanceof Node)) return false;
+    return wrapper.contains(target);
+  }, []);
+
+  const handleGroupPointerEnter = useCallback(
+    (e: React.PointerEvent) => {
+      cancelHideFullText();
+      wrapperRef.current?.classList.add(styles.starHoverGroupActive);
+      if (!isZoneHoveredRef.current) {
+        setIsZoneHovered(true);
+        onMouseEnter?.(e);
+      }
+      showFullTextIfTruncated();
+    },
+    [cancelHideFullText, onMouseEnter, showFullTextIfTruncated],
+  );
+
+  const handleGroupPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      if (isStillInsideHoverGroup(e.relatedTarget)) return;
+      wrapperRef.current?.classList.remove(styles.starHoverGroupActive);
+      setIsZoneHovered(false);
+      onMouseLeave?.();
       scheduleHideFullText();
-    }
-  }, [previewInteractive, isPreviewTruncated, showInlineFullText, scheduleHideFullText]);
+    },
+    [isStillInsideHoverGroup, onMouseLeave, scheduleHideFullText],
+  );
 
   useEffect(() => {
     return () => {
-      if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
+      cancelHideFullText();
+      wrapperRef.current?.classList.remove(styles.starHoverGroupActive);
     };
-  }, []);
+  }, [cancelHideFullText]);
 
   return (
     <>
-    <button
-      ref={visibilityRef}
-      type="button"
+    <div
+      ref={mergeWrapperRef}
       data-hossii-bubble
       data-hossii-id={hossii.id}
       className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${isPcStarMode ? styles.starPc : ''} ${showPreview && isPcStarMode ? styles.starPreviewRotate : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''} ${isRecentHighlight ? styles.starRecentGlow : ''}`}
@@ -161,26 +212,26 @@ function StarViewInner({
         '--pulse-duration': `${pulseDuration}s`,
         ...(orderedStackZ != null ? { '--star-stack': orderedStackZ } : {}),
       } as React.CSSProperties}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        setIsStarHovered(true);
-        onMouseEnter?.(e);
-      }}
-      onMouseLeave={() => {
-        setIsStarHovered(false);
-        onMouseLeave?.();
-      }}
-      aria-label={`${hossii.authorName || 'Post'} from ${hossii.createdAt.toLocaleTimeString()}`}
+      onPointerEnter={handleGroupPointerEnter}
+      onPointerLeave={handleGroupPointerLeave}
       data-emotion={emotion}
       data-animation-level={visibleLevel}
     >
-      <span
-        className={`${styles.starDot}${markerType === 'pin' || markerType === 'person' ? ` ${styles[`marker_${markerType}`]}` : ''}`}
-        aria-hidden="true"
+      <button
+        type="button"
+        className={styles.starButton}
+        data-hossii-id={hossii.id}
+        onClick={onClick}
+        aria-label={`${hossii.authorName || 'Post'} from ${hossii.createdAt.toLocaleTimeString()}`}
       >
-        {MARKER_CHAR[markerType]}
-      </span>
-      {isLaughter && <span className={styles.laughterBadge}>😂</span>}
+        <span
+          className={`${styles.starDot}${markerType === 'pin' || markerType === 'person' ? ` ${styles[`marker_${markerType}`]}` : ''}`}
+          aria-hidden="true"
+        >
+          {MARKER_CHAR[markerType]}
+        </span>
+        {isLaughter && <span className={styles.laughterBadge}>😂</span>}
+      </button>
 
       {showPreview && (previewText || hossii.imageUrl || hossii.authorName) && (
         <div
@@ -188,14 +239,10 @@ function StarViewInner({
           className={[
             styles.previewBubble,
             previewSide === 'left' ? styles.previewLeft : styles.previewRight,
-            previewInteractive ? styles.previewBubbleInteractive : '',
           ]
             .filter(Boolean)
             .join(' ')}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseEnter={showInlineFullText}
-          onMouseLeave={scheduleHideFullText}
+          aria-hidden="true"
         >
           {hossii.imageUrl && (
             <img
@@ -223,23 +270,19 @@ function StarViewInner({
             <PinButton
               className={styles.previewPinButton}
               isPinned={isPinned}
-              visible={isPinned || isStarHovered}
+              visible={isPinned || isZoneHovered}
               onToggle={() => onPinToggle(hossii.id)}
             />
           )}
         </div>
       )}
-    </button>
+    </div>
 
     {showFullTextPopover && fullTextAnchorRect && (
       <HossiiFullTextPopover
         hossii={hossii}
         anchorRect={fullTextAnchorRect}
         variant="star"
-        onMouseEnter={() => {
-          if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
-        }}
-        onMouseLeave={scheduleHideFullText}
       />
     )}
     </>
