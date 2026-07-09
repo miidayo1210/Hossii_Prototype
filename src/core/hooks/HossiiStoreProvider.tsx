@@ -95,7 +95,9 @@ import {
   upsertProfile,
   upsertSpaceNickname,
   fetchSpaceNicknames,
+  fetchLegacyDefaultNickname,
 } from '../utils/profilesApi';
+import { upsertUserProfile } from '../utils/userProfilesApi';
 import { useAuth } from '../contexts/useAuth';
 import { useAdminNavigation } from '../contexts/useAdminNavigation';
 import { HossiiContext } from './useHossiiStore';
@@ -904,32 +906,56 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   useEffect(() => {
     if (isResolvingAuth) return;
 
-    if (currentUser?.uid) {
-      authorProfileIdRef.current = currentUser.uid;
+    if (!currentUser?.uid) {
+      authorProfileIdRef.current = undefined;
+      return;
+    }
+
+    authorProfileIdRef.current = currentUser.uid;
+
+    const syncLoggedInProfile = async () => {
       const existing = stateRef.current.profile;
+      const isStaleGuestProfile = Boolean(existing && existing.id !== currentUser.uid);
+
+      let defaultNickname = '';
+      if (!isStaleGuestProfile && existing?.defaultNickname?.trim()) {
+        defaultNickname = existing.defaultNickname.trim();
+      }
+      if (!defaultNickname && currentUser.username?.trim()) {
+        defaultNickname = currentUser.username.trim();
+      }
+      if (!defaultNickname && currentUser.displayName?.trim()) {
+        defaultNickname = currentUser.displayName.trim();
+      }
+      if (!defaultNickname && isSupabaseConfigured) {
+        const legacyNickname = await fetchLegacyDefaultNickname(currentUser.uid);
+        if (legacyNickname) {
+          defaultNickname = legacyNickname;
+        }
+      }
+
       const nextProfile: UserProfile = {
         id: currentUser.uid,
-        defaultNickname:
-          existing?.defaultNickname ??
-          currentUser.username ??
-          currentUser.displayName ??
-          '',
-        createdAt: existing?.createdAt ?? new Date(),
+        defaultNickname,
+        createdAt: isStaleGuestProfile ? new Date() : (existing?.createdAt ?? new Date()),
       };
       dispatch({ type: 'SET_PROFILE', payload: nextProfile });
       saveProfile(nextProfile);
-    } else {
-      authorProfileIdRef.current = undefined;
-    }
 
-    if (currentUser && isSupabaseConfigured) {
-      void fetchSpaceNicknames(currentUser.uid).then((nicknames) => {
-        if (Object.keys(nicknames).length > 0) {
-          dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
-        }
-      });
-    }
-  }, [currentUser, isResolvingAuth]);
+      if (isSupabaseConfigured) {
+        const nicknames = await fetchSpaceNicknames(currentUser.uid);
+        dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
+        saveSpaceNicknames(nicknames);
+      }
+    };
+
+    void syncLoggedInProfile();
+  }, [
+    currentUser?.uid,
+    currentUser?.username,
+    currentUser?.displayName,
+    isResolvingAuth,
+  ]);
 
   useEffect(() => {
     setHossiiEntitiesSnapshot(state.entities.entitiesById);
@@ -1447,15 +1473,18 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, []);
 
   const setDefaultNickname = useCallback((nickname: string) => {
-    dispatch({ type: 'SET_DEFAULT_NICKNAME', payload: nickname });
-    // ログイン済みの場合のみ Supabase に同期（認証実装後に条件追加）
+    const trimmed = nickname.trim();
+    dispatch({ type: 'SET_DEFAULT_NICKNAME', payload: trimmed });
     if (isSupabaseConfigured) {
       const profile = stateRef.current.profile;
       if (profile) {
-        upsertProfile({ ...profile, defaultNickname: nickname.trim() });
+        upsertProfile({ ...profile, defaultNickname: trimmed });
+      }
+      if (currentUser?.uid) {
+        void upsertUserProfile(currentUser.uid, trimmed);
       }
     }
-  }, []);
+  }, [currentUser]);
 
   const setSpaceNickname = useCallback((spaceId: string, nickname: string) => {
     dispatch({ type: 'SET_SPACE_NICKNAME', payload: { spaceId, nickname } });
@@ -1488,8 +1517,19 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, [currentUser, state.profile?.id]);
 
   const hasNicknameForSpace = useCallback((spaceId: string) => {
-    return !!state.spaceNicknames[spaceId];
-  }, [state.spaceNicknames]);
+    const spaceNickname = state.spaceNicknames[spaceId]?.trim();
+    if (spaceNickname) return true;
+
+    if (!currentUser) return false;
+
+    const defaultNickname = state.profile?.defaultNickname?.trim();
+    if (defaultNickname) return true;
+
+    if (currentUser.username?.trim()) return true;
+    if (currentUser.displayName?.trim()) return true;
+
+    return false;
+  }, [state.spaceNicknames, state.profile?.defaultNickname, currentUser]);
 
   const setVisitingSpace = useCallback((spaceId: string | null) => {
     dispatch({ type: 'SET_VISITING_SPACE', payload: spaceId });

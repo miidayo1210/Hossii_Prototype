@@ -51,6 +51,17 @@ const RE_IS_SLUG_URL_PATH = new RegExp(
   `^\\/c\\/${URL_PATH_SLUG}\\/s\\/${URL_PATH_SLUG}$|^\\/s\\/${URL_PATH_SLUG}$`
 );
 
+const authResolvingScreenStyle = {
+  minHeight: '100dvh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'linear-gradient(150deg, #ede9fe 0%, #f5f3ff 40%, #fce7f3 100%)',
+  color: '#6b7280',
+  fontFamily: 'sans-serif',
+  fontSize: '14px',
+} as const;
+
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
   const { screen, navigate } = useRouter();
@@ -135,6 +146,7 @@ const AppContent = () => {
   // isResolvingAuth 中は onAuthStateChange の非同期解決が完了していないためスキップ
   useEffect(() => {
     if (isResolvingAuth) return;
+    if (currentUser?.username?.trim()) return;
     if (currentUser && !currentUser.isAdmin && !currentUser.isIssuedParticipant && !userProfile && currentUser.communityStatus === undefined) {
       const hasProfile = localStorage.getItem(`profile_${currentUser.uid}`);
       if (!hasProfile) {
@@ -145,6 +157,13 @@ const AppContent = () => {
       }
     }
   }, [currentUser, userProfile, isResolvingAuth]);
+
+  // ログイン済みになったらゲストモードを解除（localStorage のゲスト名を優先しない）
+  useEffect(() => {
+    if (currentUser) {
+      setIsGuestMode(false);
+    }
+  }, [currentUser]);
 
   // 参加者ログイン成功後: ログイン対象スペースへ必ず入室する
   useEffect(() => {
@@ -491,7 +510,7 @@ const AppContent = () => {
   }
 
   // 参加者ログイン画面（GuestEntryScreen より先に判定する）
-  if (!currentUser && pendingParticipantSpaceId) {
+  if (!currentUser && !isResolvingAuth && pendingParticipantSpaceId) {
     return (
       <ParticipantLoginScreen
         spaceId={pendingParticipantSpaceId}
@@ -501,7 +520,7 @@ const AppContent = () => {
   }
 
   // /s/[slug] アクセス: 未ログインかつ isPrivate なスペース → アクセス拒否画面
-  if (!currentUser && guestSpaceIsPrivate) {
+  if (!currentUser && !isResolvingAuth && guestSpaceIsPrivate) {
     return (
       <PrivateSpaceScreen
         onLoginRequested={() => {
@@ -515,7 +534,7 @@ const AppContent = () => {
   }
 
   // /s/[slug] アクセス: 未ログインかつゲスト入室前 → ゲスト入室画面
-  if (!currentUser && guestSpaceId && !isGuestMode) {
+  if (!currentUser && !isResolvingAuth && guestSpaceId && !isGuestMode) {
     return (
       <GuestEntryScreen
         spaceId={guestSpaceId}
@@ -533,7 +552,7 @@ const AppContent = () => {
   }
 
   // ログイン/新規登録が選択された後 → LoginScreen を表示（ゲストモード中も含む）
-  if (!currentUser && pendingLoginSlug) {
+  if (!currentUser && !isResolvingAuth && pendingLoginSlug) {
     return (
       <LoginScreen
         initialMode={pendingAuthMode}
@@ -545,20 +564,29 @@ const AppContent = () => {
     );
   }
 
+  // セッション復元中はゲスト導線やトップを一瞬出さない
+  if (!currentUser && isResolvingAuth) {
+    if (
+      isOnSlugPath ||
+      guestSpaceId ||
+      guestSpaceIsPrivate ||
+      pendingLoginSlug ||
+      pendingParticipantSpaceId ||
+      appRoute === 'default'
+    ) {
+      return (
+        <div style={authResolvingScreenStyle}>
+          読み込み中…
+        </div>
+      );
+    }
+  }
+
   // /s/[slug] アクセス中にスペースがまだ解決されていない間は空白を表示
   // GuestEntryScreen と同じ背景色にすることでフラッシュを防ぐ
   if (!currentUser && !isGuestMode && isOnSlugPath && !guestSpaceId && !guestSpaceIsPrivate && !spaceURLNotFound) {
     return (
-      <div style={{
-        minHeight: '100dvh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(150deg, #ede9fe 0%, #f5f3ff 40%, #fce7f3 100%)',
-        color: '#6b7280',
-        fontFamily: 'sans-serif',
-        fontSize: '14px',
-      }}>
+      <div style={authResolvingScreenStyle}>
         読み込み中…
       </div>
     );
@@ -625,6 +653,7 @@ const AppContent = () => {
         <NicknameModal
           spaceId={pendingSpaceId}
           onClose={handleNicknameModalClose}
+          variant={currentUser ? 'profile' : 'guest'}
         />
       )}
       <BottomNavBar isMobile={isMobile} onMobilePostPress={handleMobilePostNav} />

@@ -13,6 +13,7 @@ import {
   resolveParticipantLogin,
   markParticipantFirstLogin,
 } from '../utils/participantAccountsApi';
+import { fetchLegacyDefaultNickname } from '../utils/profilesApi';
 import { AuthContext } from './useAuth';
 
 export type AppUser = {
@@ -93,7 +94,13 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     }
   }
 
-  const username = resolvedProfile?.username ?? undefined;
+  let username = resolvedProfile?.username?.trim() || undefined;
+  if (!username) {
+    const legacyNickname = await fetchLegacyDefaultNickname(user.id);
+    if (legacyNickname) {
+      username = legacyNickname;
+    }
+  }
 
   // app_metadata.role = "admin" は承認済みとして扱う（communityId は取得できた場合のみ付与）
   if (roleFromMetadata === 'admin') {

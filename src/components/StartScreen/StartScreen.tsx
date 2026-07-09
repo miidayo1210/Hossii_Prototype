@@ -25,7 +25,7 @@ export const StartScreen = () => {
   };
 
   return (
-    <AuthEntryShell>
+    <AuthEntryShell showAdminLoginLink>
       <div className={`${shell.glassCard} ${shell.cardEnter}`}>
         <div className={authStyles.header}>
           <h1 className={authStyles.title}>✨ Hossii</h1>

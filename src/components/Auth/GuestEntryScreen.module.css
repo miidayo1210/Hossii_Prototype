@@ -81,6 +81,12 @@
   font-weight: 500;
 }
 
+.subtitle {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0.75rem 0 0;
+}
+
 /* ===== ボタン群（select step） ===== */
 .buttons {
   display: flex;

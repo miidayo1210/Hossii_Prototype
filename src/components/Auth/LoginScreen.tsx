@@ -108,7 +108,7 @@ export const LoginScreen = ({ onClose, initialMode = 'login' }: Props) => {
   };
 
   return (
-    <AuthEntryShell>
+    <AuthEntryShell showAdminLoginLink>
       <div className={`${shell.glassCard} ${shell.cardEnter}`}>
         {/* Close button (only show if onClose is provided) */}
         {onClose && (

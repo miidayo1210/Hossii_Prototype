@@ -70,3 +70,21 @@ export async function fetchSpaceNicknames(profileId: string): Promise<SpaceNickn
     {}
   );
 }
+
+export async function fetchLegacyDefaultNickname(profileId: string): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('default_nickname')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[profilesApi] fetchLegacyDefaultNickname error:', error.message);
+    return null;
+  }
+
+  const nickname = (data as { default_nickname?: string } | null)?.default_nickname?.trim();
+  return nickname || null;
+}

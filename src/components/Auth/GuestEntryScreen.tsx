@@ -25,7 +25,6 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
   const space = state.spaces.find((s) => s.id === spaceId);
   const spaceName = space?.name ?? 'スペース';
   const characterImageUrl = space?.characterImageUrl;
-  const welcomeMessage = space?.welcomeMessage ?? `「${spaceName}」にようこそ！ニックネームを入力してね。`;
 
   const handleGuestEnter = () => {
     const trimmed = nickname.trim();
@@ -44,6 +43,7 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
         <div className={styles.header}>
           <h1 className={styles.logo}>✨ Hossii</h1>
           <p className={styles.spaceName}>「{spaceName}」に参加する</p>
+          <p className={styles.subtitle}>参加方法を選んでください</p>
         </div>
 
         {step === 'select' && (
@@ -53,14 +53,14 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
               className={styles.primaryButton}
               onClick={() => setStep('nickname')}
             >
-              ゲストとして参加
+              ゲストで参加
             </button>
             <button
               type="button"
               className={styles.secondaryButton}
               onClick={() => onLoginRequested?.()}
             >
-              アカウントでログイン
+              ログインして参加
             </button>
           </div>
         )}
@@ -76,7 +76,7 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
                 />
               </div>
               <div className={styles.speechBubble}>
-                <p className={styles.speechText}>{welcomeMessage}</p>
+                <p className={styles.speechText}>ゲストとして参加する名前を入力してください</p>
               </div>
             </div>
             <input

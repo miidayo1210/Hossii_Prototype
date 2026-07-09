@@ -50,6 +50,14 @@
   text-align: center;
 }
 
+.profileTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.75rem 0;
+  text-align: center;
+}
+
 /* ===== ウェルカムキャラ + 吹き出し ===== */
 .welcomeArea {
   display: flex;
@@ -118,6 +126,7 @@
   line-height: 1.6;
   text-align: center;
   font-weight: 500;
+  white-space: pre-line;
 }
 
 .input {

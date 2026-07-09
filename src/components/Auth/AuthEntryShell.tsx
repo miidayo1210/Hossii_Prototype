@@ -25,12 +25,14 @@ function usePrefersReducedMotion(): boolean {
 
 type Props = {
   children: React.ReactNode;
+  /** 通常トップ・ログイン画面のみ true（管理者ログイン画面では出さない） */
+  showAdminLoginLink?: boolean;
 };
 
 /**
  * トップ・ログイン・管理者ログイン共通: 背景スライド・スクリム・装飾 Hossii・前面コンテンツ
  */
-export function AuthEntryShell({ children }: Props) {
+export function AuthEntryShell({ children, showAdminLoginLink = false }: Props) {
   const urls = AUTH_ENTRY_BG_IMAGES;
   const reduceMotion = usePrefersReducedMotion();
   const [bottomIdx, setBottomIdx] = useState(0);
@@ -134,6 +136,14 @@ export function AuthEntryShell({ children }: Props) {
       )}
 
       <div className={shell.scrim} aria-hidden />
+
+      {showAdminLoginLink && (
+        <div className={shell.adminLoginCorner}>
+          <a href="/admin/login" className={shell.adminLoginLink}>
+            管理者ログイン
+          </a>
+        </div>
+      )}
 
       <div className={shell.hossiiLayer}>
         <div className={shell.hossiiFloatInner}>
