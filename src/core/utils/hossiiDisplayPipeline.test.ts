@@ -48,6 +48,41 @@ describe('runDisplayPipeline', () => {
     expect(result.filteredIds).toEqual(['a']);
   });
 
+  it('breaks ties by id DESC when createdAt is equal', () => {
+    const same = new Date('2026-06-01T10:00:00.000Z');
+    const hossiis = [
+      makeHossii('id-a', { createdAt: same }),
+      makeHossii('id-c', { createdAt: same }),
+      makeHossii('id-b', { createdAt: same }),
+    ];
+    const result = runDisplayPipeline({
+      hossiis,
+      displayPeriod: 'all',
+      displayLimit: 50,
+      viewMode: 'full',
+      activeTagFilter: null,
+    });
+    expect(result.displayIds).toEqual(['id-c', 'id-b', 'id-a']);
+  });
+
+  it('slices by displayLimit after id tie-break sort', () => {
+    const same = new Date('2026-06-01T10:00:00.000Z');
+    const hossiis = [
+      makeHossii('id-0', { createdAt: same }),
+      makeHossii('id-3', { createdAt: same }),
+      makeHossii('id-1', { createdAt: same }),
+      makeHossii('id-2', { createdAt: same }),
+    ];
+    const result = runDisplayPipeline({
+      hossiis,
+      displayPeriod: 'all',
+      displayLimit: 2,
+      viewMode: 'full',
+      activeTagFilter: null,
+    });
+    expect(result.displayIds).toEqual(['id-3', 'id-2']);
+  });
+
   it('excludes hidden and image-only filter', () => {
     const hossiis = [
       makeHossii('a', { isHidden: true }),

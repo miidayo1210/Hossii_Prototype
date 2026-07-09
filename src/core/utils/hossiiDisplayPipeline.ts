@@ -1,4 +1,5 @@
 import type { Hossii } from '../types';
+import { sortHossiisNewestFirst } from './hossiiFetchPage';
 import { coerceIsHidden } from './hossiisApi';
 import {
   getPeriodCutoff,
@@ -36,7 +37,7 @@ export function runDisplayPipeline(params: DisplayPipelineParams): DisplayPipeli
     return true;
   });
 
-  const sorted = [...visible].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const sorted = sortHossiisNewestFirst(visible);
   const displayHossiis = sorted.slice(0, limit);
   const displayIds = displayHossiis.map((h) => h.id);
 
