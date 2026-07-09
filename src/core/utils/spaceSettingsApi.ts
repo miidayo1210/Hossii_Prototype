@@ -29,6 +29,7 @@ export type SupabaseSpaceSettingsRow = {
   mode_customized?: boolean | null;
   mode_applied_at?: string | null;
   mode_snapshot?: unknown;
+  timeline_depth_enabled?: boolean | null;
 };
 
 function isMissingColumnError(error: { code?: string; message?: string }, column: string): boolean {
@@ -132,6 +133,7 @@ function toSpaceSettings(row: SupabaseSpaceSettingsRow, spaceName: string): Spac
     posting,
     reflection,
     ...(mode ? { mode } : {}),
+    timelineDepthEnabled: row.timeline_depth_enabled === true,
   };
 }
 
@@ -196,6 +198,61 @@ export async function fetchSpaceSettings(
   }
 
   return { ...settings, spaceName };
+}
+
+/** @internal tests */
+export function timelineDepthEnabledToDbColumn(enabled: boolean): { timeline_depth_enabled: boolean } {
+  return { timeline_depth_enabled: enabled };
+}
+
+export async function updateTimelineDepthEnabled(
+  spaceId: string,
+  enabled: boolean,
+): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  const payload = timelineDepthEnabledToDbColumn(enabled);
+
+  const { data: existing, error: selectError } = await supabase
+    .from('space_settings')
+    .select('space_id')
+    .eq('space_id', spaceId)
+    .maybeSingle();
+
+  if (selectError) {
+    console.error('[spaceSettingsApi] updateTimelineDepthEnabled select error:', selectError);
+    throw selectError;
+  }
+
+  if (existing) {
+    const { error } = await supabase
+      .from('space_settings')
+      .update(payload)
+      .eq('space_id', spaceId);
+
+    if (error) {
+      if (isMissingColumnError(error, 'timeline_depth_enabled')) {
+        console.error('[spaceSettingsApi] updateTimelineDepthEnabled column missing:', error);
+      } else {
+        console.error('[spaceSettingsApi] updateTimelineDepthEnabled update error:', error);
+      }
+      throw error;
+    }
+    return;
+  }
+
+  const { error: insertError } = await supabase
+    .from('space_settings')
+    .insert({ space_id: spaceId, ...payload });
+
+  if (insertError) {
+    if (isMissingColumnError(insertError, 'timeline_depth_enabled')) {
+      console.error('[spaceSettingsApi] updateTimelineDepthEnabled column missing:', insertError);
+    } else {
+      console.error('[spaceSettingsApi] updateTimelineDepthEnabled insert error:', insertError);
+    }
+    throw insertError;
+  }
 }
 
 export async function upsertSpaceSettings(settings: SpaceSettings): Promise<void> {

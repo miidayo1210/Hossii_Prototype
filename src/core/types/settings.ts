@@ -104,6 +104,8 @@ export type SpaceSettings = {
   posting?: PostingSettings;
   reflection?: ReflectionSettings;
   mode?: SpaceModeState;
+  /** 時系列奥行き表示 ON/OFF。未設定は OFF（108） */
+  timelineDepthEnabled?: boolean;
 };
 
 export const DEFAULT_SPACE_FEATURES: SpaceFeatures = {
