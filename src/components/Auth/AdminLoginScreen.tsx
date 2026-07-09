@@ -89,7 +89,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
   // 審査中画面
   if (viewState === 'pending') {
     return (
-      <AuthEntryShell>
+      <AuthEntryShell showUserLoginBackLink>
         <div className={`${shell.glassCard} ${shell.cardEnter} ${adminStyles.pendingCard}`}>
           <div className={adminStyles.pendingIcon}>⏳</div>
           <h1 className={styles.title}>✨ Hossii</h1>
@@ -122,7 +122,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
   // 却下画面
   if (viewState === 'rejected') {
     return (
-      <AuthEntryShell>
+      <AuthEntryShell showUserLoginBackLink>
         <div className={`${shell.glassCard} ${shell.cardEnter} ${adminStyles.pendingCard}`}>
           <div className={adminStyles.pendingIcon}>❌</div>
           <h1 className={styles.title}>✨ Hossii</h1>
@@ -147,7 +147,7 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
   }
 
   return (
-    <AuthEntryShell>
+    <AuthEntryShell showUserLoginBackLink>
       <div className={`${shell.glassCard} ${shell.cardEnter} ${adminStyles.adminFormCard}`}>
         <div className={`${styles.header} ${adminStyles.adminCompactHeader}`}>
           <h1 className={styles.title}>✨ Hossii</h1>
