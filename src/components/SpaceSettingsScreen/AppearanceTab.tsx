@@ -4,7 +4,7 @@ import { STAR_MARKER_OPTIONS, DEFAULT_STAR_MARKER } from '../../core/types/setti
 import type { Space } from '../../core/types/space';
 import { BUBBLE_SHAPE_PRESETS } from '../../core/assets/bubbleShapes';
 import { saveSpaceSettings } from '../../core/utils/settingsStorage';
-import { upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
+import { updateTimelineDepthEnabled, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import {
   hasPaneBubbleShapeOverride,
   resolvePaneBubbleShapePng,
@@ -25,17 +25,26 @@ import { PaneOverrideHint } from './PaneOverrideHint';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import { SettingsSaveBar } from './SettingsSaveBar';
+import {
+  mergeTimelineDepthIntoSettings,
+  readTimelineDepthDraft,
+  shouldPersistTimelineDepth,
+} from './appearanceTimelineDepthSave';
 import sharedStyles from './SettingsShared.module.css';
+import formStyles from './GeneralTab.module.css';
 import styles from './AppearanceTab.module.css';
 
 type AppearanceDraft = {
   starMarkerType: StarMarkerType;
   bubbleShapePng: string | null;
+  timelineDepthEnabled: boolean;
 };
 
 type Props = {
   space: Space;
   settings: SpaceSettings;
+  canManageTimelineDepth: boolean;
+  settingsDbSynced: boolean;
   onUpdate: (settings: SpaceSettings) => void;
   onUpdateSpace: (patch: Partial<Space>) => void;
   onDirtyChange: (dirty: boolean) => void;
@@ -44,6 +53,8 @@ type Props = {
 export const AppearanceTab = ({
   space,
   settings,
+  canManageTimelineDepth,
+  settingsDbSynced,
   onUpdate,
   onDirtyChange,
 }: Props) => {
@@ -52,8 +63,11 @@ export const AppearanceTab = ({
     () => ({
       starMarkerType: settings.starMarkerType ?? DEFAULT_STAR_MARKER,
       bubbleShapePng: resolvePaneBubbleShapePng(editPane, space) ?? null,
+      timelineDepthEnabled: settingsDbSynced
+        ? readTimelineDepthDraft(settings)
+        : false,
     }),
-    [settings.starMarkerType, editPane, space],
+    [settings, editPane, space, settingsDbSynced],
   );
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,20 +88,44 @@ export const AppearanceTab = ({
 
   const handleSave = async () => {
     if (!saveContext) return;
+    const timelineChanged = shouldPersistTimelineDepth(
+      draft.timelineDepthEnabled,
+      settings,
+      canManageTimelineDepth,
+    );
+    if (timelineChanged && !canManageTimelineDepth) {
+      setToast({ message: '管理者のみ変更できます', type: 'error' });
+      return;
+    }
+
     setIsSaving(true);
-    const updatedSettings = { ...settings, starMarkerType: draft.starMarkerType };
+    const starMarkerChanged = draft.starMarkerType !== (settings.starMarkerType ?? DEFAULT_STAR_MARKER);
+    const bubbleChanged = initial.bubbleShapePng !== draft.bubbleShapePng;
+    const bubblePatch = buildBubbleShapePngPatch(initial.bubbleShapePng, draft.bubbleShapePng);
+
     try {
-      onUpdate(updatedSettings);
-      saveSpaceSettings(updatedSettings);
-      await upsertSpaceSettings(updatedSettings);
-      const bubblePatch = buildBubbleShapePngPatch(
-        initial.bubbleShapePng,
-        draft.bubbleShapePng,
-      );
-      await savePaneBubbleShapeOverride(
-        saveContext,
-        bubbleShapePngPatchValue(bubblePatch),
-      );
+      if (starMarkerChanged) {
+        await upsertSpaceSettings({ ...settings, starMarkerType: draft.starMarkerType });
+      }
+      if (bubbleChanged) {
+        await savePaneBubbleShapeOverride(
+          saveContext,
+          bubbleShapePngPatchValue(bubblePatch),
+        );
+      }
+      if (timelineChanged) {
+        await updateTimelineDepthEnabled(space.id, draft.timelineDepthEnabled);
+      }
+
+      let nextSettings: SpaceSettings = {
+        ...settings,
+        starMarkerType: draft.starMarkerType,
+      };
+      if (timelineChanged) {
+        nextSettings = mergeTimelineDepthIntoSettings(nextSettings, draft.timelineDepthEnabled);
+      }
+      onUpdate(nextSettings);
+      saveSpaceSettings(nextSettings);
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
@@ -183,6 +221,30 @@ export const AppearanceTab = ({
             ))}
           </div>
         </SettingsSection>
+
+        {canManageTimelineDepth && settingsDbSynced && (
+          <SettingsSection
+            title="時系列による奥行き表示"
+            description="新しい投稿を手前に、古い投稿を少し小さく表示し、スペースに時間の奥行きをつくります。現在は星モードにのみ適用されます。"
+          >
+            <div className={styles.timelineDepthToggle}>
+              <span className={styles.toggleStateLabel} aria-hidden="true">OFF</span>
+              <label className={formStyles.toggleWrapper}>
+                <input
+                  type="checkbox"
+                  className={formStyles.toggleInput}
+                  checked={draft.timelineDepthEnabled}
+                  onChange={() =>
+                    setDraft({ ...draft, timelineDepthEnabled: !draft.timelineDepthEnabled })
+                  }
+                  aria-label={`時系列による奥行き表示を${draft.timelineDepthEnabled ? 'OFF' : 'ON'}にする`}
+                />
+                <span className={formStyles.toggleSlider} />
+              </label>
+              <span className={styles.toggleStateLabel} aria-hidden="true">ON</span>
+            </div>
+          </SettingsSection>
+        )}
 
         <SettingsSaveBar isDirty={isDirty} isSaving={isSaving} onDiscard={discard} onSave={handleSave} />
       </SettingsPageHeader>

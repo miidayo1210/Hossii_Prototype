@@ -63,6 +63,7 @@ function rowToSpace(row: SpaceRow): Space {
     myHossiiEnabled: row.my_hossii_enabled ?? false,
     myHossiiMotionMode: parseMyHossiiMotionMode(row.my_hossii_motion_mode),
     myHossiiLogVisibility: parseMyHossiiLogVisibility(row.my_hossii_log_visibility),
+    communityId: row.community_id ?? undefined,
   };
 }
 

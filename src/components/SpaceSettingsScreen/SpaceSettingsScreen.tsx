@@ -8,6 +8,7 @@ import type { SpaceSettings } from '../../core/types/settings';
 import { DEFAULT_STAR_MARKER, DEFAULT_SPACE_MODE_STATE } from '../../core/types/settings';
 import type { Space, SpaceUpdatePatch } from '../../core/types/space';
 import { refreshModeCustomization } from '../../core/utils/spaceModeCustomize';
+import { canManageSpace } from '../../core/utils/spaceAdminAccess';
 import { SettingsLayout } from './SettingsLayout';
 import { SpaceModeTab } from './SpaceModeTab';
 import { BasicInfoTab } from './BasicInfoTab';
@@ -39,6 +40,10 @@ export const SpaceSettingsScreen = () => {
   const isAdmin = currentUser?.isAdmin ?? false;
 
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
+  const canManageActiveSpace = canManageSpace(currentUser, activeSpace);
+  const [settingsSyncedSpaceId, setSettingsSyncedSpaceId] = useState<string | null>(null);
+  const settingsDbSynced =
+    activeSpace != null && settingsSyncedSpaceId === activeSpace.id;
   const [activeScreen, setActiveScreen] = useState<SettingsScreenId>(DEFAULT_SETTINGS_SCREEN);
   const [screenDirty, setScreenDirty] = useState(false);
 
@@ -55,6 +60,7 @@ export const SpaceSettingsScreen = () => {
       const local = loadSpaceSettings(activeSpace.id, activeSpace.name);
       const merged: SpaceSettings = {
         ...loaded,
+        timelineDepthEnabled: loaded.timelineDepthEnabled,
         starMarkerType: loaded.starMarkerType ?? local.starMarkerType ?? DEFAULT_STAR_MARKER,
         posting: loaded.posting ?? local.posting,
         reflection: loaded.reflection ?? local.reflection,
@@ -62,6 +68,7 @@ export const SpaceSettingsScreen = () => {
       };
       setSettings(merged);
       saveSpaceSettings(merged);
+      setSettingsSyncedSpaceId(activeSpace.id);
     });
   }, [activeSpace?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -221,6 +228,8 @@ export const SpaceSettingsScreen = () => {
             key={`appearance-${activeSpace.id}`}
             space={activeSpace}
             settings={settings}
+            canManageTimelineDepth={canManageActiveSpace}
+            settingsDbSynced={settingsDbSynced}
             onUpdate={handleSettingsUpdate}
             onUpdateSpace={handleSpaceUpdate}
             onDirtyChange={handleDirtyChange}

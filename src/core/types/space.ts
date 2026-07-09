@@ -91,6 +91,8 @@ export type Space = {
   myHossiiMotionMode?: MyHossiiMotionMode;
   /** マイHossiiログ公開範囲（デフォルト public） */
   myHossiiLogVisibility?: MyHossiiLogVisibility;
+  /** 所属コミュニティ（DB: spaces.community_id） */
+  communityId?: string;
 };
 
 /** Partial update for Space; null clears nullable DB-backed fields. */
