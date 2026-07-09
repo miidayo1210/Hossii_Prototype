@@ -2,7 +2,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -46,20 +45,18 @@ export function SettingsEditPaneProvider({
 }: ProviderProps) {
   const { panes, defaultPane, reloadPanesAndSyncActive } = useSpacePane();
 
-  const [editPaneId, setEditPaneId] = useState<string | null>(() => {
+  const [selectedPaneId, setSelectedPaneId] = useState<string | null>(() => {
     const stored = loadSettingsEditPaneId(space.id);
     if (stored && panes.some((p) => p.id === stored)) return stored;
-    return defaultPane?.id ?? panes[0]?.id ?? null;
+    return null;
   });
 
-  useEffect(() => {
-    if (editPaneId && panes.some((p) => p.id === editPaneId)) return;
-    const fallback = defaultPane?.id ?? panes[0]?.id ?? null;
-    if (fallback && fallback !== editPaneId) {
-      setEditPaneId(fallback);
-      saveSettingsEditPaneId(space.id, fallback);
+  const editPaneId = useMemo((): string | null => {
+    if (selectedPaneId && panes.some((p) => p.id === selectedPaneId)) {
+      return selectedPaneId;
     }
-  }, [panes, defaultPane, editPaneId, space.id]);
+    return defaultPane?.id ?? panes[0]?.id ?? null;
+  }, [selectedPaneId, panes, defaultPane]);
 
   const editPane = useMemo(
     () => panes.find((p) => p.id === editPaneId) ?? defaultPane ?? panes[0] ?? null,
@@ -77,7 +74,7 @@ export function SettingsEditPaneProvider({
       ) {
         return false;
       }
-      setEditPaneId(paneId);
+      setSelectedPaneId(paneId);
       saveSettingsEditPaneId(space.id, paneId);
       return true;
     },
@@ -113,6 +110,7 @@ export function SettingsEditPaneProvider({
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocated with provider
 export function useSettingsEditPane(): SettingsEditPaneContextValue {
   const ctx = useContext(SettingsEditPaneContext);
   if (!ctx) {
@@ -122,6 +120,7 @@ export function useSettingsEditPane(): SettingsEditPaneContextValue {
 }
 
 /** Optional hook for tabs outside override provider scope (should not happen). */
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocated with provider
 export function useSettingsEditPaneOptional(): SettingsEditPaneContextValue | null {
   return useContext(SettingsEditPaneContext);
 }

@@ -63,7 +63,7 @@ function QRCodePanelInner() {
     navigator.clipboard.writeText(spaceUrl).then(() => {
       setLinkCopied(true);
     });
-  }, [spaceUrl]);
+  }, [spaceUrl, setLinkCopied]);
 
   useEffect(() => {
     if (!linkCopied) return;
@@ -94,7 +94,7 @@ function QRCodePanelInner() {
       .catch(() => {
         /* 未対応ブラウザや権限エラーは黙って無視 */
       });
-  }, []);
+  }, [setQrImageCopied, setQrImageSaved]);
 
   const handleCopyQrImageClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -117,7 +117,7 @@ function QRCodePanelInner() {
       .catch(() => {
         /* 失敗時は黙って無視 */
       });
-  }, [activeSpace?.spaceURL]);
+  }, [activeSpace?.spaceURL, setQrImageCopied, setQrImageSaved]);
 
   const handleSaveQrImageClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {

@@ -415,6 +415,7 @@ export function SpacePaneProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocated with provider
 export function useSpacePane(): SpacePaneContextValue {
   const ctx = useContext(SpacePaneContext);
   if (!ctx) {

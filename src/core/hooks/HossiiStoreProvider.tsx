@@ -1474,7 +1474,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
       void upsertSpaceNickname(nicknameProfileId, spaceId, nickname.trim());
     }
-  }, [currentUser?.uid, currentUser?.username]);
+  }, [currentUser]);
 
   const getActiveNickname = useCallback(() => {
     return getActiveNicknameFromState(state);

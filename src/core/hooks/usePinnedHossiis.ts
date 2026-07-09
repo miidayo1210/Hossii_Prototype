@@ -8,6 +8,7 @@ export function usePinnedHossiis(spaceId: string | undefined) {
 
   useEffect(() => {
     if (spaceId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reload pinned ids when active space changes
       setPinnedOrder(loadPinnedIds(spaceId));
     } else {
       setPinnedOrder([]);

@@ -387,7 +387,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [paneReorderBusy, setPaneReorderBusy] = useState(false);
   const prevActivePaneIdRef = useRef<string | null>(null);
 
-  const storedTabFolders = activeSpace?.tabFolders ?? [];
+  const storedTabFolders = useMemo(
+    () => activeSpace?.tabFolders ?? [],
+    [activeSpace?.tabFolders],
+  );
 
   const persistTabFolders = useCallback(
     (next: TabFolder[]) => {

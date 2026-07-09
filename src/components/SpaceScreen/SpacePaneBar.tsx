@@ -6,6 +6,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
   type Ref,
+  type RefObject,
 } from 'react';
 import type { SpacePane } from '../../core/types/spacePane';
 import type { TabFolder } from '../../core/utils/tabFolderStorage';
@@ -119,6 +120,7 @@ function FolderChip({
 
   useEffect(() => {
     if (isEditing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync edit field when rename mode opens
       setEditValue(folder.name);
       requestAnimationFrame(() => {
         inputRef.current?.focus();
@@ -491,18 +493,15 @@ export function SpacePaneBar({
     [onMoveToFolder, onReorder],
   );
 
-  const canDragPane = useCallback(
-    (_pane: SpacePane): boolean => {
-      if (!canManageTabs) return false;
-      const totalPanes = barPanes.length + [...folderMap.values()].reduce((s, a) => s + a.length, 0);
-      return totalPanes > 1;
-    },
-    [barPanes.length, canManageTabs, folderMap],
-  );
+  const canDragPane = useCallback((): boolean => {
+    if (!canManageTabs) return false;
+    const totalPanes = barPanes.length + [...folderMap.values()].reduce((s, a) => s + a.length, 0);
+    return totalPanes > 1;
+  }, [barPanes.length, canManageTabs, folderMap]);
 
   const handlePointerDown = useCallback(
     (pane: SpacePane, event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (!canDragPane(pane) || event.button !== 0 || folderDragRef.current) return;
+      if (!canDragPane() || event.button !== 0 || folderDragRef.current) return;
 
       clearLongPressTimer();
       dragRef.current = {
@@ -734,11 +733,11 @@ export function SpacePaneBar({
   const renderDropIndicator = (show: boolean) =>
     show ? <span className={styles.dropIndicator} aria-hidden /> : null;
 
-  const makeTabProps = (pane: SpacePane, refMap: Map<string, HTMLButtonElement>) => ({
+  const makeTabProps = (pane: SpacePane, refMapRef: RefObject<Map<string, HTMLButtonElement>>) => ({
     pane,
     isActive: pane.id === activePaneId,
     isDragging: pane.id === draggingPaneId,
-    canDrag: canDragPane(pane),
+    canDrag: canDragPane(),
     disabled,
     onSelect: () => handleTabClick(pane.id),
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => handlePointerDown(pane, e),
@@ -746,6 +745,8 @@ export function SpacePaneBar({
     onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => handlePointerUp(pane, e),
     onPointerCancel: handlePointerCancel,
     setTabRef: (el: HTMLButtonElement | null) => {
+      const refMap = refMapRef.current;
+      if (!refMap) return;
       if (el) refMap.set(pane.id, el);
       else refMap.delete(pane.id);
     },
@@ -767,22 +768,25 @@ export function SpacePaneBar({
         role="tablist"
       >
         {/* Bar tabs */}
+        {/* eslint-disable react-hooks/refs -- tab ref callbacks run on mount, not during render */}
         {barPanes.map((pane, index) => {
           const showIndicatorBefore =
             dropTarget?.zone === 'bar' && dropTarget.insertBeforeIndex === index;
           return (
             <div key={pane.id} className={styles.tabSlot}>
               {renderDropIndicator(showIndicatorBefore)}
-              <TabButton {...makeTabProps(pane, barTabRefs.current)} />
+              <TabButton {...makeTabProps(pane, barTabRefs)} />
             </div>
           );
         })}
+        {/* eslint-enable react-hooks/refs */}
         {dropTarget?.zone === 'bar' &&
           dropTarget.insertBeforeIndex === barPanes.length &&
           draggingPaneId != null &&
           renderDropIndicator(true)}
 
         {/* Folder clusters */}
+        {/* eslint-disable react-hooks/refs -- folder/tab ref callbacks run on mount, not during render */}
         {folders.map((folder, index) => {
           const folderPanes = folderMap.get(folder.id) ?? [];
           const isOpen = openFolderIds.has(folder.id);
@@ -835,7 +839,7 @@ export function SpacePaneBar({
                     return (
                       <div key={pane.id} className={styles.tabSlot}>
                         {renderDropIndicator(showIndicatorBefore)}
-                        <TabButton {...makeTabProps(pane, folderTabRefs.current)} />
+                        <TabButton {...makeTabProps(pane, folderTabRefs)} />
                       </div>
                     );
                   })}
@@ -848,6 +852,7 @@ export function SpacePaneBar({
             </div>
           );
         })}
+        {/* eslint-enable react-hooks/refs */}
         {draggingFolderId != null &&
           folderDropTarget?.insertBeforeIndex === folders.length &&
           renderDropIndicator(true)}

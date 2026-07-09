@@ -42,7 +42,7 @@ function mockFromTables(tables: Record<string, unknown>) {
 function nicknameTable(rows: Record<string, { nickname: string } | null>) {
   return {
     select: () => ({
-      eq: (column: string, value: string) => {
+      eq: (column: string) => {
         if (column === 'space_id') {
           return {
             eq: (_column2: string, profileId: string) => ({

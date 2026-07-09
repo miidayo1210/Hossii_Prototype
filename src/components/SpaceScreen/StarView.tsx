@@ -88,6 +88,7 @@ function StarViewInner({
 
   useLayoutEffect(() => {
     if (!fullText || !showPreview) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset truncation when preview hides
       setIsPreviewTruncated(false);
       return;
     }
@@ -131,6 +132,7 @@ function StarViewInner({
 
   useEffect(() => {
     if (previewInteractive && isPreviewTruncated) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- show popover when pin/hover makes preview interactive
       showInlineFullText();
     } else if (!previewInteractive) {
       scheduleHideFullText();

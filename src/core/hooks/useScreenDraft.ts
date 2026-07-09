@@ -15,6 +15,7 @@ export function useScreenDraft<T>(initial: T) {
   const initialKey = JSON.stringify(initial);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset draft when screen initial props change
     setSaved(initial);
     setDraft(initial);
   }, [initialKey]); // eslint-disable-line react-hooks/exhaustive-deps
