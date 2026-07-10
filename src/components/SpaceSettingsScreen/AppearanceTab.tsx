@@ -225,7 +225,7 @@ export const AppearanceTab = ({
         {canManageTimelineDepth && settingsDbSynced && (
           <SettingsSection
             title="時系列による奥行き表示"
-            description="新しい投稿を手前に、古い投稿を少し小さく表示し、スペースに時間の奥行きをつくります。現在は星モードにのみ適用されます。"
+            description="新しい投稿を手前に、古い投稿を少し小さく表示し、メイン画面に時間の奥行きをつくります。現在は、メイン画面の星モードにのみ適用されます。"
           >
             <div className={styles.timelineDepthToggle}>
               <span className={styles.toggleStateLabel} aria-hidden="true">OFF</span>
