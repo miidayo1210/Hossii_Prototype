@@ -25,8 +25,10 @@ import { computeBubblePositions, type PositionCache } from '../../core/utils/hos
 import { useSpaceHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
 import { usePinnedHossiis } from '../../core/hooks/usePinnedHossiis';
 import { buildQueryKeyV2 } from '../../core/utils/hossiiQueryKey';
-import type { PaneContext } from '../../core/utils/hossiiPaneMembership';
+import { isDefaultPane, type PaneContext } from '../../core/utils/hossiiPaneMembership';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
+import { resolveTimelineDepthActive } from '../../core/utils/resolveTimelineDepthActive';
+import { useTimelineDepthEnabled } from './useTimelineDepthEnabled';
 import { isSupabaseConfigured } from '../../core/supabase';
 import {
   loadPresentationMode,
@@ -768,6 +770,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // スペース設定（設定画面から戻ったときにフォーカスで再読み込み）
   const { spaceSettings } = useSpaceSettings(activeSpace);
+  const { enabled: timelineDepthEnabled } = useTimelineDepthEnabled(
+    activeSpaceId,
+    activeSpace?.name ?? '',
+  );
+  const timelineDepthActive = useMemo(
+    () =>
+      resolveTimelineDepthActive({
+        enabled: timelineDepthEnabled,
+        isMainPane: paneContext != null && isDefaultPane(paneContext),
+        isStarMode: renderAsStar,
+      }),
+    [timelineDepthEnabled, paneContext, renderAsStar],
+  );
   const { pinnedIds, pinnedOrder, isPinned, toggle, unpin } = usePinnedHossiis(activeSpace?.id);
   const showPinUi = !isMobile;
 
@@ -1954,6 +1969,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                     isRecentHighlight={recentHighlightIds.has(hossii.id) || isPinHighlighted}
                     orderedStackZ={displayStackZ}
                     animationLevel={animationLevel}
+                    displayIndex={index}
+                    timelineDepthActive={timelineDepthActive}
                   />
                 </div>
               );

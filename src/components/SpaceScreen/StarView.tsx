@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Hossii } from '../../core/types';
 import type { AnimationLevel } from '../../core/utils/animationLevel';
 import type { StarMarkerType } from '../../core/types/settings';
@@ -9,6 +9,7 @@ import {
   isHossiiTextTruncated,
   truncateStarPreviewText,
 } from '../../core/utils/bubbleTextTruncation';
+import { resolveStarDotDepthScale } from '../../core/utils/timelineDepthScale';
 import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
 import { HossiiFullTextPopover } from './HossiiFullTextPopover';
 import { PinButton } from './PinButton';
@@ -31,6 +32,8 @@ type Props = {
   isPinned?: boolean;
   onPinToggle?: (id: string) => void;
   showPinUi?: boolean;
+  displayIndex?: number;
+  timelineDepthActive?: boolean;
 };
 
 const MARKER_CHAR: Record<StarMarkerType, string> = {
@@ -59,6 +62,8 @@ function StarViewInner({
   isPinned = false,
   onPinToggle,
   showPinUi = false,
+  displayIndex = 0,
+  timelineDepthActive = false,
 }: Props) {
   const [isZoneHovered, setIsZoneHovered] = useState(false);
   const [showFullTextPopover, setShowFullTextPopover] = useState(false);
@@ -95,6 +100,11 @@ function StarViewInner({
 
   const fullText = getHossiiBubbleFullText(hossii);
   const previewText = fullText ? truncateStarPreviewText(fullText) : null;
+  const depthScale = resolveStarDotDepthScale(timelineDepthActive, displayIndex);
+  const starDotStyle =
+    depthScale === 1
+      ? undefined
+      : ({ '--timeline-depth-scale': depthScale } as CSSProperties);
 
   useLayoutEffect(() => {
     if (!fullText || !showPreview) {
@@ -226,6 +236,7 @@ function StarViewInner({
       >
         <span
           className={`${styles.starDot}${markerType === 'pin' || markerType === 'person' ? ` ${styles[`marker_${markerType}`]}` : ''}`}
+          style={starDotStyle}
           aria-hidden="true"
         >
           {MARKER_CHAR[markerType]}
@@ -302,6 +313,8 @@ function starViewPropsEqual(prev: Props, next: Props): boolean {
     prev.showPinUi === next.showPinUi &&
     prev.onPinToggle === next.onPinToggle &&
     prev.isRecentHighlight === next.isRecentHighlight &&
+    prev.displayIndex === next.displayIndex &&
+    prev.timelineDepthActive === next.timelineDepthActive &&
     prev.anchor === next.anchor &&
     prev.orderedStackZ === next.orderedStackZ &&
     prev.onClick === next.onClick &&

@@ -5,3 +5,8 @@ export function timelineDepthScaleFromIndex(index: number): number {
   if (index <= 59) return 0.88;
   return 0.82;
 }
+
+/** starDot 用 depth scale（無効時は常に 1） */
+export function resolveStarDotDepthScale(timelineDepthActive: boolean, index: number): number {
+  return timelineDepthActive ? timelineDepthScaleFromIndex(index) : 1;
+}
