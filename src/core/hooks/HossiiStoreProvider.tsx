@@ -95,10 +95,13 @@ import { fetchMyAuthorshipIdsForSpace } from '../utils/hossiiAuthorshipsApi';
 import {
   createMyAuthorshipIdsController,
   EMPTY_MY_AUTHORSHIP_IDS,
-  type MyAuthorshipIdsController,
   type MyAuthorshipIdsSnapshot,
   type MyAuthorshipIdsStatus,
 } from '../utils/myAuthorshipIdsController';
+import {
+  createAuthorshipControllerHost,
+  type AuthorshipControllerHost,
+} from '../utils/authorshipControllerHost';
 import {
   upsertProfile,
   upsertSpaceNickname,
@@ -927,16 +930,20 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   const [authorshipSnapshot, setAuthorshipSnapshot] = useState<MyAuthorshipIdsSnapshot>(
     () => ({ ids: EMPTY_MY_AUTHORSHIP_IDS, status: 'idle' }),
   );
-  const authorshipControllerRef = useRef<MyAuthorshipIdsController | null>(null);
-  if (authorshipControllerRef.current === null) {
-    authorshipControllerRef.current = createMyAuthorshipIdsController({
-      fetchIds: fetchMyAuthorshipIdsForSpace,
-      onChange: setAuthorshipSnapshot,
-      // PII（UUID 等）を出さず、失敗の事実のみ最小限で記録する。
-      onError: () => {
-        console.error('[HossiiStore] failed to load authorship ids');
-      },
-    });
+  // controller のライフサイクルはホストへ集約する。StrictMode の cleanup で dispose した
+  // 破棄済み instance を掴み続けないよう、生成/差し替えは必ずホスト経由で行う（Phase 1D-2-fix）。
+  const authorshipHostRef = useRef<AuthorshipControllerHost | null>(null);
+  if (authorshipHostRef.current === null) {
+    authorshipHostRef.current = createAuthorshipControllerHost(() =>
+      createMyAuthorshipIdsController({
+        fetchIds: fetchMyAuthorshipIdsForSpace,
+        onChange: setAuthorshipSnapshot,
+        // PII（UUID 等）を出さず、失敗の事実のみ最小限で記録する。
+        onError: () => {
+          console.error('[HossiiStore] failed to load authorship ids');
+        },
+      }),
+    );
   }
 
   useEffect(() => {
@@ -997,7 +1004,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // 未確定時はクリア。stale response と前 space/前 user の残存は controller が防ぐ。
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    authorshipControllerRef.current?.sync({
+    // 破棄済み instance を掴まないよう必ずホスト経由で取得する。
+    // StrictMode の 2 回目 setup（cleanup で dispose 済み）でも新 instance が生成される。
+    authorshipHostRef.current?.getOrCreate().sync({
       authReady: !isResolvingAuth,
       uid: currentUser?.uid ?? null,
       spaceId: state.activeSpaceId || null,
@@ -1005,10 +1014,16 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, [currentUser?.uid, state.activeSpaceId, isResolvingAuth]);
 
   // Provider unmount 相当。以後の in-flight 反映を止める。
+  // StrictMode: setup で controller を確保し、cleanup では「その controller が現在値のときだけ」
+  // dispose して保持をクリアする。次の setup では getOrCreate が新 instance を生成する。
+  // genuine unmount 後は setup が再実行されないため保持は null のままで、再生成は起きない。
   useEffect(() => {
-    const controller = authorshipControllerRef.current;
+    const host = authorshipHostRef.current;
+    const controller = host?.getOrCreate();
     return () => {
-      controller?.dispose();
+      if (host && controller) {
+        host.disposeIfCurrent(controller);
+      }
     };
   }, []);
 
@@ -1438,7 +1453,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         // ゲスト投稿は trigger が authorship を作らないため refresh 不要。
         const authorshipUid = currentUserRef.current?.uid;
         if (authorshipUid && activeSpaceIdRef.current === newHossii.spaceId) {
-          authorshipControllerRef.current?.refresh({
+          // peek() は生成しないため、unmount 後（保持が null）の非同期呼び出しでも
+          // 新 controller を復活させない。破棄済み instance を掴むこともない。
+          authorshipHostRef.current?.peek()?.refresh({
             uid: authorshipUid,
             spaceId: newHossii.spaceId,
           });
