@@ -41,6 +41,7 @@ import {
 } from '../../core/utils/spaceTagFilterStorage';
 import { computePreviewSlotCount } from '../../core/utils/previewSlotCount';
 import { resolveCanvasExportAllowed } from '../../core/utils/spaceSettingResolvers';
+import { resolveCanEditBubble } from '../../core/utils/canEditBubble';
 import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
 import { buildSpaceExportFilename } from '../../core/utils/spaceExportFilename';
 import {
@@ -181,6 +182,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     syncFetchedHossiis,
     setHossiiFetchLoading,
     updateSpace,
+    myAuthorshipIds,
+    myAuthorshipIdsStatus,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
   const hossiisRef = useRef(state.hossiis);
@@ -270,8 +273,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const isVisiting = visitingSpaceId !== null;
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin ?? false;
-  // 現在のユーザーID（匿名含む）
-  const myAuthorId = currentUser?.uid ?? state.profile?.id;
+  const isAuthenticated = !!currentUser;
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   // 他タブからのリアクションを受け取るための状態
@@ -1077,14 +1079,28 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setDisplayScale(scales[nextIndex]);
   }, [displayScale, setDisplayScale]);
 
-  // F02/F04: バブル編集権限チェック
-  const canEditBubble = useCallback((hossii: { authorId?: string }) => {
-    if (isAdmin) return true;
-    const permission = spaceSettings?.bubbleEditPermission ?? 'all';
-    if (permission === 'all') return true;
-    // owner_and_admin: 投稿者本人のみ（authorId が一致する場合）
-    return !!myAuthorId && hossii.authorId === myAuthorId;
-  }, [isAdmin, spaceSettings, myAuthorId]);
+  // F02/F04: バブル編集権限チェック（Identity A: 本人性は authorship を正本とする）
+  const canEditBubble = useCallback(
+    (hossii: { id: string; authorId?: string }) =>
+      resolveCanEditBubble({
+        isAdmin,
+        bubbleEditPermission: spaceSettings?.bubbleEditPermission,
+        hossiiId: hossii.id,
+        hossiiAuthorId: hossii.authorId,
+        isAuthenticated,
+        guestAuthorId: state.profile?.id,
+        myAuthorshipIds,
+        myAuthorshipIdsStatus,
+      }),
+    [
+      isAdmin,
+      spaceSettings,
+      isAuthenticated,
+      state.profile?.id,
+      myAuthorshipIds,
+      myAuthorshipIdsStatus,
+    ],
+  );
 
   // ===== F14: 選択ハンドラ =====
   const handleBubbleSelect = useCallback((id: string) => {
