@@ -11,6 +11,7 @@ import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
+import { resolveLogScopeSelection } from '../../core/utils/resolveLogScopeSelection';
 import { LogScopeSegment } from './LogScopeSegment';
 import { PaneFilterSegment, type PaneFilterCountMode } from './PaneFilterSegment';
 import type { CommentsPaneFilter } from '../../core/utils/commentsPaneFilterStorage';
@@ -118,8 +119,8 @@ export function LogListBody({
   movePaneBusyId = null,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
-  const { state, hideHossii, getActiveNickname, getAuthorId } = useHossiiStore();
-  const { profile } = state;
+  const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus } =
+    useHossiiStore();
   const isAdmin = currentUser?.isAdmin ?? false;
   const space = useMemo(
     () => (spaceId ? state.spaces.find((s) => s.id === spaceId) ?? null : null),
@@ -168,21 +169,27 @@ export function LogListBody({
     [hossiis]
   );
 
-  const authorId = getAuthorId();
-  const allCount = visibleHossiis.length;
-  const mineCount = useMemo(
-    () =>
-      authorId
-        ? visibleHossiis.filter((h) => h.authorId === authorId).length
-        : 0,
-    [visibleHossiis, authorId]
-  );
+  // 本人性の正本: ログイン中（管理者含む）は myAuthorshipIds、ゲストは端末 author_id。
+  // getAuthorId はゲスト用の guestAuthorId としてのみ使う。
+  const isAuthenticated = !!currentUser;
+  const guestAuthorId = isAuthenticated ? undefined : getAuthorId();
 
-  const scopedHossiis = useMemo(() => {
-    if (logScope !== 'mine') return visibleHossiis;
-    if (!authorId) return [];
-    return visibleHossiis.filter((h) => h.authorId === authorId);
-  }, [visibleHossiis, logScope, authorId]);
+  // mine 判定に使える identity があるか（空状態メッセージの出し分け用）。
+  const hasIdentity = isAuthenticated || !!guestAuthorId;
+
+  // all/mine の件数と一覧を 1 度に解決する（本人投稿の二重 filter を避ける）。
+  // 未 ready 時は mine を空扱い（author_id フォールバックなし）、all は影響を受けない。
+  const { allCount, mineCount, scopedHossiis } = useMemo(
+    () =>
+      resolveLogScopeSelection(visibleHossiis, {
+        logScope,
+        isAuthenticated,
+        guestAuthorId,
+        myAuthorshipIds,
+        myAuthorshipIdsStatus,
+      }),
+    [visibleHossiis, logScope, isAuthenticated, guestAuthorId, myAuthorshipIds, myAuthorshipIdsStatus],
+  );
 
   const allTagCandidates = useMemo(() => {
     const set = new Set<string>(presetTags);
@@ -330,19 +337,18 @@ export function LogListBody({
 
   const renderEmptyState = () => {
     if (isMineScope) {
-      const hasProfile = !!profile?.id;
       return (
         <div className={styles.emptyMine}>
           <span className={styles.emptyMineIcon} aria-hidden>
             📭
           </span>
           <p className={styles.emptyMineTitle}>
-            {!hasProfile
+            {!hasIdentity
               ? 'まだ投稿がありません'
               : 'このスペースへの投稿はまだありません'}
           </p>
           <p className={styles.emptyMineSubtitle}>
-            {!hasProfile
+            {!hasIdentity
               ? '気持ちを投稿すると、ここに記録が残ります'
               : '最初の投稿をして記録を残してみよう！'}
           </p>
