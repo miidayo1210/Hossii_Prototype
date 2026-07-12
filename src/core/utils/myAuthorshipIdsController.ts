@@ -15,6 +15,13 @@ export type MyAuthorshipIdsSyncInput = {
   spaceId: string | null | undefined;
 };
 
+export type MyAuthorshipIdsRefreshInput = {
+  /** ログイン本人の auth UID。未ログイン / ゲストは null | undefined（その場合は何もしない） */
+  uid: string | null | undefined;
+  /** 対象 space ID。未確定は null | undefined（その場合は何もしない） */
+  spaceId: string | null | undefined;
+};
+
 export type MyAuthorshipIdsControllerDeps = {
   /**
    * 指定 space 内の本人 authorship 付き hossii_id を取得する。
@@ -30,6 +37,12 @@ export type MyAuthorshipIdsControllerDeps = {
 export type MyAuthorshipIdsController = {
   /** 認証・space の現在値を渡して取得/リセットを判断する */
   sync: (input: MyAuthorshipIdsSyncInput) => void;
+  /**
+   * 同一 user・同一 space でも強制的に DB から再取得する。
+   * ログイン投稿の INSERT 成功後、trigger が作成した authorship を正本として
+   * 取り込むために使う。in-flight は seq で無効化され、前 space の値は残さない。
+   */
+  refresh: (input: MyAuthorshipIdsRefreshInput) => void;
   /** 即時に空集合へ戻し、in-flight 応答を無効化する */
   reset: () => void;
   /** unmount 相当。以後すべての反映を止める */
@@ -93,6 +106,30 @@ export function createMyAuthorshipIdsController(
     clearTo('idle');
   };
 
+  /**
+   * fetch を開始する共通処理。
+   * seq を進めて古い in-flight を無効化し、前 space の値を残さず loading emit してから取得する。
+   */
+  const startFetch = (key: string, spaceId: string) => {
+    currentKey = key;
+    const mySeq = ++seq;
+
+    // 取得開始時点で前 space / 前 user の ID を即クリアする。
+    emit({ ids: EMPTY_MY_AUTHORSHIP_IDS, status: 'loading' });
+
+    void fetchIds(spaceId)
+      .then((ids) => {
+        // 切替後・unmount 後・後続 refresh 後に届いた stale 応答は破棄する。
+        if (disposed || mySeq !== seq) return;
+        emit({ ids: new Set(ids), status: 'ready' });
+      })
+      .catch((error) => {
+        if (disposed || mySeq !== seq) return;
+        onError?.(error instanceof Error ? error.message : 'unknown error');
+        emit({ ids: EMPTY_MY_AUTHORSHIP_IDS, status: 'error' });
+      });
+  };
+
   const sync: MyAuthorshipIdsController['sync'] = ({ authReady, uid, spaceId }) => {
     if (disposed) return;
 
@@ -114,23 +151,17 @@ export function createMyAuthorshipIdsController(
     // （重複 fetch の抑止。error 後の同一キー再要求でも retry しない）。
     if (key === currentKey) return;
 
-    currentKey = key;
-    const mySeq = ++seq;
+    startFetch(key, spaceId);
+  };
 
-    // 取得開始時点で前 space / 前 user の ID を即クリアする。
-    emit({ ids: EMPTY_MY_AUTHORSHIP_IDS, status: 'loading' });
+  const refresh: MyAuthorshipIdsController['refresh'] = ({ uid, spaceId }) => {
+    if (disposed) return;
+    // ゲスト（uid なし）や space 未確定では refresh しない。
+    // ゲスト投稿は trigger が authorship を作らないため再取得不要。
+    if (!uid || !spaceId) return;
 
-    void fetchIds(spaceId)
-      .then((ids) => {
-        // 切替後・unmount 後に届いた stale 応答は破棄する。
-        if (disposed || mySeq !== seq) return;
-        emit({ ids: new Set(ids), status: 'ready' });
-      })
-      .catch((error) => {
-        if (disposed || mySeq !== seq) return;
-        onError?.(error instanceof Error ? error.message : 'unknown error');
-        emit({ ids: EMPTY_MY_AUTHORSHIP_IDS, status: 'error' });
-      });
+    // 同一 key でも常に再取得する（sync の重複抑止をバイパス）。
+    startFetch(`${uid}\u0000${spaceId}`, spaceId);
   };
 
   const dispose = () => {
@@ -141,5 +172,5 @@ export function createMyAuthorshipIdsController(
 
   const getSnapshot = () => snapshot;
 
-  return { sync, reset, dispose, getSnapshot };
+  return { sync, refresh, reset, dispose, getSnapshot };
 }

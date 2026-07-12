@@ -915,6 +915,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     stateRef.current = state;
   });
 
+  // 最新の currentUser を ref で保持（addHossii など deps を増やせないコールバックから参照）
+  const currentUserRef = useRef(currentUser);
+  useLayoutEffect(() => {
+    currentUserRef.current = currentUser;
+  });
+
   // ===== myAuthorshipIds（本人性の正本）の取得・保持 =====
   // 実データの race / reset / fetch 判断は純粋な controller に委譲し、
   // ここでは snapshot を state に反映するだけの薄い glue にする。
@@ -1424,6 +1430,18 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
             message: formatInsertHossiiErrorMessage(insertResult.message, insertResult.code),
           });
           return false;
+        }
+        // INSERT 成功: trigger が authorship を作成済み。
+        // ログイン中かつ投稿先が現在のアクティブスペースのままなら、DB から本人性を
+        // 正本として再取得して Set を同期する（新規投稿直後の本人編集を可能にする）。
+        // 直接 Set 追加はしない（DB を正本とし、stale response 上書きを避ける）。
+        // ゲスト投稿は trigger が authorship を作らないため refresh 不要。
+        const authorshipUid = currentUserRef.current?.uid;
+        if (authorshipUid && activeSpaceIdRef.current === newHossii.spaceId) {
+          authorshipControllerRef.current?.refresh({
+            uid: authorshipUid,
+            spaceId: newHossii.spaceId,
+          });
         }
         return true;
       } catch {
