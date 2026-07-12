@@ -91,6 +91,14 @@ import {
 } from '../utils/hossiisApi';
 import { reconcileHossiiQueryKeys } from '../utils/reconcileHossiiQueryKeys';
 import { insertModerationLog } from '../utils/moderationLogsApi';
+import { fetchMyAuthorshipIdsForSpace } from '../utils/hossiiAuthorshipsApi';
+import {
+  createMyAuthorshipIdsController,
+  EMPTY_MY_AUTHORSHIP_IDS,
+  type MyAuthorshipIdsController,
+  type MyAuthorshipIdsSnapshot,
+  type MyAuthorshipIdsStatus,
+} from '../utils/myAuthorshipIdsController';
 import {
   upsertProfile,
   upsertSpaceNickname,
@@ -799,6 +807,10 @@ export type HossiiContextValue = {
   spacesLoadedFromSupabase: boolean;
   hossiiLoadedFromSupabase: boolean;
   communitySlug: string | null | undefined;
+  /** ログイン本人の authorship 由来 hossii_id 集合（本人性の正本）。利用側から書き換え不可 */
+  myAuthorshipIds: ReadonlySet<string>;
+  /** myAuthorshipIds の取得状態。'ready' 以外は本人判定に信頼しない */
+  myAuthorshipIdsStatus: MyAuthorshipIdsStatus;
   addHossii: (input: AddHossiiInput) => Promise<boolean>;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -903,6 +915,24 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     stateRef.current = state;
   });
 
+  // ===== myAuthorshipIds（本人性の正本）の取得・保持 =====
+  // 実データの race / reset / fetch 判断は純粋な controller に委譲し、
+  // ここでは snapshot を state に反映するだけの薄い glue にする。
+  const [authorshipSnapshot, setAuthorshipSnapshot] = useState<MyAuthorshipIdsSnapshot>(
+    () => ({ ids: EMPTY_MY_AUTHORSHIP_IDS, status: 'idle' }),
+  );
+  const authorshipControllerRef = useRef<MyAuthorshipIdsController | null>(null);
+  if (authorshipControllerRef.current === null) {
+    authorshipControllerRef.current = createMyAuthorshipIdsController({
+      fetchIds: fetchMyAuthorshipIdsForSpace,
+      onChange: setAuthorshipSnapshot,
+      // PII（UUID 等）を出さず、失敗の事実のみ最小限で記録する。
+      onError: () => {
+        console.error('[HossiiStore] failed to load authorship ids');
+      },
+    });
+  }
+
   useEffect(() => {
     if (isResolvingAuth) return;
 
@@ -956,6 +986,25 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     currentUser?.displayName,
     isResolvingAuth,
   ]);
+
+  // ログイン・スペース切替・セッション復元後に authorship を取得 / ログアウト・ゲスト・
+  // 未確定時はクリア。stale response と前 space/前 user の残存は controller が防ぐ。
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    authorshipControllerRef.current?.sync({
+      authReady: !isResolvingAuth,
+      uid: currentUser?.uid ?? null,
+      spaceId: state.activeSpaceId || null,
+    });
+  }, [currentUser?.uid, state.activeSpaceId, isResolvingAuth]);
+
+  // Provider unmount 相当。以後の in-flight 反映を止める。
+  useEffect(() => {
+    const controller = authorshipControllerRef.current;
+    return () => {
+      controller?.dispose();
+    };
+  }, []);
 
   useEffect(() => {
     setHossiiEntitiesSnapshot(state.entities.entitiesById);
@@ -1616,6 +1665,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         spacesLoadedFromSupabase,
         hossiiLoadedFromSupabase,
         communitySlug,
+        myAuthorshipIds: authorshipSnapshot.ids,
+        myAuthorshipIdsStatus: authorshipSnapshot.status,
         addHossii,
         selectHossii,
         clearAll,
