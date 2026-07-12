@@ -150,6 +150,20 @@
   font-size: 0.875rem;
 }
 
+.loading {
+  text-align: center;
+  padding: 3rem 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.errorState {
+  text-align: center;
+  padding: 3rem 0;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
 /* ガラスカード */
 .card {
   background: rgba(255, 255, 255, 0.72);

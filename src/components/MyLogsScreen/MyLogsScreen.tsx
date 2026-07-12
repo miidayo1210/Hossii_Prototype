@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useAuth } from '../../core/contexts/useAuth';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { getRelativeTime } from '../../core/utils/relativeTime';
@@ -11,15 +12,42 @@ import {
 } from '../../core/utils/mylogsPaneFilterStorage';
 import { PaneFilterSegment, type PaneFilterCountMode, type PaneFilterValue } from '../CommentsScreen/PaneFilterSegment';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
+import { selectOwnHossiis } from '../../core/utils/selectOwnHossiis';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import styles from './MyLogsScreen.module.css';
 
 type FilterType = 'all' | 'current';
 
+/** 本人ログ抽出の可視状態。ログイン中は authorship の取得状態を反映する */
+type OwnLogViewState = 'loading' | 'error' | 'ready';
+
 export const MyLogsScreen = () => {
-  const { state, getActiveSpaceHossiis, getAuthorId } = useHossiiStore();
+  const { state, getActiveSpaceHossiis, myAuthorshipIds, myAuthorshipIdsStatus } =
+    useHossiiStore();
+  const { currentUser } = useAuth();
   const { hossiis, spaces, activeSpaceId } = state;
-  const authorId = getAuthorId();
+
+  // 本人性の正本: ログイン中（管理者含む）は myAuthorshipIds、ゲストは端末 author_id。
+  const isAuthenticated = !!currentUser;
+  const guestAuthorId = state.profile?.id;
+  const ownParams = useMemo(
+    () => ({ isAuthenticated, guestAuthorId, myAuthorshipIds }),
+    [isAuthenticated, guestAuthorId, myAuthorshipIds],
+  );
+
+  // ログイン中は authorship の取得状態を待つ（author_id フォールバックしない）。
+  // ゲストは status に依存せず即 ready 扱い。
+  const viewState: OwnLogViewState = isAuthenticated
+    ? myAuthorshipIdsStatus === 'ready'
+      ? 'ready'
+      : myAuthorshipIdsStatus === 'error'
+        ? 'error'
+        : 'loading'
+    : 'ready';
+
+  // 本人ログとして表示できる identity があるか（空状態メッセージの出し分け用）。
+  const hasIdentity = isAuthenticated || !!guestAuthorId;
+
   const { visiblePanes, defaultPane, activePane } = useSpacePane();
 
   const visiblePaneIds = useMemo(
@@ -84,14 +112,13 @@ export const MyLogsScreen = () => {
   }, [activeSpaceId, defaultPane, activePane, paneFilter]);
 
   const getPaneFilterCount = (mode: PaneFilterCountMode, paneId?: string): number => {
-    if (!activeSpaceId || !defaultPane || !authorId) return 0;
+    if (!activeSpaceId || !defaultPane) return 0;
+    // ログイン中は authorship が ready になるまで件数を確定しない。
+    if (viewState !== 'ready') return 0;
 
     const countVisible = (items: typeof hossiis) =>
-      items.filter(
-        (h) =>
-          h.authorId === authorId &&
-          h.spaceId === activeSpaceId &&
-          !coerceIsHidden(h.isHidden),
+      selectOwnHossiis(items, ownParams).filter(
+        (h) => h.spaceId === activeSpaceId && !coerceIsHidden(h.isHidden),
       ).length;
 
     if (mode === 'all') {
@@ -123,9 +150,11 @@ export const MyLogsScreen = () => {
   };
 
   const myLogs = useMemo(() => {
-    if (!authorId) return [];
+    // ログイン中で authorship が未 ready のときは本人ログを確定しない
+    // （author_id フォールバックはしない）。表示側で loading / error を出す。
+    if (viewState !== 'ready') return [];
 
-    let logs = hossiis.filter((h) => h.authorId === authorId);
+    let logs = selectOwnHossiis(hossiis, ownParams);
 
     if (filter === 'current') {
       logs = logs.filter((h) => h.spaceId === activeSpaceId);
@@ -141,7 +170,8 @@ export const MyLogsScreen = () => {
     );
   }, [
     hossiis,
-    authorId,
+    ownParams,
+    viewState,
     filter,
     activeSpaceId,
     sortOrder,
@@ -211,12 +241,20 @@ export const MyLogsScreen = () => {
       </header>
 
       <main className={styles.main}>
-        <div className={styles.count}>{myLogs.length} 件</div>
+        <div className={styles.count}>
+          {viewState === 'ready' ? `${myLogs.length} 件` : ''}
+        </div>
 
         <div className={styles.list}>
-          {myLogs.length === 0 ? (
+          {viewState === 'loading' ? (
+            <div className={styles.loading}>本人ログを読み込み中…</div>
+          ) : viewState === 'error' ? (
+            <div className={styles.errorState}>
+              本人ログの取得に失敗しました。時間をおいて再度お試しください。
+            </div>
+          ) : myLogs.length === 0 ? (
             <div className={styles.empty}>
-              {!authorId
+              {!hasIdentity
                 ? 'まだ投稿がありません'
                 : filter === 'current'
                   ? 'このスペースへの投稿はまだありません'
