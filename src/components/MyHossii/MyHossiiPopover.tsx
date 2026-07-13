@@ -7,6 +7,10 @@ type Props = {
   stateLabel: string;
   activity: MyHossiiActivity;
   showLogs: boolean;
+  /** 本人アバターかどうか（本人のみ DB 集計の正確な件数を表示）。 */
+  isSelf?: boolean;
+  /** 本人の DB 集計を取得中。 */
+  activityLoading?: boolean;
   onViewLogs: () => void;
   onClose: () => void;
 };
@@ -34,6 +38,8 @@ export const MyHossiiPopover = ({
   stateLabel,
   activity,
   showLogs,
+  isSelf = false,
+  activityLoading = false,
   onViewLogs,
   onClose,
 }: Props) => {
@@ -82,7 +88,9 @@ export const MyHossiiPopover = ({
 
       {showLogs ? (
         <>
-          {activity.recentPosts.length > 0 ? (
+          {isSelf && activityLoading && activity.postCount == null ? (
+            <p className={styles.emptyLogs}>この場所での記録を集計中…</p>
+          ) : activity.recentPosts.length > 0 ? (
             <ul className={styles.logList}>
               {activity.recentPosts.map((post) => (
                 <li key={post.id} className={styles.logItem}>
@@ -92,6 +100,10 @@ export const MyHossiiPopover = ({
             </ul>
           ) : (
             <p className={styles.emptyLogs}>この場所での記録はまだありません</p>
+          )}
+
+          {isSelf && activity.postCount != null && (
+            <p className={styles.postCount}>この場所での記録: {activity.postCount}件</p>
           )}
 
           {activity.lastActivityAt && (

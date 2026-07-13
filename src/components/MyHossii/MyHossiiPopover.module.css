@@ -71,6 +71,13 @@
   color: #9ca3af;
 }
 
+.postCount {
+  margin: 0 0 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #7c3aed;
+}
+
 .viewLogsButton {
   width: 100%;
   padding: 8px 12px;
