@@ -361,6 +361,16 @@ export function LogListBody({
     return <div className={styles.empty}>まだ反応がありません</div>;
   };
 
+  // listSection の JSX（sortedHossiis.map）は宣言時に即時評価されるため、
+  // その中で参照する showMovePane は listSection より前に宣言する必要がある
+  // （TDZ の ReferenceError 回避。管理者レンダリングでの白画面を防ぐ）。
+  const showMovePane =
+    isAdmin &&
+    movePaneVisiblePanes &&
+    movePaneVisiblePanes.length >= 2 &&
+    movePaneDefaultPaneId &&
+    onMoveHossiiToPane;
+
   const listSection = (
     <div
       key={logScope}
@@ -525,13 +535,6 @@ export function LogListBody({
     getPaneFilterCount &&
     visiblePanes &&
     visiblePanes.length >= 2;
-
-  const showMovePane =
-    isAdmin &&
-    movePaneVisiblePanes &&
-    movePaneVisiblePanes.length >= 2 &&
-    movePaneDefaultPaneId &&
-    onMoveHossiiToPane;
 
   const scopeHeaderBlock = (
     <div className={styles.scopeHeaderBlock}>
