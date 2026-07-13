@@ -8,6 +8,8 @@ import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
 import { MyHossiiSettingsSection } from './MyHossiiSettingsSection';
 import { JoinedSpacesSection } from './JoinedSpacesSection';
 import { CommunityPersonalSpacesSection } from './CommunityPersonalSpacesSection';
+import { CommunitySwitcher } from '../Community/CommunitySwitcher';
+import { useRouter } from '../../core/hooks/useRouter';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -17,6 +19,7 @@ type Props = {
 
 export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) => {
   const { currentUser, logout } = useAuth();
+  const { navigate } = useRouter();
   const { state, setDefaultNickname, setSpaceNickname, getActiveSpace } = useHossiiStore();
   const { profile, spaceNicknames, activeSpaceId } = state;
   const activeSpace = getActiveSpace();
@@ -135,6 +138,16 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
             </div>
           )}
         </section>
+
+        {currentUser && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>所属コミュニティ</h2>
+            <p className={styles.sectionDesc}>
+              複数のコミュニティに所属している場合は、ここで切り替えられます。
+            </p>
+            <CommunitySwitcher onNavigateHome={(id) => navigate('community', id)} />
+          </section>
+        )}
 
         {/* 参加しているスペース */}
         <section className={styles.section}>

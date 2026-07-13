@@ -9,6 +9,7 @@ import { checkCanAccessSpace } from './core/utils/spaceAccessApi';
 import { resolveSpaceSlug } from './core/utils/resolveSpaceSlug';
 import { isSupabaseConfigured, supabaseEnvironmentValidation } from './core/supabase';
 import { AuthProvider } from './core/contexts/AuthContext';
+import { SelectedCommunityProvider } from './core/contexts/SelectedCommunityContext';
 import { useAuth } from './core/contexts/useAuth';
 import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
 import { DisplayPrefsProvider } from './core/contexts/DisplayPrefsContext';
@@ -40,6 +41,8 @@ import styles from './App.module.css';
 import { ScaledContent } from './components/ScaledContent/ScaledContent';
 import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
 import { HossiiToast } from './core/ui/HossiiToast';
+import { CommunityHomeScreen } from './components/Community/CommunityHomeScreen';
+import { CommunityAcceptInviteScreen } from './components/Community/CommunityAcceptInviteScreen';
 import { DevelopmentBanner } from './components/DevelopmentBanner/DevelopmentBanner';
 import { SupabaseConfigError } from './components/SupabaseConfigError/SupabaseConfigError';
 
@@ -66,7 +69,7 @@ const authResolvingScreenStyle = {
 
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
-  const { screen, navigate } = useRouter();
+  const { screen, screenParam, navigate } = useRouter();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
@@ -655,6 +658,18 @@ const AppContent = () => {
         return <ReflectionScreen />;
       case 'neighbors':
         return <NeighborsScreen />;
+      case 'community':
+        return currentUser ? (
+          <CommunityHomeScreen communityId={screenParam} />
+        ) : (
+          <AccountScreen onSignUpRequested={() => handleGuestAuthRequested('signup')} />
+        );
+      case 'community-invite':
+        return (
+          <CommunityAcceptInviteScreen
+            inviteToken={screenParam ? decodeURIComponent(screenParam) : ''}
+          />
+        );
       default:
         return renderSpaceScreen();
     }
@@ -699,6 +714,7 @@ const App = () => {
 
   return (
     <AuthProvider>
+      <SelectedCommunityProvider>
       <AdminNavigationProvider>
         <DisplayPrefsProvider>
           <HossiiProvider initialHossiis={mockHossiis}>
@@ -708,6 +724,7 @@ const App = () => {
           </HossiiProvider>
         </DisplayPrefsProvider>
       </AdminNavigationProvider>
+      </SelectedCommunityProvider>
       <GlobalClickStarBurst />
       <DevelopmentBanner />
     </AuthProvider>

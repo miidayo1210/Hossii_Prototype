@@ -4,6 +4,7 @@ import type { Screen } from '../types';
 const VALID_SCREENS: Screen[] = [
   'post', 'screen', 'comments', 'spaces', 'profile',
   'mylogs', 'account', 'settings', 'card', 'communities', 'reflection',
+  'community', 'community-invite',
 ];
 
 type RouterState = {

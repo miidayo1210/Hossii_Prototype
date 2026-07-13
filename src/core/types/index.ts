@@ -113,7 +113,7 @@ export type AddHossiiInput = {
   scale?: number;
 };
 
-export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities' | 'reflection' | 'neighbors';
+export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities' | 'reflection' | 'neighbors' | 'community' | 'community-invite';
 
 export type HossiiState = {
   hossiis: Hossii[];
