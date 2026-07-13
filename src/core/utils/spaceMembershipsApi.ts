@@ -76,7 +76,13 @@ export async function joinSpaceAsMember(
 
 /**
  * ログイン中ユーザー本人の membership 一覧を取得する（全スペース横断）。
- * RLS により本人分のみ返る。未ログイン・未設定時は空配列。
+ * 未ログイン・未設定時は空配列。
+ *
+ * 本人性は auth.uid()（＝session.user.id）を正本とし、明示的に auth_user_id で
+ * 絞り込む。space_memberships の SELECT RLS は「本人分」に加えてスペース管理者・
+ * super_admin へ当該スペースの他メンバー行も見せるため、RLS だけに依存すると
+ * 管理者では他人の membership まで返ってしまう。本関数は「本人の所属一覧」を返す
+ * 契約なので、DB 側 RLS に加えクエリでも本人分へ限定する（UI 表示だけに依存しない）。
  */
 export async function fetchMySpaceMemberships(): Promise<SpaceMembership[]> {
   if (!isSupabaseConfigured) {
@@ -84,13 +90,15 @@ export async function fetchMySpaceMemberships(): Promise<SpaceMembership[]> {
   }
 
   const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session) {
+  const uid = sessionData.session?.user?.id;
+  if (!uid) {
     return [];
   }
 
   const { data, error } = await supabase
     .from('space_memberships')
     .select('*')
+    .eq('auth_user_id', uid)
     .order('joined_at', { ascending: false });
 
   if (error) {
