@@ -180,7 +180,9 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
  * @see mergeFetchedHossiisWithPendingInserts in hossiiPendingMerge.ts
  */
 // スペースを正規化（localStorage が壊れても安全）
-const normalizeSpace = (f: unknown): Space => {
+// export: fetchSpaceByUrl → MERGE_SPACE 経路と同じ正規化を統合テストで検証するため。
+// eslint-disable-next-line react-refresh/only-export-components -- 純粋関数。HMR 対象外の共有ヘルパー
+export const normalizeSpace = (f: unknown): Space => {
   const raw = (f ?? {}) as Record<string, unknown>;
 
   const id = typeof raw.id === 'string' && raw.id ? raw.id : generateId();
@@ -248,6 +250,13 @@ const normalizeSpace = (f: unknown): Space => {
       ? raw.myHossiiLogVisibility
       : undefined;
 
+  // コミュニティ / スペース種別のメタデータ（fetchSpaceByUrl → MERGE_SPACE 経路でも保持する）。
+  // これを落とすと個人スペースショートカット（「わたし」タブ）の表示条件・active 判定が
+  // 成立しなくなるため、必ず引き継ぐ。
+  const communityId = typeof raw.communityId === 'string' && raw.communityId ? raw.communityId : undefined;
+  const spaceType = raw.spaceType === 'personal' ? 'personal' : raw.spaceType === 'shared' ? 'shared' : undefined;
+  const ownerUserId = typeof raw.ownerUserId === 'string' && raw.ownerUserId ? raw.ownerUserId : undefined;
+
   return {
     id,
     spaceURL,
@@ -270,6 +279,9 @@ const normalizeSpace = (f: unknown): Space => {
     myHossiiEnabled,
     myHossiiMotionMode,
     myHossiiLogVisibility,
+    communityId,
+    spaceType,
+    ownerUserId,
   };
 };
 

@@ -907,6 +907,7 @@ export function SpacePaneBar({
                 ? '自分の個人スペースを表示中'
                 : '自分の個人スペースを開く'
             }
+            title="自分の個人スペース"
             className={`${styles.personalShortcut} ${
               personalShortcut.active ? styles.personalShortcutActive : ''
             }`}

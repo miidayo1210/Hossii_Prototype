@@ -24,6 +24,12 @@ function serializeSpace(f: Space): Record<string, unknown> {
   if (f.bubbleShapePng) base.bubbleShapePng = f.bubbleShapePng;
   if (f.savedBackgroundImages?.length) base.savedBackgroundImages = f.savedBackgroundImages;
   if (f.tabFolders?.length) base.tabFolders = f.tabFolders;
+  // コミュニティ / スペース種別のメタデータ（「わたし」タブの表示・active 判定に必要）。
+  // reload 直後の初期描画でも復元できるよう永続化する。
+  if (f.communityId) base.communityId = f.communityId;
+  if (f.spaceType) base.spaceType = f.spaceType;
+  if (f.ownerUserId) base.ownerUserId = f.ownerUserId;
+  if (f.accessMode) base.accessMode = f.accessMode;
   return base;
 }
 
