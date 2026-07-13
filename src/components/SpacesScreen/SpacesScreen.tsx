@@ -10,6 +10,7 @@ import { generateSpaceURL, validateSpaceURL, isSpaceURLUnique } from '../../core
 import { updateCommunitySlug, fetchCommunityBySlug } from '../../core/utils/communitiesApi';
 import type { Space, SpaceBackground } from '../../core/types/space';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
+import { PersonalSpaceTemplateEditor } from './PersonalSpaceTemplateEditor';
 import styles from './SpacesScreen.module.css';
 
 // 背景のインラインスタイルを生成
@@ -442,6 +443,13 @@ export const SpacesScreen = () => {
 
       {/* スペースグリッド */}
       <main className={styles.main}>
+        {/* Phase 4: 個人スペーステンプレート（コミュニティ管理者のみ） */}
+        {currentUser?.isAdmin && (overrideCommunityId ?? currentUser?.communityId) && (
+          <PersonalSpaceTemplateEditor
+            communityId={(overrideCommunityId ?? currentUser?.communityId) as string}
+          />
+        )}
+
         <div className={styles.spaceGrid}>
           {spaces.length === 0 &&
             currentUser?.isSuperAdmin &&
