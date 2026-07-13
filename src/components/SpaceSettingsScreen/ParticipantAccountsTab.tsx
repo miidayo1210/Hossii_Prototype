@@ -134,13 +134,23 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
         発行済み: <strong>{issuedCount}</strong> / 20
       </p>
       <div className={styles.linkOptions}>
+        <p className={styles.optionIntro}>
+          発行時に、利用者をコミュニティやスペースのメンバーとして自動登録できます。public
+          スペースだけを使わせる場合は、どちらも OFF で利用できます。
+        </p>
         <label className={styles.checkLabel}>
           <input
             type="checkbox"
             checked={linkCommunityMembership}
             onChange={(e) => setLinkCommunityMembership(e.target.checked)}
           />
-          発行時にこのスペースのコミュニティメンバーシップも作成する
+          <span className={styles.checkText}>
+            <span className={styles.checkTitle}>コミュニティにも所属させる</span>
+            <span className={styles.checkDesc}>
+              この ID の利用者を、スペースが属するコミュニティのメンバーとして登録します。コミュニティ
+              HOME や個人スペースを利用させたい場合に選択してください。
+            </span>
+          </span>
         </label>
         <label className={styles.checkLabel}>
           <input
@@ -148,8 +158,19 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
             checked={linkSpaceMembership}
             onChange={(e) => setLinkSpaceMembership(e.target.checked)}
           />
-          発行時にこのスペースのスペースメンバーシップも作成する（invite_only 用）
+          <span className={styles.checkText}>
+            <span className={styles.checkTitle}>このスペースのメンバーにも登録する</span>
+            <span className={styles.checkDesc}>
+              この ID の利用者を、このスペースのメンバーとして登録します。メンバー限定スペースへ入れる場合に選択してください。
+            </span>
+          </span>
         </label>
+        {linkSpaceMembership && !linkCommunityMembership && (
+          <p className={styles.optionNote}>
+            コミュニティ所属なしでスペースメンバーのみ登録できます。メンバー限定スペースには入れますが、コミュニティ
+            HOME や個人スペースは利用できません。
+          </p>
+        )}
       </div>
 
       {errorMsg && <p className={styles.error}>{errorMsg}</p>}
