@@ -31,6 +31,8 @@ type DropTarget =
 type PersonalShortcut = {
   label: string;
   loading?: boolean;
+  /** 現在このスペース（本人の個人スペース）を開いているとき true。active 表示に使う。 */
+  active?: boolean;
   onClick: () => void;
 };
 
@@ -898,8 +900,16 @@ export function SpacePaneBar({
         {personalShortcut && (
           <button
             type="button"
-            className={styles.personalShortcut}
-            aria-label="自分の個人スペースを開く"
+            role="tab"
+            aria-selected={!!personalShortcut.active}
+            aria-label={
+              personalShortcut.active
+                ? '自分の個人スペースを表示中'
+                : '自分の個人スペースを開く'
+            }
+            className={`${styles.personalShortcut} ${
+              personalShortcut.active ? styles.personalShortcutActive : ''
+            }`}
             disabled={disabled || personalShortcut.loading}
             onClick={(e) => {
               e.stopPropagation();

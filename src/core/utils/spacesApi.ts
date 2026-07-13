@@ -10,6 +10,8 @@ import { ensureDefaultSpacePane } from './ensureDefaultSpacePane';
 type SpaceRow = {
   id: string;
   community_id?: string | null;
+  space_type?: string | null;
+  owner_user_id?: string | null;
   space_url: string | null;
   name: string;
   quick_emotions: string[];
@@ -66,6 +68,8 @@ function rowToSpace(row: SpaceRow): Space {
     myHossiiMotionMode: parseMyHossiiMotionMode(row.my_hossii_motion_mode),
     myHossiiLogVisibility: parseMyHossiiLogVisibility(row.my_hossii_log_visibility),
     communityId: row.community_id ?? undefined,
+    spaceType: row.space_type === 'personal' ? 'personal' : 'shared',
+    ownerUserId: row.owner_user_id ?? undefined,
   };
 }
 

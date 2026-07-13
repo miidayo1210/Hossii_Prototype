@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canShowPersonalShortcut } from './personalSpaceShortcut';
+import { canShowPersonalShortcut, isViewingOwnPersonalSpace } from './personalSpaceShortcut';
 
 describe('canShowPersonalShortcut', () => {
   const base = {
@@ -37,5 +37,66 @@ describe('canShowPersonalShortcut', () => {
   it('hides when there is no membership', () => {
     expect(canShowPersonalShortcut({ ...base, membershipStatus: null })).toBe(false);
     expect(canShowPersonalShortcut({ ...base, membershipStatus: undefined })).toBe(false);
+  });
+});
+
+describe('isViewingOwnPersonalSpace', () => {
+  const uid = 'user-1';
+
+  it('is not active on a shared space', () => {
+    expect(
+      isViewingOwnPersonalSpace({
+        spaceType: 'shared',
+        spaceOwnerUserId: undefined,
+        currentUserId: uid,
+      }),
+    ).toBe(false);
+  });
+
+  it('is active when viewing own personal space (space_type + owner_user_id match auth.uid)', () => {
+    expect(
+      isViewingOwnPersonalSpace({
+        spaceType: 'personal',
+        spaceOwnerUserId: uid,
+        currentUserId: uid,
+      }),
+    ).toBe(true);
+  });
+
+  it("is not active on another person's personal space (e.g. admin viewing a member's space)", () => {
+    expect(
+      isViewingOwnPersonalSpace({
+        spaceType: 'personal',
+        spaceOwnerUserId: 'someone-else',
+        currentUserId: uid,
+      }),
+    ).toBe(false);
+  });
+
+  it('is not active for guests / unauthenticated (no current user)', () => {
+    expect(
+      isViewingOwnPersonalSpace({
+        spaceType: 'personal',
+        spaceOwnerUserId: uid,
+        currentUserId: null,
+      }),
+    ).toBe(false);
+    expect(
+      isViewingOwnPersonalSpace({
+        spaceType: 'personal',
+        spaceOwnerUserId: uid,
+        currentUserId: undefined,
+      }),
+    ).toBe(false);
+  });
+
+  it('is not active when owner is unknown even if space_type is personal', () => {
+    expect(
+      isViewingOwnPersonalSpace({
+        spaceType: 'personal',
+        spaceOwnerUserId: null,
+        currentUserId: uid,
+      }),
+    ).toBe(false);
   });
 });

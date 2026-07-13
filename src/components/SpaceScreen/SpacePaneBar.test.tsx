@@ -43,15 +43,18 @@ describe('SpacePaneBar personal shortcut', () => {
 
     const tablist = screen.getByRole('tablist');
 
-    // すべてのペインタブが存在（role="tab"）
-    const tabLabels = within(tablist).getAllByRole('tab').map((b) => b.textContent);
-    expect(tabLabels).toEqual(['メイン', '今週の実践', 'みんなの広場']);
+    // ペインタブ（aria-controls でパネルに紐づく本物の Pane タブ）が存在
+    const paneTabLabels = within(tablist)
+      .getAllByRole('tab')
+      .filter((b) => b.getAttribute('aria-controls') === 'space-pane-panel')
+      .map((b) => b.textContent);
+    expect(paneTabLabels).toEqual(['メイン', '今週の実践', 'みんなの広場']);
 
     // 「わたし」は同じタブ列コンテナ内の最後の <button>
     const allButtons = Array.from(tablist.querySelectorAll('button'));
     expect(allButtons.length).toBeGreaterThan(0);
     expect(allButtons[allButtons.length - 1]?.textContent).toBe('わたし');
-    expect(within(tablist).getByRole('button', { name: '自分の個人スペースを開く' })).toBeTruthy();
+    expect(within(tablist).getByRole('tab', { name: '自分の個人スペースを開く' })).toBeTruthy();
   });
 
   it('does not render 「わたし」 when no personalShortcut is provided (e.g. guest / suspended)', () => {
@@ -87,7 +90,49 @@ describe('SpacePaneBar personal shortcut', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '自分の個人スペースを開く' }));
+    fireEvent.click(screen.getByRole('tab', { name: '自分の個人スペースを開く' }));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['desktop', 'mobile'] as const)(
+    'marks 「わたし」 active (aria-selected) in own personal space on %s',
+    (variant) => {
+      render(
+        <SpacePaneBar
+          spaceId="space-1"
+          variant={variant}
+          folders={[]}
+          visiblePanes={panes}
+          activePaneId="main"
+          isAdmin={false}
+          onSelect={() => {}}
+          personalShortcut={{ label: 'わたし', active: true, onClick: () => {} }}
+        />,
+      );
+
+      const shortcut = screen.getByRole('tab', { name: '自分の個人スペースを表示中' });
+      expect(shortcut.getAttribute('aria-selected')).toBe('true');
+    },
+  );
+
+  it.each(['desktop', 'mobile'] as const)(
+    'does not mark 「わたし」 active on a shared space on %s',
+    (variant) => {
+      render(
+        <SpacePaneBar
+          spaceId="space-1"
+          variant={variant}
+          folders={[]}
+          visiblePanes={panes}
+          activePaneId="main"
+          isAdmin={false}
+          onSelect={() => {}}
+          personalShortcut={{ label: 'わたし', active: false, onClick: () => {} }}
+        />,
+      );
+
+      const shortcut = screen.getByRole('tab', { name: '自分の個人スペースを開く' });
+      expect(shortcut.getAttribute('aria-selected')).toBe('false');
+    },
+  );
 });

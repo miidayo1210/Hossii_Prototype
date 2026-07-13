@@ -78,7 +78,7 @@ import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
 import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
-import { canShowPersonalShortcut } from '../../core/utils/personalSpaceShortcut';
+import { canShowPersonalShortcut, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
   buildTabFolderPatch,
@@ -295,6 +295,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     isVisiting,
     spaceCommunityId: activeSpace?.communityId,
     membershipStatus: spaceCommunityMembership?.status,
+  });
+  // 「わたし」タブの active 表示: 現在開いているスペースが本人の個人スペースか。
+  // DB 正本（spaces.space_type / owner_user_id）のみで判定し、URL・表示名は使わない。
+  const personalShortcutActive = isViewingOwnPersonalSpace({
+    spaceType: activeSpace?.spaceType,
+    spaceOwnerUserId: activeSpace?.ownerUserId,
+    currentUserId: currentUser?.uid,
   });
 
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
@@ -1179,9 +1186,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return {
       label: 'わたし',
       loading: personalShortcutBusy,
+      active: personalShortcutActive,
       onClick: () => void handlePersonalShortcut(),
     };
-  }, [personalShortcutEligible, handlePersonalShortcut, personalShortcutBusy]);
+  }, [personalShortcutEligible, personalShortcutActive, handlePersonalShortcut, personalShortcutBusy]);
 
   // F06: 非表示（管理者のみ）
   const handleHideBubble = useCallback(() => {

@@ -23,3 +23,25 @@ export function canShowPersonalShortcut(params: PersonalSpaceShortcutParams): bo
   if (!params.spaceCommunityId) return false;
   return params.membershipStatus === 'active';
 }
+
+/**
+ * 現在開いているスペースが「ログイン本人のコミュニティ個人スペース」かどうかを
+ * DB 正本（spaces.space_type / owner_user_id）だけで判定する純粋関数。
+ * URL・表示名では判定しない。「わたし」タブの active 表示に使う。
+ *
+ * - space_type='personal' かつ owner_user_id=auth.uid() のときのみ true
+ * - shared スペースでは false
+ * - 他人の personal スペース（管理者が閲覧中など）では false
+ * - 未ログイン・owner 不明では false
+ */
+export type OwnPersonalSpaceParams = {
+  spaceType: 'shared' | 'personal' | null | undefined;
+  spaceOwnerUserId: string | null | undefined;
+  currentUserId: string | null | undefined;
+};
+
+export function isViewingOwnPersonalSpace(params: OwnPersonalSpaceParams): boolean {
+  if (params.spaceType !== 'personal') return false;
+  if (!params.currentUserId) return false;
+  return !!params.spaceOwnerUserId && params.spaceOwnerUserId === params.currentUserId;
+}
