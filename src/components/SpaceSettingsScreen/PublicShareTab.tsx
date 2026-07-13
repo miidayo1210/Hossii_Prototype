@@ -17,6 +17,7 @@ import {
 } from '../../core/utils/spaceShareUrl';
 import { sortPanesForDisplay } from '../../core/utils/spacePaneManagement';
 import { updateSpaceInDb } from '../../core/utils/spacesApi';
+import { adminUpdateSpaceAccessMode } from '../../core/utils/spaceMembershipsApi';
 import { useScreenDraft } from '../../core/hooks/useScreenDraft';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
@@ -27,6 +28,7 @@ import styles from './ShareTab.module.css';
 
 type PublicShareDraft = {
   isPrivate: boolean;
+  accessMode: 'public' | 'invite_only';
   spaceURLInput: string;
 };
 
@@ -41,6 +43,7 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
   const { panes } = useSpacePane();
   const initial: PublicShareDraft = {
     isPrivate: space.isPrivate ?? false,
+    accessMode: space.accessMode ?? 'public',
     spaceURLInput: space.spaceURL ?? '',
   };
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
@@ -101,10 +104,18 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
     try {
       const patch: Partial<Space> = {
         isPrivate: draft.isPrivate,
+        accessMode: draft.accessMode,
         spaceURL: draft.spaceURLInput || undefined,
       };
       onUpdateSpace(patch);
-      await updateSpaceInDb(space.id, patch);
+      if (draft.accessMode !== (space.accessMode ?? 'public')) {
+        const modeRes = await adminUpdateSpaceAccessMode(space.id, draft.accessMode);
+        if (!modeRes.ok) throw new Error(modeRes.message);
+      }
+      await updateSpaceInDb(space.id, {
+        isPrivate: draft.isPrivate,
+        spaceURL: draft.spaceURLInput || undefined,
+      });
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
@@ -160,11 +171,37 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
               <input
                 type="radio"
+                name="accessMode"
+                checked={draft.accessMode === 'public'}
+                onChange={() => setDraft({ ...draft, accessMode: 'public' })}
+              />
+              公開（URL を知っている人・ゲスト可）
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="accessMode"
+                checked={draft.accessMode === 'invite_only'}
+                onChange={() => setDraft({ ...draft, accessMode: 'invite_only' })}
+              />
+              招待制（スペースメンバーのみ）
+            </label>
+          </div>
+          <p className={styles.description} style={{ marginTop: '0.75rem' }}>
+            招待制にすると、追加したスペースメンバーと管理者だけがアクセスできます。既存の投稿は削除されません。
+          </p>
+        </SettingsSection>
+
+        <SettingsSection title="ログイン要件（従来）">
+          <div className={styles.radioList ?? ''} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+              <input
+                type="radio"
                 name="visibility"
                 checked={!draft.isPrivate}
                 onChange={() => setDraft({ ...draft, isPrivate: false })}
               />
-              URL を知っている人
+              ゲスト参加を許可
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
               <input
@@ -173,11 +210,11 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
                 checked={draft.isPrivate}
                 onChange={() => setDraft({ ...draft, isPrivate: true })}
               />
-              非公開
+              ログイン必須（非公開）
             </label>
           </div>
           <p className={styles.description} style={{ marginTop: '0.75rem' }}>
-            非公開にすると、未ログインのゲストはこのスペースにアクセスできません。
+            非公開にすると、未ログインのゲストはこのスペースにアクセスできません（招待制とは別設定です）。
           </p>
         </SettingsSection>
 

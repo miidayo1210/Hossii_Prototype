@@ -168,3 +168,132 @@ export async function fetchMyMembershipForSpace(
 
   return data ? mapSpaceMembershipRow(data as SpaceMembershipRow) : null;
 }
+
+/** 管理者向けスペースメンバー行（auth_user_id 非返却） */
+export type AdminSpaceMember = {
+  membershipId: string;
+  displayName: string;
+  role: SpaceMembershipRole;
+  status: SpaceMembershipStatus;
+  spaceNickname: string | null;
+  joinedAt: string;
+};
+
+type AdminSpaceMemberRow = {
+  membership_id: string;
+  display_name: string;
+  role: string;
+  status: string;
+  space_nickname: string | null;
+  joined_at: string;
+};
+
+function mapAdminSpaceMemberRow(row: AdminSpaceMemberRow): AdminSpaceMember {
+  return {
+    membershipId: row.membership_id,
+    displayName: row.display_name,
+    role: row.role as SpaceMembershipRole,
+    status: row.status as SpaceMembershipStatus,
+    spaceNickname: row.space_nickname,
+    joinedAt: row.joined_at,
+  };
+}
+
+export type SpaceMemberCandidate = {
+  authUserId: string;
+  displayName: string;
+};
+
+export type AdminRpcResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; message: string; code?: string };
+
+export async function fetchAdminSpaceMembers(spaceId: string): Promise<AdminSpaceMember[]> {
+  if (!isSupabaseConfigured || !spaceId) return [];
+  const { data, error } = await supabase.rpc('admin_list_space_members', { p_space_id: spaceId });
+  if (error) throw new Error(`[spaceMembershipsApi] admin_list_space_members: ${error.message}`);
+  return ((data ?? []) as AdminSpaceMemberRow[]).map(mapAdminSpaceMemberRow);
+}
+
+export async function fetchSpaceMemberCandidates(spaceId: string): Promise<SpaceMemberCandidate[]> {
+  if (!isSupabaseConfigured || !spaceId) return [];
+  const { data, error } = await supabase.rpc('admin_list_space_member_candidates', { p_space_id: spaceId });
+  if (error) throw new Error(`[spaceMembershipsApi] admin_list_space_member_candidates: ${error.message}`);
+  return ((data ?? []) as { auth_user_id: string; display_name: string }[]).map((r) => ({
+    authUserId: r.auth_user_id,
+    displayName: r.display_name,
+  }));
+}
+
+export async function adminAddSpaceMember(
+  spaceId: string,
+  authUserId: string,
+): Promise<AdminRpcResult<AdminSpaceMember>> {
+  if (!isSupabaseConfigured || !spaceId || !authUserId) {
+    return { ok: false, message: 'invalid parameters' };
+  }
+  const { data, error } = await supabase.rpc('admin_add_space_member', {
+    p_space_id: spaceId,
+    p_auth_user_id: authUserId,
+  });
+  if (error) return { ok: false, message: error.message, code: error.code };
+  const row = (Array.isArray(data) ? data[0] : data) as AdminSpaceMemberRow | undefined;
+  if (!row) return { ok: false, message: 'no data returned' };
+  return { ok: true, data: mapAdminSpaceMemberRow(row) };
+}
+
+export async function adminSuspendSpaceMember(
+  spaceId: string,
+  membershipId: string,
+): Promise<AdminRpcResult<{ membershipId: string; status: SpaceMembershipStatus }>> {
+  const { data, error } = await supabase.rpc('admin_suspend_space_member', {
+    p_space_id: spaceId,
+    p_membership_id: membershipId,
+  });
+  if (error) return { ok: false, message: error.message, code: error.code };
+  const row = (Array.isArray(data) ? data[0] : data) as { membership_id: string; status: string } | undefined;
+  if (!row) return { ok: false, message: 'no data returned' };
+  return { ok: true, data: { membershipId: row.membership_id, status: row.status as SpaceMembershipStatus } };
+}
+
+export async function adminReactivateSpaceMember(
+  spaceId: string,
+  membershipId: string,
+): Promise<AdminRpcResult<{ membershipId: string; status: SpaceMembershipStatus }>> {
+  const { data, error } = await supabase.rpc('admin_reactivate_space_member', {
+    p_space_id: spaceId,
+    p_membership_id: membershipId,
+  });
+  if (error) return { ok: false, message: error.message, code: error.code };
+  const row = (Array.isArray(data) ? data[0] : data) as { membership_id: string; status: string } | undefined;
+  if (!row) return { ok: false, message: 'no data returned' };
+  return { ok: true, data: { membershipId: row.membership_id, status: row.status as SpaceMembershipStatus } };
+}
+
+export async function adminRemoveSpaceMember(
+  spaceId: string,
+  membershipId: string,
+): Promise<AdminRpcResult<{ membershipId: string; status: SpaceMembershipStatus }>> {
+  const { data, error } = await supabase.rpc('admin_remove_space_member', {
+    p_space_id: spaceId,
+    p_membership_id: membershipId,
+  });
+  if (error) return { ok: false, message: error.message, code: error.code };
+  const row = (Array.isArray(data) ? data[0] : data) as { membership_id: string; status: string } | undefined;
+  if (!row) return { ok: false, message: 'no data returned' };
+  return { ok: true, data: { membershipId: row.membership_id, status: row.status as SpaceMembershipStatus } };
+}
+
+export async function adminUpdateSpaceAccessMode(
+  spaceId: string,
+  accessMode: 'public' | 'invite_only',
+): Promise<AdminRpcResult<'public' | 'invite_only'>> {
+  const { data, error } = await supabase.rpc('admin_update_space_access_mode', {
+    p_space_id: spaceId,
+    p_access_mode: accessMode,
+  });
+  if (error) return { ok: false, message: error.message, code: error.code };
+  const row = (Array.isArray(data) ? data[0] : data) as { access_mode: string } | undefined;
+  if (!row) return { ok: false, message: 'no data returned' };
+  return { ok: true, data: row.access_mode as 'public' | 'invite_only' };
+}

@@ -24,6 +24,7 @@ import { ModerationTab } from './ModerationTab';
 import { ExportRecordTab } from './ExportRecordTab';
 import { NeighborsTab } from './NeighborsTab';
 import { ParticipantAccountsTab } from './ParticipantAccountsTab';
+import { SpaceMembersTab } from './SpaceMembersTab';
 import { PaneManagementTab } from './PaneManagementTab';
 import { SettingsEditPaneProvider } from './SettingsEditPaneContext';
 import {
@@ -104,6 +105,10 @@ export const SpaceSettingsScreen = () => {
       updateSpace(activeSpace.id, patch);
       if (settings && patch.isPrivate !== undefined) {
         const updatedSpace = { ...activeSpace, isPrivate: patch.isPrivate };
+        setSettings(persistModeCustomization(updatedSpace, settings));
+      }
+      if (settings && patch.accessMode !== undefined) {
+        const updatedSpace = { ...activeSpace, accessMode: patch.accessMode };
         setSettings(persistModeCustomization(updatedSpace, settings));
       }
     },
@@ -254,6 +259,8 @@ export const SpaceSettingsScreen = () => {
         );
       case 'moderation':
         return <ModerationTab spaceId={activeSpace.id} space={activeSpace} />;
+      case 'spaceMembers':
+        return <SpaceMembersTab key={`members-${activeSpace.id}`} space={activeSpace} />;
       case 'exportRecord':
         return <ExportRecordTab />;
       case 'neighbors':
