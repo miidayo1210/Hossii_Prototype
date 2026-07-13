@@ -8,27 +8,11 @@ import {
 import { useAuth } from './useAuth';
 import { fetchMyCommunityMemberships } from '../utils/communityMembershipsApi';
 import type { MyCommunityMembership } from '../types/communityMembership';
-import { scopedStorageKey } from '../utils/storageScope';
+import {
+  loadStoredCommunityId,
+  saveStoredCommunityId,
+} from '../utils/selectedCommunityStorage';
 import { SelectedCommunityContext } from './useSelectedCommunity';
-
-const STORAGE_KEY = scopedStorageKey('hossii.selectedCommunityId');
-
-function loadStoredCommunityId(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function saveStoredCommunityId(id: string | null): void {
-  try {
-    if (id) localStorage.setItem(STORAGE_KEY, id);
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // ignore
-  }
-}
 
 export function SelectedCommunityProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
