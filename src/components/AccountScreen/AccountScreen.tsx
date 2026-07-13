@@ -6,6 +6,7 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
 import { MyHossiiSettingsSection } from './MyHossiiSettingsSection';
+import { JoinedSpacesSection } from './JoinedSpacesSection';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -132,6 +133,15 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               </div>
             </div>
           )}
+        </section>
+
+        {/* 参加しているスペース */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>参加しているスペース</h2>
+          <p className={styles.sectionDesc}>
+            あなたがログインして参加したスペースの一覧です。
+          </p>
+          <JoinedSpacesSection />
         </section>
 
         {/* マイHossii */}
