@@ -38,8 +38,24 @@ export function extractProjectRefFromSupabaseUrl(url: string): string | null {
   }
 }
 
+/**
+ * クライアントが必要とする VITE_ 変数だけを個別に読む。
+ *
+ * `import.meta.env` をそのまま参照すると、Vite が全 VITE_ 変数（他機能の秘匿値を
+ * 含む）をオブジェクトごとバンドルへインライン展開してしまう。必要なキーだけを
+ * 明示参照することで、意図しない秘匿値の混入を防ぐ（例: 過去の Anthropic キー混入）。
+ */
+function readClientViteEnv(): Record<string, string | boolean | undefined> {
+  return {
+    VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
+    VITE_EXPECTED_SUPABASE_REF: import.meta.env.VITE_EXPECTED_SUPABASE_REF,
+    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  };
+}
+
 export function readSupabaseEnvironmentConfig(
-  env: Record<string, string | boolean | undefined> = import.meta.env,
+  env: Record<string, string | boolean | undefined> = readClientViteEnv(),
 ): SupabaseEnvironmentConfig {
   const supabaseUrl = typeof env.VITE_SUPABASE_URL === 'string' ? env.VITE_SUPABASE_URL : null;
   const supabaseAnonKey =
