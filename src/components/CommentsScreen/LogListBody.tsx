@@ -13,7 +13,10 @@ import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { resolveLogScopeSelection } from '../../core/utils/resolveLogScopeSelection';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
 import { PostedNameLabel } from '../common/PostedNameLabel';
+import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
+import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
 import { LogScopeSegment } from './LogScopeSegment';
 import { PaneFilterSegment, type PaneFilterCountMode } from './PaneFilterSegment';
 import type { CommentsPaneFilter } from '../../core/utils/commentsPaneFilterStorage';
@@ -124,6 +127,7 @@ export function LogListBody({
   const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames } =
     useHossiiStore();
   const isAdmin = currentUser?.isAdmin ?? false;
+  const isAuthenticatedUser = !!currentUser;
   const space = useMemo(
     () => (spaceId ? state.spaces.find((s) => s.id === spaceId) ?? null : null),
     [state.spaces, spaceId],
@@ -405,11 +409,19 @@ export function LogListBody({
               currentName: postAuthorDisplayNames.get(hossii.id),
               isOwnPost: false,
             });
+            const isOwnerOnly = hossii.visibility === 'owner_only';
+            const canManageThis = canManageOwnPost({
+              isAuthenticated: isAuthenticatedUser,
+              myAuthorshipIds,
+              myAuthorshipIdsStatus,
+              hossiiId: hossii.id,
+            });
 
             return (
               <div
                 key={hossii.id}
                 className={`${styles.card} ${isMineScope ? styles.mineCard : ''}`}
+                style={isOwnerOnly ? { opacity: 0.72 } : undefined}
               >
                 <div className={styles.cardInner}>
                   <div className={styles.cardContent}>
@@ -462,8 +474,17 @@ export function LogListBody({
                       </div>
                     )}
                     <div className={styles.meta}>
-                      <span className={styles.time}>{timestamp}</span>
+                      <span className={styles.time}>
+                        {timestamp}
+                        {isOwnerOnly && <OwnerOnlyBadge />}
+                        {hossii.contentEditedAt && (
+                          <span className={styles.editedMark}>編集済み</span>
+                        )}
+                      </span>
                       <div className={styles.metaEnd}>
+                        {canManageThis && (
+                          <OwnPostActions hossii={hossii} />
+                        )}
                         {isAdmin && (
                           <>
                             {showMovePane && (

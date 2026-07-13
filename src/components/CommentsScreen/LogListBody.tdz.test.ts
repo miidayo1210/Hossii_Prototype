@@ -34,6 +34,16 @@ vi.mock('../../core/hooks/useHossiiStore', () => ({
   }),
 }));
 
+// Phase 2D-2: 本人カードは OwnPostActions を描画し useHossiiActions を参照する。
+// 描画（renderToStaticMarkup）では click しないため no-op で十分。
+vi.mock('../../core/hooks/useHossiiActions', () => ({
+  useHossiiActions: () => ({
+    editMyHossiiContent: async () => ({ ok: true }),
+    setMyHossiiVisibilityAction: async () => ({ ok: true }),
+    softDeleteMyHossiiAction: async () => ({ ok: true }),
+  }),
+}));
+
 vi.mock('../../core/hooks/useSpaceSettings', () => ({
   useSpaceSettings: () => ({ spaceSettings: { features: { likesEnabled: true } } }),
 }));

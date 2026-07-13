@@ -13,8 +13,11 @@ import {
 import { PaneFilterSegment, type PaneFilterCountMode, type PaneFilterValue } from '../CommentsScreen/PaneFilterSegment';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { selectOwnHossiis } from '../../core/utils/selectOwnHossiis';
+import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
+import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
+import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import styles from './MyLogsScreen.module.css';
 
@@ -273,20 +276,38 @@ export const MyLogsScreen = () => {
                 currentName: postAuthorDisplayNames.get(hossii.id),
                 isOwnPost: true,
               });
+              const isOwnerOnly = hossii.visibility === 'owner_only';
+              const canManage = canManageOwnPost({
+                isAuthenticated,
+                myAuthorshipIds,
+                myAuthorshipIdsStatus,
+                hossiiId: hossii.id,
+              });
 
               return (
                 <article
                   key={hossii.id}
                   className={styles.card}
-                  style={{ animationDelay: `${index * 0.03}s` }}
+                  style={{
+                    animationDelay: `${index * 0.03}s`,
+                    opacity: isOwnerOnly ? 0.72 : undefined,
+                  }}
                 >
                   <div className={styles.cardHeader}>
                     <span className={styles.spacePill}>{spaceName}</span>
-                    <span className={styles.time}>{relativeTime}</span>
+                    <div className={styles.cardHeaderRight}>
+                      {isOwnerOnly && <OwnerOnlyBadge />}
+                      <span className={styles.time}>{relativeTime}</span>
+                      {canManage && <OwnPostActions hossii={hossii} />}
+                    </div>
                   </div>
 
                   {renderHossiiText(hossii) && (
                     <p className={styles.message}>{renderHossiiText(hossii)}</p>
+                  )}
+
+                  {hossii.contentEditedAt && (
+                    <span className={styles.editedMark}>編集済み</span>
                   )}
 
                   {hossii.imageUrl && (

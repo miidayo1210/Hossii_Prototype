@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
+import type { Hossii, HossiiState, HossiiAction, AddHossiiInput, HossiiVisibility } from '../types';
 import type { Space, SpaceId, SpaceBackground, SpaceUpdatePatch } from '../types/space';
 import type { AppMode } from '../types/mode';
 import type { UserProfile, SpaceNicknames } from '../types/profile';
@@ -90,6 +90,11 @@ import {
   type HossiiRow,
 } from '../utils/hossiisApi';
 import { reconcileHossiiQueryKeys } from '../utils/reconcileHossiiQueryKeys';
+import {
+  updateMyHossii,
+  setMyHossiiVisibility,
+  softDeleteMyHossii,
+} from '../utils/myHossiiMutationsApi';
 import { insertModerationLog } from '../utils/moderationLogsApi';
 import { fetchMyAuthorshipIdsForSpace } from '../utils/hossiiAuthorshipsApi';
 import {
@@ -381,6 +386,8 @@ type ExtendedHossiiAction =
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
   | { type: 'RESTORE_HOSSII'; payload: string }
+  | { type: 'EDIT_HOSSII_CONTENT'; payload: { id: string; message: string; contentEditedAt: Date | null } }
+  | { type: 'SET_HOSSII_VISIBILITY'; payload: { id: string; visibility: HossiiVisibility } }
   | { type: 'MOVE_HOSSII_PANE'; payload: { id: string; spacePaneId: string } }
   | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii }
   | {
@@ -773,6 +780,25 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return withEntitiesUpdate(state, entities);
       }
 
+      case 'EDIT_HOSSII_CONTENT': {
+        // Phase 2D-2: 本人による本文編集。message と content_edited_at のみ更新し、
+        // identity / visibility / pane 等には触れない。
+        const { id, message, contentEditedAt } = action.payload;
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const entities = patchEntity(state.entities, { ...prev, message, contentEditedAt });
+        return withEntitiesUpdate(state, entities);
+      }
+
+      case 'SET_HOSSII_VISIBILITY': {
+        // Phase 2D-2: 本人による公開範囲変更（public <-> owner_only）。
+        const { id, visibility } = action.payload;
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const entities = patchEntity(state.entities, { ...prev, visibility });
+        return withEntitiesUpdate(state, entities);
+      }
+
       case 'UPDATE_HOSSII_FROM_REALTIME': {
         const updated = action.payload;
         const prev = state.entities.entitiesById[updated.id];
@@ -819,6 +845,11 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
   };
 };
 
+/** Phase 2D-2: 本人投稿ミューテーションの結果（UI 側でエラー表示に使う） */
+export type OwnPostMutationResult =
+  | { ok: true }
+  | { ok: false; message?: string };
+
 export type HossiiContextValue = {
   state: ExtendedHossiiState;
   spacesLoadedFromSupabase: boolean;
@@ -857,6 +888,12 @@ export type HossiiContextValue = {
   hideHossii: (id: string, adminId?: string) => void;
   restoreHossii: (id: string, adminId?: string) => void;
   moveHossiiToPane: (id: string, targetPaneId: string) => Promise<void>;
+  /** Phase 2D-2: 本人による本文編集（optimistic → RPC → 失敗時 rollback） */
+  editMyHossiiContent: (id: string, message: string) => Promise<OwnPostMutationResult>;
+  /** Phase 2D-2: 本人による公開範囲変更（public <-> owner_only） */
+  setMyHossiiVisibilityAction: (id: string, visibility: HossiiVisibility) => Promise<OwnPostMutationResult>;
+  /** Phase 2D-2: 本人によるソフト削除（物理 DELETE はしない） */
+  softDeleteMyHossiiAction: (id: string) => Promise<OwnPostMutationResult>;
   /** ページ fetch 結果を optimistic 投稿と merge して反映 */
   syncFetchedHossiis: (
     items: Hossii[],
@@ -1309,6 +1346,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           const row = payload.new as HossiiRow;
           if (row.space_id !== activeSpaceId) return;
           const hossii = rowToHossii(row);
+          // Phase 2D-2: ソフト削除済みの行は一覧へ入れない（RLS 迂回・stale 対策の保険）。
+          if (hossii.deletedAt) return;
           const runtime = spacePaneRuntimeRef.current;
           if (!shouldAcceptRealtimeInsert(hossii, runtime, activeSpaceId)) return;
           // 自分が INSERT した場合は重複 ADD のみ避ける。insertedHossiiIdsRef は fetch マージで掃除する
@@ -1329,6 +1368,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           const row = payload.new as HossiiRow;
           if (row.space_id !== activeSpaceId) return;
           const after = rowToHossii(row);
+          // Phase 2D-2: ソフト削除は UPDATE として届くため、deleted_at が付いたら一覧から除去する
+          // （本人の楽観削除の巻き戻り防止 + 別端末での削除の反映）。
+          if (after.deletedAt) {
+            dispatch({ type: 'REMOVE_HOSSII', payload: row.id });
+            return;
+          }
           const runtime = spacePaneRuntimeRef.current;
           if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
 
@@ -1794,6 +1839,86 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     [state.entities.entitiesById, state.hossiis],
   );
 
+  // ===== Phase 2D-2: 本人投稿の操作（編集 / 公開範囲 / ソフト削除）=====
+  // すべて optimistic 更新 → SECURITY DEFINER RPC → 失敗時 rollback。
+  // 本人確認は RPC(auth.uid() + hossii_authorships) が正本。ここでは identity を渡さない。
+  const editMyHossiiContent = useCallback(
+    async (id: string, message: string): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+      const prevMessage = prev.message;
+      const prevEditedAt = prev.contentEditedAt ?? null;
+
+      dispatch({
+        type: 'EDIT_HOSSII_CONTENT',
+        payload: { id, message, contentEditedAt: new Date() },
+      });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await updateMyHossii(id, message);
+      if (!res.ok) {
+        dispatch({
+          type: 'EDIT_HOSSII_CONTENT',
+          payload: { id, message: prevMessage, contentEditedAt: prevEditedAt },
+        });
+        return { ok: false, message: res.message };
+      }
+      // 成功時は DB が返した content_edited_at を正本として反映する。
+      dispatch({
+        type: 'EDIT_HOSSII_CONTENT',
+        payload: { id, message, contentEditedAt: res.contentEditedAt },
+      });
+      return { ok: true };
+    },
+    [],
+  );
+
+  const setMyHossiiVisibilityAction = useCallback(
+    async (id: string, visibility: HossiiVisibility): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+      const prevVisibility = prev.visibility ?? 'public';
+      if (prevVisibility === visibility) return { ok: true };
+
+      dispatch({ type: 'SET_HOSSII_VISIBILITY', payload: { id, visibility } });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await setMyHossiiVisibility(id, visibility);
+      if (!res.ok) {
+        dispatch({
+          type: 'SET_HOSSII_VISIBILITY',
+          payload: { id, visibility: prevVisibility },
+        });
+        return { ok: false, message: res.message };
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
+  const softDeleteMyHossiiAction = useCallback(
+    async (id: string): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+
+      // optimistic: 一覧から即時除去。
+      dispatch({ type: 'REMOVE_HOSSII', payload: id });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await softDeleteMyHossii(id);
+      if (!res.ok) {
+        // 失敗時は元の投稿を復元する（画面から消えたままにしない）。
+        dispatch({ type: 'ADD_HOSSII_FULL', payload: prev });
+        return { ok: false, message: res.message };
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
   return (
     <SpacePaneRuntimeContext.Provider value={spacePaneRuntimeRef}>
     <HossiiContext.Provider
@@ -1829,6 +1954,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         hideHossii,
         restoreHossii,
         moveHossiiToPane,
+        editMyHossiiContent,
+        setMyHossiiVisibilityAction,
+        softDeleteMyHossiiAction,
         syncFetchedHossiis,
         setHossiiFetchLoading,
       }}
@@ -1859,6 +1987,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           hideHossii,
           restoreHossii,
           moveHossiiToPane,
+          editMyHossiiContent,
+          setMyHossiiVisibilityAction,
+          softDeleteMyHossiiAction,
           syncFetchedHossiis,
           setHossiiFetchLoading,
         }}

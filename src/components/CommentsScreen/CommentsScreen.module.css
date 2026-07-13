@@ -268,7 +268,16 @@
 }
 
 .time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
   color: #9ca3af;
+}
+
+.editedMark {
+  color: #9ca3af;
+  font-size: 0.7rem;
 }
 
 .metaEnd {
