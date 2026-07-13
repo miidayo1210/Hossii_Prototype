@@ -26,6 +26,28 @@
   gap: 1rem;
 }
 
+.identityBanner {
+  background: linear-gradient(135deg, #ede9fe 0%, #fce7f3 100%);
+  border-radius: 0.875rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e9d5ff;
+}
+
+.identityGreeting {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4c1d95;
+  line-height: 1.45;
+}
+
+.identityStatus {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #7c3aed;
+  font-weight: 500;
+}
+
 /* セクション共通 */
 .section {
   background: #fff;
