@@ -78,6 +78,7 @@ import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
 import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
+import { canShowPersonalShortcut } from '../../core/utils/personalSpaceShortcut';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
   buildTabFolderPatch,
@@ -281,6 +282,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const { memberships } = useSelectedCommunity();
   const isAdmin = currentUser?.isAdmin ?? false;
   const isAuthenticated = !!currentUser;
+
+  // 個人スペースショートカット（Pane ではなく UI ボタン）。
+  // 正本は「現在表示中の shared space の community_id」で、localStorage 選択には依存しない。
+  const spaceCommunityMembership = useMemo(() => {
+    const communityId = activeSpace?.communityId;
+    if (!communityId) return null;
+    return memberships.find((m) => m.communityId === communityId) ?? null;
+  }, [activeSpace?.communityId, memberships]);
+  const personalShortcutEligible = canShowPersonalShortcut({
+    isAuthenticated,
+    isVisiting,
+    spaceCommunityId: activeSpace?.communityId,
+    membershipStatus: spaceCommunityMembership?.status,
+  });
+
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   // 他タブからのリアクションを受け取るための状態
@@ -487,12 +503,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return () => window.removeEventListener(POST_FAILURE_EVENT, onPostFailure);
   }, [showPaneToast]);
 
-  const showPaneBar = shouldShowSpacePaneBar(
-    isAdmin,
-    visiblePanes.length,
-    isVisiting,
-    panesLoading,
-  );
+  const showPaneBar =
+    shouldShowSpacePaneBar(isAdmin, visiblePanes.length, isVisiting, panesLoading) ||
+    // 個人スペースショートカットは Pane 数に関係なくタブ列へ表示するため、
+    // 単一 Pane の共有スペースでもタブ列（＝ショートカットの器）を出す。
+    (personalShortcutEligible && !isVisiting && !panesLoading);
 
   const demoTabSyncToastShownRef = useRef(false);
   useEffect(() => {
@@ -1127,12 +1142,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setSelectedBubbleId(null);
   }, []);
 
-  const spaceCommunityMembership = useMemo(() => {
-    const communityId = activeSpace?.communityId;
-    if (!communityId) return null;
-    return memberships.find((m) => m.communityId === communityId) ?? null;
-  }, [activeSpace?.communityId, memberships]);
-
   const handlePersonalShortcut = useCallback(async () => {
     const communityId = activeSpace?.communityId;
     if (!communityId || personalShortcutBusy) return;
@@ -1166,23 +1175,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   ]);
 
   const personalShortcut = useMemo(() => {
-    if (!currentUser || !activeSpace?.communityId || isVisiting) return null;
-    if (!spaceCommunityMembership || spaceCommunityMembership.status !== 'active') {
-      return null;
-    }
+    if (!personalShortcutEligible) return null;
     return {
       label: 'わたし',
       loading: personalShortcutBusy,
       onClick: () => void handlePersonalShortcut(),
     };
-  }, [
-    activeSpace?.communityId,
-    currentUser,
-    handlePersonalShortcut,
-    isVisiting,
-    personalShortcutBusy,
-    spaceCommunityMembership,
-  ]);
+  }, [personalShortcutEligible, handlePersonalShortcut, personalShortcutBusy]);
 
   // F06: 非表示（管理者のみ）
   const handleHideBubble = useCallback(() => {
