@@ -102,6 +102,12 @@ import {
   createAuthorshipControllerHost,
   type AuthorshipControllerHost,
 } from '../utils/authorshipControllerHost';
+import { joinSpaceAsMember } from '../utils/spaceMembershipsApi';
+import {
+  createMembershipJoinController,
+  resolveMembershipNickname,
+  type MembershipJoinController,
+} from '../utils/membershipJoinController';
 import {
   upsertProfile,
   upsertSpaceNickname,
@@ -1026,6 +1032,45 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       }
     };
   }, []);
+
+  // ===== space_memberships の自動登録（Phase 2B）=====
+  // ログインユーザーが active space に入ったら、その所属を space_memberships へ登録する。
+  // 実行条件・(uid+spaceId) の重複抑止・user/space 切替や再ログイン時の再実行は controller に委譲。
+  // role は渡さない（RPC 側で 'member' 固定）。membership 登録の失敗は space 表示・ログインへ
+  // 影響させず、PII を出さずに console.error へ記録するだけにとどめる。
+  // controller は React state を持たず購読もしないため、authorship のような dispose は不要
+  // （StrictMode の二重 setup は controller 内の in-flight / lastSuccessKey で吸収する）。
+  const membershipJoinRef = useRef<MembershipJoinController | null>(null);
+  if (membershipJoinRef.current === null) {
+    membershipJoinRef.current = createMembershipJoinController({
+      join: (spaceId, nickname) => joinSpaceAsMember(spaceId, nickname),
+      onError: () => {
+        console.error('[HossiiStore] failed to register space membership');
+      },
+    });
+  }
+
+  useEffect(() => {
+    membershipJoinRef.current?.sync({
+      configured: isSupabaseConfigured,
+      authReady: !isResolvingAuth,
+      uid: currentUser?.uid ?? null,
+      spaceId: state.activeSpaceId || null,
+      // ログインアカウント（auth uid）が無い＝ゲスト。ゲストは membership を作らない。
+      isGuest: !currentUser?.uid,
+      // nickname は既存 state / currentUser からのみ解決（追加 DB query なし）。取得失敗は null。
+      resolveNickname: () =>
+        resolveMembershipNickname(
+          {
+            spaceNicknames: stateRef.current.spaceNicknames,
+            profileDefaultNickname: stateRef.current.profile?.defaultNickname,
+            username: currentUserRef.current?.username,
+            displayName: currentUserRef.current?.displayName,
+          },
+          stateRef.current.activeSpaceId,
+        ),
+    });
+  }, [currentUser?.uid, state.activeSpaceId, isResolvingAuth]);
 
   useEffect(() => {
     setHossiiEntitiesSnapshot(state.entities.entitiesById);
