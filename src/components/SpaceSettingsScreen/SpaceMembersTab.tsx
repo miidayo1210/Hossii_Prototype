@@ -86,7 +86,7 @@ export const SpaceMembersTab = ({ space }: Props) => {
     <>
       <SettingsPageHeader
         title="スペースメンバー"
-        description="招待制（invite_only）スペースに参加できるメンバーを管理します。コミュニティメンバーから追加してください。"
+        description="招待制（メンバー限定）スペースに参加できるメンバーを管理します。公開スペースはURLを知っている人が利用でき、メンバー限定スペースは登録済みスペースメンバーと管理者だけが利用できます。"
       >
         <SettingsSection title="メンバーを追加">
           {candidates.length === 0 ? (

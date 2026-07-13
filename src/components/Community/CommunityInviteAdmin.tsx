@@ -79,7 +79,7 @@ export const CommunityInviteAdmin = ({ communityId }: Props) => {
   return (
     <div>
       <p className={styles.note}>
-        メール自動送信は未接続です。招待リンクをコピーして、本人へ別途お渡しください。
+        現在はメール自動送信に未対応です。招待リンクをコピーして、本人へ共有してください。
       </p>
       {error && <p className={styles.error}>{error}</p>}
       <div className={styles.inviteRow}>
@@ -101,7 +101,9 @@ export const CommunityInviteAdmin = ({ communityId }: Props) => {
       </div>
       {lastInviteUrl && (
         <div className={styles.urlBox}>
-          <p className={styles.note}>招待リンク（一度だけ表示されます。メールは送信していません）</p>
+          <p className={styles.note}>
+            招待URLを作成しました。メールは自動送信されていません。このリンクを本人へ共有してください。
+          </p>
           <code className={styles.urlCode}>{lastInviteUrl}</code>
           <button type="button" className={styles.copyBtn} onClick={() => void handleCopy()}>
             <Copy size={14} /> {copied ? 'コピーしました' : 'リンクをコピー'}

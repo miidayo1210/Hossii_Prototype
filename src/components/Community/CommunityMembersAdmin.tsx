@@ -42,8 +42,12 @@ export const CommunityMembersAdmin = ({ communityId }: Props) => {
     void load();
   }, [load]);
 
-  const run = async (fn: () => Promise<{ ok: boolean; message?: string }>) => {
+  const run = async (
+    fn: () => Promise<{ ok: boolean; message?: string }>,
+    confirmMessage?: string,
+  ) => {
     if (acting) return;
+    if (confirmMessage && !window.confirm(confirmMessage)) return;
     setActing(true);
     const res = await fn();
     setActing(false);
@@ -58,6 +62,10 @@ export const CommunityMembersAdmin = ({ communityId }: Props) => {
 
   return (
     <div>
+      <p className={styles.note}>
+        メンバーの停止・復帰・解除は、コミュニティ限定スペースと個人スペースへのアクセスに影響します。public
+        スペースは引き続き利用できます。
+      </p>
       {error && <p className={styles.error}>{error}</p>}
       {members.length === 0 ? (
         <p className={styles.muted}>メンバーがいません。</p>
@@ -77,8 +85,12 @@ export const CommunityMembersAdmin = ({ communityId }: Props) => {
                     type="button"
                     className={styles.warnBtn}
                     disabled={acting}
+                    title="コミュニティ限定スペースと個人スペースへのアクセスを一時停止します。publicスペースは引き続き利用できます。"
                     onClick={() =>
-                      void run(() => adminSuspendCommunityMember(communityId, m.membershipId))
+                      void run(
+                        () => adminSuspendCommunityMember(communityId, m.membershipId),
+                        `${m.displayName} を一時停止しますか？\nコミュニティ限定スペースと個人スペースへのアクセスを一時停止します。publicスペースは引き続き利用できます。`,
+                      )
                     }
                   >
                     停止
@@ -101,8 +113,12 @@ export const CommunityMembersAdmin = ({ communityId }: Props) => {
                     type="button"
                     className={styles.dangerBtn}
                     disabled={acting}
+                    title="コミュニティへの所属を解除します。アカウントや過去の投稿は削除されません。"
                     onClick={() =>
-                      void run(() => adminRemoveCommunityMember(communityId, m.membershipId))
+                      void run(
+                        () => adminRemoveCommunityMember(communityId, m.membershipId),
+                        `${m.displayName} の所属を解除しますか？\nコミュニティへの所属を解除します。アカウントや過去の投稿は削除されません。`,
+                      )
                     }
                   >
                     解除

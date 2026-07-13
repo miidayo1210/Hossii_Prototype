@@ -176,3 +176,71 @@
   background: #f5f3ff;
   font-weight: 600;
 }
+
+.adminGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.adminCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.85rem;
+  border-radius: 0.85rem;
+  border: 1px solid #e9d5ff;
+  background: white;
+  cursor: pointer;
+  text-align: left;
+  color: #4c1d95;
+}
+
+.adminCard:hover {
+  background: #faf5ff;
+  border-color: #c4b5fd;
+}
+
+.adminCardTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.adminCardDesc {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.adminPanel {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.adminBackBtn {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: #7c3aed;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.adminSpacesGuide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.adminGuideList {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #4b5563;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}

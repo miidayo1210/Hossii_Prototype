@@ -73,7 +73,12 @@ export const SettingsNav = ({ activeScreen, onNavigate, isAdmin }: Props) => {
                   onClick={() => handleNavigate(item.id, group.heading)}
                   tabIndex={isOpen ? 0 : -1}
                 >
-                  {item.label}
+                  <span className={styles.navItemText}>
+                    <span className={styles.navItemLabel}>{item.label}</span>
+                    {item.description && (
+                      <span className={styles.navItemDesc}>{item.description}</span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>

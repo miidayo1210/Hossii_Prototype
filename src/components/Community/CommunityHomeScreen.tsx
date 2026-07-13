@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Users, Mail, Bell } from 'lucide-react';
+import { Users, Mail, Bell, LayoutGrid, UserSquare, Settings } from 'lucide-react';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { CommunitySwitcher } from './CommunitySwitcher';
 import { CommunityMembersAdmin } from './CommunityMembersAdmin';
 import { CommunityInviteAdmin } from './CommunityInviteAdmin';
+import { PersonalSpaceTemplateEditor } from '../SpacesScreen/PersonalSpaceTemplateEditor';
 import {
   fetchCommunityHome,
   fetchCommunitySharedSpaces,
@@ -36,7 +37,9 @@ export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => 
   const [error, setError] = useState<string | null>(null);
   const [nicknameInput, setNicknameInput] = useState('');
   const [savingNick, setSavingNick] = useState(false);
-  const [adminTab, setAdminTab] = useState<'members' | 'invites'>('members');
+  const [adminView, setAdminView] = useState<
+    'overview' | 'members' | 'invites' | 'template' | 'spaces'
+  >('overview');
 
   const load = useCallback(async () => {
     if (!communityId) {
@@ -211,27 +214,100 @@ export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => 
 
           {home.isCommunityAdmin && (
             <section className={styles.card}>
-              <h3 className={styles.sectionTitle}>メンバー管理</h3>
-              <div className={styles.tabRow}>
-                <button
-                  type="button"
-                  className={adminTab === 'members' ? styles.tabActive : styles.tab}
-                  onClick={() => setAdminTab('members')}
-                >
-                  <Users size={16} /> メンバー
-                </button>
-                <button
-                  type="button"
-                  className={adminTab === 'invites' ? styles.tabActive : styles.tab}
-                  onClick={() => setAdminTab('invites')}
-                >
-                  <Mail size={16} /> 招待
-                </button>
-              </div>
-              {adminTab === 'members' ? (
-                <CommunityMembersAdmin communityId={communityId} />
+              <h3 className={styles.sectionTitle}>コミュニティ管理</h3>
+              <p className={styles.muted}>
+                メンバーの招待・停止、個人スペースのテンプレート、共有スペースの運営はここから行えます。
+              </p>
+
+              {adminView === 'overview' ? (
+                <div className={styles.adminGrid}>
+                  <button
+                    type="button"
+                    className={styles.adminCard}
+                    onClick={() => setAdminView('members')}
+                  >
+                    <Users size={20} aria-hidden />
+                    <span className={styles.adminCardTitle}>メンバーを管理</span>
+                    <span className={styles.adminCardDesc}>
+                      一覧・停止・復帰・所属解除
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.adminCard}
+                    onClick={() => setAdminView('invites')}
+                  >
+                    <Mail size={20} aria-hidden />
+                    <span className={styles.adminCardTitle}>メンバーを招待</span>
+                    <span className={styles.adminCardDesc}>
+                      招待リンクを作成して共有
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.adminCard}
+                    onClick={() => setAdminView('template')}
+                  >
+                    <UserSquare size={20} aria-hidden />
+                    <span className={styles.adminCardTitle}>個人スペーステンプレート</span>
+                    <span className={styles.adminCardDesc}>
+                      新規作成時の名前・背景を設定
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.adminCard}
+                    onClick={() => setAdminView('spaces')}
+                  >
+                    <LayoutGrid size={20} aria-hidden />
+                    <span className={styles.adminCardTitle}>スペースを管理</span>
+                    <span className={styles.adminCardDesc}>
+                      共有スペースの作成・設定へ
+                    </span>
+                  </button>
+                </div>
               ) : (
-                <CommunityInviteAdmin communityId={communityId} />
+                <div className={styles.adminPanel}>
+                  <button
+                    type="button"
+                    className={styles.adminBackBtn}
+                    onClick={() => setAdminView('overview')}
+                  >
+                    ← 管理メニューに戻る
+                  </button>
+                  {adminView === 'members' && communityId && (
+                    <CommunityMembersAdmin communityId={communityId} />
+                  )}
+                  {adminView === 'invites' && communityId && (
+                    <CommunityInviteAdmin communityId={communityId} />
+                  )}
+                  {adminView === 'template' && communityId && (
+                    <PersonalSpaceTemplateEditor communityId={communityId} />
+                  )}
+                  {adminView === 'spaces' && (
+                    <div className={styles.adminSpacesGuide}>
+                      <p className={styles.muted}>
+                        共有スペースの作成・公開範囲・スペースメンバー管理は、スペース一覧画面と各スペースの設定から行います。
+                      </p>
+                      <ul className={styles.adminGuideList}>
+                        <li>
+                          <strong>公開</strong>：URLを知っている人が利用できる
+                        </li>
+                        <li>
+                          <strong>メンバー限定</strong>：登録済みスペースメンバーと管理者だけが利用できる
+                        </li>
+                      </ul>
+                      <button
+                        type="button"
+                        className={styles.primaryBtn}
+                        onClick={() => navigate('spaces')}
+                      >
+                        <Settings size={16} aria-hidden />
+                        スペース一覧を開く
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </section>
           )}
