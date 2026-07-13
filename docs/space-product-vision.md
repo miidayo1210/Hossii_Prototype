@@ -4,6 +4,8 @@
 **Owner:** Mii Uchino
 **Status:** Draft (Iterative Development)
 
+> 本書は [`hossii-product-concept.md`](./hossii-product-concept.md) の配下で、スペースという体験単位の提供思想を扱う。
+
 ---
 
 ## 1. 概要
