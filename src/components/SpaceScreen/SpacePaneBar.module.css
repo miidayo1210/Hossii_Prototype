@@ -375,6 +375,31 @@
   cursor: not-allowed;
 }
 
+.personalShortcut {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(236, 72, 153, 0.35);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(253, 242, 248, 0.95) 0%, rgba(237, 233, 254, 0.95) 100%);
+  color: #9d174d;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.personalShortcut:hover:not(:disabled) {
+  border-color: #ec4899;
+  background: rgba(252, 231, 243, 0.98);
+}
+
+.personalShortcut:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .folderTray {
     transition: none;
