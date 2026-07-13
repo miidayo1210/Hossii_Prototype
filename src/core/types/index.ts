@@ -27,6 +27,13 @@ export type LanguageCode = 'ja' | 'en' | 'unknown';
 /** 投稿の表示種別（吹き出し / キャンバス画像） */
 export type HossiiPostKind = 'bubble' | 'canvas';
 
+/**
+ * 投稿の公開範囲（Phase 2D-1）
+ * - public: 通常投稿（従来どおり）
+ * - owner_only: 投稿したログイン本人だけが取得・表示できる（管理者の非表示とは別概念）
+ */
+export type HossiiVisibility = 'public' | 'owner_only';
+
 // 投稿データ
 export type Hossii = {
   id: string;
@@ -73,6 +80,13 @@ export type Hossii = {
   likedByMe?: boolean; // クライアント側ローカル状態（Supabase には保存しない）
   /** 未設定・bubble = 従来の吹き出し。canvas = フリー投稿（可変比率のラスタ PNG） */
   postKind?: HossiiPostKind;
+  // Phase 2D-1: 本人による公開範囲 / ソフト削除 / 本文編集
+  /** 公開範囲。未設定は 'public' 扱い */
+  visibility?: HossiiVisibility;
+  /** ソフト削除日時。null/未設定 = 未削除 */
+  deletedAt?: Date | null;
+  /** 本文編集日時。null/未設定 = 未編集（visibility 変更やモデレーションでは更新されない） */
+  contentEditedAt?: Date | null;
 };
 
 // addHossii の入力型（message は空もあり得るが、最終的に空投稿は弾く）
