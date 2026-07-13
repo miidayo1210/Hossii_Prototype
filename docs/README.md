@@ -2,6 +2,24 @@
 
 ---
 
+## 実装ブランチ（community platform Phase 2〜6）
+
+| 項目 | 状態 |
+|------|------|
+| branch | `feat/community-platform-phase2-6` |
+| 検証環境 | Supabase **development** のみ |
+| main | **未反映** |
+| production | **未反映** |
+| browser | Playwright 未整備のため **未確認**（DB/API/RLS は検証済み） |
+
+**Phase 2〜6 完了範囲（MVP）:** `community_memberships`、RLS 基盤、個人スペース・テンプレート、`access_mode` / invite_only、community HOME・切替、招待（token hash・リンクコピー）、membership suspend/reactivate/remove、発行参加 ID の membership 明示連携。
+
+**未実装:** メール招待の自動送信、account merge（[110](./仕様書/現在の仕様/110_アカウントマージ将来仕様.md)）、pair/team スペース（Phase 6 後）。
+
+**イベント用途（Leapday 型）:** `relation type` に event を足すのではなく、`temporary` + `public`/`invite_only` + イベント向け投稿設定・スクリーン・集計を **template/use-case** として組み合わせる（[109 §Phase 6](./仕様書/現在の仕様/109_コミュニティ所属個人アカウント・個人スペース・招待制スペース.md) 参照）。
+
+---
+
 ## まず読む文書
 
 Hossii の最上位の Why / What は [`hossii-product-concept.md`](./hossii-product-concept.md) にまとめている。個別機能に入る前に、まずこの文書を読む。
