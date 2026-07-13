@@ -29,7 +29,10 @@ type Props = {
   enabled: boolean;
   motionMode: MyHossiiMotionMode;
   logVisibility: MyHossiiLogVisibility;
+  /** 吹き出し・新着検知用（現在の Pane） */
   hossiis: Hossii[];
+  /** 個人ログ集計用（スペース全体の全 Pane） */
+  activityHossiis: Hossii[];
   visiblePostCount: number;
   currentUserId: string | null;
   isAuthenticatedViewer: boolean;
@@ -51,6 +54,7 @@ export const MyHossiiLayer = ({
   motionMode,
   logVisibility,
   hossiis,
+  activityHossiis,
   visiblePostCount,
   currentUserId,
   isAuthenticatedViewer,
@@ -149,7 +153,7 @@ export const MyHossiiLayer = ({
   });
 
   const handleViewLogs = (userId: string, nickname: string) => {
-    const group = resolveAuthorGroupForMyHossiiUser(hossiis, {
+    const group = resolveAuthorGroupForMyHossiiUser(activityHossiis, {
       userId,
       nickname,
       spaceId,
@@ -166,7 +170,7 @@ export const MyHossiiLayer = ({
           participant={participant}
           index={index}
           spaceId={spaceId}
-          hossiis={hossiis}
+          activityHossiis={activityHossiis}
           animationTier={animationTier}
           resolvedMotion={resolvedMotion}
           logVisibility={logVisibility}
@@ -191,7 +195,7 @@ type AvatarItemProps = {
   participant: MyHossiiParticipant;
   index: number;
   spaceId: string;
-  hossiis: Hossii[];
+  activityHossiis: Hossii[];
   animationTier: ReturnType<typeof resolveMyHossiiAnimationTier>;
   resolvedMotion: ReturnType<typeof resolveMyHossiiMotionMode>;
   logVisibility: MyHossiiLogVisibility;
@@ -208,7 +212,7 @@ function AvatarItem({
   participant,
   index,
   spaceId,
-  hossiis,
+  activityHossiis,
   animationTier,
   resolvedMotion,
   logVisibility,
@@ -222,7 +226,7 @@ function AvatarItem({
 }: AvatarItemProps) {
   const position = computeMyHossiiPosition(participant.userId, spaceId, index);
   const imageSrc = resolveMyHossiiImage(participant);
-  const activity = deriveMyHossiiActivity(hossiis, participant.userId, {
+  const activity = deriveMyHossiiActivity(activityHossiis, participant.userId, {
     nickname: participant.nickname,
     spaceId,
   });

@@ -10,6 +10,7 @@ import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useRe
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/useAuth';
+import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useNeighborSpace } from './useNeighborSpace';
 import type { EmotionKey, Hossii } from '../../core/types';
@@ -25,6 +26,8 @@ import { computeBubblePositions, type PositionCache } from '../../core/utils/hos
 import { useSpaceHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
 import { usePinnedHossiis } from '../../core/hooks/usePinnedHossiis';
 import { buildQueryKeyV2 } from '../../core/utils/hossiiQueryKey';
+import { materializeHossiisArray } from '../../core/utils/hossiiEntitiesState';
+import { shouldShowMyHossiiLayer } from '../../core/utils/myHossiiLayerVisibility';
 import { isDefaultPane, type PaneContext } from '../../core/utils/hossiiPaneMembership';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { resolveTimelineDepthActive } from '../../core/utils/resolveTimelineDepthActive';
@@ -42,6 +45,8 @@ import {
 import { computePreviewSlotCount } from '../../core/utils/previewSlotCount';
 import { resolveCanvasExportAllowed } from '../../core/utils/spaceSettingResolvers';
 import { resolveCanEditBubble } from '../../core/utils/canEditBubble';
+import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import { ensureMyPersonalSpace } from '../../core/utils/personalSpacesApi';
 import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
 import { buildSpaceExportFilename } from '../../core/utils/spaceExportFilename';
 import {
@@ -96,6 +101,7 @@ import {
 } from '../../core/utils/tabSyncDiagnostics';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { MyHossiiLayer } from '../MyHossii/MyHossiiLayer';
+import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
 import { fetchMyHossiiSettings, isMyHossiiRegistered } from '../../core/utils/userProfilesApi';
 import { fetchParticipantEligibility } from '../../core/utils/myHossiiParticipationApi';
 import type { ParticipantEligibility } from '../../core/utils/myHossiiAppearance';
@@ -273,6 +279,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !activeSpace;
   const isVisiting = visitingSpaceId !== null;
   const { currentUser } = useAuth();
+  const { memberships } = useSelectedCommunity();
   const isAdmin = currentUser?.isAdmin ?? false;
   const isAuthenticated = !!currentUser;
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
@@ -767,6 +774,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
+  const [personalShortcutBusy, setPersonalShortcutBusy] = useState(false);
 
   // A02: 選択中の装飾（ポップアップ表示用）
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
@@ -818,6 +826,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const myHossiiEnabled = spaceForVisual?.myHossiiEnabled ?? false;
   const myHossiiMotionMode = spaceForVisual?.myHossiiMotionMode ?? 'auto';
   const myHossiiLogVisibility = spaceForVisual?.myHossiiLogVisibility ?? 'public';
+  const showMyHossiiLayer = shouldShowMyHossiiLayer(
+    myHossiiEnabled,
+    activePane?.isDefault === true,
+  );
+  const allSpaceHossiisForMyHossii = useMemo(() => {
+    if (!activeSpaceId) return [];
+    return materializeHossiisArray(state.entities, activeSpaceId);
+  }, [state.entities, activeSpaceId]);
   const spaceCharacterImageUrl = spaceForVisual?.characterImageUrl;
 
   useEffect(() => {
@@ -1112,6 +1128,63 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setSelectedBubbleId(null);
   }, []);
 
+  const spaceCommunityMembership = useMemo(() => {
+    const communityId = activeSpace?.communityId;
+    if (!communityId) return null;
+    return memberships.find((m) => m.communityId === communityId) ?? null;
+  }, [activeSpace?.communityId, memberships]);
+
+  const handlePersonalShortcut = useCallback(async () => {
+    const communityId = activeSpace?.communityId;
+    if (!communityId || personalShortcutBusy) return;
+    setPersonalShortcutBusy(true);
+    try {
+      const res = await ensureMyPersonalSpace(communityId);
+      if (!res.ok) {
+        window.alert(res.message);
+        return;
+      }
+      if (!res.spaceUrl) {
+        window.alert('個人スペースを開けませんでした。');
+        return;
+      }
+      const slug = spaceCommunityMembership?.communitySlug ?? communitySlug;
+      if (!slug) {
+        window.alert('コミュニティ情報を取得できませんでした。');
+        return;
+      }
+      window.location.href = `/c/${slug}/s/${res.spaceUrl}#screen`;
+    } catch {
+      window.alert('個人スペースを開けませんでした。');
+    } finally {
+      setPersonalShortcutBusy(false);
+    }
+  }, [
+    activeSpace?.communityId,
+    communitySlug,
+    personalShortcutBusy,
+    spaceCommunityMembership?.communitySlug,
+  ]);
+
+  const personalShortcut = useMemo(() => {
+    if (!currentUser || !activeSpace?.communityId || isVisiting) return null;
+    if (!spaceCommunityMembership || spaceCommunityMembership.status !== 'active') {
+      return null;
+    }
+    return {
+      label: 'わたし',
+      loading: personalShortcutBusy,
+      onClick: () => void handlePersonalShortcut(),
+    };
+  }, [
+    activeSpace?.communityId,
+    currentUser,
+    handlePersonalShortcut,
+    isVisiting,
+    personalShortcutBusy,
+    spaceCommunityMembership,
+  ]);
+
   // F06: 非表示（管理者のみ）
   const handleHideBubble = useCallback(() => {
     if (!selectedBubbleId) return;
@@ -1212,6 +1285,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const { filteredHossiis, tagCounts } = pipeline;
+
+  const selectedHossii = useMemo(
+    () => filteredHossiis.find((h) => h.id === selectedBubbleId) ?? null,
+    [filteredHossiis, selectedBubbleId],
+  );
+
+  const showOwnerActionsOnBubble =
+    presentationMode === 'custom' &&
+    selectedHossii != null &&
+    canManageOwnPost({
+      isAuthenticated: !!currentUser,
+      myAuthorshipIds,
+      myAuthorshipIdsStatus,
+      hossiiId: selectedHossii.id,
+    });
 
   const pinnedHossiisForTray = useMemo(() => {
     const byId = new Map(filteredHossiis.map((h) => [h.id, h]));
@@ -2077,13 +2165,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         ))}
 
       {/* マイHossiiレイヤー */}
-      {controlState.hossiiVisible && activeSpace && !isVisiting && (
+      {controlState.hossiiVisible && activeSpace && !isVisiting && showMyHossiiLayer && (
         <MyHossiiLayer
           spaceId={activeSpace.id}
           enabled={myHossiiEnabled}
           motionMode={myHossiiMotionMode}
           logVisibility={myHossiiLogVisibility}
           hossiis={filteredHossiis}
+          activityHossiis={allSpaceHossiisForMyHossii}
           visiblePostCount={filteredHossiis.length}
           currentUserId={currentUser?.uid ?? null}
           isAuthenticatedViewer={!!currentUser}
@@ -2247,6 +2336,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           onReorder={isAdmin ? handlePaneReorder : undefined}
           onMoveToFolder={isAdmin ? handleMoveToFolder : undefined}
           onReorderFolder={isAdmin ? handleReorderFolder : undefined}
+          personalShortcut={personalShortcut}
         />
       )}
 
@@ -2453,6 +2543,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           <span className={styles.editToolbarHint}>
             ドラッグで移動 · 角ハンドルでリサイズ
           </span>
+          {showOwnerActionsOnBubble && selectedHossii && (
+            <OwnPostActions
+              hossii={selectedHossii}
+              onDeleted={handleBubbleDeselect}
+              className={styles.editToolbarOwnerActions}
+            />
+          )}
           {isAdmin && (
             <button
               type="button"
@@ -2588,6 +2685,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               onReorder={isAdmin ? handlePaneReorder : undefined}
               onMoveToFolder={isAdmin ? handleMoveToFolder : undefined}
               onReorderFolder={isAdmin ? handleReorderFolder : undefined}
+              personalShortcut={personalShortcut}
             />
           )}
           <TopRightMenu onPostClick={handleTopRightPostClick} />
