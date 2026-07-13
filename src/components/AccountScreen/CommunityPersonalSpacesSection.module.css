@@ -1,0 +1,137 @@
+.note {
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.retryBtn {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #6b7280;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.retryBtn:hover {
+  background: #f9fafb;
+}
+
+.privacyNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0 0 0.7rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #ede9fe;
+  border-radius: 0.6rem;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.privacyNote svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #eef0f3;
+  border-radius: 0.7rem;
+  background: #fafafa;
+}
+
+.itemMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.communityName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.subtle {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+.error {
+  font-size: 0.7rem;
+  color: #dc2626;
+}
+
+.createBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.85rem;
+  border: none;
+  border-radius: 0.55rem;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.createBtn:hover {
+  background: #6d28d9;
+}
+
+.createBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.openLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.55rem;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.openLink:hover {
+  background: #6d28d9;
+}
+
+.openDisabled {
+  flex-shrink: 0;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.55rem;
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  font-weight: 600;
+}

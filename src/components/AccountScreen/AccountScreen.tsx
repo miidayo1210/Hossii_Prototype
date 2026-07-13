@@ -7,6 +7,7 @@ import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
 import { MyHossiiSettingsSection } from './MyHossiiSettingsSection';
 import { JoinedSpacesSection } from './JoinedSpacesSection';
+import { CommunityPersonalSpacesSection } from './CommunityPersonalSpacesSection';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -142,6 +143,15 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
             あなたがログインして参加したスペースの一覧です。
           </p>
           <JoinedSpacesSection />
+        </section>
+
+        {/* コミュニティ内の個人スペース */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>コミュニティ内の個人スペース</h2>
+          <p className={styles.sectionDesc}>
+            参加中のコミュニティごとに、あなた専用の個人スペースを作成・入室できます。
+          </p>
+          <CommunityPersonalSpacesSection />
         </section>
 
         {/* マイHossii */}
