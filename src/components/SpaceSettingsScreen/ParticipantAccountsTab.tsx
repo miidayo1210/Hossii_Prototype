@@ -36,6 +36,8 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
   const [busySlot, setBusySlot] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [credentialModal, setCredentialModal] = useState<CredentialModal | null>(null);
+  const [linkCommunityMembership, setLinkCommunityMembership] = useState(false);
+  const [linkSpaceMembership, setLinkSpaceMembership] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -60,7 +62,10 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
     setBusySlot(slotNumber);
     setErrorMsg('');
     try {
-      const result = await issueParticipantAccount(space.id, slotNumber);
+      const result = await issueParticipantAccount(space.id, slotNumber, {
+        linkCommunityMembership,
+        linkSpaceMembership,
+      });
       setCredentialModal({
         loginId: result.loginId,
         password: result.password,
@@ -128,6 +133,24 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
       <p className={styles.summary}>
         発行済み: <strong>{issuedCount}</strong> / 20
       </p>
+      <div className={styles.linkOptions}>
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={linkCommunityMembership}
+            onChange={(e) => setLinkCommunityMembership(e.target.checked)}
+          />
+          発行時にこのスペースのコミュニティメンバーシップも作成する
+        </label>
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={linkSpaceMembership}
+            onChange={(e) => setLinkSpaceMembership(e.target.checked)}
+          />
+          発行時にこのスペースのスペースメンバーシップも作成する（invite_only 用）
+        </label>
+      </div>
 
       {errorMsg && <p className={styles.error}>{errorMsg}</p>}
 

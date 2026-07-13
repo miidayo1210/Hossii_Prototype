@@ -11,6 +11,8 @@ type RequestBody = {
   spaceId: string;
   action: Action;
   slotNumber?: number;
+  linkCommunityMembership?: boolean;
+  linkSpaceMembership?: boolean;
 };
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
@@ -116,7 +118,7 @@ Deno.serve(async (req) => {
     }
 
     const body = (await req.json()) as RequestBody;
-    const { spaceId, action, slotNumber } = body;
+    const { spaceId, action, slotNumber, linkCommunityMembership, linkSpaceMembership } = body;
 
     if (!spaceId || !action) {
       return jsonResponse({ error: 'spaceId and action are required' }, 400);
@@ -127,7 +129,7 @@ Deno.serve(async (req) => {
 
     const { data: spaceRow, error: spaceRowError } = await adminClient
       .from('spaces')
-      .select('id, space_url')
+      .select('id, space_url, community_id')
       .eq('id', spaceId)
       .maybeSingle();
 
@@ -194,6 +196,32 @@ Deno.serve(async (req) => {
       if (insertError) {
         await adminClient.auth.admin.deleteUser(createdUser.user.id);
         return jsonResponse({ error: insertError.message }, 500);
+      }
+
+      if (linkCommunityMembership && spaceRow.community_id) {
+        await adminClient.from('community_memberships').upsert(
+          {
+            community_id: spaceRow.community_id,
+            auth_user_id: createdUser.user.id,
+            role: 'member',
+            status: 'active',
+            invited_by: userData.user.id,
+            accepted_at: new Date().toISOString(),
+          },
+          { onConflict: 'community_id,auth_user_id' },
+        );
+      }
+
+      if (linkSpaceMembership) {
+        await adminClient.from('space_memberships').upsert(
+          {
+            space_id: spaceId,
+            auth_user_id: createdUser.user.id,
+            role: 'member',
+            status: 'active',
+          },
+          { onConflict: 'space_id,auth_user_id' },
+        );
       }
 
       return jsonResponse({ loginId, password, slotNumber: targetSlot });
