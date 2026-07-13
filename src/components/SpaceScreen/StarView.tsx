@@ -13,10 +13,14 @@ import { resolveStarDotDepthScale } from '../../core/utils/timelineDepthScale';
 import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
 import { HossiiFullTextPopover } from './HossiiFullTextPopover';
 import { PinButton } from './PinButton';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { PostedNameLabel } from '../common/PostedNameLabel';
 import styles from './StarView.module.css';
 
 type Props = {
   hossii: Hossii;
+  /** 投稿者の現在スペースニックネーム（Phase 2C） */
+  currentAuthorName?: string;
   x: number;
   y: number;
   anchor?: 'center' | 'topLeft';
@@ -47,6 +51,7 @@ const FULL_TEXT_HIDE_DELAY_MS = 150;
 
 function StarViewInner({
   hossii,
+  currentAuthorName,
   x,
   y,
   anchor = 'center',
@@ -65,6 +70,12 @@ function StarViewInner({
   displayIndex = 0,
   timelineDepthActive = false,
 }: Props) {
+  // Phase 2C: 現在名を主表示、投稿時名と異なれば補足。
+  const authorDisplay = resolvePostAuthorDisplay({
+    postedName: hossii.authorName,
+    currentName: currentAuthorName,
+    isOwnPost: false,
+  });
   const [isZoneHovered, setIsZoneHovered] = useState(false);
   const [showFullTextPopover, setShowFullTextPopover] = useState(false);
   const [fullTextAnchorRect, setFullTextAnchorRect] = useState<DOMRect | null>(null);
@@ -267,14 +278,15 @@ function StarViewInner({
           {previewText && (
             <p ref={previewTextRef} className={styles.previewText}>{previewText}</p>
           )}
-          {hossii.authorName && (
+          {authorDisplay.primaryName && (
             <span className={styles.previewAuthorLine}>
               {emotionEmoji && (
                 <span className={styles.previewEmotion} aria-hidden="true">
                   {emotionEmoji}
                 </span>
               )}
-              <span className={styles.previewAuthor}>{hossii.authorName}</span>
+              <span className={styles.previewAuthor}>{authorDisplay.primaryName}</span>
+              <PostedNameLabel name={authorDisplay.postedNameLabel} />
             </span>
           )}
           {showPinUi && onPinToggle && (
@@ -303,6 +315,7 @@ function StarViewInner({
 function starViewPropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.hossii === next.hossii &&
+    prev.currentAuthorName === next.currentAuthorName &&
     prev.x === next.x &&
     prev.y === next.y &&
     prev.animationLevel === next.animationLevel &&

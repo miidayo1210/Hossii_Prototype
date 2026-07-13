@@ -5,6 +5,7 @@ import type { AuthorPostGroup } from '../../core/utils/authorPostGroup';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getEmotionColor } from '../../core/assets/emotionColors';
 import { renderHossiiText } from '../../core/utils/render';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import styles from './AuthorTimelineModal.module.css';
 
 function formatTime(date: Date): string {
@@ -77,6 +78,8 @@ function TimelinePostRow({ post, likesEnabled, onLike, onSelect }: PostRowProps)
 
 type Props = {
   group: AuthorPostGroup;
+  /** 投稿者の現在スペースニックネーム（Phase 2C） */
+  currentAuthorName?: string;
   onClose: () => void;
   onSelectPost: (id: string) => void;
   likesEnabled?: boolean;
@@ -86,6 +89,7 @@ type Props = {
 
 export const AuthorTimelineModal = ({
   group,
+  currentAuthorName,
   onClose,
   onSelectPost,
   likesEnabled,
@@ -94,6 +98,13 @@ export const AuthorTimelineModal = ({
 }: Props) => {
   const hasPosts = group.posts.length > 0;
   const emotionColor = hasPosts ? getEmotionColor(group.latestPost.emotion) : '#a78bfa';
+  // Phase 2C: 現在名を主表示（投稿時名との併記はタイトルでは簡潔さのため主表示のみ）。
+  const primaryAuthorName =
+    resolvePostAuthorDisplay({
+      postedName: group.authorName,
+      currentName: currentAuthorName,
+      isOwnPost: false,
+    }).primaryName || group.authorName;
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -134,7 +145,7 @@ export const AuthorTimelineModal = ({
           />
           <div className={styles.headerText}>
             <h2 id="author-timeline-title" className={styles.title}>
-              {group.authorName} の投稿
+              {primaryAuthorName} の投稿
             </h2>
             <p className={styles.subtitle}>
               {hasPosts

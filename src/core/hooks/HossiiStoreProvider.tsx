@@ -108,6 +108,14 @@ import {
   resolveMembershipNickname,
   type MembershipJoinController,
 } from '../utils/membershipJoinController';
+import { fetchSpacePostAuthorDisplayNames } from '../utils/spacePostAuthorNamesApi';
+import {
+  createPostAuthorNamesController,
+  EMPTY_POST_AUTHOR_NAMES,
+  type PostAuthorNamesController,
+  type PostAuthorNamesSnapshot,
+} from '../utils/postAuthorNamesController';
+import { createControllerHost, type ControllerHost } from '../utils/controllerHost';
 import {
   upsertProfile,
   upsertSpaceNickname,
@@ -820,6 +828,12 @@ export type HossiiContextValue = {
   myAuthorshipIds: ReadonlySet<string>;
   /** myAuthorshipIds の取得状態。'ready' 以外は本人判定に信頼しない */
   myAuthorshipIdsStatus: MyAuthorshipIdsStatus;
+  /**
+   * 投稿 ID → 投稿者の現在スペースニックネーム（Phase 2C）。
+   * 過去投稿の主表示名を現在名に解決するために使う。含まれない投稿は投稿時名へ fallback。
+   * ゲスト投稿・membership 無し・nickname 未設定は含まれない。書き換え不可。
+   */
+  postAuthorDisplayNames: ReadonlyMap<string, string>;
   addHossii: (input: AddHossiiInput) => Promise<boolean>;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -1071,6 +1085,49 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         ),
     });
   }, [currentUser?.uid, state.activeSpaceId, isResolvingAuth]);
+
+  // ===== 投稿者の現在表示名マップ（Phase 2C）=====
+  // 過去投稿に「現在のスペースニックネーム」を表示するため、space 単位で
+  // 投稿 ID → 現在表示名 のマップを取得・保持する。取得は anon でも可（PII は返らない）。
+  // authorship 同様、space 切替時は旧 space の値を即クリアし、stale 応答は seq guard で破棄する。
+  // 取得失敗しても投稿表示は止めず、投稿時名（author_name）へ fallback する。
+  const [postAuthorNamesSnapshot, setPostAuthorNamesSnapshot] =
+    useState<PostAuthorNamesSnapshot>(() => ({
+      names: EMPTY_POST_AUTHOR_NAMES,
+      status: 'idle',
+    }));
+  const postAuthorNamesHostRef = useRef<ControllerHost<PostAuthorNamesController> | null>(
+    null,
+  );
+  if (postAuthorNamesHostRef.current === null) {
+    postAuthorNamesHostRef.current = createControllerHost(() =>
+      createPostAuthorNamesController({
+        fetchNames: fetchSpacePostAuthorDisplayNames,
+        onChange: setPostAuthorNamesSnapshot,
+        onError: () => {
+          console.error('[HossiiStore] failed to load post author display names');
+        },
+      }),
+    );
+  }
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    postAuthorNamesHostRef.current?.getOrCreate().sync({
+      ready: !isResolvingAuth,
+      spaceId: state.activeSpaceId || null,
+    });
+  }, [state.activeSpaceId, isResolvingAuth]);
+
+  useEffect(() => {
+    const host = postAuthorNamesHostRef.current;
+    const controller = host?.getOrCreate();
+    return () => {
+      if (host && controller) {
+        host.disposeIfCurrent(controller);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setHossiiEntitiesSnapshot(state.entities.entitiesById);
@@ -1747,6 +1804,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         communitySlug,
         myAuthorshipIds: authorshipSnapshot.ids,
         myAuthorshipIdsStatus: authorshipSnapshot.status,
+        postAuthorDisplayNames: postAuthorNamesSnapshot.names,
         addHossii,
         selectHossii,
         clearAll,

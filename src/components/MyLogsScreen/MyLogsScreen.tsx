@@ -13,6 +13,8 @@ import {
 import { PaneFilterSegment, type PaneFilterCountMode, type PaneFilterValue } from '../CommentsScreen/PaneFilterSegment';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { selectOwnHossiis } from '../../core/utils/selectOwnHossiis';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { PostedNameLabel } from '../common/PostedNameLabel';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import styles from './MyLogsScreen.module.css';
 
@@ -22,7 +24,7 @@ type FilterType = 'all' | 'current';
 type OwnLogViewState = 'loading' | 'error' | 'ready';
 
 export const MyLogsScreen = () => {
-  const { state, getActiveSpaceHossiis, myAuthorshipIds, myAuthorshipIdsStatus } =
+  const { state, getActiveSpaceHossiis, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames } =
     useHossiiStore();
   const { currentUser } = useAuth();
   const { hossiis, spaces, activeSpaceId } = state;
@@ -265,6 +267,12 @@ export const MyLogsScreen = () => {
               const spaceName = getSpaceName(hossii.spaceId);
               const relativeTime = getRelativeTime(hossii.createdAt);
               const emoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : null;
+              // Phase 2C: 現在名を主表示、投稿時名と異なれば補足（現在名マップはアクティブスペース分）。
+              const authorDisplay = resolvePostAuthorDisplay({
+                postedName: hossii.authorName,
+                currentName: postAuthorDisplayNames.get(hossii.id),
+                isOwnPost: true,
+              });
 
               return (
                 <article
@@ -298,10 +306,13 @@ export const MyLogsScreen = () => {
                     </button>
                   )}
 
-                  {(hossii.authorName || emoji) && (
+                  {(authorDisplay.primaryName || emoji) && (
                     <div className={styles.cardFooter}>
-                      {hossii.authorName && (
-                        <span className={styles.authorName}>{hossii.authorName}</span>
+                      {authorDisplay.primaryName && (
+                        <span className={styles.authorName}>
+                          {authorDisplay.primaryName}
+                          <PostedNameLabel name={authorDisplay.postedNameLabel} />
+                        </span>
                       )}
                       {emoji && <span className={styles.emotionChip}>{emoji}</span>}
                     </div>

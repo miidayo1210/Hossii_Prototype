@@ -184,6 +184,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     updateSpace,
     myAuthorshipIds,
     myAuthorshipIdsStatus,
+    postAuthorDisplayNames,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
   const hossiisRef = useRef(state.hossiis);
@@ -1919,6 +1920,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 <AuthorClusterBubble
                   key={group.groupKey}
                   group={group}
+                  currentAuthorName={
+                    postAuthorDisplayNames.get(group.latestPost.id) ??
+                    postAuthorDisplayNames.get(group.posts[0]!.id)
+                  }
                   position={clusterPos}
                   viewMode={viewMode}
                   expanded={expandedClusterKeys.has(group.groupKey)}
@@ -1966,6 +1971,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 <div key={hossii.id} className={postAnimClass} style={{ display: 'contents' }}>
                   <StarView
                     hossii={hossii}
+                    currentAuthorName={postAuthorDisplayNames.get(hossii.id)}
                     x={displayPos.x}
                     y={displayPos.y}
                     anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
@@ -1996,6 +2002,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               <div key={hossii.id} className={postAnimClass} style={{ display: 'contents' }}>
               <Bubble
                 hossii={hossii}
+                currentAuthorName={postAuthorDisplayNames.get(hossii.id)}
                 index={index}
                 position={displayPos}
                 orderedStackZ={displayStackZ}
@@ -2519,6 +2526,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {selectedAuthorGroup && (
         <AuthorTimelineModal
           group={selectedAuthorGroup}
+          currentAuthorName={
+            postAuthorDisplayNames.get(selectedAuthorGroup.latestPost.id) ??
+            postAuthorDisplayNames.get(selectedAuthorGroup.posts[0]!.id)
+          }
           onClose={() => setSelectedAuthorGroup(null)}
           onSelectPost={(id) => setSelectedPostId(id)}
           likesEnabled={spaceSettings?.features.likesEnabled ?? true}

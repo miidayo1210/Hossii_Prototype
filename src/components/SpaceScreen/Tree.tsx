@@ -16,6 +16,8 @@ import {
   bubbleLineClampForScale,
 } from '../../core/utils/bubbleTextTruncation';
 import { withBubbleAlpha, BUBBLE_BG_ALPHA, BUBBLE_BG_ALPHA_HOVER } from '../../core/utils/bubbleColorAlpha';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { PostedNameLabel } from '../common/PostedNameLabel';
 import styles from './SpaceScreen.module.css';
 
 const BUBBLE_COLORS = BUBBLE_INLINE_EDIT_COLORS;
@@ -46,6 +48,8 @@ function getCornerFromTarget(target: HTMLElement): ResizeCorner {
 
 type BubbleProps = {
   hossii: Hossii;
+  /** 投稿者の現在スペースニックネーム（Phase 2C）。異なれば「投稿時：旧名」を補足表示 */
+  currentAuthorName?: string;
   index: number;
   position: { x: number; y: number };
   isActive: boolean;
@@ -84,6 +88,7 @@ type BubbleProps = {
 
 export function BubbleInner({
   hossii,
+  currentAuthorName,
   index,
   position,
   isActive,
@@ -365,7 +370,13 @@ export function BubbleInner({
         : '🌟';
 
   const relativeTime = getRelativeTime(hossii.createdAt);
-  const authorName = hossii.authorName;
+  // Phase 2C: 現在名を主表示、投稿時名と異なれば「投稿時：旧名」を補足。
+  const authorDisplay = resolvePostAuthorDisplay({
+    postedName: hossii.authorName,
+    currentName: currentAuthorName,
+    isOwnPost: false,
+  });
+  const authorName = authorDisplay.primaryName || undefined;
 
   const animationDelay = `${(index % 8) * 0.5}s`;
   const animationDuration = `${4 + (index % 3)}s`;
@@ -567,6 +578,7 @@ export function BubbleInner({
               </div>
               <div className={styles.bubbleCanvasMeta}>
                 <span className={styles.bubbleMetaText}>{authorName ? `${authorName} · ${relativeTime}` : relativeTime}</span>
+                <PostedNameLabel name={authorDisplay.postedNameLabel} />
               </div>
             </>
           )
@@ -589,6 +601,7 @@ export function BubbleInner({
               {authorName && (
                 <span className={styles.bubbleNickname}>{authorName}</span>
               )}
+              <PostedNameLabel name={authorDisplay.postedNameLabel} />
             </div>
             {/* コメント本文 */}
             {bubbleText && (
@@ -760,6 +773,7 @@ export function BubbleInner({
 function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
   return (
     prev.hossii === next.hossii &&
+    prev.currentAuthorName === next.currentAuthorName &&
     prev.position.x === next.position.x &&
     prev.position.y === next.position.y &&
     prev.animationLevel === next.animationLevel &&

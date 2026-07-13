@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { X } from 'lucide-react';
+import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { PostedNameLabel } from '../common/PostedNameLabel';
 import styles from './PostDetailModal.module.css';
 
 type Props = {
@@ -12,6 +15,12 @@ type Props = {
 };
 
 export const PostDetailModal = ({ hossii, onClose, likesEnabled, onLike }: Props) => {
+  const { postAuthorDisplayNames } = useHossiiStore();
+  const authorDisplay = resolvePostAuthorDisplay({
+    postedName: hossii.authorName,
+    currentName: postAuthorDisplayNames.get(hossii.id),
+    isOwnPost: false,
+  });
   const emoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : null;
   const timestamp = hossii.createdAt.toLocaleString('ja-JP');
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
@@ -47,8 +56,11 @@ export const PostDetailModal = ({ hossii, onClose, likesEnabled, onLike }: Props
         </button>
 
         <div className={styles.content}>
-          {hossii.authorName && (
-            <div className={styles.author}>{hossii.authorName}</div>
+          {authorDisplay.primaryName && (
+            <div className={styles.author}>
+              {authorDisplay.primaryName}
+              <PostedNameLabel name={authorDisplay.postedNameLabel} />
+            </div>
           )}
 
           <div className={styles.message}>{renderHossiiText(hossii)}</div>

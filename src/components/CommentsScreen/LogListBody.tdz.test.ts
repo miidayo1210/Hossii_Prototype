@@ -14,6 +14,7 @@ const mockState = vi.hoisted(() => ({
   currentUser: null as { uid: string; isAdmin: boolean } | null,
   myAuthorshipIds: new Set<string>() as ReadonlySet<string>,
   myAuthorshipIdsStatus: 'ready' as MyAuthorshipIdsStatus,
+  postAuthorDisplayNames: new Map<string, string>() as ReadonlyMap<string, string>,
   guestAuthorId: 'guest-device-1' as string | null,
 }));
 
@@ -29,6 +30,7 @@ vi.mock('../../core/hooks/useHossiiStore', () => ({
     getAuthorId: () => mockState.guestAuthorId,
     myAuthorshipIds: mockState.myAuthorshipIds,
     myAuthorshipIdsStatus: mockState.myAuthorshipIdsStatus,
+    postAuthorDisplayNames: mockState.postAuthorDisplayNames,
   }),
 }));
 

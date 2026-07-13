@@ -12,6 +12,8 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { resolveLogScopeSelection } from '../../core/utils/resolveLogScopeSelection';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { PostedNameLabel } from '../common/PostedNameLabel';
 import { LogScopeSegment } from './LogScopeSegment';
 import { PaneFilterSegment, type PaneFilterCountMode } from './PaneFilterSegment';
 import type { CommentsPaneFilter } from '../../core/utils/commentsPaneFilterStorage';
@@ -119,7 +121,7 @@ export function LogListBody({
   movePaneBusyId = null,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
-  const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus } =
+  const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames } =
     useHossiiStore();
   const isAdmin = currentUser?.isAdmin ?? false;
   const space = useMemo(
@@ -397,6 +399,13 @@ export function LogListBody({
             const isSpeech = hossii.autoType === 'speech' || hossii.logType === 'speech';
             const icon = isLaughter ? '😂' : isSpeech ? '🎙' : null;
 
+            // Phase 2C: 現在名を主表示、投稿時名と異なれば補足（mine スコープでは著者名は非表示）。
+            const authorDisplay = resolvePostAuthorDisplay({
+              postedName: hossii.authorName,
+              currentName: postAuthorDisplayNames.get(hossii.id),
+              isOwnPost: false,
+            });
+
             return (
               <div
                 key={hossii.id}
@@ -404,8 +413,11 @@ export function LogListBody({
               >
                 <div className={styles.cardInner}>
                   <div className={styles.cardContent}>
-                    {!isMineScope && hossii.authorName && (
-                      <div className={styles.authorName}>{hossii.authorName}</div>
+                    {!isMineScope && authorDisplay.primaryName && (
+                      <div className={styles.authorName}>
+                        {authorDisplay.primaryName}
+                        <PostedNameLabel name={authorDisplay.postedNameLabel} />
+                      </div>
                     )}
                     {(!isLaughter && renderHossiiText(hossii)) && (
                       <div className={styles.message}>
