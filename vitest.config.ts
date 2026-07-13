@@ -1,6 +1,12 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // React コンポーネントの render テスト（*.test.tsx）で JSX を automatic runtime に固定する。
+  // これがないと esbuild の classic runtime にフォールバックし「React is not defined」で落ちる。
+  esbuild: {
+    jsx: 'automatic',
+    jsxImportSource: 'react',
+  },
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     env: {
