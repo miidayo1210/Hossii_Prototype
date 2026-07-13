@@ -25,14 +25,20 @@ describe('mapMyCommunityMembershipRow', () => {
     const mapped = mapMyCommunityMembershipRow({
       community_id: 'c1',
       community_name: 'Frogs',
+      community_slug: 'frogs',
+      community_description: 'Test community',
       role: 'member',
       status: 'active',
+      community_nickname: 'FrogUser',
     });
     expect(mapped).toEqual({
       communityId: 'c1',
       communityName: 'Frogs',
+      communitySlug: 'frogs',
+      communityDescription: 'Test community',
       role: 'member',
       status: 'active',
+      communityNickname: 'FrogUser',
     });
   });
 });
@@ -53,7 +59,15 @@ describe('fetchMyCommunityMemberships', () => {
   it('ログイン時は list_my_community_memberships を呼び、変換して返す', async () => {
     h.getSession.mockResolvedValue({ data: { session: { user: { id: 'uid' } } } });
     h.rpc.mockResolvedValue({
-      data: [{ community_id: 'c1', community_name: 'Frogs', role: 'member', status: 'active' }],
+      data: [{
+        community_id: 'c1',
+        community_name: 'Frogs',
+        community_slug: null,
+        community_description: null,
+        role: 'member',
+        status: 'active',
+        community_nickname: null,
+      }],
       error: null,
     });
     const rows = await fetchMyCommunityMemberships();

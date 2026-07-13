@@ -17,6 +17,9 @@ export type CommunityMembershipStatus =
 export interface MyCommunityMembership {
   communityId: string;
   communityName: string;
+  communitySlug?: string;
+  communityDescription?: string;
   role: CommunityMembershipRole;
   status: CommunityMembershipStatus;
+  communityNickname: string | null;
 }

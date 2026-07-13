@@ -9,8 +9,11 @@ import type {
 type MyCommunityMembershipRow = {
   community_id: string;
   community_name: string;
+  community_slug: string | null;
+  community_description: string | null;
   role: string;
   status: string;
+  community_nickname: string | null;
 };
 
 export function mapMyCommunityMembershipRow(
@@ -19,8 +22,11 @@ export function mapMyCommunityMembershipRow(
   return {
     communityId: row.community_id,
     communityName: row.community_name,
+    communitySlug: row.community_slug ?? undefined,
+    communityDescription: row.community_description ?? undefined,
     role: row.role as CommunityMembershipRole,
     status: row.status as CommunityMembershipStatus,
+    communityNickname: row.community_nickname,
   };
 }
 
