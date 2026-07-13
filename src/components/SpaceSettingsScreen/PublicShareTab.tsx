@@ -167,24 +167,37 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
         description="誰がアクセスできるか、どう招待するかを設定します。"
       >
         <SettingsSection title="公開範囲">
-          <div className={styles.radioList ?? ''} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+          <p className={styles.sectionHint}>
+            誰がこのスペースを閲覧・投稿できるかを設定します（ログイン要件とは別の設定です）。
+          </p>
+          <div className={styles.radioList}>
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="accessMode"
                 checked={draft.accessMode === 'public'}
                 onChange={() => setDraft({ ...draft, accessMode: 'public' })}
               />
-              公開（URL を知っている人・ゲスト可）
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>公開</span>
+                <span className={styles.radioDesc}>
+                  URLを知っている人は、ゲストを含めて閲覧・投稿できます。
+                </span>
+              </span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="accessMode"
                 checked={draft.accessMode === 'invite_only'}
                 onChange={() => setDraft({ ...draft, accessMode: 'invite_only' })}
               />
-              招待制（スペースメンバーのみ）
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>メンバー限定</span>
+                <span className={styles.radioDesc}>
+                  スペースメンバーと管理者だけが閲覧・投稿できます。
+                </span>
+              </span>
             </label>
           </div>
           <p className={styles.description} style={{ marginTop: '0.75rem' }}>
@@ -192,25 +205,38 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
           </p>
         </SettingsSection>
 
-        <SettingsSection title="ログイン要件（従来）">
-          <div className={styles.radioList ?? ''} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+        <SettingsSection title="ログイン要件">
+          <p className={styles.sectionHint}>
+            未ログインのゲスト参加を許可するかを設定します（公開範囲とは別の設定です）。
+          </p>
+          <div className={styles.radioList}>
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="visibility"
                 checked={!draft.isPrivate}
                 onChange={() => setDraft({ ...draft, isPrivate: false })}
               />
-              ゲスト参加を許可
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>ログイン不要</span>
+                <span className={styles.radioDesc}>
+                  ニックネームだけでゲスト参加できます。
+                </span>
+              </span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="visibility"
                 checked={draft.isPrivate}
                 onChange={() => setDraft({ ...draft, isPrivate: true })}
               />
-              ログイン必須（非公開）
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>ログイン必須</span>
+                <span className={styles.radioDesc}>
+                  Hossiiアカウントへのログインが必要です。
+                </span>
+              </span>
             </label>
           </div>
           <p className={styles.description} style={{ marginTop: '0.75rem' }}>
