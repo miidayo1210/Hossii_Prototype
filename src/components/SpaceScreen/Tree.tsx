@@ -18,6 +18,8 @@ import {
 import { withBubbleAlpha, BUBBLE_BG_ALPHA, BUBBLE_BG_ALPHA_HOVER } from '../../core/utils/bubbleColorAlpha';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
+import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
+import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
 import styles from './SpaceScreen.module.css';
 
 const BUBBLE_COLORS = BUBBLE_INLINE_EDIT_COLORS;
@@ -84,6 +86,13 @@ type BubbleProps = {
   isPinned?: boolean;
   onPinToggle?: (id: string) => void;
   showPinUi?: boolean;
+  /**
+   * ログイン本人の投稿で、本人操作（編集/公開範囲/削除）を吹き出し直下に出せるか。
+   * 呼び出し側が canManageOwnPost で判定する（authorship 正本・他人/ゲストには出さない）。
+   */
+  canManageOwn?: boolean;
+  /** 本人操作から削除が成功したときに選択解除するためのコールバック */
+  onOwnerDeleted?: () => void;
 };
 
 export function BubbleInner({
@@ -110,6 +119,8 @@ export function BubbleInner({
   isPinned = false,
   onPinToggle,
   showPinUi = false,
+  canManageOwn = false,
+  onOwnerDeleted,
 }: BubbleProps) {
   const { ref: visibilityRef, level: visibleAnimLevel } = useVisibleAnimationLevel(
     animationLevel,
@@ -207,6 +218,10 @@ export function BubbleInner({
     if (!el) return;
 
     const onPointerDown = (e: PointerEvent) => {
+      // 本人操作バー（編集/公開範囲/削除）上の操作はドラッグ・選択に干渉させない。
+      // preventDefault で click が潰れないよう、ここで早期 return する。
+      if ((e.target as HTMLElement).closest('[data-owner-actions]')) return;
+
       // 未選択 → 選択のみ（ドラッグは次のクリックから）
       if (!isSelectedRef.current) {
         onSelectRef.current?.(hossiiRef.current.id);
@@ -698,6 +713,25 @@ export function BubbleInner({
         </div>
       )}
 
+      {/* 本人操作バー: 自分の吹き出しを選択したとき、吹き出し直下に編集/公開範囲/削除を出す。
+          位置編集(canEdit)とは独立して常に到達可能にする。 */}
+      {isSelected && canManageOwn && (
+        <div
+          className={styles.bubbleOwnerBar}
+          data-owner-actions
+          data-space-export="exclude"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {hossii.visibility === 'owner_only' && <OwnerOnlyBadge />}
+          <OwnPostActions
+            hossii={hossii}
+            variant="bar"
+            onDeleted={onOwnerDeleted}
+          />
+        </div>
+      )}
+
       {/* 選択時: 4コーナーのリサイズハンドル + カラーパレット（編集権限がある場合のみ） */}
       {isSelected && canEdit && (
         <>
@@ -785,6 +819,8 @@ function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
     prev.isRecentHighlight === next.isRecentHighlight &&
     prev.isPinned === next.isPinned &&
     prev.showPinUi === next.showPinUi &&
+    prev.canManageOwn === next.canManageOwn &&
+    prev.onOwnerDeleted === next.onOwnerDeleted &&
     prev.onPinToggle === next.onPinToggle &&
     prev.onActivate === next.onActivate &&
     prev.onSelect === next.onSelect

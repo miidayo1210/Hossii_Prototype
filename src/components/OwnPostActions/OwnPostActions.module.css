@@ -3,6 +3,57 @@
   display: inline-flex;
 }
 
+/* ===== bar variant（吹き出し直下の小さな操作バー） ===== */
+.bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+}
+
+.barBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.barBtn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.barBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.barBtnDanger {
+  color: #dc2626;
+}
+
+.barBtnDanger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.barError {
+  font-size: 0.7rem;
+  color: #dc2626;
+  padding: 0 0.35rem;
+  max-width: 12rem;
+}
+
 .trigger {
   display: inline-flex;
   align-items: center;

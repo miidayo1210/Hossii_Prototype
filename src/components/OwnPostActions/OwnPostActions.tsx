@@ -11,6 +11,13 @@ type Props = {
   /** 削除成功時に親（詳細モーダル等）を閉じるためのコールバック */
   onDeleted?: () => void;
   className?: string;
+  /**
+   * 表示形式。
+   * - 'menu'（既定）: ⋮ ボタン + ドロップダウン。詳細モーダル等の狭い場所向け。
+   * - 'bar': 鉛筆 / 目・鍵 / ゴミ箱 の3アイコンを直接並べる。吹き出し直下など、
+   *   ユーザーがすぐ気づける位置に置く用途。
+   */
+  variant?: 'menu' | 'bar';
 };
 
 type Mode = 'idle' | 'editing' | 'confirmDelete';
@@ -21,7 +28,12 @@ type Mode = 'idle' | 'editing' | 'confirmDelete';
  * この UI を出すかどうかは呼び出し側が canManageOwnPost で判定する（本人・authorship ready のみ）。
  * 実際の権限は DB(RPC + RLS) が正本で、ここは表示・操作導線のみ。ゲスト投稿・他人投稿には出さない。
  */
-export const OwnPostActions = ({ hossii, onDeleted, className }: Props) => {
+export const OwnPostActions = ({
+  hossii,
+  onDeleted,
+  className,
+  variant = 'menu',
+}: Props) => {
   const { editMyHossiiContent, setMyHossiiVisibilityAction, softDeleteMyHossiiAction } =
     useHossiiActions();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -113,63 +125,8 @@ export const OwnPostActions = ({ hossii, onDeleted, className }: Props) => {
     onDeleted?.();
   };
 
-  return (
-    <div className={`${styles.root} ${className ?? ''}`} ref={rootRef}>
-      <button
-        type="button"
-        className={styles.trigger}
-        aria-label="自分の投稿を操作"
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        onClick={() => {
-          setError(null);
-          setMenuOpen((v) => !v);
-        }}
-      >
-        <MoreVertical size={16} />
-      </button>
-
-      {menuOpen && (
-        <div className={styles.menu} role="menu">
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.menuItem}
-            onClick={openEdit}
-            disabled={busy}
-          >
-            <Pencil size={14} /> 編集する
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.menuItem}
-            onClick={handleToggleVisibility}
-            disabled={busy}
-          >
-            {isOwnerOnly ? (
-              <>
-                <Eye size={14} /> みんなに公開する
-              </>
-            ) : (
-              <>
-                <EyeOff size={14} /> 自分だけに見せる
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={`${styles.menuItem} ${styles.menuItemDanger}`}
-            onClick={openDelete}
-            disabled={busy}
-          >
-            <Trash2 size={14} /> 削除する
-          </button>
-          {error && <p className={styles.menuError}>{error}</p>}
-        </div>
-      )}
-
+  const overlays = (
+    <>
       {mode === 'editing' &&
         createPortal(
           <div className={styles.overlay} onMouseDown={closeOverlay}>
@@ -251,6 +208,106 @@ export const OwnPostActions = ({ hossii, onDeleted, className }: Props) => {
           </div>,
           document.body,
         )}
+    </>
+  );
+
+  if (variant === 'bar') {
+    return (
+      <div className={`${styles.bar} ${className ?? ''}`} ref={rootRef}>
+        <button
+          type="button"
+          className={styles.barBtn}
+          aria-label="編集する"
+          title="編集する"
+          onClick={openEdit}
+          disabled={busy}
+        >
+          <Pencil size={16} />
+        </button>
+        <button
+          type="button"
+          className={styles.barBtn}
+          aria-label={isOwnerOnly ? 'みんなに公開する' : '自分だけに見せる'}
+          title={isOwnerOnly ? 'みんなに公開する' : '自分だけに見せる'}
+          onClick={handleToggleVisibility}
+          disabled={busy}
+        >
+          {isOwnerOnly ? <Eye size={16} /> : <EyeOff size={16} />}
+        </button>
+        <button
+          type="button"
+          className={`${styles.barBtn} ${styles.barBtnDanger}`}
+          aria-label="削除する"
+          title="削除する"
+          onClick={openDelete}
+          disabled={busy}
+        >
+          <Trash2 size={16} />
+        </button>
+        {error && mode === 'idle' && <span className={styles.barError}>{error}</span>}
+        {overlays}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${styles.root} ${className ?? ''}`} ref={rootRef}>
+      <button
+        type="button"
+        className={styles.trigger}
+        aria-label="自分の投稿を操作"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={() => {
+          setError(null);
+          setMenuOpen((v) => !v);
+        }}
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {menuOpen && (
+        <div className={styles.menu} role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={openEdit}
+            disabled={busy}
+          >
+            <Pencil size={14} /> 編集する
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={handleToggleVisibility}
+            disabled={busy}
+          >
+            {isOwnerOnly ? (
+              <>
+                <Eye size={14} /> みんなに公開する
+              </>
+            ) : (
+              <>
+                <EyeOff size={14} /> 自分だけに見せる
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={`${styles.menuItem} ${styles.menuItemDanger}`}
+            onClick={openDelete}
+            disabled={busy}
+          >
+            <Trash2 size={14} /> 削除する
+          </button>
+          {error && <p className={styles.menuError}>{error}</p>}
+        </div>
+      )}
+
+      {overlays}
     </div>
   );
 };

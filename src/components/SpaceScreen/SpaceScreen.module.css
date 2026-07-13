@@ -1526,6 +1526,19 @@
   margin-right: 0.25rem;
 }
 
+/* 本人操作バー: 選択した自分の吹き出しの直下に表示（見つけやすさ優先） */
+.bubbleOwnerBar {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  z-index: 210;
+  white-space: nowrap;
+}
+
 /* Mobile: Bottom nav padding */
 @media (max-width: 768px) {
   .container {

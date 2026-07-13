@@ -101,7 +101,6 @@ import {
 } from '../../core/utils/tabSyncDiagnostics';
 import { HossiiLive } from '../Hossii/HossiiLive';
 import { MyHossiiLayer } from '../MyHossii/MyHossiiLayer';
-import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
 import { fetchMyHossiiSettings, isMyHossiiRegistered } from '../../core/utils/userProfilesApi';
 import { fetchParticipantEligibility } from '../../core/utils/myHossiiParticipationApi';
 import type { ParticipantEligibility } from '../../core/utils/myHossiiAppearance';
@@ -1286,20 +1285,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const { filteredHossiis, tagCounts } = pipeline;
 
-  const selectedHossii = useMemo(
-    () => filteredHossiis.find((h) => h.id === selectedBubbleId) ?? null,
-    [filteredHossiis, selectedBubbleId],
+  // 吹き出しごとに本人操作（編集/公開範囲/削除）を出せるか。
+  // authorship を正本にし、ゲスト投稿・他人投稿・authorship 未確定では出さない。
+  // presentationMode に依存せず、custom / ordered / random すべてで機能する。
+  const canManageOwnHossii = useCallback(
+    (hossiiId: string) =>
+      canManageOwnPost({
+        isAuthenticated: !!currentUser,
+        myAuthorshipIds,
+        myAuthorshipIdsStatus,
+        hossiiId,
+      }),
+    [currentUser, myAuthorshipIds, myAuthorshipIdsStatus],
   );
-
-  const showOwnerActionsOnBubble =
-    presentationMode === 'custom' &&
-    selectedHossii != null &&
-    canManageOwnPost({
-      isAuthenticated: !!currentUser,
-      myAuthorshipIds,
-      myAuthorshipIdsStatus,
-      hossiiId: selectedHossii.id,
-    });
 
   const pinnedHossiisForTray = useMemo(() => {
     const byId = new Map(filteredHossiis.map((h) => [h.id, h]));
@@ -2116,6 +2114,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onPinToggle={handlePinToggle}
                 showPinUi={showPinUi}
                 animationLevel={animationLevel}
+                canManageOwn={canManageOwnHossii(hossii.id)}
+                onOwnerDeleted={handleBubbleDeselect}
               />
               </div>
             );
@@ -2543,13 +2543,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           <span className={styles.editToolbarHint}>
             ドラッグで移動 · 角ハンドルでリサイズ
           </span>
-          {showOwnerActionsOnBubble && selectedHossii && (
-            <OwnPostActions
-              hossii={selectedHossii}
-              onDeleted={handleBubbleDeselect}
-              className={styles.editToolbarOwnerActions}
-            />
-          )}
           {isAdmin && (
             <button
               type="button"
