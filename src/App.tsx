@@ -5,6 +5,7 @@ import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { SpacePaneProvider } from './core/hooks/SpacePaneProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
+import { resolveSpaceSlug } from './core/utils/resolveSpaceSlug';
 import { isSupabaseConfigured, supabaseEnvironmentValidation } from './core/supabase';
 import { AuthProvider } from './core/contexts/AuthContext';
 import { useAuth } from './core/contexts/useAuth';
@@ -515,6 +516,17 @@ const AppContent = () => {
       <ParticipantLoginScreen
         spaceId={pendingParticipantSpaceId}
         onClose={() => setPendingParticipantSpaceId(null)}
+        onEmailLogin={() => {
+          // 参加者ログイン → メールログイン（既存 LoginScreen）へ切り替える。
+          // 戻り先スペースは既存の pendingLoginSlug 経路を再利用し、成功後に /s/[slug] へ戻す。
+          const slug = resolveSpaceSlug({
+            spaceId: pendingParticipantSpaceId,
+            spaces: state.spaces,
+            pathname: window.location.pathname,
+          });
+          setPendingParticipantSpaceId(null);
+          if (slug) setPendingLoginSlug(slug);
+        }}
       />
     );
   }
@@ -534,7 +546,9 @@ const AppContent = () => {
   }
 
   // /s/[slug] アクセス: 未ログインかつゲスト入室前 → ゲスト入室画面
-  if (!currentUser && !isResolvingAuth && guestSpaceId && !isGuestMode) {
+  // pendingLoginSlug が立っている（＝メールログインへ切り替え中）ときは
+  // 下の LoginScreen を優先させるため、ここでは表示しない。
+  if (!currentUser && !isResolvingAuth && guestSpaceId && !isGuestMode && !pendingLoginSlug) {
     return (
       <GuestEntryScreen
         spaceId={guestSpaceId}

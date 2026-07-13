@@ -9,9 +9,11 @@ import styles from './LoginScreen.module.css';
 type Props = {
   spaceId: string;
   onClose: () => void;
+  /** 「メールアドレスでログイン」導線。押すと既存の LoginScreen（一般ログイン）へ切り替える */
+  onEmailLogin?: () => void;
 };
 
-export const ParticipantLoginScreen = ({ spaceId, onClose }: Props) => {
+export const ParticipantLoginScreen = ({ spaceId, onClose, onEmailLogin }: Props) => {
   const { loginParticipant } = useAuth();
   const { state } = useHossiiStore();
   const [loginId, setLoginId] = useState('');
@@ -112,6 +114,19 @@ export const ParticipantLoginScreen = ({ spaceId, onClose }: Props) => {
               <span>{loading ? 'ログイン中…' : 'ログイン'}</span>
             </button>
           </form>
+
+          {onEmailLogin && (
+            <div className={styles.altLoginRow}>
+              <button
+                type="button"
+                className={styles.altLoginLink}
+                onClick={onEmailLogin}
+                disabled={loading}
+              >
+                メールアドレスでログインする
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </AuthEntryShell>
