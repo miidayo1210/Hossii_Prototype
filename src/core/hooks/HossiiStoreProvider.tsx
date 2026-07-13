@@ -894,6 +894,12 @@ export type HossiiContextValue = {
   setMyHossiiVisibilityAction: (id: string, visibility: HossiiVisibility) => Promise<OwnPostMutationResult>;
   /** Phase 2D-2: 本人によるソフト削除（物理 DELETE はしない） */
   softDeleteMyHossiiAction: (id: string) => Promise<OwnPostMutationResult>;
+  /**
+   * Phase 2F: 指定スペースの「投稿者の現在表示名」マップを強制再取得する。
+   * スペースニックネーム変更後、過去投稿の現在名をリロードなしで反映するために使う。
+   * アクティブスペースと一致するときだけ再取得する（別スペースの取得で現在の表示を汚さない）。
+   */
+  refreshPostAuthorDisplayNames: (spaceId: string) => void;
   /** ページ fetch 結果を optimistic 投稿と merge して反映 */
   syncFetchedHossiis: (
     items: Hossii[],
@@ -1919,6 +1925,15 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     [],
   );
 
+  const refreshPostAuthorDisplayNames = useCallback((spaceId: string) => {
+    if (!isSupabaseConfigured || !spaceId) return;
+    // アクティブスペース以外の再取得は snapshot を汚すため行わない
+    // （controller は現在表示中の 1 スペース分だけを保持する）。
+    if (spaceId !== stateRef.current.activeSpaceId) return;
+    // peek() は controller を生成しない（unmount 後に復活させない）。
+    postAuthorNamesHostRef.current?.peek()?.refresh(spaceId);
+  }, []);
+
   return (
     <SpacePaneRuntimeContext.Provider value={spacePaneRuntimeRef}>
     <HossiiContext.Provider
@@ -1957,6 +1972,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         editMyHossiiContent,
         setMyHossiiVisibilityAction,
         softDeleteMyHossiiAction,
+        refreshPostAuthorDisplayNames,
         syncFetchedHossiis,
         setHossiiFetchLoading,
       }}
@@ -1990,6 +2006,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           editMyHossiiContent,
           setMyHossiiVisibilityAction,
           softDeleteMyHossiiAction,
+          refreshPostAuthorDisplayNames,
           syncFetchedHossiis,
           setHossiiFetchLoading,
         }}

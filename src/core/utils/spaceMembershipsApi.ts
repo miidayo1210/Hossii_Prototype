@@ -100,6 +100,38 @@ export async function fetchMySpaceMemberships(): Promise<SpaceMembership[]> {
   return ((data ?? []) as SpaceMembershipRow[]).map(mapSpaceMembershipRow);
 }
 
+export type UpdateSpaceNicknameResult =
+  | { ok: true; nickname: string | null }
+  | { ok: false; message: string; code?: string };
+
+/**
+ * ログイン本人の space_memberships.space_nickname を安全に変更する（Phase 2F）。
+ *
+ * - SECURITY DEFINER RPC 経由（authenticated のみ EXECUTE 可）。auth.uid() が正本で、
+ *   引数に auth_user_id を渡さない。RPC は本人の membership のみ・space_nickname だけを更新する。
+ * - 正規化（trim / 空→NULL / 長さ / 制御文字）は RPC 内で行われ、確定後の値を返す。
+ * - session なし・未設定時は安全に失敗する（例外を投げず ok:false）。
+ */
+export async function updateMySpaceNickname(
+  spaceId: string,
+  nickname: string,
+): Promise<UpdateSpaceNicknameResult> {
+  if (!isSupabaseConfigured || !spaceId) {
+    return { ok: false, message: 'Supabase is not configured' };
+  }
+
+  const { data, error } = await supabase.rpc('update_my_space_nickname', {
+    p_space_id: spaceId,
+    p_space_nickname: nickname,
+  });
+
+  if (error) {
+    return { ok: false, message: error.message, code: error.code };
+  }
+
+  return { ok: true, nickname: (data as string | null) ?? null };
+}
+
 /**
  * ログイン中ユーザー本人の、指定スペースにおける membership を 1 件取得する。
  * 未参加・未ログイン・未設定時は null。
