@@ -1522,6 +1522,10 @@
   white-space: nowrap;
 }
 
+.editToolbarOwnerActions {
+  margin-right: 0.25rem;
+}
+
 /* Mobile: Bottom nav padding */
 @media (max-width: 768px) {
   .container {
