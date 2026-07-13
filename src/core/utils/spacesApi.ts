@@ -17,6 +17,7 @@ type SpaceRow = {
   saved_background_images: string[] | null;
   created_at: string;
   is_private?: boolean | null;
+  access_mode?: string | null;
   preset_tags?: string[] | null;
   welcome_message?: string | null;
   description?: string | null;
@@ -42,6 +43,7 @@ function rowToSpace(row: SpaceRow): Space {
     savedBackgroundImages: row.saved_background_images ?? undefined,
     createdAt: new Date(row.created_at),
     isPrivate: row.is_private ?? undefined,
+    accessMode: row.access_mode === 'invite_only' ? 'invite_only' : 'public',
     presetTags: row.preset_tags ?? undefined,
     welcomeMessage: row.welcome_message ?? undefined,
     description: row.description ?? undefined,
@@ -153,6 +155,7 @@ export async function updateSpaceInDb(id: SpaceId, patch: SpaceUpdatePatch): Pro
   if (patch.background !== undefined) updateObj.background = patch.background;
   if (patch.savedBackgroundImages !== undefined) updateObj.saved_background_images = patch.savedBackgroundImages ?? null;
   if (patch.isPrivate !== undefined) updateObj.is_private = patch.isPrivate ?? null;
+  if (patch.accessMode !== undefined) updateObj.access_mode = patch.accessMode;
   if (patch.presetTags !== undefined) updateObj.preset_tags = patch.presetTags ?? null;
   if (patch.welcomeMessage !== undefined) updateObj.welcome_message = patch.welcomeMessage ?? null;
   if (patch.description !== undefined) updateObj.description = patch.description ?? null;

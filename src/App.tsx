@@ -5,6 +5,7 @@ import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { SpacePaneProvider } from './core/hooks/SpacePaneProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
+import { checkCanAccessSpace } from './core/utils/spaceAccessApi';
 import { resolveSpaceSlug } from './core/utils/resolveSpaceSlug';
 import { isSupabaseConfigured, supabaseEnvironmentValidation } from './core/supabase';
 import { AuthProvider } from './core/contexts/AuthContext';
@@ -259,26 +260,28 @@ const AppContent = () => {
 
     if (targetSpace) {
       initialSlugHandledRef.current = true;
-      // スペースが見つかった場合は "not found" をリセット
-      setSpaceURLNotFound(false);
 
-      if (currentUser) {
-        // ログイン済み: そのまま入室
-        setActiveSpace(targetSpace.id);
-        if (!hasNicknameForSpace(targetSpace.id)) {
-          setPendingSpaceId(targetSpace.id);
-          setShowNicknameModal(true);
+      void checkCanAccessSpace(targetSpace.id).then((allowed) => {
+        if (!allowed) {
+          setSpaceURLNotFound(true);
+          return;
         }
-        window.history.replaceState({}, '', originalPath);
-        navigate('screen');
-      } else {
-        // 未ログイン: isPrivate なスペースはアクセス拒否
-        if (!isGuestMode) {
+
+        setSpaceURLNotFound(false);
+
+        if (currentUser) {
+          setActiveSpace(targetSpace.id);
+          if (!hasNicknameForSpace(targetSpace.id)) {
+            setPendingSpaceId(targetSpace.id);
+            setShowNicknameModal(true);
+          }
+          window.history.replaceState({}, '', originalPath);
+          navigate('screen');
+        } else if (!isGuestMode) {
           if (targetSpace.isPrivate) {
             setGuestSpaceId(targetSpace.id);
             setGuestSpaceIsPrivate(true);
           } else if (hasNicknameForSpace(targetSpace.id)) {
-            // 過去に入室済み（ニックネームが localStorage に保存されている）→ そのまま入室
             setActiveSpace(targetSpace.id);
             setIsGuestMode(true);
             window.history.replaceState({}, '', originalPath);
@@ -287,7 +290,8 @@ const AppContent = () => {
             setGuestSpaceId(targetSpace.id);
           }
         }
-      }
+      });
+      return;
     } else if (spacesLoadedFromSupabase) {
       // Supabase あり: 単体取得が miss のときだけ not-found
       // loading 中や hit 直後の state 反映待ちでは出さない

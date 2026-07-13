@@ -22,6 +22,7 @@ function input(over: Partial<MembershipJoinInput> = {}): MembershipJoinInput {
     uid: 'user-1',
     spaceId: 'space-1',
     isGuest: false,
+    allowAutoJoin: true,
     resolveNickname: () => 'にっく',
     ...over,
   };
@@ -41,6 +42,12 @@ describe('createMembershipJoinController', () => {
   it('#2 guest では呼ばない', () => {
     const { controller, join } = makeController();
     controller.sync(input({ isGuest: true }));
+    expect(join).not.toHaveBeenCalled();
+  });
+
+  it('invite_only（allowAutoJoin=false）では呼ばない', () => {
+    const { controller, join } = makeController();
+    controller.sync(input({ allowAutoJoin: false }));
     expect(join).not.toHaveBeenCalled();
   });
 

@@ -18,6 +18,8 @@ export type MembershipJoinInput = {
   uid: string | null;
   spaceId: string | null;
   isGuest: boolean;
+  /** public shared のみ true。invite_only では自己 join しない。 */
+  allowAutoJoin: boolean;
   /** join 実行時に space_nickname を解決する。取得失敗時は null を返す（join は止めない）。 */
   resolveNickname: () => string | null;
 };
@@ -44,10 +46,10 @@ export function createMembershipJoinController(
 
   return {
     sync: (input) => {
-      const { configured, authReady, uid, spaceId, isGuest, resolveNickname } = input;
+      const { configured, authReady, uid, spaceId, isGuest, allowAutoJoin, resolveNickname } = input;
 
-      // ログアウト / ゲスト = 対象外。次回ログイン時に再 join できるよう dedupe を解除する。
-      if (!uid || isGuest) {
+      // ログアウト / ゲスト / invite_only = 対象外。
+      if (!uid || isGuest || !allowAutoJoin) {
         lastSuccessKey = null;
         inFlightKey = null;
         return;

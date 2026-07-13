@@ -108,6 +108,7 @@ import {
   type AuthorshipControllerHost,
 } from '../utils/authorshipControllerHost';
 import { joinSpaceAsMember } from '../utils/spaceMembershipsApi';
+import { checkCanAccessSpace } from '../utils/spaceAccessApi';
 import {
   createMembershipJoinController,
   resolveMembershipNickname,
@@ -221,6 +222,8 @@ const normalizeSpace = (f: unknown): Space => {
       : undefined;
 
   const isPrivate = typeof raw.isPrivate === 'boolean' ? raw.isPrivate : undefined;
+  const accessMode =
+    raw.accessMode === 'invite_only' ? 'invite_only' : raw.accessMode === 'public' ? 'public' : undefined;
   const welcomeMessage = typeof raw.welcomeMessage === 'string' ? raw.welcomeMessage : undefined;
   const description = typeof raw.description === 'string' ? raw.description : undefined;
   const characterName = typeof raw.characterName === 'string' ? raw.characterName : undefined;
@@ -255,6 +258,7 @@ const normalizeSpace = (f: unknown): Space => {
     savedBackgroundImages,
     presetTags,
     isPrivate,
+    accessMode,
     welcomeMessage,
     description,
     characterName,
@@ -1108,6 +1112,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }
 
   useEffect(() => {
+    const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
+    const allowAutoJoin = activeSpace?.accessMode !== 'invite_only';
+
     membershipJoinRef.current?.sync({
       configured: isSupabaseConfigured,
       authReady: !isResolvingAuth,
@@ -1115,6 +1122,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       spaceId: state.activeSpaceId || null,
       // ログインアカウント（auth uid）が無い＝ゲスト。ゲストは membership を作らない。
       isGuest: !currentUser?.uid,
+      allowAutoJoin,
       // nickname は既存 state / currentUser からのみ解決（追加 DB query なし）。取得失敗は null。
       resolveNickname: () =>
         resolveMembershipNickname(
@@ -1127,7 +1135,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           stateRef.current.activeSpaceId,
         ),
     });
-  }, [currentUser?.uid, state.activeSpaceId, isResolvingAuth]);
+  }, [currentUser?.uid, state.activeSpaceId, state.spaces, isResolvingAuth]);
 
   // ===== 投稿者の現在表示名マップ（Phase 2C）=====
   // 過去投稿に「現在のスペースニックネーム」を表示するため、space 単位で
@@ -1336,91 +1344,92 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // （削除済み）
 
   // ===== Supabase Realtime: hossiis の INSERT/UPDATE/DELETE を購読 =====
+  // invite_only 等で can_access_space=false のときは購読しない（RLS に加え二重ガード）。
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured || !state.activeSpaceId) return;
 
     const activeSpaceId = state.activeSpaceId;
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    // サーバーサイドフィルタは REPLICA IDENTITY FULL が必要なため
-    // フィルタなしで購読し、クライアントサイドでスペースIDをチェックする
-    const channel = supabase
-      .channel(`hossiis_realtime:${activeSpaceId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'hossiis' },
-        (payload) => {
-          const row = payload.new as HossiiRow;
-          if (row.space_id !== activeSpaceId) return;
-          const hossii = rowToHossii(row);
-          // Phase 2D-2: ソフト削除済みの行は一覧へ入れない（RLS 迂回・stale 対策の保険）。
-          if (hossii.deletedAt) return;
-          const runtime = spacePaneRuntimeRef.current;
-          if (!shouldAcceptRealtimeInsert(hossii, runtime, activeSpaceId)) return;
-          // 自分が INSERT した場合は重複 ADD のみ避ける。insertedHossiiIdsRef は fetch マージで掃除する
-          // （ここで delete すると、遅れて届く古い fetch が楽観行をマージせず消す）。
-          if (insertedHossiiIdsRef.current.has(row.id)) {
-            if (!stateRef.current.hossiis.some((h) => h.id === row.id)) {
-              dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
+    void checkCanAccessSpace(activeSpaceId).then((allowed) => {
+      if (cancelled || !allowed) return;
+
+      channel = supabase
+        .channel(`hossiis_realtime:${activeSpaceId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'hossiis' },
+          (payload) => {
+            const row = payload.new as HossiiRow;
+            if (row.space_id !== activeSpaceId) return;
+            const hossii = rowToHossii(row);
+            if (hossii.deletedAt) return;
+            const runtime = spacePaneRuntimeRef.current;
+            if (!shouldAcceptRealtimeInsert(hossii, runtime, activeSpaceId)) return;
+            if (insertedHossiiIdsRef.current.has(row.id)) {
+              if (!stateRef.current.hossiis.some((h) => h.id === row.id)) {
+                dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
+              }
+              return;
             }
-            return;
-          }
-          dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'hossiis' },
-        (payload) => {
-          const row = payload.new as HossiiRow;
-          if (row.space_id !== activeSpaceId) return;
-          const after = rowToHossii(row);
-          // Phase 2D-2: ソフト削除は UPDATE として届くため、deleted_at が付いたら一覧から除去する
-          // （本人の楽観削除の巻き戻り防止 + 別端末での削除の反映）。
-          if (after.deletedAt) {
-            dispatch({ type: 'REMOVE_HOSSII', payload: row.id });
-            return;
-          }
-          const runtime = spacePaneRuntimeRef.current;
-          if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
-
-          const before = stateRef.current.entities.entitiesById[row.id];
-          if (!before) {
-            if (shouldAcceptRealtimeInsert(after, runtime, activeSpaceId)) {
-              dispatch({ type: 'ADD_HOSSII_FULL', payload: after });
+            dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'hossiis' },
+          (payload) => {
+            const row = payload.new as HossiiRow;
+            if (row.space_id !== activeSpaceId) return;
+            const after = rowToHossii(row);
+            if (after.deletedAt) {
+              dispatch({ type: 'REMOVE_HOSSII', payload: row.id });
+              return;
             }
-            return;
-          }
+            const runtime = spacePaneRuntimeRef.current;
+            if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
 
-          const transition = classifyRealtimeUpdate(before, after, runtime);
-          if (transition === 'ignore') return;
-          if (transition === 'patchOnly') {
-            dispatch({ type: 'UPDATE_HOSSII_FROM_REALTIME', payload: after });
-            return;
+            const before = stateRef.current.entities.entitiesById[row.id];
+            if (!before) {
+              if (shouldAcceptRealtimeInsert(after, runtime, activeSpaceId)) {
+                dispatch({ type: 'ADD_HOSSII_FULL', payload: after });
+              }
+              return;
+            }
+
+            const transition = classifyRealtimeUpdate(before, after, runtime);
+            if (transition === 'ignore') return;
+            if (transition === 'patchOnly') {
+              dispatch({ type: 'UPDATE_HOSSII_FROM_REALTIME', payload: after });
+              return;
+            }
+            dispatch({
+              type: 'APPLY_REALTIME_PANE_UPDATE',
+              payload: { before, after, transition },
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'hossiis' },
+          (payload) => {
+            const id = (payload.old as { id: string }).id;
+            dispatch({ type: 'REMOVE_HOSSII', payload: id });
+          },
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] hossiis subscribed for space:', activeSpaceId);
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error('[Realtime] hossiis channel error:', status, activeSpaceId);
           }
-          dispatch({
-            type: 'APPLY_REALTIME_PANE_UPDATE',
-            payload: { before, after, transition },
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'hossiis' },
-        (payload) => {
-          const id = (payload.old as { id: string }).id;
-          dispatch({ type: 'REMOVE_HOSSII', payload: id });
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] hossiis subscribed for space:', activeSpaceId);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] hossiis channel error:', status, activeSpaceId);
-        }
-      });
+        });
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [state.activeSpaceId]);
 

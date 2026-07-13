@@ -93,6 +93,8 @@ export type Space = {
   myHossiiLogVisibility?: MyHossiiLogVisibility;
   /** 所属コミュニティ（DB: spaces.community_id） */
   communityId?: string;
+  /** 共有スペースの参加モード（DB: spaces.access_mode）。personal では無視。 */
+  accessMode?: 'public' | 'invite_only';
 };
 
 /** Partial update for Space; null clears nullable DB-backed fields. */
