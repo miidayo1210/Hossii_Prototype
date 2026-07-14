@@ -904,10 +904,10 @@ export function SpacePaneBar({
             aria-selected={!!personalShortcut.active}
             aria-label={
               personalShortcut.active
-                ? '自分の個人スペースを表示中'
-                : '自分の個人スペースを開く'
+                ? 'マイスペースを表示中'
+                : 'マイスペースを開く'
             }
-            title="自分の個人スペース"
+            title="マイスペース"
             className={`${styles.personalShortcut} ${
               personalShortcut.active ? styles.personalShortcutActive : ''
             }`}

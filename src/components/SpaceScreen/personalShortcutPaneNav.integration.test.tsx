@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 //
-// 統合テスト: 共有スペース画面の Pane 切替タブ列に「わたし」が表示されるまでの
+// 統合テスト: 共有スペース画面の Pane 切替タブ列に「マイスペース」が表示されるまでの
 // 実データ経路を、SpaceScreen と同じ配線で検証する。
 //
 // 目的（111 の受入）:
 //   - fetchSpaceByUrl → MERGE_SPACE 経路と同じ normalizeSpace を通したスペースが
 //     community_id / space_type / owner_user_id を保持すること（回帰防止）。
 //   - その正規化済みスペースと membership から canShowPersonalShortcut / isViewingOwnPersonalSpace を
-//     算出し、SpacePaneBar の role="tablist" 内・可視 Pane の後ろに「わたし」が出ること。
+//     算出し、SpacePaneBar の role="tablist" 内・可視 Pane の後ろに「マイスペース」が出ること。
 //   - guest / suspended / removed / community_id なし では出ないこと。
 //   - click で ensureMyPersonalSpace 相当が呼ばれ、同一画面内で個人スペース表示へ切り替わること（URL 遷移なし）。
-//   - Pane 選択で共有スペースへ戻り、「わたし」の active が解除されること。
+//   - Pane 選択で共有スペースへ戻り、「マイスペース」の active が解除されること。
 //   - 二重クリックで作成が 1 回に抑止されること。失敗時は切り替えしないこと。
 //
 // ※ SpacePaneBar 単体へ personalShortcut を手で渡すだけの isolated test ではなく、
@@ -165,7 +165,7 @@ function PaneNavHarness({
   );
 
   const personalShortcut = eligible
-    ? { label: 'わたし', loading: busy, active, onClick: () => void handlePersonalClick() }
+    ? { label: 'マイスペース', loading: busy, active, onClick: () => void handlePersonalClick() }
     : null;
 
   return (
@@ -206,7 +206,7 @@ function renderHarness(props: Partial<HarnessProps> = {}) {
 function tablistPersonalButtons() {
   const tablist = screen.getByRole('tablist');
   return Array.from(tablist.querySelectorAll('button')).filter(
-    (b) => b.textContent === 'わたし',
+    (b) => b.textContent === 'マイスペース',
   );
 }
 
@@ -226,60 +226,60 @@ describe('normalizeSpace preserves community/space metadata (fetchSpaceByUrl →
   });
 });
 
-describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeSpace + eligibility)', () => {
-  it('active member + shared space + single pane → [メイン][わたし]', () => {
+describe('Pane tab bar 「マイスペース」 shortcut (integration via real normalizeSpace + eligibility)', () => {
+  it('active member + shared space + single pane → [メイン][マイスペース]', () => {
     renderHarness({ visiblePanes: SINGLE_PANE });
     const tablist = screen.getByRole('tablist');
     const labels = Array.from(tablist.querySelectorAll('button')).map((b) => b.textContent);
-    expect(labels).toEqual(['メイン', 'わたし']);
+    expect(labels).toEqual(['メイン', 'マイスペース']);
   });
 
-  it('active member + shared space + multiple panes → 「わたし」 is the last tab', () => {
+  it('active member + shared space + multiple panes → 「マイスペース」 is the last tab', () => {
     renderHarness({ visiblePanes: MULTI_PANE });
     const tablist = screen.getByRole('tablist');
     const buttons = Array.from(tablist.querySelectorAll('button'));
-    expect(buttons[buttons.length - 1]?.textContent).toBe('わたし');
+    expect(buttons[buttons.length - 1]?.textContent).toBe('マイスペース');
     const paneTabs = within(tablist)
       .getAllByRole('tab')
       .filter((b) => b.getAttribute('aria-controls') === 'space-pane-panel')
       .map((b) => b.textContent);
     expect(paneTabs).toEqual(['メイン', '今週の実践', '今日の一歩', 'みんなの広場']);
-    expect(within(tablist).getByRole('tab', { name: '自分の個人スペースを開く' })).toBeTruthy();
+    expect(within(tablist).getByRole('tab', { name: 'マイスペースを開く' })).toBeTruthy();
   });
 
-  it('guest (unauthenticated) → no 「わたし」', () => {
+  it('guest (unauthenticated) → no 「マイスペース」', () => {
     renderHarness({ currentUser: null });
     expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('suspended membership → no 「わたし」', () => {
+  it('suspended membership → no 「マイスペース」', () => {
     renderHarness({ memberships: [membership('suspended')] });
     expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('removed membership → no 「わたし」', () => {
+  it('removed membership → no 「マイスペース」', () => {
     renderHarness({ memberships: [membership('removed')] });
     expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('no community membership at all → no 「わたし」', () => {
+  it('no community membership at all → no 「マイスペース」', () => {
     renderHarness({ memberships: [] });
     expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('space without community_id → no 「わたし」', () => {
+  it('space without community_id → no 「マイスペース」', () => {
     renderHarness({ rawSpace: sharedSpaceRaw({ communityId: undefined }) });
     expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('personal space URL (direct access) → no 「わたし」 shortcut', () => {
+  it('personal space URL (direct access) → no 「マイスペース」 shortcut', () => {
     renderHarness({
       rawSpace: sharedSpaceRaw({ spaceType: 'personal', ownerUserId: USER_ID }),
     });
     expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('another user personal space URL → no 「わたし」 shortcut', () => {
+  it('another user personal space URL → no 「マイスペース」 shortcut', () => {
     renderHarness({
       rawSpace: sharedSpaceRaw({ spaceType: 'personal', ownerUserId: 'someone-else' }),
     });
@@ -296,13 +296,13 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     renderHarness({ onEnsurePersonal, onNavigate });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: '自分の個人スペースを開く' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'マイスペースを開く' }));
     });
 
     expect(onEnsurePersonal).toHaveBeenCalledTimes(1);
     expect(onNavigate).not.toHaveBeenCalled();
     expect(screen.getByTestId('content-space-id').textContent).toBe(PERSONAL_SPACE_ID);
-    expect(screen.getByRole('tab', { name: '自分の個人スペースを表示中' }).getAttribute('aria-selected')).toBe(
+    expect(screen.getByRole('tab', { name: 'マイスペースを表示中' }).getAttribute('aria-selected')).toBe(
       'true',
     );
   });
@@ -311,13 +311,13 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     renderHarness();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: '自分の個人スペースを開く' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'マイスペースを開く' }));
     });
     expect(screen.getByTestId('content-space-id').textContent).toBe(PERSONAL_SPACE_ID);
 
     fireEvent.click(screen.getByRole('tab', { name: 'メイン' }));
     expect(screen.getByTestId('content-space-id').textContent).toBe('space-1');
-    expect(screen.getByRole('tab', { name: '自分の個人スペースを開く' }).getAttribute('aria-selected')).toBe(
+    expect(screen.getByRole('tab', { name: 'マイスペースを開く' }).getAttribute('aria-selected')).toBe(
       'false',
     );
   });
@@ -329,7 +329,7 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     );
     renderHarness({ onEnsurePersonal });
 
-    const btn = screen.getByRole('tab', { name: '自分の個人スペースを開く' });
+    const btn = screen.getByRole('tab', { name: 'マイスペースを開く' });
     fireEvent.click(btn);
     fireEvent.click(btn);
 
@@ -346,7 +346,7 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     renderHarness({ onEnsurePersonal, onNavigate });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: '自分の個人スペースを開く' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'マイスペースを開く' }));
     });
 
     expect(onEnsurePersonal).toHaveBeenCalledTimes(1);

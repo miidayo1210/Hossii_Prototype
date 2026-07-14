@@ -27,7 +27,7 @@ const panes = [
 ];
 
 describe('SpacePaneBar personal shortcut', () => {
-  it('renders 「わたし」 as the last button inside the pane tab list', () => {
+  it('renders 「マイスペース」 as the last button inside the pane tab list', () => {
     render(
       <SpacePaneBar
         spaceId="space-1"
@@ -37,7 +37,7 @@ describe('SpacePaneBar personal shortcut', () => {
         activePaneId="main"
         isAdmin={false}
         onSelect={() => {}}
-        personalShortcut={{ label: 'わたし', onClick: () => {} }}
+        personalShortcut={{ label: 'マイスペース', onClick: () => {} }}
       />,
     );
 
@@ -50,14 +50,14 @@ describe('SpacePaneBar personal shortcut', () => {
       .map((b) => b.textContent);
     expect(paneTabLabels).toEqual(['メイン', '今週の実践', 'みんなの広場']);
 
-    // 「わたし」は同じタブ列コンテナ内の最後の <button>
+    // 「マイスペース」は同じタブ列コンテナ内の最後の <button>
     const allButtons = Array.from(tablist.querySelectorAll('button'));
     expect(allButtons.length).toBeGreaterThan(0);
-    expect(allButtons[allButtons.length - 1]?.textContent).toBe('わたし');
-    expect(within(tablist).getByRole('tab', { name: '自分の個人スペースを開く' })).toBeTruthy();
+    expect(allButtons[allButtons.length - 1]?.textContent).toBe('マイスペース');
+    expect(within(tablist).getByRole('tab', { name: 'マイスペースを開く' })).toBeTruthy();
   });
 
-  it('does not render 「わたし」 when no personalShortcut is provided (e.g. guest / suspended)', () => {
+  it('does not render 「マイスペース」 when no personalShortcut is provided (e.g. guest / suspended)', () => {
     render(
       <SpacePaneBar
         spaceId="space-1"
@@ -71,11 +71,11 @@ describe('SpacePaneBar personal shortcut', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: '自分の個人スペースを開く' })).toBeNull();
-    expect(screen.queryByText('わたし')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'マイスペースを開く' })).toBeNull();
+    expect(screen.queryByText('マイスペース')).toBeNull();
   });
 
-  it('calls onClick when 「わたし」 is pressed', () => {
+  it('calls onClick when 「マイスペース」 is pressed', () => {
     const onClick = vi.fn();
     render(
       <SpacePaneBar
@@ -86,16 +86,16 @@ describe('SpacePaneBar personal shortcut', () => {
         activePaneId="main"
         isAdmin={false}
         onSelect={() => {}}
-        personalShortcut={{ label: 'わたし', onClick }}
+        personalShortcut={{ label: 'マイスペース', onClick }}
       />,
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: '自分の個人スペースを開く' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'マイスペースを開く' }));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it.each(['desktop', 'mobile'] as const)(
-    'marks 「わたし」 active (aria-selected) in own personal space on %s',
+    'marks 「マイスペース」 active (aria-selected) in own personal space on %s',
     (variant) => {
       render(
         <SpacePaneBar
@@ -106,17 +106,17 @@ describe('SpacePaneBar personal shortcut', () => {
           activePaneId="main"
           isAdmin={false}
           onSelect={() => {}}
-          personalShortcut={{ label: 'わたし', active: true, onClick: () => {} }}
+          personalShortcut={{ label: 'マイスペース', active: true, onClick: () => {} }}
         />,
       );
 
-      const shortcut = screen.getByRole('tab', { name: '自分の個人スペースを表示中' });
+      const shortcut = screen.getByRole('tab', { name: 'マイスペースを表示中' });
       expect(shortcut.getAttribute('aria-selected')).toBe('true');
     },
   );
 
   it.each(['desktop', 'mobile'] as const)(
-    'does not mark 「わたし」 active on a shared space on %s',
+    'does not mark 「マイスペース」 active on a shared space on %s',
     (variant) => {
       render(
         <SpacePaneBar
@@ -127,11 +127,11 @@ describe('SpacePaneBar personal shortcut', () => {
           activePaneId="main"
           isAdmin={false}
           onSelect={() => {}}
-          personalShortcut={{ label: 'わたし', active: false, onClick: () => {} }}
+          personalShortcut={{ label: 'マイスペース', active: false, onClick: () => {} }}
         />,
       );
 
-      const shortcut = screen.getByRole('tab', { name: '自分の個人スペースを開く' });
+      const shortcut = screen.getByRole('tab', { name: 'マイスペースを開く' });
       expect(shortcut.getAttribute('aria-selected')).toBe('false');
     },
   );

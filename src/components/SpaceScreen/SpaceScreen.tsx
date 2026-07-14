@@ -1261,7 +1261,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const personalShortcut = useMemo(() => {
     if (!personalShortcutEligible) return null;
     return {
-      label: 'わたし',
+      label: 'マイスペース',
       loading: personalShortcutBusy,
       active: personalShortcutActive,
       onClick: () => void handlePersonalShortcut(),
