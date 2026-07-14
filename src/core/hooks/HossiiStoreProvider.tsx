@@ -1483,11 +1483,14 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const currentState = stateRef.current;
     const activeSpaceId = activeSpaceIdRef.current;
     const runtime = spacePaneRuntimeRef.current;
+    const usingPostOverride = input.postSpaceId != null;
+    const targetSpaceId = input.postSpaceId ?? activeSpaceId;
+    const targetPaneId = input.postPaneId ?? runtime.activePaneId;
 
     if (
       isSupabaseConfigured &&
       !isKnownSpaceInState(
-        activeSpaceId,
+        targetSpaceId,
         currentState.spaces.map((space) => space.id),
       )
     ) {
@@ -1498,15 +1501,16 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       return false;
     }
 
-    if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) {
-      emitPostFailure({
-        reason: 'space_unavailable',
-        message: buildAddHossiiBlockMessage('space_unavailable'),
-      });
-      return false;
+    if (!usingPostOverride) {
+      if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) {
+        emitPostFailure({
+          reason: 'space_unavailable',
+          message: buildAddHossiiBlockMessage('space_unavailable'),
+        });
+        return false;
+      }
     }
-    const activePaneId = runtime.activePaneId;
-    if (activePaneId == null) {
+    if (targetPaneId == null) {
       emitPostFailure({
         reason: 'pane_unavailable',
         message: buildAddHossiiBlockMessage('pane_unavailable'),
@@ -1515,8 +1519,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
     if (
       !validateHossiiPaneSpaceMatch(
-        { spaceId: activeSpaceId, spacePaneId: activePaneId },
-        activeSpaceId,
+        { spaceId: targetSpaceId, spacePaneId: targetPaneId },
+        targetSpaceId,
       )
     ) {
       emitPostFailure({
@@ -1556,8 +1560,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       ? {
           id,
           message: msg,
-          spaceId: activeSpaceId,
-          spacePaneId: activePaneId,
+          spaceId: targetSpaceId,
+          spacePaneId: targetPaneId,
           authorId,
           authorName,
           createdAt: new Date(),
@@ -1575,8 +1579,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           id,
           message: msg,
           emotion: input.emotion,
-          spaceId: activeSpaceId,
-          spacePaneId: activePaneId,
+          spaceId: targetSpaceId,
+          spacePaneId: targetPaneId,
           authorId,
           authorName,
           createdAt: new Date(),
@@ -1626,7 +1630,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         // 直接 Set 追加はしない（DB を正本とし、stale response 上書きを避ける）。
         // ゲスト投稿は trigger が authorship を作らないため refresh 不要。
         const authorshipUid = currentUserRef.current?.uid;
-        if (authorshipUid && activeSpaceIdRef.current === newHossii.spaceId) {
+        if (authorshipUid) {
           // peek() は生成しないため、unmount 後（保持が null）の非同期呼び出しでも
           // 新 controller を復活させない。破棄済み instance を掴むこともない。
           authorshipHostRef.current?.peek()?.refresh({

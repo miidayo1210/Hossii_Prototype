@@ -3,14 +3,15 @@
 // 統合テスト: 共有スペース画面の Pane 切替タブ列に「わたし」が表示されるまでの
 // 実データ経路を、SpaceScreen と同じ配線で検証する。
 //
-// 目的（Task 7 の受入）:
+// 目的（111 の受入）:
 //   - fetchSpaceByUrl → MERGE_SPACE 経路と同じ normalizeSpace を通したスペースが
 //     community_id / space_type / owner_user_id を保持すること（回帰防止）。
 //   - その正規化済みスペースと membership から canShowPersonalShortcut / isViewingOwnPersonalSpace を
 //     算出し、SpacePaneBar の role="tablist" 内・可視 Pane の後ろに「わたし」が出ること。
 //   - guest / suspended / removed / community_id なし では出ないこと。
-//   - click で ensureMyPersonalSpace 相当が呼ばれ、個人スペースへ遷移すること。
-//   - 二重クリックで作成が 1 回に抑止されること。失敗時は遷移しないこと。
+//   - click で ensureMyPersonalSpace 相当が呼ばれ、同一画面内で個人スペース表示へ切り替わること（URL 遷移なし）。
+//   - Pane 選択で共有スペースへ戻り、「わたし」の active が解除されること。
+//   - 二重クリックで作成が 1 回に抑止されること。失敗時は切り替えしないこと。
 //
 // ※ SpacePaneBar 単体へ personalShortcut を手で渡すだけの isolated test ではなく、
 //    実際の normalizeSpace（＝ブラウザで community_id が落ちていた箇所）を経由させる。
@@ -23,6 +24,7 @@ import {
   canShowPersonalShortcut,
   isViewingOwnPersonalSpace,
 } from '../../core/utils/personalSpaceShortcut';
+import { resolveContentSpaceId } from '../../core/utils/personalSpaceTabView';
 import type { SpacePane } from '../../core/types/spacePane';
 import type { MyCommunityMembership } from '../../core/types/communityMembership';
 
@@ -30,6 +32,7 @@ afterEach(cleanup);
 
 const COMMUNITY_ID = 'comm-1';
 const USER_ID = 'user-1';
+const PERSONAL_SPACE_ID = 'personal-space-1';
 
 function makePane(id: string, name: string, sortOrder: number, isDefault = false): SpacePane {
   return {
@@ -85,7 +88,7 @@ type HarnessProps = {
   currentUser: { uid: string } | null;
   memberships: MyCommunityMembership[];
   visiblePanes: SpacePane[];
-  onEnsurePersonal: () => Promise<{ ok: boolean; spaceUrl?: string }>;
+  onEnsurePersonal: () => Promise<{ ok: boolean; spaceId?: string; spaceUrl?: string }>;
   onNavigate: (url: string) => void;
 };
 
@@ -99,10 +102,10 @@ function PaneNavHarness({
   memberships,
   visiblePanes,
   onEnsurePersonal,
-  onNavigate,
 }: HarnessProps) {
   const activeSpace = useMemo(() => normalizeSpace(rawSpace), [rawSpace]);
   const [busy, setBusy] = useState(false);
+  const [personalViewSpaceId, setPersonalViewSpaceId] = useState<string | null>(null);
   const busyRef = useRef(false);
 
   const isAuthenticated = !!currentUser;
@@ -113,55 +116,79 @@ function PaneNavHarness({
     return memberships.find((m) => m.communityId === cid) ?? null;
   }, [activeSpace.communityId, memberships]);
 
-  const eligible = canShowPersonalShortcut({
-    isAuthenticated,
-    isVisiting: false,
-    spaceCommunityId: activeSpace.communityId,
-    membershipStatus: spaceCommunityMembership?.status,
+  const eligible =
+    activeSpace.spaceType === 'shared' &&
+    canShowPersonalShortcut({
+      isAuthenticated,
+      isVisiting: false,
+      spaceCommunityId: activeSpace.communityId,
+      membershipStatus: spaceCommunityMembership?.status,
+    });
+
+  const active =
+    (personalViewSpaceId != null && activeSpace.spaceType === 'shared') ||
+    isViewingOwnPersonalSpace({
+      spaceType: activeSpace.spaceType,
+      spaceOwnerUserId: activeSpace.ownerUserId,
+      currentUserId: currentUser?.uid,
+    });
+
+  const contentSpaceId = resolveContentSpaceId({
+    shellSpaceType: activeSpace.spaceType,
+    shellSpaceId: activeSpace.id,
+    personalViewSpaceId,
   });
 
-  const active = isViewingOwnPersonalSpace({
-    spaceType: activeSpace.spaceType,
-    spaceOwnerUserId: activeSpace.ownerUserId,
-    currentUserId: currentUser?.uid,
-  });
-
-  const handleClick = useCallback(async () => {
-    if (busyRef.current) return;
+  const handlePersonalClick = useCallback(async () => {
+    if (busyRef.current || personalViewSpaceId) return;
     busyRef.current = true;
     setBusy(true);
     try {
       const res = await onEnsurePersonal();
-      if (res.ok && res.spaceUrl) {
-        onNavigate(`/c/${spaceCommunityMembership?.communitySlug}/s/${res.spaceUrl}#screen`);
+      if (res.ok && res.spaceId) {
+        setPersonalViewSpaceId(res.spaceId);
       }
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
-  }, [onEnsurePersonal, onNavigate, spaceCommunityMembership?.communitySlug]);
+  }, [onEnsurePersonal, personalViewSpaceId]);
+
+  const handlePaneSelect = useCallback(
+    (paneId: string) => {
+      if (personalViewSpaceId) {
+        setPersonalViewSpaceId(null);
+      }
+      void paneId;
+    },
+    [personalViewSpaceId],
+  );
 
   const personalShortcut = eligible
-    ? { label: 'わたし', loading: busy, active, onClick: () => void handleClick() }
+    ? { label: 'わたし', loading: busy, active, onClick: () => void handlePersonalClick() }
     : null;
 
   return (
-    <SpacePaneBar
-      spaceId={activeSpace.id}
-      variant="desktop"
-      folders={[]}
-      visiblePanes={visiblePanes}
-      activePaneId={visiblePanes[0]?.id ?? null}
-      isAdmin={false}
-      onSelect={() => {}}
-      personalShortcut={personalShortcut}
-    />
+    <div>
+      <div data-testid="content-space-id">{contentSpaceId}</div>
+      <SpacePaneBar
+        spaceId={activeSpace.id}
+        variant="desktop"
+        folders={[]}
+        visiblePanes={visiblePanes}
+        activePaneId={personalViewSpaceId ? null : visiblePanes[0]?.id ?? null}
+        isAdmin={false}
+        onSelect={handlePaneSelect}
+        personalShortcut={personalShortcut}
+      />
+    </div>
   );
 }
 
 function renderHarness(props: Partial<HarnessProps> = {}) {
   const onEnsurePersonal =
-    props.onEnsurePersonal ?? vi.fn(async () => ({ ok: true, spaceUrl: 'ps-abc' }));
+    props.onEnsurePersonal ??
+    vi.fn(async () => ({ ok: true, spaceId: PERSONAL_SPACE_ID, spaceUrl: 'ps-abc' }));
   const onNavigate = props.onNavigate ?? vi.fn();
   render(
     <PaneNavHarness
@@ -212,13 +239,11 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     const tablist = screen.getByRole('tablist');
     const buttons = Array.from(tablist.querySelectorAll('button'));
     expect(buttons[buttons.length - 1]?.textContent).toBe('わたし');
-    // 可視 Pane タブの後ろにあること
     const paneTabs = within(tablist)
       .getAllByRole('tab')
       .filter((b) => b.getAttribute('aria-controls') === 'space-pane-panel')
       .map((b) => b.textContent);
     expect(paneTabs).toEqual(['メイン', '今週の実践', '今日の一歩', 'みんなの広場']);
-    // 「わたし」自身も role=tab として tablist 内にある
     expect(within(tablist).getByRole('tab', { name: '自分の個人スペースを開く' })).toBeTruthy();
   });
 
@@ -247,24 +272,26 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('own personal space → 「わたし」 shown active', () => {
+  it('personal space URL (direct access) → no 「わたし」 shortcut', () => {
     renderHarness({
       rawSpace: sharedSpaceRaw({ spaceType: 'personal', ownerUserId: USER_ID }),
     });
-    const shortcut = screen.getByRole('tab', { name: '自分の個人スペースを表示中' });
-    expect(shortcut.getAttribute('aria-selected')).toBe('true');
+    expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('another user\'s personal space → not active', () => {
+  it('another user personal space URL → no 「わたし」 shortcut', () => {
     renderHarness({
       rawSpace: sharedSpaceRaw({ spaceType: 'personal', ownerUserId: 'someone-else' }),
     });
-    const shortcut = screen.getByRole('tab', { name: '自分の個人スペースを開く' });
-    expect(shortcut.getAttribute('aria-selected')).toBe('false');
+    expect(tablistPersonalButtons()).toHaveLength(0);
   });
 
-  it('click → ensureMyPersonalSpace called and navigates to personal space', async () => {
-    const onEnsurePersonal = vi.fn(async () => ({ ok: true, spaceUrl: 'ps-abc' }));
+  it('click → ensureMyPersonalSpace called and switches content space in-place (no navigation)', async () => {
+    const onEnsurePersonal = vi.fn(async () => ({
+      ok: true,
+      spaceId: PERSONAL_SPACE_ID,
+      spaceUrl: 'ps-abc',
+    }));
     const onNavigate = vi.fn();
     renderHarness({ onEnsurePersonal, onNavigate });
 
@@ -273,13 +300,32 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     });
 
     expect(onEnsurePersonal).toHaveBeenCalledTimes(1);
-    expect(onNavigate).toHaveBeenCalledWith('/c/dev-community/s/ps-abc#screen');
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('content-space-id').textContent).toBe(PERSONAL_SPACE_ID);
+    expect(screen.getByRole('tab', { name: '自分の個人スペースを表示中' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+  });
+
+  it('click pane after personal tab → returns to shared content space', async () => {
+    renderHarness();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: '自分の個人スペースを開く' }));
+    });
+    expect(screen.getByTestId('content-space-id').textContent).toBe(PERSONAL_SPACE_ID);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'メイン' }));
+    expect(screen.getByTestId('content-space-id').textContent).toBe('space-1');
+    expect(screen.getByRole('tab', { name: '自分の個人スペースを開く' }).getAttribute('aria-selected')).toBe(
+      'false',
+    );
   });
 
   it('double click → ensureMyPersonalSpace called only once', async () => {
-    let resolve!: (v: { ok: boolean; spaceUrl?: string }) => void;
+    let resolve!: (v: { ok: boolean; spaceId?: string; spaceUrl?: string }) => void;
     const onEnsurePersonal = vi.fn(
-      () => new Promise<{ ok: boolean; spaceUrl?: string }>((r) => (resolve = r)),
+      () => new Promise<{ ok: boolean; spaceId?: string; spaceUrl?: string }>((r) => (resolve = r)),
     );
     renderHarness({ onEnsurePersonal });
 
@@ -290,11 +336,11 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
     expect(onEnsurePersonal).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      resolve({ ok: true, spaceUrl: 'ps-abc' });
+      resolve({ ok: true, spaceId: PERSONAL_SPACE_ID, spaceUrl: 'ps-abc' });
     });
   });
 
-  it('ensureMyPersonalSpace failure → does not navigate (stays on current space)', async () => {
+  it('ensureMyPersonalSpace failure → does not switch content space', async () => {
     const onEnsurePersonal = vi.fn(async () => ({ ok: false }));
     const onNavigate = vi.fn();
     renderHarness({ onEnsurePersonal, onNavigate });
@@ -305,5 +351,6 @@ describe('Pane tab bar 「わたし」 shortcut (integration via real normalizeS
 
     expect(onEnsurePersonal).toHaveBeenCalledTimes(1);
     expect(onNavigate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('content-space-id').textContent).toBe('space-1');
   });
 });

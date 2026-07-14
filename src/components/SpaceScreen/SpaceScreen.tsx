@@ -13,7 +13,7 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useNeighborSpace } from './useNeighborSpace';
-import type { EmotionKey, Hossii } from '../../core/types';
+import type { EmotionKey, Hossii, AddHossiiInput } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { mapLogicalToContainerPercent, mapContainerPercentToLogical } from '../../core/utils/sharpContentRect';
@@ -47,6 +47,13 @@ import { resolveCanvasExportAllowed } from '../../core/utils/spaceSettingResolve
 import { resolveCanEditBubble } from '../../core/utils/canEditBubble';
 import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
 import { ensureMyPersonalSpace } from '../../core/utils/personalSpacesApi';
+import { fetchSpaceByUrl } from '../../core/utils/spacesApi';
+import { defaultSpacePaneId } from '../../core/utils/spacePanesApi';
+import {
+  applyPostTargetToInput,
+  resolveContentSpaceId,
+  resolvePersonalPostTarget,
+} from '../../core/utils/personalSpaceTabView';
 import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
 import { buildSpaceExportFilename } from '../../core/utils/spaceExportFilename';
 import {
@@ -188,6 +195,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     syncFetchedHossiis,
     setHossiiFetchLoading,
     updateSpace,
+    addSpaceLocal,
     myAuthorshipIds,
     myAuthorshipIdsStatus,
     postAuthorDisplayNames,
@@ -228,6 +236,24 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     reloadPanesAndSyncActive,
   } = useSpacePane();
 
+  const activeSpace = getActiveSpace();
+  const [personalViewSpaceId, setPersonalViewSpaceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPersonalViewSpaceId(null);
+  }, [activeSpaceId]);
+
+  const contentSpaceId = resolveContentSpaceId({
+    shellSpaceType: activeSpace?.spaceType,
+    shellSpaceId: activeSpaceId,
+    personalViewSpaceId,
+  });
+
+  const contentSpace = useMemo(
+    () => (contentSpaceId ? state.spaces.find((s) => s.id === contentSpaceId) ?? null : null),
+    [state.spaces, contentSpaceId],
+  );
+
   const paneContext = useMemo((): PaneContext | null => {
     if (!activeSpaceId || !contextActivePaneId || !defaultPane) return null;
     return {
@@ -237,20 +263,48 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     };
   }, [activeSpaceId, contextActivePaneId, defaultPane]);
 
+  const contentPaneContext = useMemo((): PaneContext | null => {
+    if (personalViewSpaceId && contentSpaceId) {
+      const defaultPaneId = defaultSpacePaneId(contentSpaceId);
+      return {
+        spaceId: contentSpaceId,
+        activePaneId: defaultPaneId,
+        defaultPaneId,
+      };
+    }
+    return paneContext;
+  }, [personalViewSpaceId, contentSpaceId, paneContext]);
+
   const screenQueryKey = useMemo(() => {
-    if (!activeSpaceId || !paneContext) return null;
+    if (!contentSpaceId || !contentPaneContext) return null;
     return buildQueryKeyV2(
-      activeSpaceId,
-      { kind: 'pane', paneId: paneContext.activePaneId },
+      contentSpaceId,
+      { kind: 'pane', paneId: contentPaneContext.activePaneId },
       displayPeriod,
     );
-  }, [activeSpaceId, paneContext, displayPeriod]);
+  }, [contentSpaceId, contentPaneContext, displayPeriod]);
 
   const resolveSpaceHossiis = useCallback(() => {
-    if (!screenQueryKey) return getActiveSpaceHossiis();
+    if (!screenQueryKey) {
+      if (contentSpaceId && contentSpaceId !== activeSpaceId) {
+        return materializeHossiisArray(state.entities, contentSpaceId);
+      }
+      return getActiveSpaceHossiis();
+    }
     const keyed = getHossiisForQueryKey(screenQueryKey);
-    return keyed.length > 0 ? keyed : getActiveSpaceHossiis();
-  }, [screenQueryKey, getHossiisForQueryKey, getActiveSpaceHossiis]);
+    if (keyed.length > 0) return keyed;
+    if (contentSpaceId && contentSpaceId !== activeSpaceId) {
+      return materializeHossiisArray(state.entities, contentSpaceId);
+    }
+    return getActiveSpaceHossiis();
+  }, [
+    screenQueryKey,
+    getHossiisForQueryKey,
+    getActiveSpaceHossiis,
+    contentSpaceId,
+    activeSpaceId,
+    state.entities,
+  ]);
 
   const handleSpaceFetched = useCallback(
     (items: Hossii[], opts?: { merge?: boolean }) => {
@@ -261,17 +315,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const fetchProgress = useSpaceHossiiFetch({
-    spaceId: activeSpaceId,
+    spaceId: contentSpaceId,
     displayLimit,
     displayPeriod,
-    paneContext,
-    enabled: !visitingSpaceId && isSupabaseConfigured && !panesLoading && paneContext !== null,
+    paneContext: contentPaneContext,
+    enabled: !visitingSpaceId && isSupabaseConfigured && !panesLoading && contentPaneContext !== null,
     onFetched: handleSpaceFetched,
     onLoadingChange: setHossiiFetchLoading,
     getExistingHossiis: () => hossiisRef.current,
   });
 
-  const activeSpace = getActiveSpace();
   const showActiveSpaceUnavailableBanner =
     isSupabaseConfigured &&
     spacesLoadedFromSupabase &&
@@ -290,19 +343,34 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     if (!communityId) return null;
     return memberships.find((m) => m.communityId === communityId) ?? null;
   }, [activeSpace?.communityId, memberships]);
-  const personalShortcutEligible = canShowPersonalShortcut({
-    isAuthenticated,
-    isVisiting,
-    spaceCommunityId: activeSpace?.communityId,
-    membershipStatus: spaceCommunityMembership?.status,
-  });
-  // 「わたし」タブの active 表示: 現在開いているスペースが本人の個人スペースか。
-  // DB 正本（spaces.space_type / owner_user_id）のみで判定し、URL・表示名は使わない。
-  const personalShortcutActive = isViewingOwnPersonalSpace({
-    spaceType: activeSpace?.spaceType,
-    spaceOwnerUserId: activeSpace?.ownerUserId,
-    currentUserId: currentUser?.uid,
-  });
+  const personalShortcutEligible =
+    activeSpace?.spaceType === 'shared' &&
+    canShowPersonalShortcut({
+      isAuthenticated,
+      isVisiting,
+      spaceCommunityId: activeSpace?.communityId,
+      membershipStatus: spaceCommunityMembership?.status,
+    });
+  const personalShortcutActive =
+    (personalViewSpaceId != null && activeSpace?.spaceType === 'shared') ||
+    isViewingOwnPersonalSpace({
+      spaceType: activeSpace?.spaceType,
+      spaceOwnerUserId: activeSpace?.ownerUserId,
+      currentUserId: currentUser?.uid,
+    });
+
+  const postTargetOverride = useMemo(
+    () => resolvePersonalPostTarget(personalViewSpaceId, defaultSpacePaneId),
+    [personalViewSpaceId],
+  );
+
+  const postHossii = useCallback(
+    (input: AddHossiiInput) =>
+      addHossii(applyPostTargetToInput(input, postTargetOverride)),
+    [addHossii, postTargetOverride],
+  );
+
+  const paneBarActivePaneId = personalViewSpaceId ? null : contextActivePaneId;
 
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
@@ -537,10 +605,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const handlePaneSelect = useCallback(
     (paneId: string) => {
       if (postSending) return;
-      if (paneId === contextActivePaneId) return;
+      const leavingPersonal = personalViewSpaceId != null;
+      if (leavingPersonal) {
+        setPersonalViewSpaceId(null);
+      }
+      if (!leavingPersonal && paneId === contextActivePaneId) return;
       setActivePaneById(paneId);
     },
-    [postSending, contextActivePaneId, setActivePaneById],
+    [postSending, contextActivePaneId, personalViewSpaceId, setActivePaneById],
   );
 
   const handlePaneCreated = useCallback(
@@ -801,21 +873,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
 
   // スペース設定（設定画面から戻ったときにフォーカスで再読み込み）
-  const { spaceSettings } = useSpaceSettings(activeSpace);
+  const { spaceSettings } = useSpaceSettings(contentSpace ?? activeSpace);
   const { enabled: timelineDepthEnabled } = useTimelineDepthEnabled(
-    activeSpaceId,
-    activeSpace?.name ?? '',
+    contentSpaceId,
+    contentSpace?.name ?? activeSpace?.name ?? '',
   );
   const timelineDepthActive = useMemo(
     () =>
       resolveTimelineDepthActive({
         enabled: timelineDepthEnabled,
-        isMainPane: paneContext != null && isDefaultPane(paneContext),
+        isMainPane: contentPaneContext != null && isDefaultPane(contentPaneContext),
         isStarMode: renderAsStar,
       }),
-    [timelineDepthEnabled, paneContext, renderAsStar],
+    [timelineDepthEnabled, contentPaneContext, renderAsStar],
   );
-  const { pinnedIds, pinnedOrder, isPinned, toggle, unpin } = usePinnedHossiis(activeSpace?.id);
+  const { pinnedIds, pinnedOrder, isPinned, toggle, unpin } = usePinnedHossiis(contentSpace?.id);
   const showPinUi = !isMobile;
 
   // 隣人スペース・訪問モード・漂着ボトル管理
@@ -838,8 +910,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   // 訪問中は背景・タイトル・装飾を訪問先に合わせる（投稿 0 件でも自スペースの見た目が残らないようにする）
   const spaceForVisual = useMemo(() => {
     if (isVisiting && visitingSpaceInfo) return visitingSpaceInfo;
+    if (personalViewSpaceId && contentSpace) return contentSpace;
     return resolvePaneVisualSpace(activePane, activeSpace);
-  }, [isVisiting, visitingSpaceInfo, activePane, activeSpace]);
+  }, [isVisiting, visitingSpaceInfo, personalViewSpaceId, contentSpace, activePane, activeSpace]);
 
   const spaceDescription = spaceForVisual?.description?.trim() ?? '';
   const hasDescription = spaceDescription.length > 0;
@@ -849,12 +922,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const myHossiiLogVisibility = spaceForVisual?.myHossiiLogVisibility ?? 'public';
   const showMyHossiiLayer = shouldShowMyHossiiLayer(
     myHossiiEnabled,
-    activePane?.isDefault === true,
+    personalViewSpaceId != null || activePane?.isDefault === true,
   );
   const allSpaceHossiisForMyHossii = useMemo(() => {
-    if (!activeSpaceId) return [];
-    return materializeHossiisArray(state.entities, activeSpaceId);
-  }, [state.entities, activeSpaceId]);
+    if (!contentSpaceId) return [];
+    return materializeHossiisArray(state.entities, contentSpaceId);
+  }, [state.entities, contentSpaceId]);
   const spaceCharacterImageUrl = spaceForVisual?.characterImageUrl;
 
   useEffect(() => {
@@ -879,12 +952,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, [currentUser?.uid]);
 
   useEffect(() => {
-    if (!currentUser?.uid || !activeSpace?.id) {
+    if (!currentUser?.uid || !contentSpace?.id) {
       setMyHossiiParticipantEligibility('not_participant');
       return;
     }
     let cancelled = false;
-    fetchParticipantEligibility(currentUser.uid, activeSpace.id, {
+    fetchParticipantEligibility(currentUser.uid, contentSpace.id, {
       legacyProfileId: state.profile?.id,
       defaultNickname: state.profile?.defaultNickname,
     })
@@ -897,7 +970,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.uid, activeSpace?.id, state.profile?.id, state.profile?.defaultNickname]);
+  }, [currentUser?.uid, contentSpace?.id, state.profile?.id, state.profile?.defaultNickname]);
 
   const resolvedBackground = useMemo(() => {
     if (isVisiting && visitingSpaceInfo) {
@@ -1151,7 +1224,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const handlePersonalShortcut = useCallback(async () => {
     const communityId = activeSpace?.communityId;
-    if (!communityId || personalShortcutBusy) return;
+    if (!communityId || personalShortcutBusy || activeSpace?.spaceType !== 'shared') return;
+    if (personalViewSpaceId) return;
     setPersonalShortcutBusy(true);
     try {
       const res = await ensureMyPersonalSpace(communityId);
@@ -1159,16 +1233,17 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         window.alert(res.message);
         return;
       }
-      if (!res.spaceUrl) {
-        window.alert('個人スペースを開けませんでした。');
-        return;
+      const existing = state.spaces.find((s) => s.id === res.spaceId);
+      if (!existing) {
+        const fetched = res.spaceUrl ? await fetchSpaceByUrl(res.spaceUrl) : null;
+        if (fetched) {
+          addSpaceLocal(fetched);
+        } else {
+          window.alert('個人スペースを開けませんでした。');
+          return;
+        }
       }
-      const slug = spaceCommunityMembership?.communitySlug ?? communitySlug;
-      if (!slug) {
-        window.alert('コミュニティ情報を取得できませんでした。');
-        return;
-      }
-      window.location.href = `/c/${slug}/s/${res.spaceUrl}#screen`;
+      setPersonalViewSpaceId(res.spaceId);
     } catch {
       window.alert('個人スペースを開けませんでした。');
     } finally {
@@ -1176,9 +1251,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     }
   }, [
     activeSpace?.communityId,
-    communitySlug,
+    activeSpace?.spaceType,
+    addSpaceLocal,
     personalShortcutBusy,
-    spaceCommunityMembership?.communitySlug,
+    personalViewSpaceId,
+    state.spaces,
   ]);
 
   const personalShortcut = useMemo(() => {
@@ -1227,7 +1304,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // リアクションブロードキャスト
   const { broadcastReaction } = useReactionBroadcast({
-    activeSpaceId,
+    activeSpaceId: contentSpaceId ?? activeSpaceId ?? '',
     onReaction: handleBroadcastReaction,
   });
 
@@ -1336,19 +1413,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, []);
 
   useEffect(() => {
-    if (!activeSpace?.id) return;
-    setActiveTagFilter(loadSpaceTagFilter(activeSpace.id));
-  }, [activeSpace?.id]);
+    if (!contentSpace?.id) return;
+    setActiveTagFilter(loadSpaceTagFilter(contentSpace.id));
+  }, [contentSpace?.id]);
 
   const tagCandidates = useMemo(() => {
     const fromPosts = [...tagCounts.keys()];
-    const presetOrder = activeSpace?.presetTags ?? [];
+    const presetOrder = contentSpace?.presetTags ?? [];
     const presetInPosts = presetOrder.filter((t) => fromPosts.includes(t));
     const rest = fromPosts
       .filter((t) => !presetOrder.includes(t))
       .sort((a, b) => (tagCounts.get(b) ?? 0) - (tagCounts.get(a) ?? 0));
     return [...presetInPosts, ...rest];
-  }, [activeSpace?.presetTags, tagCounts]);
+  }, [contentSpace?.presetTags, tagCounts]);
 
   const showTagControls = viewMode !== 'slideshow' && (tagCandidates.length > 0 || activeTagFilter != null);
 
@@ -1356,7 +1433,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     (tag: string | null) => {
       const runFilter = () => {
         setActiveTagFilter(tag);
-        if (activeSpace?.id) saveSpaceTagFilter(activeSpace.id, tag);
+        if (contentSpace?.id) saveSpaceTagFilter(contentSpace.id, tag);
         setTagPanelOpen(false);
       };
       if (prefersReducedMotion) {
@@ -1371,7 +1448,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         tagFilterTimerRef.current = setTimeout(() => setTagFilterPhase('idle'), 250);
       }, 200);
     },
-    [activeSpace?.id, prefersReducedMotion],
+    [contentSpace?.id, prefersReducedMotion],
   );
 
   const handleStarToggle = useCallback(() => {
@@ -1581,7 +1658,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const handleSpaceExport = useCallback(async () => {
     if (!showSpaceExportButton || spaceExportBlockedUI) return;
     const root = spaceExportRootRef.current;
-    const space = activeSpace;
+    const space = contentSpace ?? activeSpace;
     if (!root || !space) return;
 
     spaceExportAbortRef.current?.abort();
@@ -1637,6 +1714,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, [
     showSpaceExportButton,
     spaceExportBlockedUI,
+    contentSpace,
     activeSpace,
     communitySlug,
     filteredHossiis.length,
@@ -1802,7 +1880,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     : null;
 
   // クイックログパネル: 画面上のスペース（訪問中は隣人）と一覧を揃える
-  const logListSpaceId = isVisiting ? visitingSpaceId : activeSpaceId;
+  const logListSpaceId = isVisiting ? visitingSpaceId : contentSpaceId;
   const logListHossiis = isVisiting ? visitingHossiis : resolveSpaceHossiis();
   const logPresetTags =
     isVisiting && visitingSpaceInfo
@@ -1913,6 +1991,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       onClose={handleQuickPostClose}
       speechToFreePosterRef={speechToFreePosterRef}
       onSendingChange={setPostSending}
+      postTargetOverride={postTargetOverride}
     />
   );
 
@@ -2174,7 +2253,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       {/* マイHossiiレイヤー */}
       {controlState.hossiiVisible && activeSpace && !isVisiting && showMyHossiiLayer && (
         <MyHossiiLayer
-          spaceId={activeSpace.id}
+          spaceId={contentSpace?.id ?? activeSpace.id}
           enabled={myHossiiEnabled}
           motionMode={myHossiiMotionMode}
           logVisibility={myHossiiLogVisibility}
@@ -2332,7 +2411,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           variant="mobile"
           folders={effectiveFolders}
           visiblePanes={visiblePanes}
-          activePaneId={contextActivePaneId}
+          activePaneId={paneBarActivePaneId}
           isAdmin={isAdmin}
           disabled={postSending || paneReorderBusy}
           onSelect={handlePaneSelect}
@@ -2592,7 +2671,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             interimText={interimText}
             speechLevels={speechLevels}
             setSpeechLevels={setSpeechLevels}
-            onPost={(text) => addHossii({ message: text, logType: 'speech', origin: 'manual' })}
+            onPost={(text) => postHossii({ message: text, logType: 'speech', origin: 'manual' })}
             onEditCandidate={openSpeechCandidateEditor}
             onDismissCandidate={dismissSpeechCandidate}
             dismissedCandidates={dismissedSpeechCandidates}
@@ -2674,7 +2753,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               variant="desktop"
               folders={effectiveFolders}
               visiblePanes={visiblePanes}
-              activePaneId={contextActivePaneId}
+              activePaneId={paneBarActivePaneId}
               isAdmin={isAdmin}
               disabled={postSending || paneReorderBusy}
               onSelect={handlePaneSelect}

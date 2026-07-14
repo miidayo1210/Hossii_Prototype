@@ -111,6 +111,9 @@ export type AddHossiiInput = {
   postKind?: HossiiPostKind;
   /** canvas 投稿時の初期スケール（省略時はストア側デフォルト） */
   scale?: number;
+  /** 共有スペース上の「わたし」タブ表示時など、表示 shell と異なる投稿先 */
+  postSpaceId?: string;
+  postPaneId?: string;
 };
 
 export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities' | 'reflection' | 'neighbors' | 'community' | 'community-invite';
