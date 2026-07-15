@@ -13,6 +13,7 @@ import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
+import { useHossiiGuideBubble } from '../../core/hooks/useHossiiGuideBubble';
 import { useNeighborSpace } from './useNeighborSpace';
 import type { EmotionKey, Hossii, AddHossiiInput } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
@@ -1820,6 +1821,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !isVisiting &&
     !showInitialLoadingOverlay;
 
+  const guideDisplayReady =
+    !showActiveSpaceUnavailableBanner &&
+    !showInitialLoadingOverlay &&
+    !awaitingFirstHossiis;
+
+  const { guideMessage, dismissGuide } = useHossiiGuideBubble({
+    spaceId: contentSpace?.id ?? activeSpace?.id,
+    hossiiGuide: spaceSettings?.hossiiGuide,
+    displayReady: guideDisplayReady,
+    blocked: !guideDisplayReady || showByAuthorLoadingOverlay,
+  });
+
   const toggleClusterExpand = useCallback((groupKey: string) => {
     setExpandedClusterKeys((prev) => {
       const next = new Set(prev);
@@ -2342,6 +2355,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           readingEnabled={voiceEnabled}
           onLikeTrigger={likeReactionTrigger?.id}
           idleImageOverride={spaceCharacterImageUrl ?? null}
+          guideMessage={guideMessage}
+          onGuideDismiss={dismissGuide}
         />
       )}
 
