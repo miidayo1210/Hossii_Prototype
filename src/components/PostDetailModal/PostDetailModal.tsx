@@ -16,9 +16,16 @@ type Props = {
   onClose: () => void;
   likesEnabled?: boolean;
   onLike?: (id: string) => void;
+  readOnlyArchived?: boolean;
 };
 
-export const PostDetailModal = ({ hossii, onClose, likesEnabled, onLike }: Props) => {
+export const PostDetailModal = ({
+  hossii,
+  onClose,
+  likesEnabled,
+  onLike,
+  readOnlyArchived = false,
+}: Props) => {
   const { postAuthorDisplayNames, myAuthorshipIds, myAuthorshipIdsStatus } = useHossiiStore();
   const { currentUser } = useAuth();
   const authorDisplay = resolvePostAuthorDisplay({
@@ -27,12 +34,14 @@ export const PostDetailModal = ({ hossii, onClose, likesEnabled, onLike }: Props
     isOwnPost: false,
   });
   const isOwnerOnly = hossii.visibility === 'owner_only';
-  const canManage = canManageOwnPost({
-    isAuthenticated: !!currentUser,
-    myAuthorshipIds,
-    myAuthorshipIdsStatus,
-    hossiiId: hossii.id,
-  });
+  const canManage =
+    !readOnlyArchived &&
+    canManageOwnPost({
+      isAuthenticated: !!currentUser,
+      myAuthorshipIds,
+      myAuthorshipIdsStatus,
+      hossiiId: hossii.id,
+    });
   const emoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : null;
   const timestamp = hossii.createdAt.toLocaleString('ja-JP');
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);

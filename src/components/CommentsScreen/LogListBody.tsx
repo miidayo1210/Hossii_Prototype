@@ -88,6 +88,8 @@ export type LogListBodyProps = {
   onNavigateToPost?: () => void;
   /** クイックログパネルの「投稿してみる」 */
   onOpenQuickPost?: () => void;
+  /** 112: アーカイブ中は本人操作・クイック投稿導線を出さない */
+  readOnlyArchived?: boolean;
   /** Phase 9B: #comments の Pane フィルタ（panelMode では未使用） */
   paneFilter?: CommentsPaneFilter;
   visiblePanes?: SpacePane[];
@@ -122,6 +124,7 @@ export function LogListBody({
   movePaneDefaultPaneId,
   onMoveHossiiToPane,
   movePaneBusyId = null,
+  readOnlyArchived = false,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
   const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames } =
@@ -133,7 +136,7 @@ export function LogListBody({
     [state.spaces, spaceId],
   );
   const { spaceSettings } = useSpaceSettings(space);
-  const likesEnabled = spaceSettings?.features.likesEnabled ?? true;
+  const likesEnabled = !readOnlyArchived && (spaceSettings?.features.likesEnabled ?? true);
 
   const filterKey = spaceId ?? '';
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(filterKey));
@@ -261,13 +264,14 @@ export function LogListBody({
   const activeNickname = getActiveNickname();
 
   const handleEmptyPostClick = useCallback(() => {
+    if (readOnlyArchived) return;
     if (panelMode) {
       onClose?.();
       onOpenQuickPost?.();
     } else {
       onNavigateToPost?.();
     }
-  }, [panelMode, onClose, onOpenQuickPost, onNavigateToPost]);
+  }, [readOnlyArchived, panelMode, onClose, onOpenQuickPost, onNavigateToPost]);
 
   const filterBlock = (
     <div className={styles.filterContainer}>
@@ -358,9 +362,11 @@ export function LogListBody({
               ? '気持ちを投稿すると、ここに記録が残ります'
               : '最初の投稿をして記録を残してみよう！'}
           </p>
-          <button type="button" className={styles.emptyMineAction} onClick={handleEmptyPostClick}>
-            💬 投稿してみる
-          </button>
+          {!readOnlyArchived && (
+            <button type="button" className={styles.emptyMineAction} onClick={handleEmptyPostClick}>
+              💬 投稿してみる
+            </button>
+          )}
         </div>
       );
     }
@@ -410,12 +416,14 @@ export function LogListBody({
               isOwnPost: false,
             });
             const isOwnerOnly = hossii.visibility === 'owner_only';
-            const canManageThis = canManageOwnPost({
-              isAuthenticated: isAuthenticatedUser,
-              myAuthorshipIds,
-              myAuthorshipIdsStatus,
-              hossiiId: hossii.id,
-            });
+            const canManageThis =
+              !readOnlyArchived &&
+              canManageOwnPost({
+                isAuthenticated: isAuthenticatedUser,
+                myAuthorshipIds,
+                myAuthorshipIdsStatus,
+                hossiiId: hossii.id,
+              });
 
             return (
               <div
