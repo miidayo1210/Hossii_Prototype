@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../supabase';
-import { getAdminCommunity, createCommunity } from '../utils/communitiesApi';
-import type { CommunityStatus } from '../utils/communitiesApi';
+import { fetchCommunitiesByAdminId, createCommunity } from '../utils/communitiesApi';
+import type { Community, CommunityStatus } from '../utils/communitiesApi';
+import { resolveSpacesCommunityId } from '../utils/adminCommunityScope';
 import {
   upsertUserProfile,
   fetchUserProfile,
@@ -14,7 +15,11 @@ import {
   markParticipantFirstLogin,
 } from '../utils/participantAccountsApi';
 import { fetchLegacyDefaultNickname } from '../utils/profilesApi';
-import { clearStoredCommunityId } from '../utils/selectedCommunityStorage';
+import {
+  clearStoredCommunityId,
+  loadStoredCommunityId,
+  saveStoredCommunityId,
+} from '../utils/selectedCommunityStorage';
 import { AuthContext } from './useAuth';
 
 export type AppUser = {
@@ -29,6 +34,13 @@ export type AppUser = {
   communityName?: string;
   communitySlug?: string;
   communityStatus?: CommunityStatus;
+  /** 本人が admin_id として所有するコミュニティ（#spaces スコープ検証用） */
+  adminCommunities?: Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    status: CommunityStatus;
+  }>;
 };
 
 export type AuthContextType = {
@@ -56,6 +68,32 @@ type AuthProviderProps = {
   children: ReactNode;
 };
 
+function summarizeAdminCommunities(communities: Community[]) {
+  return communities.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    status: c.status,
+  }));
+}
+
+function resolveOwnedCommunityScope(
+  managedCommunities: Community[],
+  storedCommunityId: string | null,
+): { communityId: string | null; community: Community | null } {
+  const resolvedId = resolveSpacesCommunityId({
+    overrideCommunityId: null,
+    selectedCommunityId: storedCommunityId,
+    fallbackCommunityId: null,
+    managedCommunities,
+    isSuperAdmin: false,
+  });
+  const community = resolvedId
+    ? managedCommunities.find((c) => c.id === resolvedId) ?? null
+    : null;
+  return { communityId: resolvedId, community };
+}
+
 /**
  * Supabase User → AppUser（非同期: communities テーブルで管理者チェック）
  * app_metadata.role = "admin" は承認済みとして扱う（Supabase Dashboard で手動設定した場合）
@@ -77,14 +115,26 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     };
   }
 
-  // communities テーブルで communityId を取得（app_metadata.role = 'admin' でも必ず試みる）
-  const [community, userProfileResult] = await Promise.all([
-    getAdminCommunity(user.id),
+  // communities テーブルで本人が所有するコミュニティ一覧を取得
+  const [managedCommunities, userProfileResult] = await Promise.all([
+    fetchCommunitiesByAdminId(user.id),
     fetchUserProfile(user.id).catch((error) => {
       console.error('[AuthContext] fetchUserProfile error:', error);
       return null;
     }),
   ]);
+  const adminCommunities = summarizeAdminCommunities(managedCommunities);
+  const storedCommunityId = loadStoredCommunityId();
+  const { communityId: resolvedCommunityId, community: resolvedCommunity } =
+    resolveOwnedCommunityScope(managedCommunities, storedCommunityId);
+
+  if (resolvedCommunityId && resolvedCommunityId !== storedCommunityId) {
+    saveStoredCommunityId(resolvedCommunityId);
+  }
+
+  const hasApprovedManaged = managedCommunities.some((c) => c.status === 'approved');
+  const displayCommunity =
+    resolvedCommunity ?? managedCommunities[0] ?? null;
 
   let resolvedProfile = userProfileResult;
   if (!resolvedProfile && isIssuedParticipant) {
@@ -103,22 +153,23 @@ async function resolveAppUser(user: User): Promise<AppUser> {
     }
   }
 
-  // app_metadata.role = "admin" は承認済みとして扱う（communityId は取得できた場合のみ付与）
+  // app_metadata.role = "admin" は承認済みとして扱う
   if (roleFromMetadata === 'admin') {
     return {
       uid: user.id,
       email: user.email ?? null,
-      displayName: displayName ?? community?.name ?? null,
+      displayName: displayName ?? displayCommunity?.name ?? null,
       isAdmin: true,
       username,
-      communityId: community?.id,
-      communityName: community?.name,
-      communitySlug: community?.slug ?? undefined,
-      communityStatus: 'approved',
+      communityId: resolvedCommunityId ?? undefined,
+      communityName: displayCommunity?.name,
+      communitySlug: displayCommunity?.slug ?? undefined,
+      communityStatus: displayCommunity?.status,
+      adminCommunities,
     };
   }
 
-  if (!community) {
+  if (managedCommunities.length === 0) {
     return {
       uid: user.id,
       email: user.email ?? null,
@@ -132,14 +183,15 @@ async function resolveAppUser(user: User): Promise<AppUser> {
   return {
     uid: user.id,
     email: user.email ?? null,
-    displayName: displayName ?? community.name ?? null,
-    isAdmin: community.status === 'approved',
+    displayName: displayName ?? displayCommunity?.name ?? null,
+    isAdmin: hasApprovedManaged,
     username,
-    communityId: community.id,
-    communityName: community.name,
-    communitySlug: community.slug ?? undefined,
-    communityStatus: community.status,
+    communityId: resolvedCommunityId ?? undefined,
+    communityName: displayCommunity?.name,
+    communitySlug: displayCommunity?.slug ?? undefined,
+    communityStatus: displayCommunity?.status,
     isIssuedParticipant,
+    adminCommunities,
   };
 }
 

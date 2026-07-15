@@ -42,24 +42,32 @@ function rowToCommunity(row: CommunityRow): Community {
 }
 
 /**
- * 指定ユーザーが管理者として登録しているコミュニティを取得する
- * 存在しなければ null を返す（isAdmin 判定・status 確認に使用）
+ * 指定ユーザーが管理者として登録しているコミュニティ一覧を取得する。
+ * 複数所有時もエラーにならない（#spaces スコープ解決の正本）。
  */
-export async function getAdminCommunity(adminId: string): Promise<Community | null> {
-  if (!isSupabaseConfigured) return null;
+export async function fetchCommunitiesByAdminId(adminId: string): Promise<Community[]> {
+  if (!isSupabaseConfigured) return [];
 
   const { data, error } = await supabase
     .from('communities')
     .select('*')
     .eq('admin_id', adminId)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
   if (error) {
-    console.error('[communitiesApi] getAdminCommunity error:', error.message);
-    return null;
+    console.error('[communitiesApi] fetchCommunitiesByAdminId error:', error.message);
+    return [];
   }
 
-  return data ? rowToCommunity(data as CommunityRow) : null;
+  return ((data ?? []) as CommunityRow[]).map(rowToCommunity);
+}
+
+/**
+ * @deprecated 複数コミュニティ所有時は不正確。fetchCommunitiesByAdminId + resolveSpacesCommunityId を使用すること。
+ */
+export async function getAdminCommunity(adminId: string): Promise<Community | null> {
+  const rows = await fetchCommunitiesByAdminId(adminId);
+  return rows.find((r) => r.status === 'approved') ?? null;
 }
 
 /**

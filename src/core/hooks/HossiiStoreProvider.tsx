@@ -131,6 +131,8 @@ import {
 import { upsertUserProfile } from '../utils/userProfilesApi';
 import { useAuth } from '../contexts/useAuth';
 import { useAdminNavigation } from '../contexts/useAdminNavigation';
+import { useSelectedCommunity } from '../contexts/useSelectedCommunity';
+import { resolveSpacesCommunityId } from '../utils/adminCommunityScope';
 import { HossiiContext } from './useHossiiStore';
 import { setHossiiEntitiesSnapshot } from './hossiiEntityStore';
 import { HossiiActionsContext } from './useHossiiActions';
@@ -942,13 +944,30 @@ type HossiiProviderProps = {
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
   const { currentUser, isResolvingAuth } = useAuth();
   const { overrideCommunityId, overrideCommunitySlug } = useAdminNavigation();
+  const { selectedCommunityId } = useSelectedCommunity();
   /** 直近で成功した fetchSpaces のコミュニティ ID（スーパー管理者のスコープ切替検知用） */
   const lastScopedCommunityFetchKeyRef = useRef<string | undefined>(undefined);
   /** 直近で fetchSpaces を開始したコミュニティ ID（仕様 67 案2: ref 未定義でも fetch 前クリアを判定） */
   const lastSpacesFetchTargetRef = useRef<string | undefined>(undefined);
   /** fetchSpaces の世代（仕様 67 案 E: 古い応答を state に適用しない） */
   const spacesFetchRequestIdRef = useRef(0);
-  const communityId = overrideCommunityId ?? currentUser?.communityId;
+  const communityId = useMemo(() => {
+    const managed = currentUser?.adminCommunities ?? [];
+    const resolved = resolveSpacesCommunityId({
+      overrideCommunityId,
+      selectedCommunityId,
+      fallbackCommunityId: currentUser?.communityId,
+      managedCommunities: managed,
+      isSuperAdmin: currentUser?.isSuperAdmin === true,
+    });
+    return resolved ?? undefined;
+  }, [
+    currentUser?.adminCommunities,
+    currentUser?.communityId,
+    currentUser?.isSuperAdmin,
+    overrideCommunityId,
+    selectedCommunityId,
+  ]);
   const communitySlug = overrideCommunitySlug ?? currentUser?.communitySlug;
 
   const { spaces, activeSpaceId } = useMemo(() => initializeSpaces(), []);
@@ -1299,6 +1318,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     communityId,
     isResolvingAuth,
     overrideCommunityId,
+    selectedCommunityId,
     currentUser?.isSuperAdmin,
     currentUser?.communityId,
   ]);
