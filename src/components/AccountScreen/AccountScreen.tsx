@@ -179,11 +179,11 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
           <JoinedSpacesSection />
         </section>
 
-        {/* コミュニティ内の個人スペース */}
+        {/* コミュニティ内のマイスペース */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>コミュニティ内の個人スペース</h2>
+          <h2 className={styles.sectionTitle}>コミュニティ内のマイスペース</h2>
           <p className={styles.sectionDesc}>
-            参加中のコミュニティごとに、あなた専用の個人スペースを作成・入室できます。
+            参加中のコミュニティごとに、マイスペースの有無を確認し、未作成の場合はここから作成できます。
           </p>
           <CommunityPersonalSpacesSection />
         </section>

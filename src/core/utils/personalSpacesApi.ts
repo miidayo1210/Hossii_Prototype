@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { fetchMyCommunityMemberships } from './communityMembershipsApi';
 import { fetchSpaceByUrl } from './spacesApi';
+import type { CommunityMembershipRole } from '../types/communityMembership';
 import type { Space } from '../types/space';
 
 /**
@@ -19,6 +21,11 @@ export type CommunityPersonalSpace = {
   /** 未作成 / slug 欠損なら null（/s 導線を出さない） */
   personalSpaceUrl: string | null;
   personalSpaceStatus: string | null;
+};
+
+/** アカウント画面向け: active community の個人スペース行 + membership role。 */
+export type AccountCommunityPersonalSpace = CommunityPersonalSpace & {
+  membershipRole: CommunityMembershipRole;
 };
 
 type Row = {
@@ -59,6 +66,31 @@ export async function fetchMyCommunityPersonalSpaces(): Promise<CommunityPersona
   }
 
   return ((data ?? []) as Row[]).map(mapCommunityPersonalSpaceRow);
+}
+
+/**
+ * アカウント画面用: active な所属コミュニティごとの個人スペース行を返す。
+ * - list_my_community_personal_spaces は active のみだが、role 欠損のため memberships と突合する。
+ * - pending / suspended / removed は表示対象外（二重で除外）。
+ */
+export async function fetchAccountCommunityPersonalSpaces(): Promise<AccountCommunityPersonalSpace[]> {
+  const [personalRows, memberships] = await Promise.all([
+    fetchMyCommunityPersonalSpaces(),
+    fetchMyCommunityMemberships(),
+  ]);
+
+  const roleByCommunityId = new Map(
+    memberships
+      .filter((m) => m.status === 'active')
+      .map((m) => [m.communityId, m.role] as const),
+  );
+
+  return personalRows
+    .filter((row) => row.membershipStatus === 'active')
+    .map((row) => ({
+      ...row,
+      membershipRole: roleByCommunityId.get(row.communityId) ?? 'member',
+    }));
 }
 
 export type EnsurePersonalSpaceResult =
