@@ -1,38 +1,41 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, Lock, Plus } from 'lucide-react';
+import { Archive, Lock, Plus } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import type { CommunityMembershipRole } from '../../core/types/communityMembership';
 import {
-  fetchMyCommunityPersonalSpaces,
+  fetchAccountCommunityPersonalSpaces,
   ensureMyPersonalSpace,
   fetchPersonalSpaceForStore,
-  type CommunityPersonalSpace,
+  type AccountCommunityPersonalSpace,
 } from '../../core/utils/personalSpacesApi';
 import styles from './CommunityPersonalSpacesSection.module.css';
 
 type Status = 'idle' | 'loading' | 'error' | 'ready';
 
+function membershipRoleLabel(role: CommunityMembershipRole): string {
+  return role === 'admin' ? '管理者' : 'メンバー';
+}
+
 /**
- * Phase 3: コミュニティ内個人スペースの作成導線。
+ * アカウント画面: 所属コミュニティごとのマイスペース有無と作成導線。
  *
- * - 個人スペースは AccountScreen / MyLogs / My Hossii（個人領域）とは別物で、
- *   特定コミュニティの目的に沿った「その人専用の実際のスペース」。
- * - 本人が active member のコミュニティごとに、未作成なら「作る」、作成済みなら状態表示。
- * - 作成後はアカウント画面に留まり、共有スペースの「マイスペース」タブから開く。
- * - 未ログイン（ゲスト）は案内を表示し、何も取得しない。
+ * - active な community_memberships のコミュニティのみ表示。
+ * - 作成は ensure_my_personal_space(community_id) を明示指定。画面遷移なし。
+ * - 作成後は当該コミュニティ行のみ即時更新し、store へ personal space を追加。
  */
 export const CommunityPersonalSpacesSection = () => {
   const { currentUser } = useAuth();
   const uid = currentUser?.uid ?? null;
   const [status, setStatus] = useState<Status>('idle');
-  const [items, setItems] = useState<CommunityPersonalSpace[]>([]);
+  const [items, setItems] = useState<AccountCommunityPersonalSpace[]>([]);
   const reqIdRef = useRef(0);
 
   const load = useCallback(async () => {
     const reqId = ++reqIdRef.current;
     setStatus('loading');
     try {
-      const rows = await fetchMyCommunityPersonalSpaces();
+      const rows = await fetchAccountCommunityPersonalSpaces();
       if (reqId !== reqIdRef.current) return;
       setItems(rows);
       setStatus('ready');
@@ -62,7 +65,12 @@ export const CommunityPersonalSpacesSection = () => {
       setItems((prev) =>
         prev.map((it) =>
           it.communityId === communityId
-            ? { ...it, personalSpaceId: spaceId, personalSpaceUrl: spaceUrl, personalSpaceStatus: 'active' }
+            ? {
+                ...it,
+                personalSpaceId: spaceId,
+                personalSpaceUrl: spaceUrl,
+                personalSpaceStatus: 'active',
+              }
             : it,
         ),
       );
@@ -73,7 +81,7 @@ export const CommunityPersonalSpacesSection = () => {
   if (!currentUser) {
     return (
       <p className={styles.note}>
-        ログインして、コミュニティに参加すると、個人スペースをここから作成できます。
+        ログインして、コミュニティに参加すると、マイスペースをここから作成できます。
       </p>
     );
   }
@@ -85,7 +93,7 @@ export const CommunityPersonalSpacesSection = () => {
   if (status === 'error') {
     return (
       <div className={styles.note}>
-        <p>個人スペース情報の取得に失敗しました。時間をおいて再度お試しください。</p>
+        <p>マイスペース情報の取得に失敗しました。時間をおいて再度お試しください。</p>
         <button type="button" className={styles.retryBtn} onClick={() => void load()}>
           再読み込み
         </button>
@@ -97,7 +105,7 @@ export const CommunityPersonalSpacesSection = () => {
     return (
       <p className={styles.note}>
         参加中のコミュニティがありません。コミュニティに参加すると、そのコミュニティ内に
-        あなた専用の個人スペースを作成できます。
+        あなた専用のマイスペースを作成できます。
       </p>
     );
   }
@@ -107,7 +115,7 @@ export const CommunityPersonalSpacesSection = () => {
       <div className={styles.privacyNote}>
         <Lock size={13} />
         <span>
-          個人スペースは、あなたとそのコミュニティの管理者が閲覧できます。他のメンバーには公開されません。
+          マイスペースは、あなたとそのコミュニティの管理者が閲覧できます。他のメンバーには公開されません。
         </span>
       </div>
       <ul className={styles.list}>
@@ -120,7 +128,7 @@ export const CommunityPersonalSpacesSection = () => {
 };
 
 type ItemProps = {
-  item: CommunityPersonalSpace;
+  item: AccountCommunityPersonalSpace;
   onCreated: (communityId: string, spaceId: string, spaceUrl: string | null) => void;
 };
 
@@ -130,15 +138,16 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const created = !!item.personalSpaceId;
+  const archived = item.personalSpaceStatus === 'archived';
 
   const create = async () => {
-    if (creating) return;
+    if (creating || created) return;
     setCreating(true);
     setError(null);
     const res = await ensureMyPersonalSpace(item.communityId);
     if (!res.ok) {
       setCreating(false);
-      setError('個人スペースの作成に失敗しました。時間をおいてお試しください。');
+      setError('マイスペースの作成に失敗しました。時間をおいてお試しください。');
       return;
     }
     const fetched = await fetchPersonalSpaceForStore(res.spaceUrl);
@@ -151,27 +160,39 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
 
   return (
     <li className={styles.item}>
-      <div className={styles.itemMain}>
+      <div className={styles.itemHeader}>
         <span className={styles.communityName}>{item.communityName}</span>
+        <span className={styles.roleBadge}>{membershipRoleLabel(item.membershipRole)}</span>
+      </div>
+
+      <div className={styles.itemBody}>
         {created ? (
-          <span className={styles.subtle}>
-            マイスペースがあります。共有スペースの「マイスペース」タブから開けます。
-          </span>
+          <>
+            <div className={styles.statusRow}>
+              <span className={styles.statusLabel}>マイスペースあり</span>
+              {archived && (
+                <span className={styles.archivedBadge}>
+                  <Archive size={12} />
+                  アーカイブ
+                </span>
+              )}
+            </div>
+            <span className={styles.subtle}>
+              共有スペースの「マイスペース」タブから利用できます
+            </span>
+          </>
         ) : (
-          <span className={styles.subtle}>
-            このコミュニティ内に、あなた専用のスペース（初期タブと背景つき）を1つ作成します。
-            投稿や記録はコピーされず、空の状態から始まります。
-          </span>
+          <>
+            <span className={styles.statusLabel}>マイスペース未作成</span>
+            <span className={styles.subtle}>
+              このコミュニティ内に、あなた専用のスペースを1つ作成します。
+            </span>
+          </>
         )}
         {error && <span className={styles.error}>{error}</span>}
       </div>
 
-      {created ? (
-        <span className={styles.createdBadge}>
-          <Check size={14} />
-          作成済み
-        </span>
-      ) : (
+      {!created && (
         <button
           type="button"
           className={styles.createBtn}
@@ -179,7 +200,7 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
           onClick={() => void create()}
         >
           <Plus size={14} />
-          {creating ? '作成中…' : '個人スペースを作る'}
+          {creating ? '作成中…' : 'マイスペースを作る'}
         </button>
       )}
     </li>

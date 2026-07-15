@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => {
   const rpc = vi.fn();
   const getSession = vi.fn();
-  return { rpc, getSession };
+  const fetchMyCommunityMemberships = vi.fn();
+  return { rpc, getSession, fetchMyCommunityMemberships };
 });
 
 vi.mock('./../supabase', () => ({
@@ -14,9 +15,14 @@ vi.mock('./../supabase', () => ({
   },
 }));
 
+vi.mock('./communityMembershipsApi', () => ({
+  fetchMyCommunityMemberships: h.fetchMyCommunityMemberships,
+}));
+
 import {
   mapCommunityPersonalSpaceRow,
   fetchMyCommunityPersonalSpaces,
+  fetchAccountCommunityPersonalSpaces,
   ensureMyPersonalSpace,
   fetchPersonalSpaceForStore,
 } from './personalSpacesApi';
@@ -73,6 +79,52 @@ describe('fetchMyCommunityPersonalSpaces', () => {
     h.getSession.mockResolvedValue({ data: { session: { user: { id: 'uid' } } } });
     h.rpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
     await expect(fetchMyCommunityPersonalSpaces()).rejects.toThrow(/boom/);
+  });
+});
+
+describe('fetchAccountCommunityPersonalSpaces', () => {
+  beforeEach(() => {
+    h.rpc.mockReset();
+    h.getSession.mockReset();
+    h.fetchMyCommunityMemberships.mockReset();
+    h.getSession.mockResolvedValue({ data: { session: { user: { id: 'uid' } } } });
+  });
+
+  it('active community ごとに role を付与して返す', async () => {
+    h.rpc.mockResolvedValue({
+      data: [
+        { community_id: 'c1', community_name: 'A', membership_status: 'active', personal_space_id: null, personal_space_url: null, personal_space_status: null },
+        { community_id: 'c2', community_name: 'B', membership_status: 'active', personal_space_id: 'ps-2', personal_space_url: 'p-b', personal_space_status: 'active' },
+      ],
+      error: null,
+    });
+    h.fetchMyCommunityMemberships.mockResolvedValue([
+      { communityId: 'c1', communityName: 'A', role: 'admin', status: 'active', communityNickname: null },
+      { communityId: 'c2', communityName: 'B', role: 'member', status: 'active', communityNickname: null },
+    ]);
+
+    const rows = await fetchAccountCommunityPersonalSpaces();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ communityId: 'c1', membershipRole: 'admin', personalSpaceId: null });
+    expect(rows[1]).toMatchObject({ communityId: 'c2', membershipRole: 'member', personalSpaceId: 'ps-2' });
+  });
+
+  it('pending / suspended / removed は除外する', async () => {
+    h.rpc.mockResolvedValue({
+      data: [
+        { community_id: 'c-active', community_name: 'Active', membership_status: 'active', personal_space_id: null, personal_space_url: null, personal_space_status: null },
+        { community_id: 'c-suspended', community_name: 'Suspended', membership_status: 'suspended', personal_space_id: null, personal_space_url: null, personal_space_status: null },
+      ],
+      error: null,
+    });
+    h.fetchMyCommunityMemberships.mockResolvedValue([
+      { communityId: 'c-active', communityName: 'Active', role: 'member', status: 'active', communityNickname: null },
+      { communityId: 'c-suspended', communityName: 'Suspended', role: 'member', status: 'suspended', communityNickname: null },
+    ]);
+
+    const rows = await fetchAccountCommunityPersonalSpaces();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].communityId).toBe('c-active');
   });
 });
 
