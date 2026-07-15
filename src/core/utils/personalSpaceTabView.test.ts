@@ -35,6 +35,16 @@ describe('resolveContentSpaceId', () => {
       }),
     ).toBe('personal-1');
   });
+
+  it('uses personal view id on legacy shell without spaceType', () => {
+    expect(
+      resolveContentSpaceId({
+        shellSpaceType: undefined,
+        shellSpaceId: 'shared-1',
+        personalViewSpaceId: 'personal-1',
+      }),
+    ).toBe('personal-1');
+  });
 });
 
 describe('resolvePersonalPostTarget', () => {

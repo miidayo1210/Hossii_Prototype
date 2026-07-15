@@ -18,6 +18,7 @@ import {
   mapCommunityPersonalSpaceRow,
   fetchMyCommunityPersonalSpaces,
   ensureMyPersonalSpace,
+  fetchPersonalSpaceForStore,
 } from './personalSpacesApi';
 
 describe('mapCommunityPersonalSpaceRow', () => {
@@ -97,5 +98,20 @@ describe('ensureMyPersonalSpace', () => {
     const res = await ensureMyPersonalSpace('');
     expect(res.ok).toBe(false);
     expect(h.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchPersonalSpaceForStore', () => {
+  it('spaceUrl が null なら null を返し fetch を呼ばない', async () => {
+    const fetchFn = vi.fn();
+    expect(await fetchPersonalSpaceForStore(null, fetchFn)).toBeNull();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('spaceUrl があるとき fetchFn の結果を返す', async () => {
+    const space = { id: 'ps-1', name: '個人', quickEmotions: [], createdAt: new Date() };
+    const fetchFn = vi.fn(async () => space);
+    expect(await fetchPersonalSpaceForStore('p-abc', fetchFn)).toBe(space);
+    expect(fetchFn).toHaveBeenCalledWith('p-abc');
   });
 });

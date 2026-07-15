@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canShowPersonalShortcut, isViewingOwnPersonalSpace } from './personalSpaceShortcut';
+import { canShowPersonalShortcut, isSharedSpaceShell, isViewingOwnPersonalSpace } from './personalSpaceShortcut';
 
 describe('canShowPersonalShortcut', () => {
   const base = {
@@ -37,6 +37,18 @@ describe('canShowPersonalShortcut', () => {
   it('hides when there is no membership', () => {
     expect(canShowPersonalShortcut({ ...base, membershipStatus: null })).toBe(false);
     expect(canShowPersonalShortcut({ ...base, membershipStatus: undefined })).toBe(false);
+  });
+});
+
+describe('isSharedSpaceShell', () => {
+  it('treats shared and undefined as shared shell', () => {
+    expect(isSharedSpaceShell('shared')).toBe(true);
+    expect(isSharedSpaceShell(undefined)).toBe(true);
+    expect(isSharedSpaceShell(null)).toBe(true);
+  });
+
+  it('treats personal as non-shell', () => {
+    expect(isSharedSpaceShell('personal')).toBe(false);
   });
 });
 
