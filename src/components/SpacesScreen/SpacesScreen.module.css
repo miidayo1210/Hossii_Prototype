@@ -346,6 +346,175 @@
 }
 
 /* ------------------------------------------------
+   セクション（共有 / 個人）
+   ------------------------------------------------ */
+.sectionBlock {
+  margin-bottom: 2.5rem;
+}
+
+.sectionBlock:last-child {
+  margin-bottom: 0;
+}
+
+.sectionHeader {
+  margin-bottom: 0.25rem;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+}
+
+.sectionDescription {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 1.25rem 0;
+}
+
+.personalCollapseHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.personalCollapseHeader:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.personalCountBadge {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.personalSectionBody {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.personalList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.personalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+.personalRowMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.personalOwnerPrimary {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.personalOwnerSelf {
+  font-weight: 500;
+  color: #7c3aed;
+  margin-left: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.personalArchiveBadge {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.personalOwnerSecondary {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0.125rem 0 0 0;
+}
+
+.personalSpaceName {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+}
+
+.personalRowActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.personalActionLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.openSpaceButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.openSpaceButton:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.personalRowActions .settingsButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.625rem;
+}
+
+.personalEmptyNote {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  padding: 1rem;
+  text-align: center;
+  background: #f9fafb;
+  border-radius: 0.75rem;
+  border: 1px dashed #e5e7eb;
+  margin: 0;
+}
+
+/* ------------------------------------------------
    スペースカード
    ------------------------------------------------ */
 .spaceCard {

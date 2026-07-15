@@ -41,6 +41,14 @@ function rowToCommunity(row: CommunityRow): Community {
   };
 }
 
+/** 同一 admin が複数コミュニティを持つときの正本選択（approved 優先・最古 created_at）。 */
+export function pickPrimaryAdminCommunity(rows: CommunityRow[]): CommunityRow | null {
+  if (rows.length === 0) return null;
+  const approved = rows.filter((r) => r.status === 'approved');
+  const pool = approved.length > 0 ? approved : rows;
+  return [...pool].sort((a, b) => a.created_at.localeCompare(b.created_at))[0] ?? null;
+}
+
 /**
  * 指定ユーザーが管理者として登録しているコミュニティを取得する
  * 存在しなければ null を返す（isAdmin 判定・status 確認に使用）
@@ -52,14 +60,15 @@ export async function getAdminCommunity(adminId: string): Promise<Community | nu
     .from('communities')
     .select('*')
     .eq('admin_id', adminId)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
   if (error) {
     console.error('[communitiesApi] getAdminCommunity error:', error.message);
     return null;
   }
 
-  return data ? rowToCommunity(data as CommunityRow) : null;
+  const row = pickPrimaryAdminCommunity((data ?? []) as CommunityRow[]);
+  return row ? rowToCommunity(row) : null;
 }
 
 /**
