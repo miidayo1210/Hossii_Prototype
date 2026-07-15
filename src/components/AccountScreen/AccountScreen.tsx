@@ -12,6 +12,7 @@ import { CommunitySwitcher } from '../Community/CommunitySwitcher';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { resolveAccountIdentity } from '../../core/utils/resolveAccountIdentity';
+import { resolveAccountSection } from './accountSection';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -21,7 +22,8 @@ type Props = {
 
 export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) => {
   const { currentUser, logout } = useAuth();
-  const { navigate } = useRouter();
+  const { screenParam, navigate } = useRouter();
+  const activeSection = resolveAccountSection(screenParam);
   const { selectedMembership } = useSelectedCommunity();
   const { state, setDefaultNickname, setSpaceNickname, getActiveSpace } = useHossiiStore();
   const { profile, spaceNicknames, activeSpaceId } = state;
@@ -98,8 +100,10 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
         <h1 className={styles.title}>アカウント</h1>
       </header>
 
-      <main className={styles.content}>
+      <main className={styles.content} data-account-section={activeSection}>
 
+        {activeSection === 'home' && (
+          <div data-testid="account-section-home">
         <section className={styles.identityBanner} aria-live="polite">
           <p className={styles.identityGreeting}>{identity.greeting}</p>
           <p className={styles.identityStatus}>{identity.statusLabel}</p>
@@ -265,6 +269,29 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
             <p className={styles.currentValue}>現在の設定: {profile.defaultNickname}</p>
           )}
         </section>
+          </div>
+        )}
+
+        {activeSection === 'profile' && (
+          <div data-testid="account-section-profile" className={styles.sectionPlaceholder}>
+            <h2 className={styles.sectionTitle}>プロフィール</h2>
+            <p className={styles.sectionDesc}>表示名・ニックネーム・認証操作（移管予定）</p>
+          </div>
+        )}
+
+        {activeSection === 'spaces' && (
+          <div data-testid="account-section-spaces" className={styles.sectionPlaceholder}>
+            <h2 className={styles.sectionTitle}>参加先</h2>
+            <p className={styles.sectionDesc}>コミュニティとスペース（移管予定）</p>
+          </div>
+        )}
+
+        {activeSection === 'my-hossii' && (
+          <div data-testid="account-section-my-hossii" className={styles.sectionPlaceholder}>
+            <h2 className={styles.sectionTitle}>マイHossii</h2>
+            <p className={styles.sectionDesc}>Hossiiの登録と登場（移管予定）</p>
+          </div>
+        )}
 
       </main>
     </div>
