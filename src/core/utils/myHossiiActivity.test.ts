@@ -37,6 +37,40 @@ describe('deriveMyHossiiActivity', () => {
     expect(activity.recentPosts).toHaveLength(1);
     expect(activity.recentPosts[0]?.id).toBe('2');
   });
+
+  it('aggregates posts across panes in the same space', () => {
+    const userId = 'user-a';
+    const paneOnly: Hossii[] = [];
+    const allPanes = [
+      makeHossii({
+        id: 'pane-main',
+        authorId: userId,
+        spacePaneId: 'pane-main',
+        createdAt: new Date('2026-07-01'),
+        message: 'main',
+      }),
+      makeHossii({
+        id: 'pane-sub',
+        authorId: userId,
+        spacePaneId: 'pane-sub',
+        createdAt: new Date('2026-07-05'),
+        message: 'sub',
+      }),
+    ];
+
+    const paneActivity = deriveMyHossiiActivity(paneOnly, userId, {
+      nickname: 'みい',
+      spaceId: 'space-1',
+    });
+    const allPaneActivity = deriveMyHossiiActivity(allPanes, userId, {
+      nickname: 'みい',
+      spaceId: 'space-1',
+    });
+
+    expect(paneActivity.recentPosts).toHaveLength(0);
+    expect(allPaneActivity.recentPosts).toHaveLength(2);
+    expect(allPaneActivity.recentPosts[0]?.id).toBe('pane-sub');
+  });
 });
 
 describe('findAuthorGroupForUser', () => {

@@ -5,6 +5,8 @@ import type { ParticipantEligibility } from '../../core/utils/myHossiiAppearance
 import { shouldShowSpaceRegistrationPrompt } from '../../core/utils/myHossiiAppearance';
 import type { AuthorPostGroup } from '../../core/utils/authorPostGroup';
 import { useMyHossiiParticipants } from '../../core/hooks/useMyHossiiParticipants';
+import { useMySpaceActivity } from '../../core/hooks/useMySpaceActivity';
+import type { MyHossiiActivity } from '../../core/utils/myHossiiActivity';
 import { resolveMyHossiiAnimationTier } from '../../core/utils/myHossiiAnimationLevel';
 import { computeMyHossiiPosition, resolveMyHossiiMotionMode } from '../../core/utils/myHossiiPosition';
 import { resolveMyHossiiImage } from '../../core/utils/resolveMyHossiiImage';
@@ -29,7 +31,10 @@ type Props = {
   enabled: boolean;
   motionMode: MyHossiiMotionMode;
   logVisibility: MyHossiiLogVisibility;
+  /** 吹き出し・新着検知用（現在の Pane） */
   hossiis: Hossii[];
+  /** 個人ログ集計用（スペース全体の全 Pane） */
+  activityHossiis: Hossii[];
   visiblePostCount: number;
   currentUserId: string | null;
   isAuthenticatedViewer: boolean;
@@ -51,6 +56,7 @@ export const MyHossiiLayer = ({
   motionMode,
   logVisibility,
   hossiis,
+  activityHossiis,
   visiblePostCount,
   currentUserId,
   isAuthenticatedViewer,
@@ -60,6 +66,12 @@ export const MyHossiiLayer = ({
   onViewAuthorLogs,
 }: Props) => {
   const { participants, isLoading, error } = useMyHossiiParticipants(spaceId, enabled);
+  // 本人アバターの個人ログは DB 集計 RPC を正本とする（ロード済みデータでは未取得分が欠ける）。
+  // 未ログイン / 未設定 / RPC 失敗時は provisional（ロード済み集約）へ安全に fallback する。
+  const { activity: selfDbActivity, loading: selfActivityLoading } = useMySpaceActivity(
+    spaceId,
+    enabled && isAuthenticatedViewer && !!currentUserId,
+  );
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
   const prevHossiiIdsRef = useRef<Set<string>>(new Set());
@@ -149,7 +161,7 @@ export const MyHossiiLayer = ({
   });
 
   const handleViewLogs = (userId: string, nickname: string) => {
-    const group = resolveAuthorGroupForMyHossiiUser(hossiis, {
+    const group = resolveAuthorGroupForMyHossiiUser(activityHossiis, {
       userId,
       nickname,
       spaceId,
@@ -166,7 +178,9 @@ export const MyHossiiLayer = ({
           participant={participant}
           index={index}
           spaceId={spaceId}
-          hossiis={hossiis}
+          activityHossiis={activityHossiis}
+          selfDbActivity={selfDbActivity}
+          selfActivityLoading={selfActivityLoading}
           animationTier={animationTier}
           resolvedMotion={resolvedMotion}
           logVisibility={logVisibility}
@@ -191,7 +205,10 @@ type AvatarItemProps = {
   participant: MyHossiiParticipant;
   index: number;
   spaceId: string;
-  hossiis: Hossii[];
+  activityHossiis: Hossii[];
+  /** 本人アバター用: DB 集計 RPC からの正確なアクティビティ（他参加者には使わない）。 */
+  selfDbActivity: MyHossiiActivity | null;
+  selfActivityLoading: boolean;
   animationTier: ReturnType<typeof resolveMyHossiiAnimationTier>;
   resolvedMotion: ReturnType<typeof resolveMyHossiiMotionMode>;
   logVisibility: MyHossiiLogVisibility;
@@ -208,7 +225,9 @@ function AvatarItem({
   participant,
   index,
   spaceId,
-  hossiis,
+  activityHossiis,
+  selfDbActivity,
+  selfActivityLoading,
   animationTier,
   resolvedMotion,
   logVisibility,
@@ -222,15 +241,19 @@ function AvatarItem({
 }: AvatarItemProps) {
   const position = computeMyHossiiPosition(participant.userId, spaceId, index);
   const imageSrc = resolveMyHossiiImage(participant);
-  const activity = deriveMyHossiiActivity(hossiis, participant.userId, {
+  const isSelf = !!currentUserId && participant.userId === currentUserId && isAuthenticatedViewer;
+  const provisionalActivity = deriveMyHossiiActivity(activityHossiis, participant.userId, {
     nickname: participant.nickname,
     spaceId,
   });
+  // 本人アバターは DB 正本を優先。取得前・失敗時は provisional（ロード済み集約）を維持。
+  const activity = isSelf && selfDbActivity ? selfDbActivity : provisionalActivity;
   const displayState = deriveMyHossiiDisplayState(activity);
   const stateLabel = getMyHossiiStateLabel(displayState);
   const activityScale = resolveActivityScale(activity.lastActivityAt);
-  const isSelf = !!currentUserId && participant.userId === currentUserId && isAuthenticatedViewer;
   const speechBubble = activeBubbles.find((b) => b.userId === participant.userId)?.text ?? null;
+  // 本人のみ: DB 集計の取得中は popover で「集計中」を出す。
+  const activityLoading = isSelf && selfActivityLoading && !selfDbActivity;
 
   return (
     <MyHossiiAvatar
@@ -245,6 +268,7 @@ function AvatarItem({
       stateLabel={stateLabel}
       activityScale={activityScale}
       activity={activity}
+      activityLoading={activityLoading}
       logVisibility={logVisibility}
       isAuthenticatedViewer={isAuthenticatedViewer}
       speechBubble={speechBubble}

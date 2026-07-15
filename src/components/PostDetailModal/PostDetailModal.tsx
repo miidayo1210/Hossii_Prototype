@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { X } from 'lucide-react';
+import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useAuth } from '../../core/contexts/useAuth';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import { PostedNameLabel } from '../common/PostedNameLabel';
+import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
+import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
 import styles from './PostDetailModal.module.css';
 
 type Props = {
@@ -9,9 +16,32 @@ type Props = {
   onClose: () => void;
   likesEnabled?: boolean;
   onLike?: (id: string) => void;
+  readOnlyArchived?: boolean;
 };
 
-export const PostDetailModal = ({ hossii, onClose, likesEnabled, onLike }: Props) => {
+export const PostDetailModal = ({
+  hossii,
+  onClose,
+  likesEnabled,
+  onLike,
+  readOnlyArchived = false,
+}: Props) => {
+  const { postAuthorDisplayNames, myAuthorshipIds, myAuthorshipIdsStatus } = useHossiiStore();
+  const { currentUser } = useAuth();
+  const authorDisplay = resolvePostAuthorDisplay({
+    postedName: hossii.authorName,
+    currentName: postAuthorDisplayNames.get(hossii.id),
+    isOwnPost: false,
+  });
+  const isOwnerOnly = hossii.visibility === 'owner_only';
+  const canManage =
+    !readOnlyArchived &&
+    canManageOwnPost({
+      isAuthenticated: !!currentUser,
+      myAuthorshipIds,
+      myAuthorshipIdsStatus,
+      hossiiId: hossii.id,
+    });
   const emoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : null;
   const timestamp = hossii.createdAt.toLocaleString('ja-JP');
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
@@ -47,11 +77,25 @@ export const PostDetailModal = ({ hossii, onClose, likesEnabled, onLike }: Props
         </button>
 
         <div className={styles.content}>
-          {hossii.authorName && (
-            <div className={styles.author}>{hossii.authorName}</div>
+          {(isOwnerOnly || canManage) && (
+            <div className={styles.ownerBar}>
+              {isOwnerOnly ? <OwnerOnlyBadge /> : <span />}
+              {canManage && <OwnPostActions hossii={hossii} onDeleted={onClose} />}
+            </div>
+          )}
+
+          {authorDisplay.primaryName && (
+            <div className={styles.author}>
+              {authorDisplay.primaryName}
+              <PostedNameLabel name={authorDisplay.postedNameLabel} />
+            </div>
           )}
 
           <div className={styles.message}>{renderHossiiText(hossii)}</div>
+
+          {hossii.contentEditedAt && (
+            <span className={styles.editedMark}>編集済み</span>
+          )}
 
           {hossii.imageUrl && (
             <img

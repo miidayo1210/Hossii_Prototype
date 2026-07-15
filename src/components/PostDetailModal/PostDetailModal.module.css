@@ -48,6 +48,20 @@
   gap: 1rem;
 }
 
+.ownerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-right: 2rem; /* 右上の閉じるボタンと重ならないように */
+}
+
+.editedMark {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  margin-top: -0.5rem;
+}
+
 .author {
   font-size: 0.875rem;
   font-weight: 600;

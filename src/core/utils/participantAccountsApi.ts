@@ -69,14 +69,21 @@ export async function fetchParticipantAccounts(spaceId: string): Promise<Partici
 async function invokeParticipantAccountAction(
   spaceId: string,
   action: EdgeFunctionAction,
-  slotNumber?: number
+  slotNumber?: number,
+  options?: { linkCommunityMembership?: boolean; linkSpaceMembership?: boolean },
 ): Promise<ParticipantAccountIssueResult | { slotNumber: number; revoked: true }> {
   if (!isSupabaseConfigured) {
     throw new Error('Supabase is not configured');
   }
 
   const { data, error } = await supabase.functions.invoke('issue-participant-account', {
-    body: { spaceId, action, slotNumber },
+    body: {
+      spaceId,
+      action,
+      slotNumber,
+      linkCommunityMembership: options?.linkCommunityMembership ?? false,
+      linkSpaceMembership: options?.linkSpaceMembership ?? false,
+    },
   });
 
   if (error) {
@@ -91,11 +98,17 @@ async function invokeParticipantAccountAction(
   return data as ParticipantAccountIssueResult | { slotNumber: number; revoked: true };
 }
 
+export type IssueParticipantOptions = {
+  linkCommunityMembership?: boolean;
+  linkSpaceMembership?: boolean;
+};
+
 export async function issueParticipantAccount(
   spaceId: string,
-  slotNumber?: number
+  slotNumber?: number,
+  options?: IssueParticipantOptions,
 ): Promise<ParticipantAccountIssueResult> {
-  const result = await invokeParticipantAccountAction(spaceId, 'issue', slotNumber);
+  const result = await invokeParticipantAccountAction(spaceId, 'issue', slotNumber, options);
   return result as ParticipantAccountIssueResult;
 }
 

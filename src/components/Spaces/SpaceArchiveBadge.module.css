@@ -1,0 +1,33 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  color: #92400e;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.label {
+  letter-spacing: 0.01em;
+}
+
+.hint {
+  font-size: 0.62rem;
+  font-weight: 500;
+  opacity: 0.88;
+}
+
+@media (prefers-color-scheme: dark) {
+  .badge {
+    background: rgba(120, 53, 15, 0.55);
+    border-color: rgba(251, 191, 36, 0.35);
+    color: #fde68a;
+  }
+}

@@ -1,11 +1,17 @@
-import { useState } from 'react';
-import { LogOut, User, Mail } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { LogOut, User } from 'lucide-react';
 import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
 import { MyHossiiSettingsSection } from './MyHossiiSettingsSection';
+import { JoinedSpacesSection } from './JoinedSpacesSection';
+import { CommunityPersonalSpacesSection } from './CommunityPersonalSpacesSection';
+import { CommunitySwitcher } from '../Community/CommunitySwitcher';
+import { useRouter } from '../../core/hooks/useRouter';
+import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
+import { resolveAccountIdentity } from '../../core/utils/resolveAccountIdentity';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -15,9 +21,28 @@ type Props = {
 
 export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) => {
   const { currentUser, logout } = useAuth();
+  const { navigate } = useRouter();
+  const { selectedMembership } = useSelectedCommunity();
   const { state, setDefaultNickname, setSpaceNickname, getActiveSpace } = useHossiiStore();
   const { profile, spaceNicknames, activeSpaceId } = state;
   const activeSpace = getActiveSpace();
+
+  const identity = useMemo(
+    () =>
+      resolveAccountIdentity({
+        currentUser,
+        spaceNickname: spaceNicknames[activeSpaceId] ?? null,
+        communityNickname: selectedMembership?.communityNickname ?? null,
+        profileNickname: profile?.defaultNickname ?? null,
+      }),
+    [
+      currentUser,
+      spaceNicknames,
+      activeSpaceId,
+      selectedMembership?.communityNickname,
+      profile?.defaultNickname,
+    ],
+  );
 
   const [defaultNicknameInput, setDefaultNicknameInput] = useState(
     profile?.defaultNickname || ''
@@ -56,9 +81,11 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     setIsLoggingOut(true);
     try {
       await logout();
+      navigate('screen');
     } catch (error) {
       console.error('Logout error:', error);
       alert('ログアウトに失敗しました');
+    } finally {
       setIsLoggingOut(false);
     }
   };
@@ -73,6 +100,11 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
 
       <main className={styles.content}>
 
+        <section className={styles.identityBanner} aria-live="polite">
+          <p className={styles.identityGreeting}>{identity.greeting}</p>
+          <p className={styles.identityStatus}>{identity.statusLabel}</p>
+        </section>
+
         {/* アカウント情報 */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>アカウント情報</h2>
@@ -84,13 +116,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
                   <User size={28} />
                 </div>
                 <div className={styles.userDetails}>
-                  <div className={styles.userName}>
-                    {profile?.defaultNickname || 'ニックネーム未設定'}
-                  </div>
-                  <div className={styles.userMeta}>
-                    <Mail size={13} />
-                    <span>{currentUser.email}</span>
-                  </div>
+                  <div className={styles.userName}>{identity.displayName}</div>
                 </div>
               </div>
               <button
@@ -132,6 +158,34 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
               </div>
             </div>
           )}
+        </section>
+
+        {currentUser && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>所属コミュニティ</h2>
+            <p className={styles.sectionDesc}>
+              複数のコミュニティに所属している場合は、ここで切り替えられます。
+            </p>
+            <CommunitySwitcher onNavigateHome={(id) => navigate('community', id)} />
+          </section>
+        )}
+
+        {/* 参加しているスペース */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>参加しているスペース</h2>
+          <p className={styles.sectionDesc}>
+            あなたがログインして参加したスペースの一覧です。
+          </p>
+          <JoinedSpacesSection />
+        </section>
+
+        {/* コミュニティ内の個人スペース */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>コミュニティ内の個人スペース</h2>
+          <p className={styles.sectionDesc}>
+            参加中のコミュニティごとに、あなた専用の個人スペースを作成・入室できます。
+          </p>
+          <CommunityPersonalSpacesSection />
         </section>
 
         {/* マイHossii */}

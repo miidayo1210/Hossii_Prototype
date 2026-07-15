@@ -5,8 +5,11 @@ import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { SpacePaneProvider } from './core/hooks/SpacePaneProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
+import { checkCanAccessSpace } from './core/utils/spaceAccessApi';
+import { resolveSpaceSlug } from './core/utils/resolveSpaceSlug';
 import { isSupabaseConfigured, supabaseEnvironmentValidation } from './core/supabase';
 import { AuthProvider } from './core/contexts/AuthContext';
+import { SelectedCommunityProvider } from './core/contexts/SelectedCommunityContext';
 import { useAuth } from './core/contexts/useAuth';
 import { AdminNavigationProvider } from './core/contexts/AdminNavigationContext';
 import { DisplayPrefsProvider } from './core/contexts/DisplayPrefsContext';
@@ -38,6 +41,8 @@ import styles from './App.module.css';
 import { ScaledContent } from './components/ScaledContent/ScaledContent';
 import { GlobalClickStarBurst } from './components/GlobalClickStarBurst/GlobalClickStarBurst';
 import { HossiiToast } from './core/ui/HossiiToast';
+import { CommunityHomeScreen } from './components/Community/CommunityHomeScreen';
+import { CommunityAcceptInviteScreen } from './components/Community/CommunityAcceptInviteScreen';
 import { DevelopmentBanner } from './components/DevelopmentBanner/DevelopmentBanner';
 import { SupabaseConfigError } from './components/SupabaseConfigError/SupabaseConfigError';
 
@@ -64,7 +69,7 @@ const authResolvingScreenStyle = {
 
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
-  const { screen, navigate } = useRouter();
+  const { screen, screenParam, navigate } = useRouter();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
@@ -258,26 +263,28 @@ const AppContent = () => {
 
     if (targetSpace) {
       initialSlugHandledRef.current = true;
-      // スペースが見つかった場合は "not found" をリセット
-      setSpaceURLNotFound(false);
 
-      if (currentUser) {
-        // ログイン済み: そのまま入室
-        setActiveSpace(targetSpace.id);
-        if (!hasNicknameForSpace(targetSpace.id)) {
-          setPendingSpaceId(targetSpace.id);
-          setShowNicknameModal(true);
+      void checkCanAccessSpace(targetSpace.id).then((allowed) => {
+        if (!allowed) {
+          setSpaceURLNotFound(true);
+          return;
         }
-        window.history.replaceState({}, '', originalPath);
-        navigate('screen');
-      } else {
-        // 未ログイン: isPrivate なスペースはアクセス拒否
-        if (!isGuestMode) {
+
+        setSpaceURLNotFound(false);
+
+        if (currentUser) {
+          setActiveSpace(targetSpace.id);
+          if (!hasNicknameForSpace(targetSpace.id)) {
+            setPendingSpaceId(targetSpace.id);
+            setShowNicknameModal(true);
+          }
+          window.history.replaceState({}, '', originalPath);
+          navigate('screen');
+        } else if (!isGuestMode) {
           if (targetSpace.isPrivate) {
             setGuestSpaceId(targetSpace.id);
             setGuestSpaceIsPrivate(true);
           } else if (hasNicknameForSpace(targetSpace.id)) {
-            // 過去に入室済み（ニックネームが localStorage に保存されている）→ そのまま入室
             setActiveSpace(targetSpace.id);
             setIsGuestMode(true);
             window.history.replaceState({}, '', originalPath);
@@ -286,7 +293,8 @@ const AppContent = () => {
             setGuestSpaceId(targetSpace.id);
           }
         }
-      }
+      });
+      return;
     } else if (spacesLoadedFromSupabase) {
       // Supabase あり: 単体取得が miss のときだけ not-found
       // loading 中や hit 直後の state 反映待ちでは出さない
@@ -515,6 +523,17 @@ const AppContent = () => {
       <ParticipantLoginScreen
         spaceId={pendingParticipantSpaceId}
         onClose={() => setPendingParticipantSpaceId(null)}
+        onEmailLogin={() => {
+          // 参加者ログイン → メールログイン（既存 LoginScreen）へ切り替える。
+          // 戻り先スペースは既存の pendingLoginSlug 経路を再利用し、成功後に /s/[slug] へ戻す。
+          const slug = resolveSpaceSlug({
+            spaceId: pendingParticipantSpaceId,
+            spaces: state.spaces,
+            pathname: window.location.pathname,
+          });
+          setPendingParticipantSpaceId(null);
+          if (slug) setPendingLoginSlug(slug);
+        }}
       />
     );
   }
@@ -534,7 +553,9 @@ const AppContent = () => {
   }
 
   // /s/[slug] アクセス: 未ログインかつゲスト入室前 → ゲスト入室画面
-  if (!currentUser && !isResolvingAuth && guestSpaceId && !isGuestMode) {
+  // pendingLoginSlug が立っている（＝メールログインへ切り替え中）ときは
+  // 下の LoginScreen を優先させるため、ここでは表示しない。
+  if (!currentUser && !isResolvingAuth && guestSpaceId && !isGuestMode && !pendingLoginSlug) {
     return (
       <GuestEntryScreen
         spaceId={guestSpaceId}
@@ -637,6 +658,18 @@ const AppContent = () => {
         return <ReflectionScreen />;
       case 'neighbors':
         return <NeighborsScreen />;
+      case 'community':
+        return currentUser ? (
+          <CommunityHomeScreen communityId={screenParam} />
+        ) : (
+          <AccountScreen onSignUpRequested={() => handleGuestAuthRequested('signup')} />
+        );
+      case 'community-invite':
+        return (
+          <CommunityAcceptInviteScreen
+            inviteToken={screenParam ? decodeURIComponent(screenParam) : ''}
+          />
+        );
       default:
         return renderSpaceScreen();
     }
@@ -681,6 +714,7 @@ const App = () => {
 
   return (
     <AuthProvider>
+      <SelectedCommunityProvider>
       <AdminNavigationProvider>
         <DisplayPrefsProvider>
           <HossiiProvider initialHossiis={mockHossiis}>
@@ -690,6 +724,7 @@ const App = () => {
           </HossiiProvider>
         </DisplayPrefsProvider>
       </AdminNavigationProvider>
+      </SelectedCommunityProvider>
       <GlobalClickStarBurst />
       <DevelopmentBanner />
     </AuthProvider>

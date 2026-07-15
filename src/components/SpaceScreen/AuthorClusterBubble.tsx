@@ -6,6 +6,8 @@ import type { AuthorPostGroup } from '../../core/utils/authorPostGroup';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getEmotionColor } from '../../core/assets/emotionColors';
 import { renderHossiiText } from '../../core/utils/render';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { PostedNameLabel } from '../common/PostedNameLabel';
 import styles from './AuthorClusterBubble.module.css';
 
 const MAX_PREVIEW_POSTS = 20;
@@ -29,6 +31,8 @@ function getPreviewText(hossii: Hossii): string {
 
 type Props = {
   group: AuthorPostGroup;
+  /** 投稿者の現在スペースニックネーム（Phase 2C）。異なれば「投稿時：旧名」を補足表示 */
+  currentAuthorName?: string;
   position: { x: number; y: number };
   viewMode: ViewMode;
   expanded: boolean;
@@ -42,6 +46,7 @@ type Props = {
 
 function AuthorClusterBubbleInner({
   group,
+  currentAuthorName,
   position,
   viewMode,
   expanded,
@@ -80,7 +85,14 @@ function AuthorClusterBubbleInner({
 
   const displayPos = dragPos ?? position;
   const emotionColor = getEmotionColor(group.latestPost.emotion);
-  const initial = group.authorName.charAt(0).toUpperCase() || '?';
+  // Phase 2C: グループ投稿者の現在名を主表示、投稿時名と異なれば補足。
+  const authorDisplay = resolvePostAuthorDisplay({
+    postedName: group.authorName,
+    currentName: currentAuthorName,
+    isOwnPost: false,
+  });
+  const primaryAuthorName = authorDisplay.primaryName || group.authorName;
+  const initial = primaryAuthorName.charAt(0).toUpperCase() || '?';
   const previewPosts = group.posts.slice(-MAX_PREVIEW_POSTS);
   const hiddenCount = group.posts.length - previewPosts.length;
   const recentEmotions = group.posts.slice(-3).map(getPostEmoji);
@@ -222,7 +234,7 @@ function AuthorClusterBubbleInner({
         }
       }}
       aria-expanded={expanded}
-      aria-label={`${group.authorName}の投稿 ${group.posts.length}件`}
+      aria-label={`${primaryAuthorName}の投稿 ${group.posts.length}件`}
     >
       <div className={styles.header}>
         <span
@@ -234,7 +246,8 @@ function AuthorClusterBubbleInner({
         >
           {initial}
         </span>
-        <span className={styles.authorName}>{group.authorName}</span>
+        <span className={styles.authorName}>{primaryAuthorName}</span>
+        <PostedNameLabel name={authorDisplay.postedNameLabel} />
         <span className={styles.countBadge}>{group.posts.length}件</span>
         <span className={styles.timeLabel}>{formatTime(group.latestPost.createdAt)}</span>
         <span className={styles.emotionRow} aria-hidden>

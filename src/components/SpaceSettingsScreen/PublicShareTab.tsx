@@ -17,6 +17,7 @@ import {
 } from '../../core/utils/spaceShareUrl';
 import { sortPanesForDisplay } from '../../core/utils/spacePaneManagement';
 import { updateSpaceInDb } from '../../core/utils/spacesApi';
+import { adminUpdateSpaceAccessMode } from '../../core/utils/spaceMembershipsApi';
 import { useScreenDraft } from '../../core/hooks/useScreenDraft';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
@@ -27,6 +28,7 @@ import styles from './ShareTab.module.css';
 
 type PublicShareDraft = {
   isPrivate: boolean;
+  accessMode: 'public' | 'invite_only';
   spaceURLInput: string;
 };
 
@@ -41,6 +43,7 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
   const { panes } = useSpacePane();
   const initial: PublicShareDraft = {
     isPrivate: space.isPrivate ?? false,
+    accessMode: space.accessMode ?? 'public',
     spaceURLInput: space.spaceURL ?? '',
   };
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
@@ -101,10 +104,18 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
     try {
       const patch: Partial<Space> = {
         isPrivate: draft.isPrivate,
+        accessMode: draft.accessMode,
         spaceURL: draft.spaceURLInput || undefined,
       };
       onUpdateSpace(patch);
-      await updateSpaceInDb(space.id, patch);
+      if (draft.accessMode !== (space.accessMode ?? 'public')) {
+        const modeRes = await adminUpdateSpaceAccessMode(space.id, draft.accessMode);
+        if (!modeRes.ok) throw new Error(modeRes.message);
+      }
+      await updateSpaceInDb(space.id, {
+        isPrivate: draft.isPrivate,
+        spaceURL: draft.spaceURLInput || undefined,
+      });
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
@@ -156,28 +167,80 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
         description="誰がアクセスできるか、どう招待するかを設定します。"
       >
         <SettingsSection title="公開範囲">
-          <div className={styles.radioList ?? ''} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+          <p className={styles.sectionHint}>
+            誰がこのスペースを閲覧・投稿できるかを設定します（ログイン要件とは別の設定です）。
+          </p>
+          <div className={styles.radioList}>
+            <label className={styles.radioOption}>
+              <input
+                type="radio"
+                name="accessMode"
+                checked={draft.accessMode === 'public'}
+                onChange={() => setDraft({ ...draft, accessMode: 'public' })}
+              />
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>公開</span>
+                <span className={styles.radioDesc}>
+                  URLを知っている人は、ゲストを含めて閲覧・投稿できます。
+                </span>
+              </span>
+            </label>
+            <label className={styles.radioOption}>
+              <input
+                type="radio"
+                name="accessMode"
+                checked={draft.accessMode === 'invite_only'}
+                onChange={() => setDraft({ ...draft, accessMode: 'invite_only' })}
+              />
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>メンバー限定</span>
+                <span className={styles.radioDesc}>
+                  スペースメンバーと管理者だけが閲覧・投稿できます。
+                </span>
+              </span>
+            </label>
+          </div>
+          <p className={styles.description} style={{ marginTop: '0.75rem' }}>
+            招待制にすると、追加したスペースメンバーと管理者だけがアクセスできます。既存の投稿は削除されません。
+          </p>
+        </SettingsSection>
+
+        <SettingsSection title="ログイン要件">
+          <p className={styles.sectionHint}>
+            未ログインのゲスト参加を許可するかを設定します（公開範囲とは別の設定です）。
+          </p>
+          <div className={styles.radioList}>
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="visibility"
                 checked={!draft.isPrivate}
                 onChange={() => setDraft({ ...draft, isPrivate: false })}
               />
-              URL を知っている人
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>ログイン不要</span>
+                <span className={styles.radioDesc}>
+                  ニックネームだけでゲスト参加できます。
+                </span>
+              </span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}>
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="visibility"
                 checked={draft.isPrivate}
                 onChange={() => setDraft({ ...draft, isPrivate: true })}
               />
-              非公開
+              <span className={styles.radioLabelBlock}>
+                <span className={styles.radioTitle}>ログイン必須</span>
+                <span className={styles.radioDesc}>
+                  Hossiiアカウントへのログインが必要です。
+                </span>
+              </span>
             </label>
           </div>
           <p className={styles.description} style={{ marginTop: '0.75rem' }}>
-            非公開にすると、未ログインのゲストはこのスペースにアクセスできません。
+            非公開にすると、未ログインのゲストはこのスペースにアクセスできません（招待制とは別設定です）。
           </p>
         </SettingsSection>
 

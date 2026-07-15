@@ -150,6 +150,20 @@
   font-size: 0.875rem;
 }
 
+.loading {
+  text-align: center;
+  padding: 3rem 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.errorState {
+  text-align: center;
+  padding: 3rem 0;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
 /* ガラスカード */
 .card {
   background: rgba(255, 255, 255, 0.72);
@@ -206,6 +220,20 @@
   font-size: 0.625rem;
   color: #9ca3af;
   flex-shrink: 0;
+}
+
+.cardHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.editedMark {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.625rem;
+  color: #9ca3af;
 }
 
 /* メッセージ（2行目） */

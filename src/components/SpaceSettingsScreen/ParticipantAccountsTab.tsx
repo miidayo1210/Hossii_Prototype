@@ -36,6 +36,8 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
   const [busySlot, setBusySlot] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [credentialModal, setCredentialModal] = useState<CredentialModal | null>(null);
+  const [linkCommunityMembership, setLinkCommunityMembership] = useState(false);
+  const [linkSpaceMembership, setLinkSpaceMembership] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -60,7 +62,10 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
     setBusySlot(slotNumber);
     setErrorMsg('');
     try {
-      const result = await issueParticipantAccount(space.id, slotNumber);
+      const result = await issueParticipantAccount(space.id, slotNumber, {
+        linkCommunityMembership,
+        linkSpaceMembership,
+      });
       setCredentialModal({
         loginId: result.loginId,
         password: result.password,
@@ -128,6 +133,45 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
       <p className={styles.summary}>
         発行済み: <strong>{issuedCount}</strong> / 20
       </p>
+      <div className={styles.linkOptions}>
+        <p className={styles.optionIntro}>
+          発行時に、利用者をコミュニティやスペースのメンバーとして自動登録できます。public
+          スペースだけを使わせる場合は、どちらも OFF で利用できます。
+        </p>
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={linkCommunityMembership}
+            onChange={(e) => setLinkCommunityMembership(e.target.checked)}
+          />
+          <span className={styles.checkText}>
+            <span className={styles.checkTitle}>コミュニティにも所属させる</span>
+            <span className={styles.checkDesc}>
+              この ID の利用者を、スペースが属するコミュニティのメンバーとして登録します。コミュニティ
+              HOME や個人スペースを利用させたい場合に選択してください。
+            </span>
+          </span>
+        </label>
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={linkSpaceMembership}
+            onChange={(e) => setLinkSpaceMembership(e.target.checked)}
+          />
+          <span className={styles.checkText}>
+            <span className={styles.checkTitle}>このスペースのメンバーにも登録する</span>
+            <span className={styles.checkDesc}>
+              この ID の利用者を、このスペースのメンバーとして登録します。メンバー限定スペースへ入れる場合に選択してください。
+            </span>
+          </span>
+        </label>
+        {linkSpaceMembership && !linkCommunityMembership && (
+          <p className={styles.optionNote}>
+            コミュニティ所属なしでスペースメンバーのみ登録できます。メンバー限定スペースには入れますが、コミュニティ
+            HOME や個人スペースは利用できません。
+          </p>
+        )}
+      </div>
 
       {errorMsg && <p className={styles.error}>{errorMsg}</p>}
 
