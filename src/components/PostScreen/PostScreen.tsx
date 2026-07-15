@@ -45,6 +45,7 @@ import {
   type BubblePaletteId,
 } from '../../core/utils/bubbleColorPalettes';
 import styles from './PostScreen.module.css';
+import { PostFieldLabel } from './PostFieldLabel';
 import { CanvasPostEditor, type CanvasPostEditorHandle } from './CanvasPostEditor';
 import {
   isWebSerialSupported,
@@ -953,16 +954,13 @@ export const PostScreen = ({
               submitAttempted && !isMessageSatisfied ? ` ${styles.fieldError}` : ''
             }`}
           >
-            <div className={styles.labelRow}>
-              <div className={styles.label}>メッセージ</div>
-              {pf.message.required && <span className={styles.requiredBadge}>必須</span>}
-            </div>
+            <PostFieldLabel label="メッセージ" required={pf.message.required} />
             <textarea
               ref={messageTextareaRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleMessageKeyDown}
-              placeholder="なんでも書いてね…（任意）"
+              placeholder="なんでも書いてね…"
               className={styles.textarea}
               maxLength={200}
               title={panelMode ? '⌘+Enter（Windows は Ctrl+Enter）で投稿' : undefined}
@@ -981,10 +979,7 @@ export const PostScreen = ({
               submitAttempted && !isEmotionSatisfied ? ` ${styles.fieldError}` : ''
             }`}
           >
-            <div className={styles.labelRow}>
-              <div className={styles.label}>気持ちをつける（任意）</div>
-              {pf.emotion.required && <span className={styles.requiredBadge}>必須</span>}
-            </div>
+            <PostFieldLabel label="気持ちをつける" required={pf.emotion.required} />
             <div className={styles.emotionBar}>
               {emotionButtons.map((btn) => (
                 <button
@@ -1014,12 +1009,11 @@ export const PostScreen = ({
         {/* F01: 吹き出し色選択（4テーマ + デフォルト + 各8色）。フォーカス順はテーマ4→デフォルト→8色 */}
         {pf.bubbleColor.enabled && (
         <div className={panelMode ? styles.panelSection : styles.section}>
-          <div className={styles.labelRow}>
-            <div className={styles.label} id={bubbleColorLabelId}>
-              吹き出しの色（任意）
-            </div>
-            {pf.bubbleColor.required && <span className={styles.requiredBadge}>必須</span>}
-          </div>
+          <PostFieldLabel
+            label="吹き出しの色"
+            required={pf.bubbleColor.required}
+            id={bubbleColorLabelId}
+          />
           <div
             ref={colorPaletteRef}
             className={styles.colorPaletteToolbar}
@@ -1075,10 +1069,7 @@ export const PostScreen = ({
         {/* B02: 吹き出し形状選択 */}
         {showBubbleShape && (
           <div className={panelMode ? styles.panelSection : styles.section}>
-            <div className={styles.labelRow}>
-              <div className={styles.label}>吹き出しの形（任意）</div>
-              {pf.bubbleShape.required && <span className={styles.requiredBadge}>必須</span>}
-            </div>
+            <PostFieldLabel label="吹き出しの形" required={pf.bubbleShape.required} />
             <div className={styles.shapePicker}>
               <button
                 type="button"
@@ -1113,10 +1104,7 @@ export const PostScreen = ({
             submitAttempted && !isTagsSatisfied ? ` ${styles.fieldError}` : ''
           }`}
         >
-          <div className={styles.labelRow}>
-            <div className={styles.label}>ハッシュタグ（任意）</div>
-            {pf.tags.required && <span className={styles.requiredBadge}>必須</span>}
-          </div>
+          <PostFieldLabel label="ハッシュタグ" required={pf.tags.required} />
 
           {/* プリセットタグ（スペースに登録されている場合のみ表示） */}
           {presetTags.length > 0 && (
@@ -1182,10 +1170,7 @@ export const PostScreen = ({
               submitAttempted && !isNumberSatisfied ? ` ${styles.fieldError}` : ''
             }`}
           >
-            <div className={styles.labelRow}>
-              <div className={styles.label}>数値（任意）</div>
-              {pf.numberPost.required && <span className={styles.requiredBadge}>必須</span>}
-            </div>
+            <PostFieldLabel label="数値" required={pf.numberPost.required} />
             <input
               type="number"
               value={numberInput}
@@ -1208,10 +1193,7 @@ export const PostScreen = ({
               submitAttempted && !isPhotoSatisfied ? ` ${styles.fieldError}` : ''
             }`}
           >
-            <div className={styles.labelRow}>
-              <div className={styles.label}>写真 / お絵描き（任意）</div>
-              {pf.photo.required && <span className={styles.requiredBadge}>必須</span>}
-            </div>
+            <PostFieldLabel label="写真 / お絵描き" required={pf.photo.required} />
             {imagePreview ? (
               <div className={styles.imagePreviewContainer}>
                 <img
