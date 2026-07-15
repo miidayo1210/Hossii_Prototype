@@ -12,6 +12,7 @@ import { CommunitySwitcher } from '../Community/CommunitySwitcher';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { resolveAccountIdentity } from '../../core/utils/resolveAccountIdentity';
+import { MY_SPACE_INTRO } from '../../core/utils/mySpaceCopy';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -183,7 +184,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>コミュニティ内のマイスペース</h2>
           <p className={styles.sectionDesc}>
-            参加中のコミュニティごとに、マイスペースの有無を確認し、未作成の場合はここから作成できます。
+            {MY_SPACE_INTRO} 参加中のコミュニティごとに、有無を確認し、未作成の場合はここから作れます。
           </p>
           <CommunityPersonalSpacesSection />
         </section>

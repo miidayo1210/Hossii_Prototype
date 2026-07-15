@@ -94,7 +94,9 @@ import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
 import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
-import { canShowPersonalShortcut, isSharedSpaceShell, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
+import { canShowPersonalShortcut, getPersonalShortcutHiddenReason, isSharedSpaceShell, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
+import { MY_SPACE_OPEN_ERROR } from '../../core/utils/mySpaceCopy';
+import { hasSeenMySpaceTabHint, markMySpaceTabHintSeen } from '../../core/utils/mySpaceTabHint';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
   buildTabFolderPatch,
@@ -1272,7 +1274,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       }
       const res = await ensureMyPersonalSpace(communityId);
       if (!res.ok) {
-        window.alert(res.message);
+        showPaneToast(res.message, 'error');
         return;
       }
       const existing = state.spaces.find((s) => s.id === res.spaceId);
@@ -1281,13 +1283,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         if (fetched) {
           addSpaceLocal(fetched);
         } else {
-          window.alert('個人スペースを開けませんでした。');
+          showPaneToast(MY_SPACE_OPEN_ERROR, 'error');
           return;
         }
       }
       setPersonalViewSpaceId(res.spaceId);
     } catch {
-      window.alert('個人スペースを開けませんでした。');
+      showPaneToast(MY_SPACE_OPEN_ERROR, 'error');
     } finally {
       setPersonalShortcutBusy(false);
     }
@@ -1298,6 +1300,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     currentUser?.uid,
     personalShortcutBusy,
     personalViewSpaceId,
+    showPaneToast,
     state.spaces,
   ]);
 
@@ -1310,6 +1313,44 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       onClick: () => void handlePersonalShortcut(),
     };
   }, [personalShortcutEligible, personalShortcutActive, handlePersonalShortcut, personalShortcutBusy]);
+
+  const [showMySpaceTabHint, setShowMySpaceTabHint] = useState(false);
+
+  useEffect(() => {
+    if (!personalShortcutEligible || hasSeenMySpaceTabHint()) {
+      setShowMySpaceTabHint(false);
+      return;
+    }
+    setShowMySpaceTabHint(true);
+  }, [personalShortcutEligible]);
+
+  const mySpaceTabHint = showMySpaceTabHint
+    ? {
+        onDismiss: () => {
+          markMySpaceTabHintSeen();
+          setShowMySpaceTabHint(false);
+        },
+      }
+    : null;
+
+  const personalShortcutHiddenReason = useMemo(() => {
+    if (!isSharedSpaceShell(activeSpace?.spaceType) || isVisiting || panesLoading) return null;
+    if (personalShortcutEligible) return null;
+    return getPersonalShortcutHiddenReason({
+      isAuthenticated,
+      isVisiting,
+      spaceCommunityId: activeSpace?.communityId,
+      membershipStatus: spaceCommunityMembership?.status,
+    });
+  }, [
+    activeSpace?.communityId,
+    activeSpace?.spaceType,
+    isAuthenticated,
+    isVisiting,
+    panesLoading,
+    personalShortcutEligible,
+    spaceCommunityMembership?.status,
+  ]);
 
   // F06: 非表示（管理者のみ）
   const handleHideBubble = useCallback(() => {
@@ -2484,7 +2525,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           onMoveToFolder={isAdmin && !isContentArchived ? handleMoveToFolder : undefined}
           onReorderFolder={isAdmin && !isContentArchived ? handleReorderFolder : undefined}
           personalShortcut={personalShortcut}
+          mySpaceTabHint={mySpaceTabHint}
         />
+      )}
+      {personalShortcutHiddenReason && (
+        <p className={styles.mySpaceHiddenNote} data-space-export="exclude">
+          {personalShortcutHiddenReason}
+        </p>
       )}
 
       {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー / タグ・星 */}
@@ -2827,7 +2874,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               onMoveToFolder={isAdmin && !isContentArchived ? handleMoveToFolder : undefined}
               onReorderFolder={isAdmin && !isContentArchived ? handleReorderFolder : undefined}
               personalShortcut={personalShortcut}
+              mySpaceTabHint={mySpaceTabHint}
             />
+          )}
+          {personalShortcutHiddenReason && !isMobile && (
+            <p className={styles.mySpaceHiddenNoteDesktop} data-space-export="exclude">
+              {personalShortcutHiddenReason}
+            </p>
           )}
           <TopRightMenu onPostClick={handleTopRightPostClick} postNavDisabled={isContentArchived} />
           <LeftControlBar

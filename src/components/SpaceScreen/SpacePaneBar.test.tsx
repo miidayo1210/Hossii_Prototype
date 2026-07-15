@@ -135,4 +135,25 @@ describe('SpacePaneBar personal shortcut', () => {
       expect(shortcut.getAttribute('aria-selected')).toBe('false');
     },
   );
+
+  it('shows first-time my-space tab hint and dismisses on close', () => {
+    const onDismiss = vi.fn();
+    render(
+      <SpacePaneBar
+        spaceId="s1"
+        variant="desktop"
+        folders={[]}
+        visiblePanes={[makePane('main', 'メイン', 0, true)]}
+        activePaneId="main"
+        isAdmin={false}
+        onSelect={() => {}}
+        personalShortcut={{ label: 'マイスペース', onClick: () => {} }}
+        mySpaceTabHint={{ onDismiss }}
+      />,
+    );
+
+    expect(screen.getByRole('status').textContent).toMatch(/右端のマイスペース/);
+    fireEvent.click(screen.getByRole('button', { name: '案内を閉じる' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });
