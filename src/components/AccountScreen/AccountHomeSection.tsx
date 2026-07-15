@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import type { AccountIdentity } from '../../core/utils/resolveAccountIdentity';
 import type { AccountSection } from './accountSection';
 import { accountSectionToParam } from './accountSection';
+import { badgeForSection, useAccountHomeEntryBadges } from './useAccountHomeEntryBadges';
 import styles from './AccountHomeSection.module.css';
 
 type EntryCard = {
@@ -23,6 +24,8 @@ type Props = {
 };
 
 export const AccountHomeSection = ({ identity, communitySummary, onNavigate }: Props) => {
+  const entryBadges = useAccountHomeEntryBadges();
+
   return (
     <div data-testid="account-section-home" className={styles.home}>
       <section className={styles.greetingBlock} aria-live="polite">
@@ -45,7 +48,9 @@ export const AccountHomeSection = ({ identity, communitySummary, onNavigate }: P
       </section>
 
       <nav className={styles.entryList} aria-label="区分への入口">
-        {ENTRY_CARDS.map((card) => (
+        {ENTRY_CARDS.map((card) => {
+          const badge = badgeForSection(card.section, entryBadges);
+          return (
           <button
             key={card.section}
             type="button"
@@ -53,12 +58,20 @@ export const AccountHomeSection = ({ identity, communitySummary, onNavigate }: P
             onClick={() => onNavigate('account', accountSectionToParam(card.section))}
           >
             <span className={styles.entryText}>
-              <span className={styles.entryLabel}>{card.label}</span>
+              <span className={styles.entryLabelRow}>
+                <span className={styles.entryLabel}>{card.label}</span>
+                {badge && (
+                  <span className={styles.entryBadge} aria-label={`${card.label}: ${badge}`}>
+                    {badge}
+                  </span>
+                )}
+              </span>
               <span className={styles.entryHint}>{card.hint}</span>
             </span>
             <ChevronRight size={18} className={styles.entryArrow} aria-hidden />
           </button>
-        ))}
+          );
+        })}
       </nav>
     </div>
   );

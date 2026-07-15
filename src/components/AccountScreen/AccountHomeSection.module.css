@@ -89,10 +89,28 @@
   min-width: 0;
 }
 
+.entryLabelRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .entryLabel {
   font-size: 0.9375rem;
   font-weight: 600;
   color: #374151;
+}
+
+.entryBadge {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: #f3e8ff;
+  color: #7c3aed;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .entryHint {
