@@ -108,7 +108,36 @@
 | 項目 | 内容 |
 |------|------|
 | **目的** | 入口カードに件数・登録状態バッジを付与（上部要約との重複なし） |
-| **状態** | IN_PROGRESS |
+| **変更ファイル** | `useAccountHomeEntryBadges.ts`, `AccountHomeSection.tsx`, 関連テスト |
+| **実装内容** | 参加先カードに参加スペース件数、マイHossiiカードに登録状態バッジ。既存 API を再利用 |
+| **テスト結果** | 6件 PASS / lint PASS / build PASS |
+| **commit** | a14cd4f |
+| **状態** | DONE |
+| **次のQuest** | Q9 |
+
+---
+
+## Quest Q9 — T9: ホーム要約のローディング表示
+
+| 項目 | 内容 |
+|------|------|
+| **目的** | ホーム上部要約のコミュニティ行に読み込み状態を反映（区分内の既存 loading/error は子コンポーネント維持） |
+| **変更ファイル** | `accountCommunitySummary.ts`, `AccountScreen.tsx`, テスト |
+| **実装内容** | `resolveCommunitySummaryLabel` で membership loading 時に「読み込み中」を表示 |
+| **テスト結果** | 6件 PASS / lint PASS / build PASS |
+| **commit** | （本コミット） |
+| **状態** | DONE |
+| **次のQuest** | — |
+
+---
+
+## Quest Q10 — T10: デザイン調整
+
+| 項目 | 内容 |
+|------|------|
+| **目的** | 丸み・アクセント・カード平坦化（仕様3章） |
+| **状態** | SKIPPED |
+| **理由** | Q7 で Phase 1 最低限のスタイル整理を実施済み。Phase 2 専用の追加デザイン調整はスコープ外として保留 |
 
 ---
 
@@ -116,7 +145,9 @@
 
 | Quest | 理由 |
 |-------|------|
-| T11〜T14 (Phase 3) | 未確定事項 U1〜U4 の決定が必要 |
+| T10 デザイン調整（Phase 2 追加分） | Q7 で Phase 1 分を実施済み。追加 polish は別途判断 |
+| T11 区分ナビ最終 UI | 未確定 U1 |
 | T12 ニックネーム統合 | 仕様書で変更禁止 |
 | T13 マイHossii対象スペース | 仕様書で変更禁止 |
-| T14 認証導線整理 | 仕様書で変更禁止 |
+| T14 認証導線整理 | 未確定 U4 |
+| T15 既存テスト追随 | Phase 3。CommunityPersonalSpacesSection 等は現行テスト PASS を確認済み |

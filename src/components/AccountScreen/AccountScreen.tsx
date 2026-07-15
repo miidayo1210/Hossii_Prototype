@@ -11,7 +11,7 @@ import { AccountHomeSection } from './AccountHomeSection';
 import { AccountProfileSection } from './AccountProfileSection';
 import { AccountSpacesSection } from './AccountSpacesSection';
 import { AccountMyHossiiSection } from './AccountMyHossiiSection';
-import { resolveCommunitySummary } from './accountCommunitySummary';
+import { resolveCommunitySummaryLabel } from './accountCommunitySummary';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -23,7 +23,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
   const { currentUser } = useAuth();
   const { screenParam, navigate } = useRouter();
   const activeSection = resolveAccountSection(screenParam);
-  const { selectedMembership } = useSelectedCommunity();
+  const { selectedMembership, loading: communityLoading } = useSelectedCommunity();
   const { state } = useHossiiStore();
   const { profile, spaceNicknames, activeSpaceId } = state;
 
@@ -44,7 +44,8 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     ],
   );
 
-  const communitySummary = resolveCommunitySummary(
+  const communitySummary = resolveCommunitySummaryLabel(
+    communityLoading,
     Boolean(currentUser),
     selectedMembership?.communityName,
   );
