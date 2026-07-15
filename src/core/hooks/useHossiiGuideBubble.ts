@@ -26,6 +26,7 @@ export function useHossiiGuideBubble({
   const dismissedSpaceIdsRef = useRef<Set<string>>(new Set());
   const autoShownSpaceIdsRef = useRef<Set<string>>(new Set());
   const [guideMessage, setGuideMessage] = useState<string | null>(null);
+  const prevSpaceIdRef = useRef<string | null | undefined>(spaceId);
 
   const dismissGuide = useCallback(() => {
     if (!spaceId) return;
@@ -34,9 +35,11 @@ export function useHossiiGuideBubble({
   }, [spaceId]);
 
   useEffect(() => {
-    // spaceId 変更時は表示状態をクリアしてから再スケジュール
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on space change
-    setGuideMessage(null);
+    if (prevSpaceIdRef.current !== spaceId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on space change only
+      setGuideMessage(null);
+      prevSpaceIdRef.current = spaceId;
+    }
 
     if (!spaceId || !displayReady || blocked) {
       return;
