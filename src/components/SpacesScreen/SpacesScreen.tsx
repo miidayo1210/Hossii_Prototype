@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Pencil, Check, X, Settings, ChevronLeft } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Pencil, Check, X, Settings, ChevronLeft, ChevronDown, ExternalLink } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/useAuth';
@@ -12,6 +12,12 @@ import type { Space, SpaceBackground } from '../../core/types/space';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import { PersonalSpaceTemplateEditor } from './PersonalSpaceTemplateEditor';
 import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
+import { partitionAdminCommunitySpaces } from '../../core/utils/adminSpacesListView';
+import {
+  fetchPersonalSpaceOwnerLabels,
+  resolvePersonalSpaceOwnerDisplay,
+  type OwnerLookupRow,
+} from '../../core/utils/personalSpaceOwnerLabelsApi';
 import styles from './SpacesScreen.module.css';
 
 // 背景のインラインスタイルを生成
@@ -37,6 +43,12 @@ export const SpacesScreen = () => {
   const { currentUser, logout, refreshCommunitySlug } = useAuth();
   const { overrideCommunityId, overrideCommunityName, clearOverrideCommunity, setOverrideCommunity } = useAdminNavigation();
   const { spaces } = state;
+
+  const communityId = overrideCommunityId ?? currentUser?.communityId;
+  const { sharedSpaces, personalSpaces } = useMemo(
+    () => partitionAdminCommunitySpaces(spaces, communityId),
+    [spaces, communityId],
+  );
 
   const pageTitle = overrideCommunityName
     ? `${overrideCommunityName} のスペース管理`
@@ -102,6 +114,10 @@ export const SpacesScreen = () => {
   // コピー完了表示
   const [copiedSpaceId, setCopiedSpaceId] = useState<string | null>(null);
 
+  // 個人スペースセクション（デフォルト折りたたみ）
+  const [personalSectionExpanded, setPersonalSectionExpanded] = useState(false);
+  const [ownerLabels, setOwnerLabels] = useState<Map<string, OwnerLookupRow>>(new Map());
+
   // objectURL 追跡（クリーンアップ用）
   const objectURLsRef = useRef<Set<string>>(new Set());
 
@@ -125,6 +141,32 @@ export const SpacesScreen = () => {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAccountMenu]);
+
+  useEffect(() => {
+    if (!communityId || personalSpaces.length === 0) {
+      setOwnerLabels(new Map());
+      return;
+    }
+
+    const ownerIds = personalSpaces
+      .map((s) => s.ownerUserId)
+      .filter((id): id is string => !!id);
+
+    let cancelled = false;
+    void fetchPersonalSpaceOwnerLabels(communityId, ownerIds).then((labels) => {
+      if (!cancelled) setOwnerLabels(labels);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [communityId, personalSpaces]);
+
+  const isLoadingSpaces =
+    spaces.length === 0 &&
+    currentUser?.isSuperAdmin &&
+    !!overrideCommunityId &&
+    !spacesLoadedFromSupabase;
 
   // ---- コミュニティ ID 編集 ----
   const startEditCommunityId = () => {
@@ -190,7 +232,7 @@ export const SpacesScreen = () => {
     const result = validateSpaceURL(value);
     if (!result.valid) {
       setNewSpaceSlugError(result.error);
-    } else if (!isSpaceURLUnique(value, spaces)) {
+    } else if (!isSpaceURLUnique(value, sharedSpaces)) {
       setNewSpaceSlugError('このIDはすでに使用されています');
     } else {
       setNewSpaceSlugError(null);
@@ -202,7 +244,7 @@ export const SpacesScreen = () => {
     if (!trimmedName) return;
     const slugResult = validateSpaceURL(newSpaceSlug);
     if (!slugResult.valid) return;
-    if (!isSpaceURLUnique(newSpaceSlug, spaces)) return;
+    if (!isSpaceURLUnique(newSpaceSlug, sharedSpaces)) return;
 
     const newSpace: Space = {
       id: generateId(),
@@ -247,7 +289,7 @@ export const SpacesScreen = () => {
     const result = validateSpaceURL(value);
     if (!result.valid) {
       setEditingSlugError(result.error);
-    } else if (!isSpaceURLUnique(value, spaces, spaceId)) {
+    } else if (!isSpaceURLUnique(value, sharedSpaces, spaceId)) {
       setEditingSlugError('このIDはすでに使用されています');
     } else {
       setEditingSlugError(null);
@@ -293,6 +335,14 @@ export const SpacesScreen = () => {
   const handleOpenSettings = (space: Space) => {
     setActiveSpace(space.id);
     navigate('settings');
+  };
+
+  const handleOpenSpace = (space: Space) => {
+    const slug = space.spaceURL ?? space.id;
+    const url = communitySlug
+      ? `/c/${communitySlug}/s/${slug}#screen`
+      : `/s/${slug}#screen`;
+    window.location.href = url;
   };
 
   // ---- 削除 ----
@@ -442,41 +492,33 @@ export const SpacesScreen = () => {
         </div>
       </header>
 
-      {/* スペースグリッド */}
+      {/* 共有 / 個人スペース */}
       <main className={styles.main}>
-        {/* Phase 4: 個人スペーステンプレート（コミュニティ管理者のみ） */}
-        {currentUser?.isAdmin && (overrideCommunityId ?? currentUser?.communityId) && (
-          <PersonalSpaceTemplateEditor
-            communityId={(overrideCommunityId ?? currentUser?.communityId) as string}
-          />
-        )}
+        <section className={styles.sectionBlock} aria-labelledby="shared-spaces-heading">
+          <div className={styles.sectionHeader}>
+            <h2 id="shared-spaces-heading" className={styles.sectionTitle}>
+              共有スペース
+            </h2>
+          </div>
 
-        <div className={styles.spaceGrid}>
-          {spaces.length === 0 &&
-            currentUser?.isSuperAdmin &&
-            overrideCommunityId &&
-            !spacesLoadedFromSupabase && (
+          <div className={styles.spaceGrid}>
+            {isLoadingSpaces && (
               <div className={styles.emptyState}>
                 <p className={styles.emptyStateText}>スペース一覧を読み込み中です…</p>
               </div>
             )}
 
-          {spaces.length === 0 &&
-            !(
-              currentUser?.isSuperAdmin &&
-              overrideCommunityId &&
-              !spacesLoadedFromSupabase
-            ) && (
+            {!isLoadingSpaces && sharedSpaces.length === 0 && (
               <div className={styles.emptyState}>
                 <div className={styles.emptyStateIcon}>🌌</div>
-                <p className={styles.emptyStateText}>まだスペースがありません</p>
+                <p className={styles.emptyStateText}>まだ共有スペースがありません</p>
                 <p className={styles.emptyStateSubtext}>
                   右上の「新しいスペースを作成」から始めましょう
                 </p>
               </div>
             )}
 
-          {spaces.map((space) => (
+            {sharedSpaces.map((space) => (
             <div key={space.id} className={styles.spaceCard}>
               {/* 背景サムネイル */}
               <div
@@ -644,8 +686,97 @@ export const SpacesScreen = () => {
                 </div>
               )}
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </section>
+
+        {currentUser?.isAdmin && communityId && (
+          <section className={styles.sectionBlock} aria-labelledby="personal-spaces-heading">
+            <button
+              type="button"
+              id="personal-spaces-heading"
+              className={styles.personalCollapseHeader}
+              onClick={() => setPersonalSectionExpanded((v) => !v)}
+              aria-expanded={personalSectionExpanded}
+            >
+              <span>個人スペース</span>
+              <span className={styles.personalCountBadge}>{personalSpaces.length}件</span>
+              <ChevronDown
+                size={18}
+                aria-hidden
+                className={
+                  personalSectionExpanded
+                    ? styles.personalCollapseChevronExpanded
+                    : styles.personalCollapseChevron
+                }
+              />
+            </button>
+
+            {personalSectionExpanded && (
+              <div className={styles.personalSectionBody}>
+                <PersonalSpaceTemplateEditor communityId={communityId} />
+
+                {personalSpaces.length === 0 ? (
+                  <p className={styles.personalEmptyNote}>
+                    まだ個人スペースはありません（メンバーが作成するとここに表示されます）
+                  </p>
+                ) : (
+                  <ul className={styles.personalList}>
+                    {personalSpaces.map((space) => {
+                      const lookup = space.ownerUserId
+                        ? ownerLabels.get(space.ownerUserId)
+                        : undefined;
+                      const ownerDisplay = resolvePersonalSpaceOwnerDisplay(lookup);
+
+                      return (
+                        <li key={space.id} className={styles.personalRow}>
+                          <div className={styles.personalRowMain}>
+                            <div className={styles.personalOwnerLine}>
+                              <span className={styles.personalOwnerPrimary}>
+                                {ownerDisplay.displayName}
+                              </span>
+                              {space.isArchived && (
+                                <span className={styles.personalArchiveBadge}>
+                                  <SpaceArchiveBadge showReadOnlyHint={false} />
+                                </span>
+                              )}
+                            </div>
+                            {ownerDisplay.supplementaryEmail && (
+                              <p className={styles.personalOwnerSecondary}>
+                                {ownerDisplay.supplementaryEmail}
+                              </p>
+                            )}
+                            <p className={styles.personalSpaceName}>{space.name}</p>
+                          </div>
+                          <div className={styles.personalRowActions}>
+                            <button
+                              type="button"
+                              className={styles.openSpaceButton}
+                              onClick={() => handleOpenSpace(space)}
+                              title="スペースを開く"
+                            >
+                              <ExternalLink size={14} />
+                              <span className={styles.personalActionLabel}>開く</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.settingsButton}
+                              onClick={() => handleOpenSettings(space)}
+                              title="スペースを設定"
+                            >
+                              <Settings size={14} />
+                              <span className={styles.personalActionLabel}>設定</span>
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       {/* スペース作成モーダル */}
