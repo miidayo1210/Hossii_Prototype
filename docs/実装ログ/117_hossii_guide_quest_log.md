@@ -41,3 +41,34 @@
 - **B2**: 投稿反応 `.bubble` 優先 → 5.7 暫定仮定で Q8 実装
 
 ---
+
+## Q1 — パッケージ定義・型
+
+- **目的:** 8 パッケージ定義、`HossiiGuideSettings` 型、定数検証テスト
+- **変更ファイル:**
+  - `src/core/assets/hossiiGuidePackages.ts`
+  - `src/core/assets/hossiiGuidePackages.test.ts`
+  - `src/core/types/settings.ts`
+  - `docs/実装ログ/117_hossii_guide_quest_log.md`
+- **実装内容:** 仕様 10.3 の 8 パッケージ（各 5 件）をコード定義。`resolvePackageMessages` / `isKnownHossiiGuidePackageKey` を追加。型を `settings.ts` に追加。
+- **テスト結果:** `npm test src/core/assets/hossiiGuidePackages.test.ts` — 6 passed。lint/build OK。
+- **commit:** `5b3ce8c`
+- **状態:** DONE
+- **次の Quest:** Q2
+
+---
+
+## Q2 — ランダム選択・バリデーション・テキスト整形
+
+- **目的:** `buildGuideMessagePool` / `pickRandomGuideMessage` / 保存バリデーション / 表示テキスト整形
+- **変更ファイル:**
+  - `src/core/utils/hossiiGuide.ts`
+  - `src/core/utils/hossiiGuide.test.ts`
+  - `docs/実装ログ/117_hossii_guide_quest_log.md`
+- **実装内容:** Phase 1 向けプール構築（package のみ）、ランダム 1 件選択、管理保存バリデーション、`formatGuideMessageText`、`GUIDE_BUBBLE_INITIAL_DELAY_MS` 定数。
+- **テスト結果:** `npm test src/core/utils/hossiiGuide.test.ts` — 20 passed。lint/build OK。
+- **commit:** （このコミット）
+- **状態:** DONE
+- **次の Quest:** Q3
+
+---
