@@ -82,6 +82,7 @@ export const SpaceSettingsScreen = () => {
         posting: loaded.posting ?? local.posting,
         reflection: loaded.reflection ?? local.reflection,
         mode: loaded.mode ?? local.mode ?? DEFAULT_SPACE_MODE_STATE,
+        hossiiGuide: loaded.hossiiGuide ?? local.hossiiGuide,
       };
       setSettings(merged);
       saveSpaceSettings(merged);

@@ -7,6 +7,8 @@ import {
   DEFAULT_SPACE_MODE_STATE,
 } from '../types/settings';
 import { mergePostFieldSettings, parsePostFieldsFromJson, postFieldsToJson, resolvePostFields } from './postFieldSettings';
+import { normalizeHossiiGuideSettings } from './hossiiGuide';
+import type { HossiiGuideSettings } from '../types/settings';
 
 /** Legacy row shape（DROP 前の DB / テスト用） */
 export type SupabaseSpaceSettingsRow = {
@@ -30,6 +32,7 @@ export type SupabaseSpaceSettingsRow = {
   mode_applied_at?: string | null;
   mode_snapshot?: unknown;
   timeline_depth_enabled?: boolean | null;
+  hossii_guide?: unknown;
 };
 
 function isMissingColumnError(error: { code?: string; message?: string }, column: string): boolean {
@@ -123,6 +126,7 @@ function toSpaceSettings(row: SupabaseSpaceSettingsRow, spaceName: string): Spac
     randomRecallEnabled: row.random_recall_enabled ?? DEFAULT_REFLECTION_SETTINGS.randomRecallEnabled,
   };
   const mode = parseModeState(row);
+  const hossiiGuide = normalizeHossiiGuideSettings(row.hossii_guide);
   return {
     spaceId: row.space_id,
     spaceName: row.space_name ?? spaceName,
@@ -134,7 +138,28 @@ function toSpaceSettings(row: SupabaseSpaceSettingsRow, spaceName: string): Spac
     reflection,
     ...(mode ? { mode } : {}),
     timelineDepthEnabled: row.timeline_depth_enabled === true,
+    ...(hossiiGuide ? { hossiiGuide } : {}),
   };
+}
+
+/** @internal tests */
+export function hossiiGuideToJson(
+  guide: HossiiGuideSettings | undefined,
+): Record<string, unknown> | null {
+  if (!guide) {
+    return null;
+  }
+  const payload: Record<string, unknown> = {
+    enabled: guide.enabled,
+    mode: guide.mode,
+  };
+  if (guide.packageKey !== undefined) {
+    payload.packageKey = guide.packageKey;
+  }
+  if (guide.customMessages !== undefined) {
+    payload.customMessages = guide.customMessages;
+  }
+  return payload;
 }
 
 /** @internal tests */
@@ -329,5 +354,17 @@ export async function upsertSpaceSettings(settings: SpaceSettings): Promise<void
   if (modeError && !isMissingColumnError(modeError, 'applied_mode')) {
     console.error('[spaceSettingsApi] upsertSpaceSettings mode error:', modeError);
     throw modeError;
+  }
+
+  if (settings.hossiiGuide !== undefined) {
+    const { error: guideError } = await supabase
+      .from('space_settings')
+      .update({ hossii_guide: hossiiGuideToJson(settings.hossiiGuide) })
+      .eq('space_id', settings.spaceId);
+
+    if (guideError && !isMissingColumnError(guideError, 'hossii_guide')) {
+      console.error('[spaceSettingsApi] upsertSpaceSettings hossii_guide error:', guideError);
+      throw guideError;
+    }
   }
 }
