@@ -1,0 +1,32 @@
+.notice {
+  position: fixed;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 280;
+  max-width: min(92vw, 28rem);
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  background: rgba(255, 251, 235, 0.96);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  color: #92400e;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  pointer-events: none;
+}
+
+@media (min-width: 769px) {
+  .notice {
+    bottom: 1.25rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .notice {
+    background: rgba(69, 26, 3, 0.92);
+    border-color: rgba(251, 191, 36, 0.4);
+    color: #fde68a;
+  }
+}

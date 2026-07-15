@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Hossii, HossiiState, HossiiAction, AddHossiiInput } from '../types';
+import type { Hossii, HossiiState, HossiiAction, AddHossiiInput, HossiiVisibility } from '../types';
 import type { Space, SpaceId, SpaceBackground, SpaceUpdatePatch } from '../types/space';
 import type { AppMode } from '../types/mode';
 import type { UserProfile, SpaceNicknames } from '../types/profile';
@@ -90,7 +90,38 @@ import {
   type HossiiRow,
 } from '../utils/hossiisApi';
 import { reconcileHossiiQueryKeys } from '../utils/reconcileHossiiQueryKeys';
+import {
+  updateMyHossii,
+  setMyHossiiVisibility,
+  softDeleteMyHossii,
+} from '../utils/myHossiiMutationsApi';
 import { insertModerationLog } from '../utils/moderationLogsApi';
+import { fetchMyAuthorshipIdsForSpace } from '../utils/hossiiAuthorshipsApi';
+import {
+  createMyAuthorshipIdsController,
+  EMPTY_MY_AUTHORSHIP_IDS,
+  type MyAuthorshipIdsSnapshot,
+  type MyAuthorshipIdsStatus,
+} from '../utils/myAuthorshipIdsController';
+import {
+  createAuthorshipControllerHost,
+  type AuthorshipControllerHost,
+} from '../utils/authorshipControllerHost';
+import { joinSpaceAsMember } from '../utils/spaceMembershipsApi';
+import { checkCanAccessSpace } from '../utils/spaceAccessApi';
+import {
+  createMembershipJoinController,
+  resolveMembershipNickname,
+  type MembershipJoinController,
+} from '../utils/membershipJoinController';
+import { fetchSpacePostAuthorDisplayNames } from '../utils/spacePostAuthorNamesApi';
+import {
+  createPostAuthorNamesController,
+  EMPTY_POST_AUTHOR_NAMES,
+  type PostAuthorNamesController,
+  type PostAuthorNamesSnapshot,
+} from '../utils/postAuthorNamesController';
+import { createControllerHost, type ControllerHost } from '../utils/controllerHost';
 import {
   upsertProfile,
   upsertSpaceNickname,
@@ -149,7 +180,9 @@ const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
  * @see mergeFetchedHossiisWithPendingInserts in hossiiPendingMerge.ts
  */
 // スペースを正規化（localStorage が壊れても安全）
-const normalizeSpace = (f: unknown): Space => {
+// export: fetchSpaceByUrl → MERGE_SPACE 経路と同じ正規化を統合テストで検証するため。
+// eslint-disable-next-line react-refresh/only-export-components -- 純粋関数。HMR 対象外の共有ヘルパー
+export const normalizeSpace = (f: unknown): Space => {
   const raw = (f ?? {}) as Record<string, unknown>;
 
   const id = typeof raw.id === 'string' && raw.id ? raw.id : generateId();
@@ -191,6 +224,8 @@ const normalizeSpace = (f: unknown): Space => {
       : undefined;
 
   const isPrivate = typeof raw.isPrivate === 'boolean' ? raw.isPrivate : undefined;
+  const accessMode =
+    raw.accessMode === 'invite_only' ? 'invite_only' : raw.accessMode === 'public' ? 'public' : undefined;
   const welcomeMessage = typeof raw.welcomeMessage === 'string' ? raw.welcomeMessage : undefined;
   const description = typeof raw.description === 'string' ? raw.description : undefined;
   const characterName = typeof raw.characterName === 'string' ? raw.characterName : undefined;
@@ -215,6 +250,17 @@ const normalizeSpace = (f: unknown): Space => {
       ? raw.myHossiiLogVisibility
       : undefined;
 
+  // コミュニティ / スペース種別のメタデータ（fetchSpaceByUrl → MERGE_SPACE 経路でも保持する）。
+  // これを落とすと個人スペースショートカット（「わたし」タブ）の表示条件・active 判定が
+  // 成立しなくなるため、必ず引き継ぐ。
+  const communityId = typeof raw.communityId === 'string' && raw.communityId ? raw.communityId : undefined;
+  const spaceType = raw.spaceType === 'personal' ? 'personal' : raw.spaceType === 'shared' ? 'shared' : undefined;
+  const ownerUserId = typeof raw.ownerUserId === 'string' && raw.ownerUserId ? raw.ownerUserId : undefined;
+  const isArchived = typeof raw.isArchived === 'boolean' ? raw.isArchived : false;
+  const archivedAt =
+    typeof raw.archivedAt === 'string' && raw.archivedAt ? new Date(raw.archivedAt) : undefined;
+  const archivedBy = typeof raw.archivedBy === 'string' && raw.archivedBy ? raw.archivedBy : undefined;
+
   return {
     id,
     spaceURL,
@@ -225,6 +271,7 @@ const normalizeSpace = (f: unknown): Space => {
     savedBackgroundImages,
     presetTags,
     isPrivate,
+    accessMode,
     welcomeMessage,
     description,
     characterName,
@@ -236,6 +283,12 @@ const normalizeSpace = (f: unknown): Space => {
     myHossiiEnabled,
     myHossiiMotionMode,
     myHossiiLogVisibility,
+    communityId,
+    spaceType,
+    ownerUserId,
+    isArchived,
+    archivedAt,
+    archivedBy,
   };
 };
 
@@ -356,6 +409,8 @@ type ExtendedHossiiAction =
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
   | { type: 'RESTORE_HOSSII'; payload: string }
+  | { type: 'EDIT_HOSSII_CONTENT'; payload: { id: string; message: string; contentEditedAt: Date | null } }
+  | { type: 'SET_HOSSII_VISIBILITY'; payload: { id: string; visibility: HossiiVisibility } }
   | { type: 'MOVE_HOSSII_PANE'; payload: { id: string; spacePaneId: string } }
   | { type: 'UPDATE_HOSSII_FROM_REALTIME'; payload: Hossii }
   | {
@@ -748,6 +803,25 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return withEntitiesUpdate(state, entities);
       }
 
+      case 'EDIT_HOSSII_CONTENT': {
+        // Phase 2D-2: 本人による本文編集。message と content_edited_at のみ更新し、
+        // identity / visibility / pane 等には触れない。
+        const { id, message, contentEditedAt } = action.payload;
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const entities = patchEntity(state.entities, { ...prev, message, contentEditedAt });
+        return withEntitiesUpdate(state, entities);
+      }
+
+      case 'SET_HOSSII_VISIBILITY': {
+        // Phase 2D-2: 本人による公開範囲変更（public <-> owner_only）。
+        const { id, visibility } = action.payload;
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const entities = patchEntity(state.entities, { ...prev, visibility });
+        return withEntitiesUpdate(state, entities);
+      }
+
       case 'UPDATE_HOSSII_FROM_REALTIME': {
         const updated = action.payload;
         const prev = state.entities.entitiesById[updated.id];
@@ -794,11 +868,26 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
   };
 };
 
+/** Phase 2D-2: 本人投稿ミューテーションの結果（UI 側でエラー表示に使う） */
+export type OwnPostMutationResult =
+  | { ok: true }
+  | { ok: false; message?: string };
+
 export type HossiiContextValue = {
   state: ExtendedHossiiState;
   spacesLoadedFromSupabase: boolean;
   hossiiLoadedFromSupabase: boolean;
   communitySlug: string | null | undefined;
+  /** ログイン本人の authorship 由来 hossii_id 集合（本人性の正本）。利用側から書き換え不可 */
+  myAuthorshipIds: ReadonlySet<string>;
+  /** myAuthorshipIds の取得状態。'ready' 以外は本人判定に信頼しない */
+  myAuthorshipIdsStatus: MyAuthorshipIdsStatus;
+  /**
+   * 投稿 ID → 投稿者の現在スペースニックネーム（Phase 2C）。
+   * 過去投稿の主表示名を現在名に解決するために使う。含まれない投稿は投稿時名へ fallback。
+   * ゲスト投稿・membership 無し・nickname 未設定は含まれない。書き換え不可。
+   */
+  postAuthorDisplayNames: ReadonlyMap<string, string>;
   addHossii: (input: AddHossiiInput) => Promise<boolean>;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -822,6 +911,18 @@ export type HossiiContextValue = {
   hideHossii: (id: string, adminId?: string) => void;
   restoreHossii: (id: string, adminId?: string) => void;
   moveHossiiToPane: (id: string, targetPaneId: string) => Promise<void>;
+  /** Phase 2D-2: 本人による本文編集（optimistic → RPC → 失敗時 rollback） */
+  editMyHossiiContent: (id: string, message: string) => Promise<OwnPostMutationResult>;
+  /** Phase 2D-2: 本人による公開範囲変更（public <-> owner_only） */
+  setMyHossiiVisibilityAction: (id: string, visibility: HossiiVisibility) => Promise<OwnPostMutationResult>;
+  /** Phase 2D-2: 本人によるソフト削除（物理 DELETE はしない） */
+  softDeleteMyHossiiAction: (id: string) => Promise<OwnPostMutationResult>;
+  /**
+   * Phase 2F: 指定スペースの「投稿者の現在表示名」マップを強制再取得する。
+   * スペースニックネーム変更後、過去投稿の現在名をリロードなしで反映するために使う。
+   * アクティブスペースと一致するときだけ再取得する（別スペースの取得で現在の表示を汚さない）。
+   */
+  refreshPostAuthorDisplayNames: (spaceId: string) => void;
   /** ページ fetch 結果を optimistic 投稿と merge して反映 */
   syncFetchedHossiis: (
     items: Hossii[],
@@ -903,6 +1004,34 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     stateRef.current = state;
   });
 
+  // 最新の currentUser を ref で保持（addHossii など deps を増やせないコールバックから参照）
+  const currentUserRef = useRef(currentUser);
+  useLayoutEffect(() => {
+    currentUserRef.current = currentUser;
+  });
+
+  // ===== myAuthorshipIds（本人性の正本）の取得・保持 =====
+  // 実データの race / reset / fetch 判断は純粋な controller に委譲し、
+  // ここでは snapshot を state に反映するだけの薄い glue にする。
+  const [authorshipSnapshot, setAuthorshipSnapshot] = useState<MyAuthorshipIdsSnapshot>(
+    () => ({ ids: EMPTY_MY_AUTHORSHIP_IDS, status: 'idle' }),
+  );
+  // controller のライフサイクルはホストへ集約する。StrictMode の cleanup で dispose した
+  // 破棄済み instance を掴み続けないよう、生成/差し替えは必ずホスト経由で行う（Phase 1D-2-fix）。
+  const authorshipHostRef = useRef<AuthorshipControllerHost | null>(null);
+  if (authorshipHostRef.current === null) {
+    authorshipHostRef.current = createAuthorshipControllerHost(() =>
+      createMyAuthorshipIdsController({
+        fetchIds: fetchMyAuthorshipIdsForSpace,
+        onChange: setAuthorshipSnapshot,
+        // PII（UUID 等）を出さず、失敗の事実のみ最小限で記録する。
+        onError: () => {
+          console.error('[HossiiStore] failed to load authorship ids');
+        },
+      }),
+    );
+  }
+
   useEffect(() => {
     if (isResolvingAuth) return;
 
@@ -956,6 +1085,119 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     currentUser?.displayName,
     isResolvingAuth,
   ]);
+
+  // ログイン・スペース切替・セッション復元後に authorship を取得 / ログアウト・ゲスト・
+  // 未確定時はクリア。stale response と前 space/前 user の残存は controller が防ぐ。
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    // 破棄済み instance を掴まないよう必ずホスト経由で取得する。
+    // StrictMode の 2 回目 setup（cleanup で dispose 済み）でも新 instance が生成される。
+    authorshipHostRef.current?.getOrCreate().sync({
+      authReady: !isResolvingAuth,
+      uid: currentUser?.uid ?? null,
+      spaceId: state.activeSpaceId || null,
+    });
+  }, [currentUser?.uid, state.activeSpaceId, isResolvingAuth]);
+
+  // Provider unmount 相当。以後の in-flight 反映を止める。
+  // StrictMode: setup で controller を確保し、cleanup では「その controller が現在値のときだけ」
+  // dispose して保持をクリアする。次の setup では getOrCreate が新 instance を生成する。
+  // genuine unmount 後は setup が再実行されないため保持は null のままで、再生成は起きない。
+  useEffect(() => {
+    const host = authorshipHostRef.current;
+    const controller = host?.getOrCreate();
+    return () => {
+      if (host && controller) {
+        host.disposeIfCurrent(controller);
+      }
+    };
+  }, []);
+
+  // ===== space_memberships の自動登録（Phase 2B）=====
+  // ログインユーザーが active space に入ったら、その所属を space_memberships へ登録する。
+  // 実行条件・(uid+spaceId) の重複抑止・user/space 切替や再ログイン時の再実行は controller に委譲。
+  // role は渡さない（RPC 側で 'member' 固定）。membership 登録の失敗は space 表示・ログインへ
+  // 影響させず、PII を出さずに console.error へ記録するだけにとどめる。
+  // controller は React state を持たず購読もしないため、authorship のような dispose は不要
+  // （StrictMode の二重 setup は controller 内の in-flight / lastSuccessKey で吸収する）。
+  const membershipJoinRef = useRef<MembershipJoinController | null>(null);
+  if (membershipJoinRef.current === null) {
+    membershipJoinRef.current = createMembershipJoinController({
+      join: (spaceId, nickname) => joinSpaceAsMember(spaceId, nickname),
+      onError: () => {
+        console.error('[HossiiStore] failed to register space membership');
+      },
+    });
+  }
+
+  useEffect(() => {
+    const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
+    const allowAutoJoin = activeSpace?.accessMode !== 'invite_only';
+
+    membershipJoinRef.current?.sync({
+      configured: isSupabaseConfigured,
+      authReady: !isResolvingAuth,
+      uid: currentUser?.uid ?? null,
+      spaceId: state.activeSpaceId || null,
+      // ログインアカウント（auth uid）が無い＝ゲスト。ゲストは membership を作らない。
+      isGuest: !currentUser?.uid,
+      allowAutoJoin,
+      // nickname は既存 state / currentUser からのみ解決（追加 DB query なし）。取得失敗は null。
+      resolveNickname: () =>
+        resolveMembershipNickname(
+          {
+            spaceNicknames: stateRef.current.spaceNicknames,
+            profileDefaultNickname: stateRef.current.profile?.defaultNickname,
+            username: currentUserRef.current?.username,
+            displayName: currentUserRef.current?.displayName,
+          },
+          stateRef.current.activeSpaceId,
+        ),
+    });
+  }, [currentUser?.uid, state.activeSpaceId, state.spaces, isResolvingAuth]);
+
+  // ===== 投稿者の現在表示名マップ（Phase 2C）=====
+  // 過去投稿に「現在のスペースニックネーム」を表示するため、space 単位で
+  // 投稿 ID → 現在表示名 のマップを取得・保持する。取得は anon でも可（PII は返らない）。
+  // authorship 同様、space 切替時は旧 space の値を即クリアし、stale 応答は seq guard で破棄する。
+  // 取得失敗しても投稿表示は止めず、投稿時名（author_name）へ fallback する。
+  const [postAuthorNamesSnapshot, setPostAuthorNamesSnapshot] =
+    useState<PostAuthorNamesSnapshot>(() => ({
+      names: EMPTY_POST_AUTHOR_NAMES,
+      status: 'idle',
+    }));
+  const postAuthorNamesHostRef = useRef<ControllerHost<PostAuthorNamesController> | null>(
+    null,
+  );
+  if (postAuthorNamesHostRef.current === null) {
+    postAuthorNamesHostRef.current = createControllerHost(() =>
+      createPostAuthorNamesController({
+        fetchNames: fetchSpacePostAuthorDisplayNames,
+        onChange: setPostAuthorNamesSnapshot,
+        onError: () => {
+          console.error('[HossiiStore] failed to load post author display names');
+        },
+      }),
+    );
+  }
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    postAuthorNamesHostRef.current?.getOrCreate().sync({
+      ready: !isResolvingAuth,
+      spaceId: state.activeSpaceId || null,
+    });
+  }, [state.activeSpaceId, isResolvingAuth]);
+
+  useEffect(() => {
+    const host = postAuthorNamesHostRef.current;
+    const controller = host?.getOrCreate();
+    return () => {
+      if (host && controller) {
+        host.disposeIfCurrent(controller);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setHossiiEntitiesSnapshot(state.entities.entitiesById);
@@ -1121,83 +1363,92 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // （削除済み）
 
   // ===== Supabase Realtime: hossiis の INSERT/UPDATE/DELETE を購読 =====
+  // invite_only 等で can_access_space=false のときは購読しない（RLS に加え二重ガード）。
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured || !state.activeSpaceId) return;
 
     const activeSpaceId = state.activeSpaceId;
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    // サーバーサイドフィルタは REPLICA IDENTITY FULL が必要なため
-    // フィルタなしで購読し、クライアントサイドでスペースIDをチェックする
-    const channel = supabase
-      .channel(`hossiis_realtime:${activeSpaceId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'hossiis' },
-        (payload) => {
-          const row = payload.new as HossiiRow;
-          if (row.space_id !== activeSpaceId) return;
-          const hossii = rowToHossii(row);
-          const runtime = spacePaneRuntimeRef.current;
-          if (!shouldAcceptRealtimeInsert(hossii, runtime, activeSpaceId)) return;
-          // 自分が INSERT した場合は重複 ADD のみ避ける。insertedHossiiIdsRef は fetch マージで掃除する
-          // （ここで delete すると、遅れて届く古い fetch が楽観行をマージせず消す）。
-          if (insertedHossiiIdsRef.current.has(row.id)) {
-            if (!stateRef.current.hossiis.some((h) => h.id === row.id)) {
-              dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
+    void checkCanAccessSpace(activeSpaceId).then((allowed) => {
+      if (cancelled || !allowed) return;
+
+      channel = supabase
+        .channel(`hossiis_realtime:${activeSpaceId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'hossiis' },
+          (payload) => {
+            const row = payload.new as HossiiRow;
+            if (row.space_id !== activeSpaceId) return;
+            const hossii = rowToHossii(row);
+            if (hossii.deletedAt) return;
+            const runtime = spacePaneRuntimeRef.current;
+            if (!shouldAcceptRealtimeInsert(hossii, runtime, activeSpaceId)) return;
+            if (insertedHossiiIdsRef.current.has(row.id)) {
+              if (!stateRef.current.hossiis.some((h) => h.id === row.id)) {
+                dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
+              }
+              return;
             }
-            return;
-          }
-          dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'hossiis' },
-        (payload) => {
-          const row = payload.new as HossiiRow;
-          if (row.space_id !== activeSpaceId) return;
-          const after = rowToHossii(row);
-          const runtime = spacePaneRuntimeRef.current;
-          if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
-
-          const before = stateRef.current.entities.entitiesById[row.id];
-          if (!before) {
-            if (shouldAcceptRealtimeInsert(after, runtime, activeSpaceId)) {
-              dispatch({ type: 'ADD_HOSSII_FULL', payload: after });
+            dispatch({ type: 'ADD_HOSSII_FULL', payload: hossii });
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'hossiis' },
+          (payload) => {
+            const row = payload.new as HossiiRow;
+            if (row.space_id !== activeSpaceId) return;
+            const after = rowToHossii(row);
+            if (after.deletedAt) {
+              dispatch({ type: 'REMOVE_HOSSII', payload: row.id });
+              return;
             }
-            return;
-          }
+            const runtime = spacePaneRuntimeRef.current;
+            if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) return;
 
-          const transition = classifyRealtimeUpdate(before, after, runtime);
-          if (transition === 'ignore') return;
-          if (transition === 'patchOnly') {
-            dispatch({ type: 'UPDATE_HOSSII_FROM_REALTIME', payload: after });
-            return;
+            const before = stateRef.current.entities.entitiesById[row.id];
+            if (!before) {
+              if (shouldAcceptRealtimeInsert(after, runtime, activeSpaceId)) {
+                dispatch({ type: 'ADD_HOSSII_FULL', payload: after });
+              }
+              return;
+            }
+
+            const transition = classifyRealtimeUpdate(before, after, runtime);
+            if (transition === 'ignore') return;
+            if (transition === 'patchOnly') {
+              dispatch({ type: 'UPDATE_HOSSII_FROM_REALTIME', payload: after });
+              return;
+            }
+            dispatch({
+              type: 'APPLY_REALTIME_PANE_UPDATE',
+              payload: { before, after, transition },
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'hossiis' },
+          (payload) => {
+            const id = (payload.old as { id: string }).id;
+            dispatch({ type: 'REMOVE_HOSSII', payload: id });
+          },
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] hossiis subscribed for space:', activeSpaceId);
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error('[Realtime] hossiis channel error:', status, activeSpaceId);
           }
-          dispatch({
-            type: 'APPLY_REALTIME_PANE_UPDATE',
-            payload: { before, after, transition },
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'hossiis' },
-        (payload) => {
-          const id = (payload.old as { id: string }).id;
-          dispatch({ type: 'REMOVE_HOSSII', payload: id });
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] hossiis subscribed for space:', activeSpaceId);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] hossiis channel error:', status, activeSpaceId);
-        }
-      });
+        });
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [state.activeSpaceId]);
 
@@ -1239,11 +1490,14 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const currentState = stateRef.current;
     const activeSpaceId = activeSpaceIdRef.current;
     const runtime = spacePaneRuntimeRef.current;
+    const usingPostOverride = input.postSpaceId != null;
+    const targetSpaceId = input.postSpaceId ?? activeSpaceId;
+    const targetPaneId = input.postPaneId ?? runtime.activePaneId;
 
     if (
       isSupabaseConfigured &&
       !isKnownSpaceInState(
-        activeSpaceId,
+        targetSpaceId,
         currentState.spaces.map((space) => space.id),
       )
     ) {
@@ -1254,15 +1508,16 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       return false;
     }
 
-    if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) {
-      emitPostFailure({
-        reason: 'space_unavailable',
-        message: buildAddHossiiBlockMessage('space_unavailable'),
-      });
-      return false;
+    if (!usingPostOverride) {
+      if (!runtimeMatchesActiveSpace(runtime, activeSpaceId)) {
+        emitPostFailure({
+          reason: 'space_unavailable',
+          message: buildAddHossiiBlockMessage('space_unavailable'),
+        });
+        return false;
+      }
     }
-    const activePaneId = runtime.activePaneId;
-    if (activePaneId == null) {
+    if (targetPaneId == null) {
       emitPostFailure({
         reason: 'pane_unavailable',
         message: buildAddHossiiBlockMessage('pane_unavailable'),
@@ -1271,8 +1526,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
     if (
       !validateHossiiPaneSpaceMatch(
-        { spaceId: activeSpaceId, spacePaneId: activePaneId },
-        activeSpaceId,
+        { spaceId: targetSpaceId, spacePaneId: targetPaneId },
+        targetSpaceId,
       )
     ) {
       emitPostFailure({
@@ -1312,8 +1567,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       ? {
           id,
           message: msg,
-          spaceId: activeSpaceId,
-          spacePaneId: activePaneId,
+          spaceId: targetSpaceId,
+          spacePaneId: targetPaneId,
           authorId,
           authorName,
           createdAt: new Date(),
@@ -1331,8 +1586,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           id,
           message: msg,
           emotion: input.emotion,
-          spaceId: activeSpaceId,
-          spacePaneId: activePaneId,
+          spaceId: targetSpaceId,
+          spacePaneId: targetPaneId,
           authorId,
           authorName,
           createdAt: new Date(),
@@ -1375,6 +1630,20 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
             message: formatInsertHossiiErrorMessage(insertResult.message, insertResult.code),
           });
           return false;
+        }
+        // INSERT 成功: trigger が authorship を作成済み。
+        // ログイン中かつ投稿先が現在のアクティブスペースのままなら、DB から本人性を
+        // 正本として再取得して Set を同期する（新規投稿直後の本人編集を可能にする）。
+        // 直接 Set 追加はしない（DB を正本とし、stale response 上書きを避ける）。
+        // ゲスト投稿は trigger が authorship を作らないため refresh 不要。
+        const authorshipUid = currentUserRef.current?.uid;
+        if (authorshipUid) {
+          // peek() は生成しないため、unmount 後（保持が null）の非同期呼び出しでも
+          // 新 controller を復活させない。破棄済み instance を掴むこともない。
+          authorshipHostRef.current?.peek()?.refresh({
+            uid: authorshipUid,
+            spaceId: newHossii.spaceId,
+          });
         }
         return true;
       } catch {
@@ -1608,6 +1877,95 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     [state.entities.entitiesById, state.hossiis],
   );
 
+  // ===== Phase 2D-2: 本人投稿の操作（編集 / 公開範囲 / ソフト削除）=====
+  // すべて optimistic 更新 → SECURITY DEFINER RPC → 失敗時 rollback。
+  // 本人確認は RPC(auth.uid() + hossii_authorships) が正本。ここでは identity を渡さない。
+  const editMyHossiiContent = useCallback(
+    async (id: string, message: string): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+      const prevMessage = prev.message;
+      const prevEditedAt = prev.contentEditedAt ?? null;
+
+      dispatch({
+        type: 'EDIT_HOSSII_CONTENT',
+        payload: { id, message, contentEditedAt: new Date() },
+      });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await updateMyHossii(id, message);
+      if (!res.ok) {
+        dispatch({
+          type: 'EDIT_HOSSII_CONTENT',
+          payload: { id, message: prevMessage, contentEditedAt: prevEditedAt },
+        });
+        return { ok: false, message: res.message };
+      }
+      // 成功時は DB が返した content_edited_at を正本として反映する。
+      dispatch({
+        type: 'EDIT_HOSSII_CONTENT',
+        payload: { id, message, contentEditedAt: res.contentEditedAt },
+      });
+      return { ok: true };
+    },
+    [],
+  );
+
+  const setMyHossiiVisibilityAction = useCallback(
+    async (id: string, visibility: HossiiVisibility): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+      const prevVisibility = prev.visibility ?? 'public';
+      if (prevVisibility === visibility) return { ok: true };
+
+      dispatch({ type: 'SET_HOSSII_VISIBILITY', payload: { id, visibility } });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await setMyHossiiVisibility(id, visibility);
+      if (!res.ok) {
+        dispatch({
+          type: 'SET_HOSSII_VISIBILITY',
+          payload: { id, visibility: prevVisibility },
+        });
+        return { ok: false, message: res.message };
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
+  const softDeleteMyHossiiAction = useCallback(
+    async (id: string): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+
+      // optimistic: 一覧から即時除去。
+      dispatch({ type: 'REMOVE_HOSSII', payload: id });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await softDeleteMyHossii(id);
+      if (!res.ok) {
+        // 失敗時は元の投稿を復元する（画面から消えたままにしない）。
+        dispatch({ type: 'ADD_HOSSII_FULL', payload: prev });
+        return { ok: false, message: res.message };
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
+  const refreshPostAuthorDisplayNames = useCallback((spaceId: string) => {
+    if (!isSupabaseConfigured || !spaceId) return;
+    // アクティブスペース以外の再取得は snapshot を汚すため行わない
+    // （controller は現在表示中の 1 スペース分だけを保持する）。
+    if (spaceId !== stateRef.current.activeSpaceId) return;
+    // peek() は controller を生成しない（unmount 後に復活させない）。
+    postAuthorNamesHostRef.current?.peek()?.refresh(spaceId);
+  }, []);
+
   return (
     <SpacePaneRuntimeContext.Provider value={spacePaneRuntimeRef}>
     <HossiiContext.Provider
@@ -1616,6 +1974,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         spacesLoadedFromSupabase,
         hossiiLoadedFromSupabase,
         communitySlug,
+        myAuthorshipIds: authorshipSnapshot.ids,
+        myAuthorshipIdsStatus: authorshipSnapshot.status,
+        postAuthorDisplayNames: postAuthorNamesSnapshot.names,
         addHossii,
         selectHossii,
         clearAll,
@@ -1640,6 +2001,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         hideHossii,
         restoreHossii,
         moveHossiiToPane,
+        editMyHossiiContent,
+        setMyHossiiVisibilityAction,
+        softDeleteMyHossiiAction,
+        refreshPostAuthorDisplayNames,
         syncFetchedHossiis,
         setHossiiFetchLoading,
       }}
@@ -1670,6 +2035,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           hideHossii,
           restoreHossii,
           moveHossiiToPane,
+          editMyHossiiContent,
+          setMyHossiiVisibilityAction,
+          softDeleteMyHossiiAction,
+          refreshPostAuthorDisplayNames,
           syncFetchedHossiis,
           setHossiiFetchLoading,
         }}

@@ -12,6 +12,12 @@ export type MyHossiiRecentPost = {
 export type MyHossiiActivity = {
   recentPosts: MyHossiiRecentPost[];
   lastActivityAt: Date | null;
+  /**
+   * スペース全体（全 Pane・全ページ）での本人投稿の総数。
+   * DB 集計 RPC（get_my_space_activity）から得た正確な件数のときのみ入る。
+   * クライアントのロード済みデータから導出した暫定値では undefined。
+   */
+  postCount?: number;
 };
 
 const MAX_RECENT = 3;

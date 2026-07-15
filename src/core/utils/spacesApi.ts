@@ -10,6 +10,8 @@ import { ensureDefaultSpacePane } from './ensureDefaultSpacePane';
 type SpaceRow = {
   id: string;
   community_id?: string | null;
+  space_type?: string | null;
+  owner_user_id?: string | null;
   space_url: string | null;
   name: string;
   quick_emotions: string[];
@@ -17,6 +19,7 @@ type SpaceRow = {
   saved_background_images: string[] | null;
   created_at: string;
   is_private?: boolean | null;
+  access_mode?: string | null;
   preset_tags?: string[] | null;
   welcome_message?: string | null;
   description?: string | null;
@@ -29,6 +32,9 @@ type SpaceRow = {
   my_hossii_enabled?: boolean | null;
   my_hossii_motion_mode?: string | null;
   my_hossii_log_visibility?: string | null;
+  is_archived?: boolean | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
 };
 
 // SpaceRow → Space（camelCase）
@@ -42,6 +48,7 @@ function rowToSpace(row: SpaceRow): Space {
     savedBackgroundImages: row.saved_background_images ?? undefined,
     createdAt: new Date(row.created_at),
     isPrivate: row.is_private ?? undefined,
+    accessMode: row.access_mode === 'invite_only' ? 'invite_only' : 'public',
     presetTags: row.preset_tags ?? undefined,
     welcomeMessage: row.welcome_message ?? undefined,
     description: row.description ?? undefined,
@@ -64,6 +71,11 @@ function rowToSpace(row: SpaceRow): Space {
     myHossiiMotionMode: parseMyHossiiMotionMode(row.my_hossii_motion_mode),
     myHossiiLogVisibility: parseMyHossiiLogVisibility(row.my_hossii_log_visibility),
     communityId: row.community_id ?? undefined,
+    spaceType: row.space_type === 'personal' ? 'personal' : 'shared',
+    ownerUserId: row.owner_user_id ?? undefined,
+    isArchived: row.is_archived ?? false,
+    archivedAt: row.archived_at ? new Date(row.archived_at) : undefined,
+    archivedBy: row.archived_by ?? undefined,
   };
 }
 
@@ -153,6 +165,7 @@ export async function updateSpaceInDb(id: SpaceId, patch: SpaceUpdatePatch): Pro
   if (patch.background !== undefined) updateObj.background = patch.background;
   if (patch.savedBackgroundImages !== undefined) updateObj.saved_background_images = patch.savedBackgroundImages ?? null;
   if (patch.isPrivate !== undefined) updateObj.is_private = patch.isPrivate ?? null;
+  if (patch.accessMode !== undefined) updateObj.access_mode = patch.accessMode;
   if (patch.presetTags !== undefined) updateObj.preset_tags = patch.presetTags ?? null;
   if (patch.welcomeMessage !== undefined) updateObj.welcome_message = patch.welcomeMessage ?? null;
   if (patch.description !== undefined) updateObj.description = patch.description ?? null;

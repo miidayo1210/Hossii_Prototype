@@ -93,6 +93,20 @@ export type Space = {
   myHossiiLogVisibility?: MyHossiiLogVisibility;
   /** 所属コミュニティ（DB: spaces.community_id） */
   communityId?: string;
+  /** 共有スペースの参加モード（DB: spaces.access_mode）。personal では無視。 */
+  accessMode?: 'public' | 'invite_only';
+  /** スペース種別（DB: spaces.space_type）。未取得/旧データは 'shared' 相当。 */
+  spaceType?: 'shared' | 'personal';
+  /**
+   * 個人スペースの所有者（DB: spaces.owner_user_id = auth.users.id）。
+   * personal のときのみ入る。RLS により他人の personal は取得できないため、
+   * 本人の personal スペースでは currentUser.uid と一致する。
+   */
+  ownerUserId?: string;
+  /** アーカイブ状態（DB: spaces.is_archived）。true のとき閲覧専用。 */
+  isArchived?: boolean;
+  archivedAt?: Date;
+  archivedBy?: string;
 };
 
 /** Partial update for Space; null clears nullable DB-backed fields. */

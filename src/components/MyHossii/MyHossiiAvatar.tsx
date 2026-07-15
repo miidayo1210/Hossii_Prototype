@@ -19,6 +19,8 @@ export type MyHossiiAvatarProps = {
   stateLabel: string;
   activityScale: number;
   activity: MyHossiiActivity;
+  /** 本人の DB 集計を取得中（popover で「集計中」を表示）。 */
+  activityLoading?: boolean;
   logVisibility: MyHossiiLogVisibility;
   isAuthenticatedViewer: boolean;
   speechBubble: string | null;
@@ -40,6 +42,7 @@ export const MyHossiiAvatar = ({
   stateLabel,
   activityScale,
   activity,
+  activityLoading = false,
   logVisibility,
   isAuthenticatedViewer,
   speechBubble,
@@ -104,6 +107,8 @@ export const MyHossiiAvatar = ({
           stateLabel={stateLabel}
           activity={activity}
           showLogs={showLogs}
+          isSelf={isSelf}
+          activityLoading={activityLoading}
           onViewLogs={() => onViewLogs(userId, nickname)}
           onClose={onDeselect}
         />

@@ -11,6 +11,7 @@ type Props = {
   spaceName: string;
   activeScreen: SettingsScreenId;
   isAdmin: boolean;
+  canManageSpaceArchive?: boolean;
   onBack: () => void;
   onNavigate: (id: SettingsScreenId) => void;
   children: ReactNode;
@@ -20,6 +21,7 @@ export const SettingsLayout = ({
   spaceName,
   activeScreen,
   isAdmin,
+  canManageSpaceArchive = false,
   onBack,
   onNavigate,
   children,
@@ -39,7 +41,12 @@ export const SettingsLayout = ({
 
     <div className={shellStyles.content}>
       <aside className={shellStyles.sidebar}>
-        <SettingsNav activeScreen={activeScreen} onNavigate={onNavigate} isAdmin={isAdmin} />
+        <SettingsNav
+          activeScreen={activeScreen}
+          onNavigate={onNavigate}
+          isAdmin={isAdmin}
+          canManageSpaceArchive={canManageSpaceArchive}
+        />
       </aside>
       <main className={shellStyles.main}>
         {PANE_OVERRIDE_SCREENS.has(activeScreen) && activeScreen !== 'background' && (
