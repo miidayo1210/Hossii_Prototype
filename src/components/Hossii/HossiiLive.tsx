@@ -34,6 +34,10 @@ type Props = {
   decorativeImageSrc?: string | null;
   /** 泳ぎ・反応を維持したまま待機画像だけ差し替える（スペースキャラ設定用） */
   idleImageOverride?: string | null;
+  /** 117: ガイド吹き出し文言（null = 非表示） */
+  guideMessage?: string | null;
+  /** 117: ガイド吹き出しを閉じたとき */
+  onGuideDismiss?: () => void;
 };
 
 /** Hossii のサイズ (CSS の width/height と一致させる) */
@@ -169,6 +173,8 @@ export function HossiiLive({
   decorative = false,
   decorativeImageSrc,
   idleImageOverride,
+  guideMessage,
+  onGuideDismiss,
 }: Props) {
   // === State ===
   const [position, setPosition] = useState(getInitialPosition);
@@ -178,6 +184,7 @@ export function HossiiLive({
   const [isSpinning, setIsSpinning] = useState(false);
   const [tapTransform, setTapTransform] = useState<string | null>(null);
   const [bubble, setBubble] = useState<string | null>(null);
+  const [guideSuppressedByReaction, setGuideSuppressedByReaction] = useState(false);
   const [longBubble, setLongBubble] = useState<{ emoji: string; text: string } | null>(null);
   const [idleBubble, setIdleBubble] = useState<string | null>(null);
   const [effect, setEffect] = useState<{ emoji: string; animClass: string } | null>(null);
@@ -185,6 +192,19 @@ export function HossiiLive({
   // 表情状態（優先順位: interaction > reaction > idle）
   const [interactionFace, setInteractionFace] = useState<string | null>(null);
   const [reactionFace, setReactionFace] = useState<string | null>(null);
+
+  // 117 Phase 1 暫定（B2）: 投稿反応中は guide を抑止し、終了後は自動復帰しない
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when guide message changes
+    setGuideSuppressedByReaction(false);
+  }, [guideMessage]);
+
+  useEffect(() => {
+    if (bubble && guideMessage) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- latch suppression on post reaction
+      setGuideSuppressedByReaction(true);
+    }
+  }, [bubble, guideMessage]);
 
   // いいねトリガーへの反応（喜び系表情 + スピン）
   useEffect(() => {
@@ -626,6 +646,12 @@ export function HossiiLive({
         ? `${baseTransform ?? ''} ${tapTransform}`.trim()
         : baseTransform;
 
+  const showGuideBubble =
+    Boolean(guideMessage) &&
+    !bubble &&
+    !longBubble &&
+    !guideSuppressedByReaction;
+
   return (
     <>
       {/* Hossii本体 */}
@@ -665,6 +691,31 @@ export function HossiiLive({
           <span className={styles.fallbackEmoji}>🌟</span>
         </div>
 
+        {/* ガイド吹き出し（117） */}
+        {showGuideBubble && (
+          <div
+            className={styles.guideBubble}
+            role="status"
+            aria-live="polite"
+          >
+            <button
+              type="button"
+              className={styles.guideBubbleClose}
+              aria-label="案内を閉じる"
+              onClick={(e) => {
+                e.stopPropagation();
+                onGuideDismiss?.();
+              }}
+            >
+              ×
+            </button>
+            <span className={styles.guideBubbleAccent} aria-hidden>
+              ✦
+            </span>
+            <span className={styles.guideBubbleText}>{guideMessage}</span>
+          </div>
+        )}
+
         {/* 短い吹き出し（投稿時） */}
         {bubble && !longBubble && (
           <div className={styles.bubble}>
@@ -681,7 +732,7 @@ export function HossiiLive({
         )}
 
         {/* AI Brain 吹き出し（AI からのメッセージ） */}
-        {brainMessage && !bubble && !longBubble && (
+        {brainMessage && !bubble && !longBubble && !showGuideBubble && (
           <div className={styles.brainBubble}>
             <span className={styles.brainBubbleIcon}>✨</span>
             <span className={styles.brainBubbleText}>{brainMessage}</span>
@@ -689,7 +740,7 @@ export function HossiiLive({
         )}
 
         {/* アイドル吹き出し（自発セリフ） */}
-        {idleBubble && !bubble && !longBubble && !brainMessage && (
+        {idleBubble && !bubble && !longBubble && !brainMessage && !showGuideBubble && (
           <div className={styles.idleBubble}>
             <span className={styles.idleBubbleText}>{idleBubble}</span>
           </div>
