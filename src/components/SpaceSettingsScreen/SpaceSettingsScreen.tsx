@@ -282,14 +282,16 @@ export const SpaceSettingsScreen = () => {
           />
         );
       case 'character':
-        return (
+        return settings ? (
           <CharacterTab
             key={`char-${activeSpace.id}`}
             space={activeSpace}
+            settings={settings}
+            onUpdateSettings={handleSettingsUpdate}
             onUpdateSpace={handleSpaceUpdate}
             onDirtyChange={handleDirtyChange}
           />
-        );
+        ) : null;
       case 'decoration':
         return (
           <DecorationTab

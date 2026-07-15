@@ -9,6 +9,17 @@ export type HossiiGuideValidationResult =
   | { ok: true; settings: HossiiGuideSettings }
   | { ok: false; message: string };
 
+/** 管理 UI / ストレージ向け draft 初期値 */
+export function buildHossiiGuideDraft(
+  settings: HossiiGuideSettings | undefined,
+): HossiiGuideSettings {
+  return {
+    ...DEFAULT_HOSSII_GUIDE_SETTINGS,
+    ...settings,
+    mode: 'package',
+  };
+}
+
 /** localStorage / JSONB からの部分データを正規化 */
 export function normalizeHossiiGuideSettings(
   raw: unknown,
