@@ -137,6 +137,14 @@
   cursor: not-allowed;
 }
 
+.spaceNameRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+}
+
 .badge {
   font-size: 0.75rem;
   padding: 0.15rem 0.5rem;

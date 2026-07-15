@@ -57,6 +57,35 @@ export async function setSpaceArchived(
   return { ok: true, ...mapped };
 }
 
+type ArchiveFlagRow = {
+  id: string;
+  is_archived: boolean | null;
+};
+
+/**
+ * 複数スペースのアーカイブ状態を一括取得する（一覧バッジ用）。
+ * RPC 変更なし。既存 `spaces.is_archived` 列のみ参照する。
+ */
+export async function fetchSpaceArchiveFlags(spaceIds: string[]): Promise<Map<string, boolean>> {
+  const flags = new Map<string, boolean>();
+  if (!isSupabaseConfigured || spaceIds.length === 0) return flags;
+
+  const { data, error } = await supabase
+    .from('spaces')
+    .select('id, is_archived')
+    .in('id', spaceIds);
+
+  if (error) {
+    console.error('[spaceArchiveApi] fetch archive flags failed');
+    return flags;
+  }
+
+  for (const row of (data ?? []) as ArchiveFlagRow[]) {
+    flags.set(row.id, row.is_archived === true);
+  }
+  return flags;
+}
+
 /** Space 型へ archive フィールドをマージする（MERGE_SPACE 用）。 */
 export function applyArchiveFieldsToSpace(
   space: Space,

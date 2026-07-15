@@ -11,6 +11,7 @@ import { updateCommunitySlug, fetchCommunityBySlug } from '../../core/utils/comm
 import type { Space, SpaceBackground } from '../../core/types/space';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import { PersonalSpaceTemplateEditor } from './PersonalSpaceTemplateEditor';
+import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
 import styles from './SpacesScreen.module.css';
 
 // 背景のインラインスタイルを生成
@@ -528,6 +529,7 @@ export const SpacesScreen = () => {
                       <span className={styles.cardName} title={space.name}>
                         {space.name}
                       </span>
+                      {space.isArchived && <SpaceArchiveBadge />}
                       <button
                         type="button"
                         className={styles.iconButton}

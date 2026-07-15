@@ -8,6 +8,7 @@ import {
   normalizeSpaceNickname,
   MAX_SPACE_NICKNAME_LENGTH,
 } from '../../core/utils/spaceNicknameRules';
+import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
 import styles from './JoinedSpacesSection.module.css';
 
 type Status = 'idle' | 'loading' | 'error' | 'ready';
@@ -164,7 +165,10 @@ const JoinedSpaceItem = ({ space, onSaved }: JoinedSpaceItemProps) => {
   return (
     <li className={styles.item}>
       <div className={styles.itemMain}>
-        <span className={styles.spaceName}>{space.spaceName ?? '不明なスペース'}</span>
+        <span className={styles.spaceNameRow}>
+          <span className={styles.spaceName}>{space.spaceName ?? '不明なスペース'}</span>
+          {space.isArchived && <SpaceArchiveBadge />}
+        </span>
         {space.communityName && (
           <span className={styles.communityName}>{space.communityName}</span>
         )}

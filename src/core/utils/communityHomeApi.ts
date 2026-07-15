@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { fetchSpaceArchiveFlags } from './spaceArchiveApi';
 import type { CommunityMembershipRole, CommunityMembershipStatus } from '../types/communityMembership';
 
 export type CommunityHomeData = {
@@ -21,6 +22,7 @@ export type CommunitySharedSpace = {
   spaceUrl: string;
   accessMode: 'public' | 'invite_only';
   canEnter: boolean;
+  isArchived: boolean;
 };
 
 type HomeRow = {
@@ -78,11 +80,20 @@ export async function fetchCommunitySharedSpaces(
     p_community_id: communityId,
   });
   if (error) throw new Error(`list_community_shared_spaces: ${error.message}`);
-  return ((data ?? []) as SharedSpaceRow[]).map((r) => ({
+  const spaces = ((data ?? []) as SharedSpaceRow[]).map((r) => ({
     spaceId: r.space_id,
     spaceName: r.space_name,
     spaceUrl: r.space_url,
     accessMode: (r.access_mode === 'invite_only' ? 'invite_only' : 'public') as 'public' | 'invite_only',
     canEnter: r.can_enter,
+    isArchived: false,
+  }));
+
+  if (spaces.length === 0) return spaces;
+
+  const flags = await fetchSpaceArchiveFlags(spaces.map((s) => s.spaceId));
+  return spaces.map((s) => ({
+    ...s,
+    isArchived: flags.get(s.spaceId) ?? false,
   }));
 }

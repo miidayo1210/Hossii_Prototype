@@ -15,6 +15,7 @@ import {
 } from '../../core/utils/communityHomeApi';
 import { updateMyCommunityNickname } from '../../core/utils/communityInvitationsApi';
 import { ensureMyPersonalSpace } from '../../core/utils/personalSpacesApi';
+import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
 import styles from './CommunityHomeScreen.module.css';
 
 type Props = {
@@ -177,7 +178,10 @@ export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => 
                         disabled={!s.canEnter}
                         onClick={() => openSpace(s)}
                       >
-                        <span>{s.spaceName}</span>
+                        <span className={styles.spaceNameRow}>
+                          <span>{s.spaceName}</span>
+                          {s.isArchived && <SpaceArchiveBadge />}
+                        </span>
                         <span className={styles.badge}>
                           {s.accessMode === 'invite_only' ? '招待制' : '公開'}
                         </span>

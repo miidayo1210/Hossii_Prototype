@@ -47,6 +47,14 @@
   min-width: 0;
 }
 
+.spaceNameRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .spaceName {
   font-size: 0.9rem;
   font-weight: 600;

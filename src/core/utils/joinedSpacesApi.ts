@@ -18,6 +18,7 @@ export type JoinedSpace = {
   /** slug 未設定なら null → /s 導線を出さない */
   spaceUrl: string | null;
   communityName: string | null;
+  isArchived: boolean;
 };
 
 export type SpaceLookupRow = {
@@ -25,6 +26,7 @@ export type SpaceLookupRow = {
   name: string;
   space_url: string | null;
   community_id: string | null;
+  is_archived?: boolean | null;
 };
 
 export type CommunityLookupRow = {
@@ -61,6 +63,7 @@ export function buildJoinedSpaces(
         communityName: s?.community_id
           ? communityNameById.get(s.community_id) ?? null
           : null,
+        isArchived: s?.is_archived === true,
       };
     });
 }
@@ -85,7 +88,7 @@ export async function fetchMyJoinedSpaces(): Promise<JoinedSpace[]> {
 
   const { data: spaceData, error: spaceError } = await supabase
     .from('spaces')
-    .select('id, name, space_url, community_id')
+    .select('id, name, space_url, community_id, is_archived')
     .in('id', spaceIds);
   if (spaceError) {
     throw new Error(`[joinedSpacesApi] fetch spaces failed: ${spaceError.message}`);
