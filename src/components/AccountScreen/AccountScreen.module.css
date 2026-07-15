@@ -70,6 +70,13 @@
   line-height: 1.5;
 }
 
+.sectionPlaceholder {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
+}
+
 /* ユーザー情報（ログイン済み） */
 .userInfo {
   display: flex;
