@@ -81,8 +81,9 @@ describe('AccountScreen section routing', () => {
     render(<AccountScreen />);
 
     expect(screen.getByTestId('account-section-home')).toBeTruthy();
-    expect(screen.getByTestId('joined-spaces-section')).toBeTruthy();
-    expect(screen.queryByTestId('account-section-profile')).toBeNull();
+    expect(screen.getByText('表示名')).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByTestId('joined-spaces-section')).toBeNull();
   });
 
   it('renders profile section when screenParam is profile', () => {
