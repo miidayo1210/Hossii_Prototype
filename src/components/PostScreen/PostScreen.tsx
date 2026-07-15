@@ -32,6 +32,7 @@ import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import type { AddHossiiInput, EmotionKey, ToastState } from '../../core/types';
+import { applyPostTargetToInput } from '../../core/utils/personalSpaceTabView';
 import {
   loadContinuousPost,
   loadPostBubbleColorDraft,
@@ -117,6 +118,8 @@ type Props = {
   speechToFreePosterRef?: MutableRefObject<((text: string) => void) | undefined>;
   /** クイック投稿パネル: 送信中フラグを親へ通知（Pane 切替ガード用） */
   onSendingChange?: (sending: boolean) => void;
+  /** 共有スペース上の「わたし」タブ表示時など、shell と異なる投稿先 */
+  postTargetOverride?: { spaceId: string; paneId: string } | null;
 };
 
 export const PostScreen = ({
@@ -129,6 +132,7 @@ export const PostScreen = ({
   onSaveSpeechDraft,
   speechToFreePosterRef,
   onSendingChange,
+  postTargetOverride = null,
 }: Props) => {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
@@ -251,7 +255,8 @@ export const PostScreen = ({
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
   const { activePaneId, activePane, isLoading: panesLoading } = useSpacePane();
-  const canPost = !panesLoading && activePaneId != null;
+  const effectivePostPaneId = postTargetOverride?.paneId ?? activePaneId;
+  const canPost = !panesLoading && effectivePostPaneId != null;
   const { prefs: { showHossii } } = useDisplayPrefs();
   const { navigate } = useRouter();
   const { currentUser } = useAuth();
@@ -281,12 +286,27 @@ export const PostScreen = ({
   }, [state.activeSpaceId]);
 
   useEffect(() => {
-    const activeSpace = getActiveSpace();
+    const activeSpace = postTargetOverride
+      ? state.spaces.find((s) => s.id === postTargetOverride.spaceId) ?? getActiveSpace()
+      : getActiveSpace();
     if (activeSpace) {
       const settings = loadSpaceSettings(activeSpace.id, activeSpace.name);
       setSpaceSettings(settings);
     }
-  }, [getActiveSpace]);
+  }, [getActiveSpace, postTargetOverride, state.spaces]);
+
+  const submitAddHossii = useCallback(
+    (input: AddHossiiInput) =>
+      addHossii(
+        applyPostTargetToInput(
+          input,
+          postTargetOverride
+            ? { spaceId: postTargetOverride.spaceId, paneId: postTargetOverride.paneId }
+            : null,
+        ),
+      ),
+    [addHossii, postTargetOverride],
+  );
 
   // フォーカス時に設定を再読み込み
   useEffect(() => {
@@ -534,7 +554,7 @@ export const PostScreen = ({
   const submitBubbleHossii = useCallback(
     async (input: AddHossiiInput) => {
       savePostBubbleColorDraft(selectedPaletteId, selectedColor);
-      const accepted = await addHossii(input);
+      const accepted = await submitAddHossii(input);
       if (!accepted) return;
 
       if (!currentUser) return;
@@ -557,7 +577,7 @@ export const PostScreen = ({
         setToast({ message: toastMsg, type: 'success' });
       }
     },
-    [selectedPaletteId, selectedColor, addHossii, currentUser],
+    [selectedPaletteId, selectedColor, submitAddHossii, currentUser],
   );
 
   useEffect(() => {
@@ -914,7 +934,7 @@ export const PostScreen = ({
             <CanvasPostEditor
               ref={canvasEditorRef}
               spaceId={getActiveSpace()?.id ?? 'default'}
-              addHossii={addHossii}
+              addHossii={(input) => void submitAddHossii(input)}
               panelMode={!!panelMode}
               onClose={onClose}
               onGoToSpace={() => navigate('screen')}

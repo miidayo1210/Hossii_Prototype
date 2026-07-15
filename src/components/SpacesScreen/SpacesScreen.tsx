@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Pencil, Check, X, Settings, ChevronLeft } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Pencil, Check, X, Settings, ChevronLeft, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAuth } from '../../core/contexts/useAuth';
@@ -10,6 +10,13 @@ import { generateSpaceURL, validateSpaceURL, isSpaceURLUnique } from '../../core
 import { updateCommunitySlug, fetchCommunityBySlug } from '../../core/utils/communitiesApi';
 import type { Space, SpaceBackground } from '../../core/types/space';
 import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
+import { PersonalSpaceTemplateEditor } from './PersonalSpaceTemplateEditor';
+import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
+import {
+  fetchPersonalSpaceOwnerLabels,
+  resolvePersonalSpaceOwnerLabel,
+  type OwnerLookupRow,
+} from '../../core/utils/personalSpaceOwnerLabelsApi';
 import styles from './SpacesScreen.module.css';
 
 // 背景のインラインスタイルを生成
@@ -35,6 +42,16 @@ export const SpacesScreen = () => {
   const { currentUser, logout, refreshCommunitySlug } = useAuth();
   const { overrideCommunityId, overrideCommunityName, clearOverrideCommunity, setOverrideCommunity } = useAdminNavigation();
   const { spaces } = state;
+
+  const communityId = overrideCommunityId ?? currentUser?.communityId;
+  const sharedSpaces = useMemo(
+    () => spaces.filter((s) => s.spaceType !== 'personal'),
+    [spaces],
+  );
+  const personalSpaces = useMemo(
+    () => spaces.filter((s) => s.spaceType === 'personal'),
+    [spaces],
+  );
 
   const pageTitle = overrideCommunityName
     ? `${overrideCommunityName} のスペース管理`
@@ -100,6 +117,10 @@ export const SpacesScreen = () => {
   // コピー完了表示
   const [copiedSpaceId, setCopiedSpaceId] = useState<string | null>(null);
 
+  // 個人スペースセクション（113: デフォルト折りたたみ）
+  const [personalSectionExpanded, setPersonalSectionExpanded] = useState(false);
+  const [ownerLabels, setOwnerLabels] = useState<Map<string, OwnerLookupRow>>(new Map());
+
   // objectURL 追跡（クリーンアップ用）
   const objectURLsRef = useRef<Set<string>>(new Set());
 
@@ -123,6 +144,33 @@ export const SpacesScreen = () => {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAccountMenu]);
+
+  // 個人スペース所有者ラベル（113）
+  useEffect(() => {
+    if (!communityId || personalSpaces.length === 0) {
+      setOwnerLabels(new Map());
+      return;
+    }
+
+    const ownerIds = personalSpaces
+      .map((s) => s.ownerUserId)
+      .filter((id): id is string => !!id);
+
+    let cancelled = false;
+    void fetchPersonalSpaceOwnerLabels(communityId, ownerIds).then((labels) => {
+      if (!cancelled) setOwnerLabels(labels);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [communityId, personalSpaces]);
+
+  const isLoadingSpaces =
+    spaces.length === 0 &&
+    currentUser?.isSuperAdmin &&
+    !!overrideCommunityId &&
+    !spacesLoadedFromSupabase;
 
   // ---- コミュニティ ID 編集 ----
   const startEditCommunityId = () => {
@@ -293,6 +341,14 @@ export const SpacesScreen = () => {
     navigate('settings');
   };
 
+  const handleOpenSpace = (space: Space) => {
+    const slug = space.spaceURL ?? space.id;
+    const url = communitySlug
+      ? `/c/${communitySlug}/s/${slug}#screen`
+      : `/s/${slug}#screen`;
+    window.location.href = url;
+  };
+
   // ---- 削除 ----
   const handleDeleteSpace = (space: Space) => {
     const confirmed = window.confirm(
@@ -339,7 +395,7 @@ export const SpacesScreen = () => {
               className={styles.createSpaceButton}
               onClick={openCreateModal}
             >
-              + 新しいスペースを作成
+              + 新しい共有スペースを作成
             </button>
           )}
 
@@ -440,202 +496,290 @@ export const SpacesScreen = () => {
         </div>
       </header>
 
-      {/* スペースグリッド */}
+      {/* 共有 / 個人スペース（113） */}
       <main className={styles.main}>
-        <div className={styles.spaceGrid}>
-          {spaces.length === 0 &&
-            currentUser?.isSuperAdmin &&
-            overrideCommunityId &&
-            !spacesLoadedFromSupabase && (
+        <section className={styles.sectionBlock} aria-labelledby="shared-spaces-heading">
+          <div className={styles.sectionHeader}>
+            <h2 id="shared-spaces-heading" className={styles.sectionTitle}>
+              共有スペース
+            </h2>
+            <p className={styles.sectionDescription}>
+              チーム・イベントなど、コミュニティ全体で共有するスペースです。
+            </p>
+          </div>
+
+          <div className={styles.spaceGrid}>
+            {isLoadingSpaces && (
               <div className={styles.emptyState}>
                 <p className={styles.emptyStateText}>スペース一覧を読み込み中です…</p>
               </div>
             )}
 
-          {spaces.length === 0 &&
-            !(
-              currentUser?.isSuperAdmin &&
-              overrideCommunityId &&
-              !spacesLoadedFromSupabase
-            ) && (
+            {!isLoadingSpaces && sharedSpaces.length === 0 && (
               <div className={styles.emptyState}>
                 <div className={styles.emptyStateIcon}>🌌</div>
-                <p className={styles.emptyStateText}>まだスペースがありません</p>
+                <p className={styles.emptyStateText}>まだ共有スペースがありません</p>
                 <p className={styles.emptyStateSubtext}>
-                  右上の「新しいスペースを作成」から始めましょう
+                  右上の「新しい共有スペースを作成」から始めましょう
                 </p>
               </div>
             )}
 
-          {spaces.map((space) => (
-            <div key={space.id} className={styles.spaceCard}>
-              {/* 背景サムネイル */}
-              <div
-                className={styles.cardBg}
-                style={getBgStyle(space.background)}
-                onClick={() =>
-                  setEditingBgSpaceId(editingBgSpaceId === space.id ? null : space.id)
-                }
-              >
-                <div className={styles.cardBgOverlay}>
-                  <span className={styles.cardBgEditHint}>背景を変更</span>
-                </div>
-              </div>
-
-              {/* カード本体 */}
-              <div className={styles.cardBody}>
-                {/* スペース名 */}
-                <div className={styles.cardNameRow}>
-                  {editingNameId === space.id ? (
-                    <>
-                      <input
-                        className={styles.cardNameInput}
-                        value={editingNameValue}
-                        onChange={(e) => setEditingNameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditName(space.id);
-                          if (e.key === 'Escape') cancelEditName();
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className={styles.iconButton}
-                        onClick={() => commitEditName(space.id)}
-                        title="確定"
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.iconButton}
-                        onClick={cancelEditName}
-                        title="キャンセル"
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className={styles.cardName} title={space.name}>
-                        {space.name}
-                      </span>
-                      <button
-                        type="button"
-                        className={styles.iconButton}
-                        onClick={() => startEditName(space)}
-                        title="名前を変更"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    </>
-                  )}
+            {sharedSpaces.map((space) => (
+              <div key={space.id} className={styles.spaceCard}>
+                {/* 背景サムネイル */}
+                <div
+                  className={styles.cardBg}
+                  style={getBgStyle(space.background)}
+                  onClick={() =>
+                    setEditingBgSpaceId(editingBgSpaceId === space.id ? null : space.id)
+                  }
+                >
+                  <div className={styles.cardBgOverlay}>
+                    <span className={styles.cardBgEditHint}>背景を変更</span>
+                  </div>
                 </div>
 
-                {/* スペース ID (slug) */}
-                <div>
-                  <div className={styles.cardSlugRow}>
-                    <span className={styles.cardSlugLabel}>ID</span>
-                    {editingSlugId === space.id ? (
+                {/* カード本体 */}
+                <div className={styles.cardBody}>
+                  {/* スペース名 */}
+                  <div className={styles.cardNameRow}>
+                    {editingNameId === space.id ? (
                       <>
                         <input
-                          className={styles.cardSlugInput}
-                          value={editingSlugValue}
-                          onChange={(e) => handleSlugChange(e.target.value, space.id)}
+                          className={styles.cardNameInput}
+                          value={editingNameValue}
+                          onChange={(e) => setEditingNameValue(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitEditSlug(space.id);
-                            if (e.key === 'Escape') cancelEditSlug();
+                            if (e.key === 'Enter') commitEditName(space.id);
+                            if (e.key === 'Escape') cancelEditName();
                           }}
                           autoFocus
                         />
                         <button
                           type="button"
                           className={styles.iconButton}
-                          onClick={() => commitEditSlug(space.id)}
+                          onClick={() => commitEditName(space.id)}
                           title="確定"
-                          disabled={!!editingSlugError}
                         >
-                          <Check size={12} />
+                          <Check size={14} />
                         </button>
                         <button
                           type="button"
                           className={styles.iconButton}
-                          onClick={cancelEditSlug}
+                          onClick={cancelEditName}
                           title="キャンセル"
                         >
-                          <X size={12} />
+                          <X size={14} />
                         </button>
                       </>
                     ) : (
                       <>
-                        <span className={styles.cardSlug} title={space.spaceURL ?? space.id}>
-                          {space.spaceURL ?? space.id}
+                        <span className={styles.cardName} title={space.name}>
+                          {space.name}
                         </span>
+                        {space.isArchived && <SpaceArchiveBadge />}
                         <button
                           type="button"
                           className={styles.iconButton}
-                          onClick={() => startEditSlug(space)}
-                          title="IDを編集"
+                          onClick={() => startEditName(space)}
+                          title="名前を変更"
                         >
-                          <Pencil size={12} />
+                          <Pencil size={14} />
                         </button>
                       </>
                     )}
                   </div>
-                  {editingSlugId === space.id && editingSlugError && (
-                    <p className={styles.cardSlugError}>{editingSlugError}</p>
-                  )}
-                </div>
-              </div>
 
-              {/* アクションボタン */}
-              <div className={styles.cardActions}>
-                <button
-                  type="button"
-                  className={`${styles.copyButton} ${
-                    copiedSpaceId === space.id ? styles.copyButtonCopied : ''
-                  }`}
-                  onClick={() => handleCopyLink(space)}
-                  title={communitySlug
-                    ? `/c/${communitySlug}/s/${space.spaceURL ?? space.id}`
-                    : `/s/${space.spaceURL ?? space.id}`}
-                >
-                  {copiedSpaceId === space.id ? '✓ コピー完了' : '🔗 招待URLをコピー'}
-                </button>
-                <button
-                  type="button"
-                  className={styles.settingsButton}
-                  onClick={() => handleOpenSettings(space)}
-                  title="スペースを設定"
-                >
-                  <Settings size={14} />
-                </button>
-                <button
-                  type="button"
-                  className={styles.deleteButton}
-                  onClick={() => handleDeleteSpace(space)}
-                  title="削除"
-                >
-                  🗑
-                </button>
-              </div>
-
-              {/* 背景セレクター（展開） */}
-              {editingBgSpaceId === space.id && (
-                <div className={styles.bgSelectorContainer}>
-                  <BackgroundSelector
-                    currentBackground={space.background}
-                    onSelect={(bg) => handleBackgroundSelect(space.id, bg)}
-                    onImageURLRevoke={handleImageURLRevoke}
-                    spaceId={space.id}
-                    savedBackgroundImages={space.savedBackgroundImages}
-                    onUpdateSavedImages={(urls) => updateSpace(space.id, { savedBackgroundImages: urls })}
-                  />
+                  {/* スペース ID (slug) */}
+                  <div>
+                    <div className={styles.cardSlugRow}>
+                      <span className={styles.cardSlugLabel}>ID</span>
+                      {editingSlugId === space.id ? (
+                        <>
+                          <input
+                            className={styles.cardSlugInput}
+                            value={editingSlugValue}
+                            onChange={(e) => handleSlugChange(e.target.value, space.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') commitEditSlug(space.id);
+                              if (e.key === 'Escape') cancelEditSlug();
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            className={styles.iconButton}
+                            onClick={() => commitEditSlug(space.id)}
+                            title="確定"
+                            disabled={!!editingSlugError}
+                          >
+                            <Check size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.iconButton}
+                            onClick={cancelEditSlug}
+                            title="キャンセル"
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className={styles.cardSlug} title={space.spaceURL ?? space.id}>
+                            {space.spaceURL ?? space.id}
+                          </span>
+                          <button
+                            type="button"
+                            className={styles.iconButton}
+                            onClick={() => startEditSlug(space)}
+                            title="IDを編集"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {editingSlugId === space.id && editingSlugError && (
+                      <p className={styles.cardSlugError}>{editingSlugError}</p>
+                    )}
+                  </div>
                 </div>
+
+                {/* アクションボタン */}
+                <div className={styles.cardActions}>
+                  <button
+                    type="button"
+                    className={`${styles.copyButton} ${
+                      copiedSpaceId === space.id ? styles.copyButtonCopied : ''
+                    }`}
+                    onClick={() => handleCopyLink(space)}
+                    title={communitySlug
+                      ? `/c/${communitySlug}/s/${space.spaceURL ?? space.id}`
+                      : `/s/${space.spaceURL ?? space.id}`}
+                  >
+                    {copiedSpaceId === space.id ? '✓ コピー完了' : '🔗 招待URLをコピー'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.settingsButton}
+                    onClick={() => handleOpenSettings(space)}
+                    title="スペースを設定"
+                  >
+                    <Settings size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.deleteButton}
+                    onClick={() => handleDeleteSpace(space)}
+                    title="削除"
+                  >
+                    🗑
+                  </button>
+                </div>
+
+                {/* 背景セレクター（展開） */}
+                {editingBgSpaceId === space.id && (
+                  <div className={styles.bgSelectorContainer}>
+                    <BackgroundSelector
+                      currentBackground={space.background}
+                      onSelect={(bg) => handleBackgroundSelect(space.id, bg)}
+                      onImageURLRevoke={handleImageURLRevoke}
+                      spaceId={space.id}
+                      savedBackgroundImages={space.savedBackgroundImages}
+                      onUpdateSavedImages={(urls) => updateSpace(space.id, { savedBackgroundImages: urls })}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {currentUser?.isAdmin && communityId && (
+          <section className={styles.sectionBlock} aria-labelledby="personal-spaces-heading">
+            <button
+              type="button"
+              id="personal-spaces-heading"
+              className={styles.personalCollapseHeader}
+              onClick={() => setPersonalSectionExpanded((v) => !v)}
+              aria-expanded={personalSectionExpanded}
+            >
+              {personalSectionExpanded ? (
+                <ChevronDown size={18} aria-hidden />
+              ) : (
+                <ChevronRight size={18} aria-hidden />
               )}
-            </div>
-          ))}
-        </div>
+              <span>個人スペース</span>
+              <span className={styles.personalCountBadge}>{personalSpaces.length}件</span>
+            </button>
+
+            {personalSectionExpanded && (
+              <div className={styles.personalSectionBody}>
+                <PersonalSpaceTemplateEditor communityId={communityId} />
+
+                {personalSpaces.length === 0 ? (
+                  <p className={styles.personalEmptyNote}>
+                    まだ個人スペースはありません（メンバーが作成するとここに表示されます）
+                  </p>
+                ) : (
+                  <ul className={styles.personalList}>
+                    {personalSpaces.map((space) => {
+                      const lookup = space.ownerUserId
+                        ? ownerLabels.get(space.ownerUserId)
+                        : undefined;
+                      const label = resolvePersonalSpaceOwnerLabel(space.ownerUserId, lookup);
+                      const isSelf = !!space.ownerUserId && space.ownerUserId === currentUser?.uid;
+
+                      return (
+                        <li key={space.id} className={styles.personalRow}>
+                          <div className={styles.personalRowMain}>
+                            <div>
+                              <span className={styles.personalOwnerPrimary}>{label.primary}</span>
+                              {isSelf && (
+                                <span className={styles.personalOwnerSelf}>（自分）</span>
+                              )}
+                              {space.isArchived && (
+                                <span className={styles.personalArchiveBadge}>
+                                  <SpaceArchiveBadge />
+                                </span>
+                              )}
+                            </div>
+                            {label.secondary && (
+                              <p className={styles.personalOwnerSecondary}>{label.secondary}</p>
+                            )}
+                            <p className={styles.personalSpaceName}>{space.name}</p>
+                          </div>
+                          <div className={styles.personalRowActions}>
+                            <button
+                              type="button"
+                              className={styles.settingsButton}
+                              onClick={() => handleOpenSettings(space)}
+                              title="スペースを設定"
+                            >
+                              <Settings size={14} />
+                              <span className={styles.personalActionLabel}>設定</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.openSpaceButton}
+                              onClick={() => handleOpenSpace(space)}
+                              title="スペースを開く"
+                            >
+                              <ExternalLink size={14} />
+                              <span className={styles.personalActionLabel}>開く</span>
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       {/* スペース作成モーダル */}
@@ -648,7 +792,7 @@ export const SpacesScreen = () => {
         >
           <div className={styles.modal}>
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>新しいスペースを作成</h2>
+              <h2 className={styles.modalTitle}>新しい共有スペースを作成</h2>
               <button
                 type="button"
                 className={styles.modalCloseButton}

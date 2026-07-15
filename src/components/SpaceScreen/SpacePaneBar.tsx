@@ -28,6 +28,14 @@ type DropTarget =
   | { zone: 'folder-chip'; folderId: string }
   | { zone: 'folder-tabs'; folderId: string; insertBeforeIndex: number };
 
+type PersonalShortcut = {
+  label: string;
+  loading?: boolean;
+  /** 現在このスペース（本人の個人スペース）を開いているとき true。active 表示に使う。 */
+  active?: boolean;
+  onClick: () => void;
+};
+
 type Props = {
   spaceId: string;
   /** Ordered list of folders to display (including default folder when applicable). */
@@ -51,6 +59,8 @@ type Props = {
   onReorderFolder?: (draggedId: string, insertBeforeIndex: number) => void;
   /** モバイルバーの DOM 参照（ヒント配置など） */
   rootRef?: Ref<HTMLElement>;
+  /** 個人スペースへのショートカット（Pane ではなく UI ボタン） */
+  personalShortcut?: PersonalShortcut | null;
 };
 
 type DragState = {
@@ -298,6 +308,7 @@ export function SpacePaneBar({
   onMoveToFolder,
   onReorderFolder,
   rootRef,
+  personalShortcut = null,
 }: Props) {
   const { barPanes, folderMap } = useMemo(
     () => splitPanesByFolders(visiblePanes),
@@ -883,6 +894,30 @@ export function SpacePaneBar({
             }}
           >
             ＋
+          </button>
+        )}
+
+        {personalShortcut && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!!personalShortcut.active}
+            aria-label={
+              personalShortcut.active
+                ? 'マイスペースを表示中'
+                : 'マイスペースを開く'
+            }
+            title="マイスペース"
+            className={`${styles.personalShortcut} ${
+              personalShortcut.active ? styles.personalShortcutActive : ''
+            }`}
+            disabled={disabled || personalShortcut.loading}
+            onClick={(e) => {
+              e.stopPropagation();
+              personalShortcut.onClick();
+            }}
+          >
+            {personalShortcut.loading ? '…' : personalShortcut.label}
           </button>
         )}
       </div>

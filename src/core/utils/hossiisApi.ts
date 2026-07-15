@@ -41,6 +41,10 @@ export type HossiiRow = {
   like_count: number;
   /** マイグレーション前の行では欠ける場合あり（bubble 扱い） */
   post_kind?: string | null;
+  // Phase 2D-1: 公開範囲 / ソフト削除 / 本文編集（古い行や mock では欠ける場合あり）
+  visibility?: string | null;
+  deleted_at?: string | null;
+  content_edited_at?: string | null;
 };
 
 /** INSERT 用。未マイグレーション列（tags / post_kind）は含めない */
@@ -60,6 +64,11 @@ function inferPostKindFromRow(row: HossiiRow): Hossii['postKind'] {
   const url = row.image_url ?? '';
   if (url.includes('/canvas/') || url.includes('canvas%2F')) return 'canvas';
   return 'bubble';
+}
+
+/** visibility を厳密に 'public' | 'owner_only' へ。欠損/不正値は 'public'（後方互換） */
+export function coerceVisibility(value: unknown): Hossii['visibility'] {
+  return value === 'owner_only' ? 'owner_only' : 'public';
 }
 
 export function coerceIsHidden(value: unknown): boolean {
@@ -102,6 +111,9 @@ export function rowToHossii(row: HossiiRow): Hossii {
     numberValue: row.number_value ?? undefined,
     likeCount: row.like_count ?? 0,
     postKind: inferPostKindFromRow(row),
+    visibility: coerceVisibility(row.visibility),
+    deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+    contentEditedAt: row.content_edited_at ? new Date(row.content_edited_at) : null,
   };
 }
 

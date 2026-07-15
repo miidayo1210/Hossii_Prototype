@@ -10,9 +10,10 @@ import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useRe
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/useAuth';
+import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useNeighborSpace } from './useNeighborSpace';
-import type { EmotionKey, Hossii } from '../../core/types';
+import type { EmotionKey, Hossii, AddHossiiInput } from '../../core/types';
 import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { mapLogicalToContainerPercent, mapContainerPercentToLogical } from '../../core/utils/sharpContentRect';
@@ -25,6 +26,8 @@ import { computeBubblePositions, type PositionCache } from '../../core/utils/hos
 import { useSpaceHossiiFetch } from '../../core/hooks/useSpaceHossiiFetch';
 import { usePinnedHossiis } from '../../core/hooks/usePinnedHossiis';
 import { buildQueryKeyV2 } from '../../core/utils/hossiiQueryKey';
+import { materializeHossiisArray } from '../../core/utils/hossiiEntitiesState';
+import { shouldShowMyHossiiLayer } from '../../core/utils/myHossiiLayerVisibility';
 import { isDefaultPane, type PaneContext } from '../../core/utils/hossiiPaneMembership';
 import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { resolveTimelineDepthActive } from '../../core/utils/resolveTimelineDepthActive';
@@ -41,6 +44,22 @@ import {
 } from '../../core/utils/spaceTagFilterStorage';
 import { computePreviewSlotCount } from '../../core/utils/previewSlotCount';
 import { resolveCanvasExportAllowed } from '../../core/utils/spaceSettingResolvers';
+import { resolveCanEditBubble } from '../../core/utils/canEditBubble';
+import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import {
+  isSpaceArchivedReadOnly,
+  resolveBubbleCanEditForArchivedSpace,
+  resolveCanManageOwnForArchivedSpace,
+  resolveLikesEnabledForArchivedSpace,
+} from '../../core/utils/spaceArchivePolicy';
+import { ensureMyPersonalSpace } from '../../core/utils/personalSpacesApi';
+import { fetchSpaceByUrl } from '../../core/utils/spacesApi';
+import { defaultSpacePaneId } from '../../core/utils/spacePanesApi';
+import {
+  applyPostTargetToInput,
+  resolveContentSpaceId,
+  resolvePersonalPostTarget,
+} from '../../core/utils/personalSpaceTabView';
 import { buildSpaceShareUrl } from '../../core/utils/spaceShareUrl';
 import { buildSpaceExportFilename } from '../../core/utils/spaceExportFilename';
 import {
@@ -60,6 +79,8 @@ import { AuthorTimelineModal } from './AuthorTimelineModal';
 import { groupHossiisByAuthor, sortAuthorGroups } from '../../core/utils/groupHossiisByAuthor';
 import type { AuthorPostGroup } from '../../core/utils/authorPostGroup';
 import { VisitBanner } from './VisitBanner';
+import { SpaceArchiveBanner } from './SpaceArchiveBanner';
+import { SpaceArchivePostNotice } from './SpaceArchivePostNotice';
 import { MessageBottle } from '../MessageBottle/MessageBottle';
 import { PostDetailModal } from '../PostDetailModal/PostDetailModal';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
@@ -72,6 +93,7 @@ import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
 import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
+import { canShowPersonalShortcut, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
   buildTabFolderPatch,
@@ -181,6 +203,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     syncFetchedHossiis,
     setHossiiFetchLoading,
     updateSpace,
+    addSpaceLocal,
+    myAuthorshipIds,
+    myAuthorshipIdsStatus,
+    postAuthorDisplayNames,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
   const hossiisRef = useRef(state.hossiis);
@@ -218,6 +244,26 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     reloadPanesAndSyncActive,
   } = useSpacePane();
 
+  const activeSpace = getActiveSpace();
+  const [personalViewSpaceId, setPersonalViewSpaceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPersonalViewSpaceId(null);
+  }, [activeSpaceId]);
+
+  const contentSpaceId = resolveContentSpaceId({
+    shellSpaceType: activeSpace?.spaceType,
+    shellSpaceId: activeSpaceId,
+    personalViewSpaceId,
+  });
+
+  const contentSpace = useMemo(
+    () => (contentSpaceId ? state.spaces.find((s) => s.id === contentSpaceId) ?? null : null),
+    [state.spaces, contentSpaceId],
+  );
+
+  const isContentArchived = isSpaceArchivedReadOnly(contentSpace);
+
   const paneContext = useMemo((): PaneContext | null => {
     if (!activeSpaceId || !contextActivePaneId || !defaultPane) return null;
     return {
@@ -227,20 +273,48 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     };
   }, [activeSpaceId, contextActivePaneId, defaultPane]);
 
+  const contentPaneContext = useMemo((): PaneContext | null => {
+    if (personalViewSpaceId && contentSpaceId) {
+      const defaultPaneId = defaultSpacePaneId(contentSpaceId);
+      return {
+        spaceId: contentSpaceId,
+        activePaneId: defaultPaneId,
+        defaultPaneId,
+      };
+    }
+    return paneContext;
+  }, [personalViewSpaceId, contentSpaceId, paneContext]);
+
   const screenQueryKey = useMemo(() => {
-    if (!activeSpaceId || !paneContext) return null;
+    if (!contentSpaceId || !contentPaneContext) return null;
     return buildQueryKeyV2(
-      activeSpaceId,
-      { kind: 'pane', paneId: paneContext.activePaneId },
+      contentSpaceId,
+      { kind: 'pane', paneId: contentPaneContext.activePaneId },
       displayPeriod,
     );
-  }, [activeSpaceId, paneContext, displayPeriod]);
+  }, [contentSpaceId, contentPaneContext, displayPeriod]);
 
   const resolveSpaceHossiis = useCallback(() => {
-    if (!screenQueryKey) return getActiveSpaceHossiis();
+    if (!screenQueryKey) {
+      if (contentSpaceId && contentSpaceId !== activeSpaceId) {
+        return materializeHossiisArray(state.entities, contentSpaceId);
+      }
+      return getActiveSpaceHossiis();
+    }
     const keyed = getHossiisForQueryKey(screenQueryKey);
-    return keyed.length > 0 ? keyed : getActiveSpaceHossiis();
-  }, [screenQueryKey, getHossiisForQueryKey, getActiveSpaceHossiis]);
+    if (keyed.length > 0) return keyed;
+    if (contentSpaceId && contentSpaceId !== activeSpaceId) {
+      return materializeHossiisArray(state.entities, contentSpaceId);
+    }
+    return getActiveSpaceHossiis();
+  }, [
+    screenQueryKey,
+    getHossiisForQueryKey,
+    getActiveSpaceHossiis,
+    contentSpaceId,
+    activeSpaceId,
+    state.entities,
+  ]);
 
   const handleSpaceFetched = useCallback(
     (items: Hossii[], opts?: { merge?: boolean }) => {
@@ -251,17 +325,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const fetchProgress = useSpaceHossiiFetch({
-    spaceId: activeSpaceId,
+    spaceId: contentSpaceId,
     displayLimit,
     displayPeriod,
-    paneContext,
-    enabled: !visitingSpaceId && isSupabaseConfigured && !panesLoading && paneContext !== null,
+    paneContext: contentPaneContext,
+    enabled: !visitingSpaceId && isSupabaseConfigured && !panesLoading && contentPaneContext !== null,
     onFetched: handleSpaceFetched,
     onLoadingChange: setHossiiFetchLoading,
     getExistingHossiis: () => hossiisRef.current,
   });
 
-  const activeSpace = getActiveSpace();
   const showActiveSpaceUnavailableBanner =
     isSupabaseConfigured &&
     spacesLoadedFromSupabase &&
@@ -269,9 +342,48 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !activeSpace;
   const isVisiting = visitingSpaceId !== null;
   const { currentUser } = useAuth();
+  const { memberships } = useSelectedCommunity();
   const isAdmin = currentUser?.isAdmin ?? false;
-  // 現在のユーザーID（匿名含む）
-  const myAuthorId = currentUser?.uid ?? state.profile?.id;
+  const isAuthenticated = !!currentUser;
+
+  // 個人スペースショートカット（Pane ではなく UI ボタン）。
+  // 正本は「現在表示中の shared space の community_id」で、localStorage 選択には依存しない。
+  const spaceCommunityMembership = useMemo(() => {
+    const communityId = activeSpace?.communityId;
+    if (!communityId) return null;
+    return memberships.find((m) => m.communityId === communityId) ?? null;
+  }, [activeSpace?.communityId, memberships]);
+  const personalShortcutEligible =
+    activeSpace?.spaceType === 'shared' &&
+    canShowPersonalShortcut({
+      isAuthenticated,
+      isVisiting,
+      spaceCommunityId: activeSpace?.communityId,
+      membershipStatus: spaceCommunityMembership?.status,
+    });
+  const personalShortcutActive =
+    (personalViewSpaceId != null && activeSpace?.spaceType === 'shared') ||
+    isViewingOwnPersonalSpace({
+      spaceType: activeSpace?.spaceType,
+      spaceOwnerUserId: activeSpace?.ownerUserId,
+      currentUserId: currentUser?.uid,
+    });
+
+  const postTargetOverride = useMemo(
+    () => resolvePersonalPostTarget(personalViewSpaceId, defaultSpacePaneId),
+    [personalViewSpaceId],
+  );
+
+  const postHossii = useCallback(
+    (input: AddHossiiInput) => {
+      if (isContentArchived) return;
+      addHossii(applyPostTargetToInput(input, postTargetOverride));
+    },
+    [addHossii, postTargetOverride, isContentArchived],
+  );
+
+  const paneBarActivePaneId = personalViewSpaceId ? null : contextActivePaneId;
+
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   // 他タブからのリアクションを受け取るための状態
@@ -454,6 +566,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     resetQuickPostSpeechState();
   }, [resetQuickPostSpeechState]);
 
+  useEffect(() => {
+    if (!isContentArchived) return;
+    if (quickPostOpen) handleQuickPostClose();
+    if (speechPanelOpen) setSpeechPanelOpen(false);
+  }, [isContentArchived, quickPostOpen, speechPanelOpen, handleQuickPostClose]);
+
   const handleQuickLogClose = useCallback(() => {
     setQuickLogOpen(false);
   }, []);
@@ -478,12 +596,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return () => window.removeEventListener(POST_FAILURE_EVENT, onPostFailure);
   }, [showPaneToast]);
 
-  const showPaneBar = shouldShowSpacePaneBar(
-    isAdmin,
-    visiblePanes.length,
-    isVisiting,
-    panesLoading,
-  );
+  const showPaneBar =
+    shouldShowSpacePaneBar(isAdmin, visiblePanes.length, isVisiting, panesLoading) ||
+    // 個人スペースショートカットは Pane 数に関係なくタブ列へ表示するため、
+    // 単一 Pane の共有スペースでもタブ列（＝ショートカットの器）を出す。
+    (personalShortcutEligible && !isVisiting && !panesLoading);
 
   const demoTabSyncToastShownRef = useRef(false);
   useEffect(() => {
@@ -506,10 +623,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const handlePaneSelect = useCallback(
     (paneId: string) => {
       if (postSending) return;
-      if (paneId === contextActivePaneId) return;
+      const leavingPersonal = personalViewSpaceId != null;
+      if (leavingPersonal) {
+        setPersonalViewSpaceId(null);
+      }
+      if (!leavingPersonal && paneId === contextActivePaneId) return;
       setActivePaneById(paneId);
     },
-    [postSending, contextActivePaneId, setActivePaneById],
+    [postSending, contextActivePaneId, personalViewSpaceId, setActivePaneById],
   );
 
   const handlePaneCreated = useCallback(
@@ -657,29 +778,30 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   /** 投稿パネルを開く（位置未指定＝ランダム配置）／閉じる */
   const openQuickPost = useCallback(() => {
-    if (isVisiting) return;
+    if (isVisiting || isContentArchived) return;
     if (quickPostOpen) return;
     resetQuickPostSpeechState();
     setPostScreenKey((k) => k + 1);
     setQuickPostOpen(true);
-  }, [isVisiting, quickPostOpen, resetQuickPostSpeechState]);
+  }, [isVisiting, isContentArchived, quickPostOpen, resetQuickPostSpeechState]);
 
   const handleQuickPostDockToggle = useCallback(() => {
-    if (isVisiting) return;
+    if (isVisiting || isContentArchived) return;
     if (quickPostOpen) {
       handleQuickPostClose();
       return;
     }
     openQuickPost();
-  }, [isVisiting, quickPostOpen, handleQuickPostClose, openQuickPost]);
+  }, [isVisiting, isContentArchived, quickPostOpen, handleQuickPostClose, openQuickPost]);
 
   const handleTopRightPostClick = useCallback(() => {
     if (isVisiting) {
       setVisitingToastVisible(true);
       return;
     }
+    if (isContentArchived) return;
     handleQuickPostDockToggle();
-  }, [isVisiting, handleQuickPostDockToggle]);
+  }, [isVisiting, isContentArchived, handleQuickPostDockToggle]);
 
   useImperativeHandle(
     ref,
@@ -707,7 +829,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (isVisiting) return;
+      if (isVisiting || isContentArchived) return;
       if (e.code !== 'KeyN') return;
 
       const ctrlN = e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
@@ -720,7 +842,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     };
     document.addEventListener('keydown', onKeyDown, { capture: true });
     return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [isVisiting, handleQuickPostDockToggle]);
+  }, [isVisiting, isContentArchived, handleQuickPostDockToggle]);
 
   useEffect(() => {
     return () => {
@@ -764,26 +886,31 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
+  const [personalShortcutBusy, setPersonalShortcutBusy] = useState(false);
 
   // A02: 選択中の装飾（ポップアップ表示用）
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
 
   // スペース設定（設定画面から戻ったときにフォーカスで再読み込み）
-  const { spaceSettings } = useSpaceSettings(activeSpace);
+  const { spaceSettings } = useSpaceSettings(contentSpace ?? activeSpace);
+  const likesEnabledForView = resolveLikesEnabledForArchivedSpace(
+    isContentArchived,
+    spaceSettings?.features.likesEnabled ?? true,
+  );
   const { enabled: timelineDepthEnabled } = useTimelineDepthEnabled(
-    activeSpaceId,
-    activeSpace?.name ?? '',
+    contentSpaceId,
+    contentSpace?.name ?? activeSpace?.name ?? '',
   );
   const timelineDepthActive = useMemo(
     () =>
       resolveTimelineDepthActive({
         enabled: timelineDepthEnabled,
-        isMainPane: paneContext != null && isDefaultPane(paneContext),
+        isMainPane: contentPaneContext != null && isDefaultPane(contentPaneContext),
         isStarMode: renderAsStar,
       }),
-    [timelineDepthEnabled, paneContext, renderAsStar],
+    [timelineDepthEnabled, contentPaneContext, renderAsStar],
   );
-  const { pinnedIds, pinnedOrder, isPinned, toggle, unpin } = usePinnedHossiis(activeSpace?.id);
+  const { pinnedIds, pinnedOrder, isPinned, toggle, unpin } = usePinnedHossiis(contentSpace?.id);
   const showPinUi = !isMobile;
 
   // 隣人スペース・訪問モード・漂着ボトル管理
@@ -806,8 +933,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   // 訪問中は背景・タイトル・装飾を訪問先に合わせる（投稿 0 件でも自スペースの見た目が残らないようにする）
   const spaceForVisual = useMemo(() => {
     if (isVisiting && visitingSpaceInfo) return visitingSpaceInfo;
+    if (personalViewSpaceId && contentSpace) return contentSpace;
     return resolvePaneVisualSpace(activePane, activeSpace);
-  }, [isVisiting, visitingSpaceInfo, activePane, activeSpace]);
+  }, [isVisiting, visitingSpaceInfo, personalViewSpaceId, contentSpace, activePane, activeSpace]);
 
   const spaceDescription = spaceForVisual?.description?.trim() ?? '';
   const hasDescription = spaceDescription.length > 0;
@@ -815,6 +943,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const myHossiiEnabled = spaceForVisual?.myHossiiEnabled ?? false;
   const myHossiiMotionMode = spaceForVisual?.myHossiiMotionMode ?? 'auto';
   const myHossiiLogVisibility = spaceForVisual?.myHossiiLogVisibility ?? 'public';
+  const showMyHossiiLayer = shouldShowMyHossiiLayer(
+    myHossiiEnabled,
+    personalViewSpaceId != null || activePane?.isDefault === true,
+  );
+  const allSpaceHossiisForMyHossii = useMemo(() => {
+    if (!contentSpaceId) return [];
+    return materializeHossiisArray(state.entities, contentSpaceId);
+  }, [state.entities, contentSpaceId]);
   const spaceCharacterImageUrl = spaceForVisual?.characterImageUrl;
 
   useEffect(() => {
@@ -839,12 +975,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, [currentUser?.uid]);
 
   useEffect(() => {
-    if (!currentUser?.uid || !activeSpace?.id) {
+    if (!currentUser?.uid || !contentSpace?.id) {
       setMyHossiiParticipantEligibility('not_participant');
       return;
     }
     let cancelled = false;
-    fetchParticipantEligibility(currentUser.uid, activeSpace.id, {
+    fetchParticipantEligibility(currentUser.uid, contentSpace.id, {
       legacyProfileId: state.profile?.id,
       defaultNickname: state.profile?.defaultNickname,
     })
@@ -857,7 +993,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.uid, activeSpace?.id, state.profile?.id, state.profile?.defaultNickname]);
+  }, [currentUser?.uid, contentSpace?.id, state.profile?.id, state.profile?.defaultNickname]);
 
   const resolvedBackground = useMemo(() => {
     if (isVisiting && visitingSpaceInfo) {
@@ -919,13 +1055,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
 
   const handleLike = useCallback(async (hossiiId: string) => {
+    if (isContentArchived) return;
     try {
       await incrementLike(hossiiId);
       setLikeReactionTrigger({ id: `like-${hossiiId}-${Date.now()}` });
     } catch (err) {
       console.error('[SpaceScreen] incrementLike error:', err);
     }
-  }, []);
+  }, [isContentArchived]);
 
   /** アプリ内「大画面」— 見た目の最大化（Fullscreen API は補助） */
   const [immersiveLayout, setImmersiveLayout] = useState(false);
@@ -1077,14 +1214,32 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setDisplayScale(scales[nextIndex]);
   }, [displayScale, setDisplayScale]);
 
-  // F02/F04: バブル編集権限チェック
-  const canEditBubble = useCallback((hossii: { authorId?: string }) => {
-    if (isAdmin) return true;
-    const permission = spaceSettings?.bubbleEditPermission ?? 'all';
-    if (permission === 'all') return true;
-    // owner_and_admin: 投稿者本人のみ（authorId が一致する場合）
-    return !!myAuthorId && hossii.authorId === myAuthorId;
-  }, [isAdmin, spaceSettings, myAuthorId]);
+  // F02/F04: バブル編集権限チェック（Identity A: 本人性は authorship を正本とする）
+  const canEditBubble = useCallback(
+    (hossii: { id: string; authorId?: string }) =>
+      resolveBubbleCanEditForArchivedSpace(
+        isContentArchived,
+        resolveCanEditBubble({
+          isAdmin,
+          bubbleEditPermission: spaceSettings?.bubbleEditPermission,
+          hossiiId: hossii.id,
+          hossiiAuthorId: hossii.authorId,
+          isAuthenticated,
+          guestAuthorId: state.profile?.id,
+          myAuthorshipIds,
+          myAuthorshipIdsStatus,
+        }),
+      ),
+    [
+      isContentArchived,
+      isAdmin,
+      spaceSettings,
+      isAuthenticated,
+      state.profile?.id,
+      myAuthorshipIds,
+      myAuthorshipIdsStatus,
+    ],
+  );
 
   // ===== F14: 選択ハンドラ =====
   const handleBubbleSelect = useCallback((id: string) => {
@@ -1095,22 +1250,71 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setSelectedBubbleId(null);
   }, []);
 
+  const handlePersonalShortcut = useCallback(async () => {
+    const communityId = activeSpace?.communityId;
+    if (!communityId || personalShortcutBusy || activeSpace?.spaceType !== 'shared') return;
+    if (personalViewSpaceId) return;
+    setPersonalShortcutBusy(true);
+    try {
+      const res = await ensureMyPersonalSpace(communityId);
+      if (!res.ok) {
+        window.alert(res.message);
+        return;
+      }
+      const existing = state.spaces.find((s) => s.id === res.spaceId);
+      if (!existing) {
+        const fetched = res.spaceUrl ? await fetchSpaceByUrl(res.spaceUrl) : null;
+        if (fetched) {
+          addSpaceLocal(fetched);
+        } else {
+          window.alert('個人スペースを開けませんでした。');
+          return;
+        }
+      }
+      setPersonalViewSpaceId(res.spaceId);
+    } catch {
+      window.alert('個人スペースを開けませんでした。');
+    } finally {
+      setPersonalShortcutBusy(false);
+    }
+  }, [
+    activeSpace?.communityId,
+    activeSpace?.spaceType,
+    addSpaceLocal,
+    personalShortcutBusy,
+    personalViewSpaceId,
+    state.spaces,
+  ]);
+
+  const personalShortcut = useMemo(() => {
+    if (!personalShortcutEligible) return null;
+    return {
+      label: 'マイスペース',
+      loading: personalShortcutBusy,
+      active: personalShortcutActive,
+      onClick: () => void handlePersonalShortcut(),
+    };
+  }, [personalShortcutEligible, personalShortcutActive, handlePersonalShortcut, personalShortcutBusy]);
+
   // F06: 非表示（管理者のみ）
   const handleHideBubble = useCallback(() => {
+    if (isContentArchived) return;
     if (!selectedBubbleId) return;
     hideHossii(selectedBubbleId);
     setSelectedBubbleId(null);
-  }, [selectedBubbleId, hideHossii]);
+  }, [isContentArchived, selectedBubbleId, hideHossii]);
 
   // F05: PointerUp で即座にスケール保存
   const handleScaleSave = useCallback((id: string, scale: number) => {
+    if (isContentArchived) return;
     updateHossiiScaleAction(id, scale);
-  }, [updateHossiiScaleAction]);
+  }, [isContentArchived, updateHossiiScaleAction]);
 
   // F01: カラー選択で即座に保存
   const handleColorSave = useCallback((id: string, color: string | null) => {
+    if (isContentArchived) return;
     updateHossiiColorAction(id, color);
-  }, [updateHossiiColorAction]);
+  }, [isContentArchived, updateHossiiColorAction]);
 
   // Escape キーでデセレクト
   useEffect(() => {
@@ -1131,7 +1335,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // リアクションブロードキャスト
   const { broadcastReaction } = useReactionBroadcast({
-    activeSpaceId,
+    activeSpaceId: contentSpaceId ?? activeSpaceId ?? '',
     onReaction: handleBroadcastReaction,
   });
 
@@ -1196,6 +1400,23 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const { filteredHossiis, tagCounts } = pipeline;
 
+  // 吹き出しごとに本人操作（編集/公開範囲/削除）を出せるか。
+  // authorship を正本にし、ゲスト投稿・他人投稿・authorship 未確定では出さない。
+  // presentationMode に依存せず、custom / ordered / random すべてで機能する。
+  const canManageOwnHossii = useCallback(
+    (hossiiId: string) =>
+      resolveCanManageOwnForArchivedSpace(
+        isContentArchived,
+        canManageOwnPost({
+          isAuthenticated: !!currentUser,
+          myAuthorshipIds,
+          myAuthorshipIdsStatus,
+          hossiiId,
+        }),
+      ),
+    [isContentArchived, currentUser, myAuthorshipIds, myAuthorshipIdsStatus],
+  );
+
   const pinnedHossiisForTray = useMemo(() => {
     const byId = new Map(filteredHossiis.map((h) => [h.id, h]));
     return pinnedOrder
@@ -1226,19 +1447,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, []);
 
   useEffect(() => {
-    if (!activeSpace?.id) return;
-    setActiveTagFilter(loadSpaceTagFilter(activeSpace.id));
-  }, [activeSpace?.id]);
+    if (!contentSpace?.id) return;
+    setActiveTagFilter(loadSpaceTagFilter(contentSpace.id));
+  }, [contentSpace?.id]);
 
   const tagCandidates = useMemo(() => {
     const fromPosts = [...tagCounts.keys()];
-    const presetOrder = activeSpace?.presetTags ?? [];
+    const presetOrder = contentSpace?.presetTags ?? [];
     const presetInPosts = presetOrder.filter((t) => fromPosts.includes(t));
     const rest = fromPosts
       .filter((t) => !presetOrder.includes(t))
       .sort((a, b) => (tagCounts.get(b) ?? 0) - (tagCounts.get(a) ?? 0));
     return [...presetInPosts, ...rest];
-  }, [activeSpace?.presetTags, tagCounts]);
+  }, [contentSpace?.presetTags, tagCounts]);
 
   const showTagControls = viewMode !== 'slideshow' && (tagCandidates.length > 0 || activeTagFilter != null);
 
@@ -1246,7 +1467,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     (tag: string | null) => {
       const runFilter = () => {
         setActiveTagFilter(tag);
-        if (activeSpace?.id) saveSpaceTagFilter(activeSpace.id, tag);
+        if (contentSpace?.id) saveSpaceTagFilter(contentSpace.id, tag);
         setTagPanelOpen(false);
       };
       if (prefersReducedMotion) {
@@ -1261,7 +1482,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         tagFilterTimerRef.current = setTimeout(() => setTagFilterPhase('idle'), 250);
       }, 200);
     },
-    [activeSpace?.id, prefersReducedMotion],
+    [contentSpace?.id, prefersReducedMotion],
   );
 
   const handleStarToggle = useCallback(() => {
@@ -1389,7 +1610,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       clearTimeout(backgroundPeekTapTimerRef.current);
       backgroundPeekTapTimerRef.current = null;
     }
-    if (isVisiting) return;
+    if (isVisiting || isContentArchived) return;
     if (quickPostOpen) {
       handleQuickPostClose();
       return;
@@ -1408,14 +1629,15 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       setQuickPostOpen(true);
       setQuickPostPos(savedPos);
     }, 320);
-  }, [isVisiting, quickPostOpen, resetQuickPostSpeechState, shouldMapToSharp, handleQuickPostClose]);
+  }, [isVisiting, isContentArchived, quickPostOpen, resetQuickPostSpeechState, shouldMapToSharp, handleQuickPostClose]);
 
   const handlePositionSave = useCallback(
     (id: string, x: number, y: number) => {
+      if (isContentArchived) return;
       const saved = toStoragePos({ x, y });
       updateHossiiPositionAction(id, saved.x, saved.y);
     },
-    [toStoragePos, updateHossiiPositionAction],
+    [isContentArchived, toStoragePos, updateHossiiPositionAction],
   );
 
   const spaceExportAbortRef = useRef<AbortController | null>(null);
@@ -1471,7 +1693,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const handleSpaceExport = useCallback(async () => {
     if (!showSpaceExportButton || spaceExportBlockedUI) return;
     const root = spaceExportRootRef.current;
-    const space = activeSpace;
+    const space = contentSpace ?? activeSpace;
     if (!root || !space) return;
 
     spaceExportAbortRef.current?.abort();
@@ -1527,6 +1749,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, [
     showSpaceExportButton,
     spaceExportBlockedUI,
+    contentSpace,
     activeSpace,
     communitySlug,
     filteredHossiis.length,
@@ -1692,7 +1915,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     : null;
 
   // クイックログパネル: 画面上のスペース（訪問中は隣人）と一覧を揃える
-  const logListSpaceId = isVisiting ? visitingSpaceId : activeSpaceId;
+  const logListSpaceId = isVisiting ? visitingSpaceId : contentSpaceId;
   const logListHossiis = isVisiting ? visitingHossiis : resolveSpaceHossiis();
   const logPresetTags =
     isVisiting && visitingSpaceInfo
@@ -1703,6 +1926,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const showDoubleTapHint =
     isMobilePortrait &&
     !isVisiting &&
+    !isContentArchived &&
     !quickPostOpen &&
     viewMode !== 'slideshow';
 
@@ -1803,6 +2027,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       onClose={handleQuickPostClose}
       speechToFreePosterRef={speechToFreePosterRef}
       onSendingChange={setPostSending}
+      postTargetOverride={postTargetOverride}
     />
   );
 
@@ -1820,6 +2045,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           hint="Communities から Dev Community を開くか、/c/dev-community/s/dev-public など seed スペースへ移動してください。"
         />
       )}
+      {isContentArchived && !isVisiting && <SpaceArchiveBanner />}
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
         <SlideshowView
@@ -1903,6 +2129,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 <AuthorClusterBubble
                   key={group.groupKey}
                   group={group}
+                  currentAuthorName={
+                    postAuthorDisplayNames.get(group.latestPost.id) ??
+                    postAuthorDisplayNames.get(group.posts[0]!.id)
+                  }
                   position={clusterPos}
                   viewMode={viewMode}
                   expanded={expandedClusterKeys.has(group.groupKey)}
@@ -1950,6 +2180,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 <div key={hossii.id} className={postAnimClass} style={{ display: 'contents' }}>
                   <StarView
                     hossii={hossii}
+                    currentAuthorName={postAuthorDisplayNames.get(hossii.id)}
                     x={displayPos.x}
                     y={displayPos.y}
                     anchor={layoutMode === 'ordered' ? 'topLeft' : 'center'}
@@ -1980,6 +2211,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               <div key={hossii.id} className={postAnimClass} style={{ display: 'contents' }}>
               <Bubble
                 hossii={hossii}
+                currentAuthorName={postAuthorDisplayNames.get(hossii.id)}
                 index={index}
                 position={displayPos}
                 orderedStackZ={displayStackZ}
@@ -1996,7 +2228,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onColorSave={handleColorSave}
                 viewMode={viewMode}
                 canEdit={canEditBubble(hossii)}
-                likesEnabled={spaceSettings?.features.likesEnabled ?? true}
+                likesEnabled={likesEnabledForView}
                 onLike={handleLike}
                 bubbleShapePng={hossii.bubbleShapePng ?? spaceForVisual?.bubbleShapePng}
                 layoutAlignTopLeft={layoutMode === 'ordered'}
@@ -2005,6 +2237,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onPinToggle={handlePinToggle}
                 showPinUi={showPinUi}
                 animationLevel={animationLevel}
+                canManageOwn={canManageOwnHossii(hossii.id)}
+                onOwnerDeleted={handleBubbleDeselect}
               />
               </div>
             );
@@ -2054,13 +2288,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         ))}
 
       {/* マイHossiiレイヤー */}
-      {controlState.hossiiVisible && activeSpace && !isVisiting && (
+      {controlState.hossiiVisible && activeSpace && !isVisiting && showMyHossiiLayer && (
         <MyHossiiLayer
-          spaceId={activeSpace.id}
+          spaceId={contentSpace?.id ?? activeSpace.id}
           enabled={myHossiiEnabled}
           motionMode={myHossiiMotionMode}
           logVisibility={myHossiiLogVisibility}
           hossiis={filteredHossiis}
+          activityHossiis={allSpaceHossiisForMyHossii}
           visiblePostCount={filteredHossiis.length}
           currentUserId={currentUser?.uid ?? null}
           isAuthenticatedViewer={!!currentUser}
@@ -2213,17 +2448,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           variant="mobile"
           folders={effectiveFolders}
           visiblePanes={visiblePanes}
-          activePaneId={contextActivePaneId}
+          activePaneId={paneBarActivePaneId}
           isAdmin={isAdmin}
           disabled={postSending || paneReorderBusy}
           onSelect={handlePaneSelect}
-          onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
-          onAddFolder={isAdmin ? handleAddFolder : undefined}
-          onRenameFolder={isAdmin ? handleRenameFolder : undefined}
-          onDeleteFolder={isAdmin ? handleDeleteFolder : undefined}
-          onReorder={isAdmin ? handlePaneReorder : undefined}
-          onMoveToFolder={isAdmin ? handleMoveToFolder : undefined}
-          onReorderFolder={isAdmin ? handleReorderFolder : undefined}
+          onAddPane={isAdmin && !isContentArchived ? () => setPaneCreateOpen(true) : undefined}
+          onAddFolder={isAdmin && !isContentArchived ? handleAddFolder : undefined}
+          onRenameFolder={isAdmin && !isContentArchived ? handleRenameFolder : undefined}
+          onDeleteFolder={isAdmin && !isContentArchived ? handleDeleteFolder : undefined}
+          onReorder={isAdmin && !isContentArchived ? handlePaneReorder : undefined}
+          onMoveToFolder={isAdmin && !isContentArchived ? handleMoveToFolder : undefined}
+          onReorderFolder={isAdmin && !isContentArchived ? handleReorderFolder : undefined}
+          personalShortcut={personalShortcut}
         />
       )}
 
@@ -2425,7 +2661,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       )}
 
       {/* F14: 選択時ツールバー（書き出し対象外） */}
-      {selectedBubbleId && (
+      {selectedBubbleId && !isContentArchived && (
         <div className={styles.editToolbar} data-space-export="exclude">
           <span className={styles.editToolbarHint}>
             ドラッグで移動 · 角ハンドルでリサイズ
@@ -2472,7 +2708,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             interimText={interimText}
             speechLevels={speechLevels}
             setSpeechLevels={setSpeechLevels}
-            onPost={(text) => addHossii({ message: text, logType: 'speech', origin: 'manual' })}
+            onPost={(text) => postHossii({ message: text, logType: 'speech', origin: 'manual' })}
             onEditCandidate={openSpeechCandidateEditor}
             onDismissCandidate={dismissSpeechCandidate}
             dismissedCandidates={dismissedSpeechCandidates}
@@ -2495,18 +2731,23 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         <PostDetailModal
           hossii={selectedPost}
           onClose={() => setSelectedPostId(null)}
-          likesEnabled={spaceSettings?.features.likesEnabled ?? true}
-          onLike={handleLike}
+          likesEnabled={likesEnabledForView}
+          onLike={isContentArchived ? undefined : handleLike}
+          readOnlyArchived={isContentArchived}
         />
       )}
 
       {selectedAuthorGroup && (
         <AuthorTimelineModal
           group={selectedAuthorGroup}
+          currentAuthorName={
+            postAuthorDisplayNames.get(selectedAuthorGroup.latestPost.id) ??
+            postAuthorDisplayNames.get(selectedAuthorGroup.posts[0]!.id)
+          }
           onClose={() => setSelectedAuthorGroup(null)}
           onSelectPost={(id) => setSelectedPostId(id)}
-          likesEnabled={spaceSettings?.features.likesEnabled ?? true}
-          onLike={handleLike}
+          likesEnabled={likesEnabledForView}
+          onLike={isContentArchived ? undefined : handleLike}
           isMobilePortrait={isMobilePortrait}
         />
       )}
@@ -2550,20 +2791,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               variant="desktop"
               folders={effectiveFolders}
               visiblePanes={visiblePanes}
-              activePaneId={contextActivePaneId}
+              activePaneId={paneBarActivePaneId}
               isAdmin={isAdmin}
               disabled={postSending || paneReorderBusy}
               onSelect={handlePaneSelect}
-              onAddPane={isAdmin ? () => setPaneCreateOpen(true) : undefined}
-              onAddFolder={isAdmin ? handleAddFolder : undefined}
-              onRenameFolder={isAdmin ? handleRenameFolder : undefined}
-              onDeleteFolder={isAdmin ? handleDeleteFolder : undefined}
-              onReorder={isAdmin ? handlePaneReorder : undefined}
-              onMoveToFolder={isAdmin ? handleMoveToFolder : undefined}
-              onReorderFolder={isAdmin ? handleReorderFolder : undefined}
+              onAddPane={isAdmin && !isContentArchived ? () => setPaneCreateOpen(true) : undefined}
+              onAddFolder={isAdmin && !isContentArchived ? handleAddFolder : undefined}
+              onRenameFolder={isAdmin && !isContentArchived ? handleRenameFolder : undefined}
+              onDeleteFolder={isAdmin && !isContentArchived ? handleDeleteFolder : undefined}
+              onReorder={isAdmin && !isContentArchived ? handlePaneReorder : undefined}
+              onMoveToFolder={isAdmin && !isContentArchived ? handleMoveToFolder : undefined}
+              onReorderFolder={isAdmin && !isContentArchived ? handleReorderFolder : undefined}
+              personalShortcut={personalShortcut}
             />
           )}
-          <TopRightMenu onPostClick={handleTopRightPostClick} />
+          <TopRightMenu onPostClick={handleTopRightPostClick} postNavDisabled={isContentArchived} />
           <LeftControlBar
             controls={controlState}
             onToggle={handleControlToggle}
@@ -2605,7 +2847,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       )}
 
       {/* クイック投稿パネル（スマホ縦=固定ボトムシート、横=右固定ドック、PC のみ FloatingPanelShell） */}
-      {quickPostOpen &&
+      {quickPostOpen && !isContentArchived &&
         (mobilePostSplit ? (
           <div className={styles.mobilePostSheet}>{quickPostPanel}</div>
         ) : mobilePostLandscapeSplit ? (
@@ -2649,10 +2891,15 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             panelMode
             onClose={handleQuickLogClose}
             onAfterAdminHide={isVisiting ? removeVisitingHossii : undefined}
-            onOpenQuickPost={() => {
-              handleQuickLogClose();
-              openQuickPost();
-            }}
+            onOpenQuickPost={
+              isContentArchived
+                ? undefined
+                : () => {
+                    handleQuickLogClose();
+                    openQuickPost();
+                  }
+            }
+            readOnlyArchived={isContentArchived}
           />
         </FloatingPanelShell>
       )}
@@ -2740,6 +2987,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       )}
 
       {/* 訪問中に投稿しようとしたときのフィードバック */}
+      {isContentArchived && !isVisiting && <SpaceArchivePostNotice />}
+
       <HossiiToast
         show={visitingToastVisible}
         message="訪問中のスペースには投稿できません"

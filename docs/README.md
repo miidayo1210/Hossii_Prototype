@@ -2,11 +2,44 @@
 
 ---
 
+## 実装ブランチ（community platform Phase 2〜6）
+
+| 項目 | 状態 |
+|------|------|
+| branch | `feat/community-platform-phase2-6` |
+| 検証環境 | Supabase **development** のみ |
+| main | **未反映** |
+| production | **未反映** |
+| browser | Playwright 未整備のため **未確認**（DB/API/RLS は検証済み） |
+
+**Phase 2〜6 完了範囲（MVP）:** `community_memberships`、RLS 基盤、個人スペース・テンプレート、`access_mode` / invite_only、community HOME・切替、招待（token hash・リンクコピー）、membership suspend/reactivate/remove、発行参加 ID の membership 明示連携。
+
+**未実装:** メール招待の自動送信、account merge（[110](./仕様書/現在の仕様/110_アカウントマージ将来仕様.md)）、pair/team スペース（Phase 6 後）。
+
+**イベント用途（Leapday 型）:** `relation type` に event を足すのではなく、`temporary` + `public`/`invite_only` + イベント向け投稿設定・スクリーン・集計を **template/use-case** として組み合わせる（[109 §Phase 6](./仕様書/現在の仕様/109_コミュニティ所属個人アカウント・個人スペース・招待制スペース.md) 参照）。
+
+---
+
+## まず読む文書
+
+Hossii の最上位の Why / What は [`hossii-product-concept.md`](./hossii-product-concept.md) にまとめている。個別機能に入る前に、まずこの文書を読む。
+
+**読む順番:**
+
+1. [`hossii-product-concept.md`](./hossii-product-concept.md) — Hossii は何を実現し、なぜ存在するのか（最上位のコンセプト）
+2. [`space-product-vision.md`](./space-product-vision.md) — スペースという体験単位の提供思想
+3. [`core/core-concepts.md`](./core/core-concepts.md) — 実装・仕様で使う共通概念と用語
+4. [`仕様書/現在の仕様/`](./仕様書/現在の仕様/) — 機能別の実装仕様（feature specs）
+
+---
+
 ## 構成
 
 ```
 docs/
 ├── README.md                    ← このファイル（全体マップ）
+│
+├── hossii-product-concept.md    ← Hossii最上位のコンセプト（Why / What）
 │
 ├── core/                        ← Hossii基盤（全スペース共通）
 │   └── core-concepts.md         ← 用語定義・共通データ構造・4レイヤーモデル
@@ -61,9 +94,10 @@ docs/
 
 ### 初めて触れる人向け
 
-1. [space-product-vision.md](./space-product-vision.md) — Hossiiが何を目指すか
-2. [core/core-concepts.md](./core/core-concepts.md) — 用語と共通構造
-3. [仕様書/現在の仕様/00_仕様概要.md](./仕様書/現在の仕様/00_仕様概要.md) — 現在実装されている機能の全体像
+1. [hossii-product-concept.md](./hossii-product-concept.md) — Hossiiは何を実現し、なぜ存在するのか（最上位のコンセプト）
+2. [space-product-vision.md](./space-product-vision.md) — スペースという体験単位の提供思想
+3. [core/core-concepts.md](./core/core-concepts.md) — 用語と共通構造
+4. [仕様書/現在の仕様/00_仕様概要.md](./仕様書/現在の仕様/00_仕様概要.md) — 現在実装されている機能の全体像
 
 ### 新しいスペースタイプを追加したい人向け
 

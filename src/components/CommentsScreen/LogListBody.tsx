@@ -11,6 +11,12 @@ import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
 import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
+import { resolveLogScopeSelection } from '../../core/utils/resolveLogScopeSelection';
+import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import { PostedNameLabel } from '../common/PostedNameLabel';
+import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
+import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
 import { LogScopeSegment } from './LogScopeSegment';
 import { PaneFilterSegment, type PaneFilterCountMode } from './PaneFilterSegment';
 import type { CommentsPaneFilter } from '../../core/utils/commentsPaneFilterStorage';
@@ -82,6 +88,8 @@ export type LogListBodyProps = {
   onNavigateToPost?: () => void;
   /** クイックログパネルの「投稿してみる」 */
   onOpenQuickPost?: () => void;
+  /** 112: アーカイブ中は本人操作・クイック投稿導線を出さない */
+  readOnlyArchived?: boolean;
   /** Phase 9B: #comments の Pane フィルタ（panelMode では未使用） */
   paneFilter?: CommentsPaneFilter;
   visiblePanes?: SpacePane[];
@@ -116,17 +124,19 @@ export function LogListBody({
   movePaneDefaultPaneId,
   onMoveHossiiToPane,
   movePaneBusyId = null,
+  readOnlyArchived = false,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
-  const { state, hideHossii, getActiveNickname, getAuthorId } = useHossiiStore();
-  const { profile } = state;
+  const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames } =
+    useHossiiStore();
   const isAdmin = currentUser?.isAdmin ?? false;
+  const isAuthenticatedUser = !!currentUser;
   const space = useMemo(
     () => (spaceId ? state.spaces.find((s) => s.id === spaceId) ?? null : null),
     [state.spaces, spaceId],
   );
   const { spaceSettings } = useSpaceSettings(space);
-  const likesEnabled = spaceSettings?.features.likesEnabled ?? true;
+  const likesEnabled = !readOnlyArchived && (spaceSettings?.features.likesEnabled ?? true);
 
   const filterKey = spaceId ?? '';
   const [filters, setFilters] = useState<HossiiFilters>(() => loadFilters(filterKey));
@@ -168,21 +178,27 @@ export function LogListBody({
     [hossiis]
   );
 
-  const authorId = getAuthorId();
-  const allCount = visibleHossiis.length;
-  const mineCount = useMemo(
-    () =>
-      authorId
-        ? visibleHossiis.filter((h) => h.authorId === authorId).length
-        : 0,
-    [visibleHossiis, authorId]
-  );
+  // 本人性の正本: ログイン中（管理者含む）は myAuthorshipIds、ゲストは端末 author_id。
+  // getAuthorId はゲスト用の guestAuthorId としてのみ使う。
+  const isAuthenticated = !!currentUser;
+  const guestAuthorId = isAuthenticated ? undefined : getAuthorId();
 
-  const scopedHossiis = useMemo(() => {
-    if (logScope !== 'mine') return visibleHossiis;
-    if (!authorId) return [];
-    return visibleHossiis.filter((h) => h.authorId === authorId);
-  }, [visibleHossiis, logScope, authorId]);
+  // mine 判定に使える identity があるか（空状態メッセージの出し分け用）。
+  const hasIdentity = isAuthenticated || !!guestAuthorId;
+
+  // all/mine の件数と一覧を 1 度に解決する（本人投稿の二重 filter を避ける）。
+  // 未 ready 時は mine を空扱い（author_id フォールバックなし）、all は影響を受けない。
+  const { allCount, mineCount, scopedHossiis } = useMemo(
+    () =>
+      resolveLogScopeSelection(visibleHossiis, {
+        logScope,
+        isAuthenticated,
+        guestAuthorId,
+        myAuthorshipIds,
+        myAuthorshipIdsStatus,
+      }),
+    [visibleHossiis, logScope, isAuthenticated, guestAuthorId, myAuthorshipIds, myAuthorshipIdsStatus],
+  );
 
   const allTagCandidates = useMemo(() => {
     const set = new Set<string>(presetTags);
@@ -248,13 +264,14 @@ export function LogListBody({
   const activeNickname = getActiveNickname();
 
   const handleEmptyPostClick = useCallback(() => {
+    if (readOnlyArchived) return;
     if (panelMode) {
       onClose?.();
       onOpenQuickPost?.();
     } else {
       onNavigateToPost?.();
     }
-  }, [panelMode, onClose, onOpenQuickPost, onNavigateToPost]);
+  }, [readOnlyArchived, panelMode, onClose, onOpenQuickPost, onNavigateToPost]);
 
   const filterBlock = (
     <div className={styles.filterContainer}>
@@ -330,30 +347,41 @@ export function LogListBody({
 
   const renderEmptyState = () => {
     if (isMineScope) {
-      const hasProfile = !!profile?.id;
       return (
         <div className={styles.emptyMine}>
           <span className={styles.emptyMineIcon} aria-hidden>
             📭
           </span>
           <p className={styles.emptyMineTitle}>
-            {!hasProfile
+            {!hasIdentity
               ? 'まだ投稿がありません'
               : 'このスペースへの投稿はまだありません'}
           </p>
           <p className={styles.emptyMineSubtitle}>
-            {!hasProfile
+            {!hasIdentity
               ? '気持ちを投稿すると、ここに記録が残ります'
               : '最初の投稿をして記録を残してみよう！'}
           </p>
-          <button type="button" className={styles.emptyMineAction} onClick={handleEmptyPostClick}>
-            💬 投稿してみる
-          </button>
+          {!readOnlyArchived && (
+            <button type="button" className={styles.emptyMineAction} onClick={handleEmptyPostClick}>
+              💬 投稿してみる
+            </button>
+          )}
         </div>
       );
     }
     return <div className={styles.empty}>まだ反応がありません</div>;
   };
+
+  // listSection の JSX（sortedHossiis.map）は宣言時に即時評価されるため、
+  // その中で参照する showMovePane は listSection より前に宣言する必要がある
+  // （TDZ の ReferenceError 回避。管理者レンダリングでの白画面を防ぐ）。
+  const showMovePane =
+    isAdmin &&
+    movePaneVisiblePanes &&
+    movePaneVisiblePanes.length >= 2 &&
+    movePaneDefaultPaneId &&
+    onMoveHossiiToPane;
 
   const listSection = (
     <div
@@ -381,15 +409,35 @@ export function LogListBody({
             const isSpeech = hossii.autoType === 'speech' || hossii.logType === 'speech';
             const icon = isLaughter ? '😂' : isSpeech ? '🎙' : null;
 
+            // Phase 2C: 現在名を主表示、投稿時名と異なれば補足（mine スコープでは著者名は非表示）。
+            const authorDisplay = resolvePostAuthorDisplay({
+              postedName: hossii.authorName,
+              currentName: postAuthorDisplayNames.get(hossii.id),
+              isOwnPost: false,
+            });
+            const isOwnerOnly = hossii.visibility === 'owner_only';
+            const canManageThis =
+              !readOnlyArchived &&
+              canManageOwnPost({
+                isAuthenticated: isAuthenticatedUser,
+                myAuthorshipIds,
+                myAuthorshipIdsStatus,
+                hossiiId: hossii.id,
+              });
+
             return (
               <div
                 key={hossii.id}
                 className={`${styles.card} ${isMineScope ? styles.mineCard : ''}`}
+                style={isOwnerOnly ? { opacity: 0.72 } : undefined}
               >
                 <div className={styles.cardInner}>
                   <div className={styles.cardContent}>
-                    {!isMineScope && hossii.authorName && (
-                      <div className={styles.authorName}>{hossii.authorName}</div>
+                    {!isMineScope && authorDisplay.primaryName && (
+                      <div className={styles.authorName}>
+                        {authorDisplay.primaryName}
+                        <PostedNameLabel name={authorDisplay.postedNameLabel} />
+                      </div>
                     )}
                     {(!isLaughter && renderHossiiText(hossii)) && (
                       <div className={styles.message}>
@@ -434,8 +482,17 @@ export function LogListBody({
                       </div>
                     )}
                     <div className={styles.meta}>
-                      <span className={styles.time}>{timestamp}</span>
+                      <span className={styles.time}>
+                        {timestamp}
+                        {isOwnerOnly && <OwnerOnlyBadge />}
+                        {hossii.contentEditedAt && (
+                          <span className={styles.editedMark}>編集済み</span>
+                        )}
+                      </span>
                       <div className={styles.metaEnd}>
+                        {canManageThis && (
+                          <OwnPostActions hossii={hossii} />
+                        )}
                         {isAdmin && (
                           <>
                             {showMovePane && (
@@ -519,13 +576,6 @@ export function LogListBody({
     getPaneFilterCount &&
     visiblePanes &&
     visiblePanes.length >= 2;
-
-  const showMovePane =
-    isAdmin &&
-    movePaneVisiblePanes &&
-    movePaneVisiblePanes.length >= 2 &&
-    movePaneDefaultPaneId &&
-    onMoveHossiiToPane;
 
   const scopeHeaderBlock = (
     <div className={styles.scopeHeaderBlock}>

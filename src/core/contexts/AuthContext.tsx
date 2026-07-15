@@ -14,6 +14,7 @@ import {
   markParticipantFirstLogin,
 } from '../utils/participantAccountsApi';
 import { fetchLegacyDefaultNickname } from '../utils/profilesApi';
+import { clearStoredCommunityId } from '../utils/selectedCommunityStorage';
 import { AuthContext } from './useAuth';
 
 export type AppUser = {
@@ -356,6 +357,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // ===== ログアウト =====
   const logout = useCallback(async (): Promise<void> => {
     if (!isSupabaseConfigured) {
+      clearStoredCommunityId();
       setCurrentUser(null);
       clearMockUser();
       return;
@@ -364,6 +366,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // scope: 'local' でローカルセッションのみ削除（他タブへの影響を最小化し確実にログアウト）
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) throw error;
+
+    // onAuthStateChange を待たずに UI を guest へ遷移させる（pending 表示の取り残し防止）
+    clearStoredCommunityId();
+    setCurrentUser(null);
   }, []);
 
   // ===== Google ログイン =====

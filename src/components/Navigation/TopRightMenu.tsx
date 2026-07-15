@@ -17,9 +17,11 @@ const NAV_ITEMS: NavItem[] = [
 type Props = {
   /** 「投稿する」ボタン専用コールバック。指定時は navigate('post') の代わりに呼ぶ */
   onPostClick?: () => void;
+  /** アーカイブ中など投稿導線を無効化 */
+  postNavDisabled?: boolean;
 };
 
-export const TopRightMenu = ({ onPostClick }: Props) => {
+export const TopRightMenu = ({ onPostClick, postNavDisabled = false }: Props) => {
   const { screen: currentScreen, navigate } = useRouter();
 
   return (
@@ -32,12 +34,15 @@ export const TopRightMenu = ({ onPostClick }: Props) => {
             currentScreen === item.screen ? styles.navButtonActive : ''
           }`}
           onClick={() => {
+            if (item.screen === 'post' && postNavDisabled) return;
             if (item.screen === 'post' && onPostClick) {
               onPostClick();
               return;
             }
             navigate(item.screen);
           }}
+          disabled={item.screen === 'post' && postNavDisabled}
+          title={item.screen === 'post' && postNavDisabled ? 'アーカイブ中は投稿できません' : undefined}
         >
           {item.label}
         </button>
