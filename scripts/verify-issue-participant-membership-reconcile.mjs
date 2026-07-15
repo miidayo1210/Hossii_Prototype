@@ -58,11 +58,10 @@ async function findFreeSlot(spaceId) {
   const { data, error } = await admin
     .from('space_participant_accounts')
     .select('slot_number')
-    .eq('space_id', spaceId)
-    .eq('status', 'active');
+    .eq('space_id', spaceId);
   if (error) throw error;
   const used = new Set((data ?? []).map((row) => row.slot_number));
-  for (let slot = 15; slot <= 20; slot += 1) {
+  for (let slot = 1; slot <= 20; slot += 1) {
     if (!used.has(slot)) return slot;
   }
   throw new Error(`no free participant slot on ${spaceId}`);
