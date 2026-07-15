@@ -31,6 +31,7 @@ vi.mock('../../core/contexts/useAuth', () => ({
 vi.mock('../../core/contexts/useSelectedCommunity', () => ({
   useSelectedCommunity: () => ({
     selectedMembership: h.selectedMembership,
+    loading: false,
   }),
 }));
 
