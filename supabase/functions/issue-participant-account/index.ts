@@ -51,6 +51,24 @@ function buildAuthEmail(spaceId: string, loginId: string): string {
   return `${spaceId}.${safeLoginId}@participants.internal`;
 }
 
+async function ensureCommunityMembershipForSpaceMember(
+  adminClient: ReturnType<typeof createClient>,
+  spaceId: string,
+  authUserId: string,
+) {
+  const { error } = await adminClient.rpc('ensure_community_membership_for_space_member', {
+    p_space_id: spaceId,
+    p_auth_user_id: authUserId,
+  });
+
+  if (error) {
+    console.error(
+      '[issue-participant-account] ensure_community_membership_for_space_member failed:',
+      error.message,
+    );
+  }
+}
+
 async function assertAdminAccess(
   adminClient: ReturnType<typeof createClient>,
   userId: string,
@@ -221,6 +239,12 @@ Deno.serve(async (req) => {
             status: 'active',
           },
           { onConflict: 'space_id,auth_user_id' },
+        );
+
+        await ensureCommunityMembershipForSpaceMember(
+          adminClient,
+          spaceId,
+          createdUser.user.id,
         );
       }
 
