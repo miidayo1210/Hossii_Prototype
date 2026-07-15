@@ -13,6 +13,7 @@ import { useRouter } from '../../core/hooks/useRouter';
 import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { resolveAccountIdentity } from '../../core/utils/resolveAccountIdentity';
 import { resolveAccountSection } from './accountSection';
+import { AccountSectionNav } from './AccountSectionNav';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -99,6 +100,8 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
       <header className={styles.header}>
         <h1 className={styles.title}>アカウント</h1>
       </header>
+
+      <AccountSectionNav activeSection={activeSection} onNavigate={navigate} />
 
       <main className={styles.content} data-account-section={activeSection}>
 
