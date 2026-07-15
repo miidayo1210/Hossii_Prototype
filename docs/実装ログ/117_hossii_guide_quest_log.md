@@ -69,6 +69,22 @@
 - **テスト結果:** `npm test src/core/utils/hossiiGuide.test.ts` — 20 passed。lint/build OK。
 - **commit:** （このコミット）
 - **状態:** DONE
-- **次の Quest:** Q3
+- **ブロッカー:** なし（dev/prod DB への apply は未実施・意図的）
+- **次の Quest:** Q4
+
+---
+
+## Q3 — migration: hossii_guide JSONB
+
+- **目的:** `space_settings.hossii_guide` 列追加（append-only migration）
+- **変更ファイル:**
+  - `supabase/migrations/20260718100000_add_hossii_guide_to_space_settings.sql`
+  - `docs/実装ログ/117_hossii_guide_quest_log.md`
+- **実装内容:** nullable JSONB 列 `hossii_guide` を追加。backfill なし、destructive 操作なし。
+- **テスト結果:** 全テスト 836 passed。lint/build OK。DB apply は未実施。
+- **commit:** （このコミット）
+- **状態:** DONE
+- **DB 適用:** なし（ファイル作成と静的確認のみ）
+- **次の Quest:** Q4
 
 ---
