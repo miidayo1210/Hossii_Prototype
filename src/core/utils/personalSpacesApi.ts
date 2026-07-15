@@ -1,4 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { fetchSpaceByUrl } from './spacesApi';
+import type { Space } from '../types/space';
 
 /**
  * Phase 3: コミュニティ内個人スペースの表示・作成 API。
@@ -90,4 +92,16 @@ export async function ensureMyPersonalSpace(
     return { ok: false, message: 'personal space not returned' };
   }
   return { ok: true, spaceId: row.space_id, spaceUrl: row.space_url ?? null };
+}
+
+/**
+ * ensure_my_personal_space 成功後に fetchSpaceByUrl で取得し、グローバル store へ載せる。
+ * 取得できなければ null（呼び出し側で UI のみ更新する）。
+ */
+export async function fetchPersonalSpaceForStore(
+  spaceUrl: string | null,
+  fetchFn: (url: string) => Promise<Space | null> = fetchSpaceByUrl,
+): Promise<Space | null> {
+  if (!spaceUrl) return null;
+  return fetchFn(spaceUrl);
 }

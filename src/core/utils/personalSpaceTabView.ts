@@ -14,7 +14,7 @@ export function resolveContentSpaceId(params: {
   shellSpaceId: string | null;
   personalViewSpaceId: string | null;
 }): string | null {
-  if (params.shellSpaceType === 'shared' && params.personalViewSpaceId) {
+  if (params.shellSpaceType !== 'personal' && params.personalViewSpaceId) {
     return params.personalViewSpaceId;
   }
   return params.shellSpaceId;

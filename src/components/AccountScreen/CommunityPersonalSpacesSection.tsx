@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ExternalLink, Lock, Plus } from 'lucide-react';
+import { Check, Lock, Plus } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
+import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import {
   fetchMyCommunityPersonalSpaces,
   ensureMyPersonalSpace,
+  fetchPersonalSpaceForStore,
   type CommunityPersonalSpace,
 } from '../../core/utils/personalSpacesApi';
 import styles from './CommunityPersonalSpacesSection.module.css';
@@ -11,13 +13,12 @@ import styles from './CommunityPersonalSpacesSection.module.css';
 type Status = 'idle' | 'loading' | 'error' | 'ready';
 
 /**
- * Phase 3: コミュニティ内個人スペースの作成・入室導線。
+ * Phase 3: コミュニティ内個人スペースの作成導線。
  *
  * - 個人スペースは AccountScreen / MyLogs / My Hossii（個人領域）とは別物で、
  *   特定コミュニティの目的に沿った「その人専用の実際のスペース」。
- * - 本人が active member のコミュニティごとに、未作成なら「作る」、作成済みなら「開く」。
- * - 作成前に、何が作られるか・誰が閲覧できるか（本人と所属コミュニティ管理者）を明示する。
- * - shared スペースへ自動同期はしない（作成のみ）。
+ * - 本人が active member のコミュニティごとに、未作成なら「作る」、作成済みなら状態表示。
+ * - 作成後はアカウント画面に留まり、共有スペースの「マイスペース」タブから開く。
  * - 未ログイン（ゲスト）は案内を表示し、何も取得しない。
  */
 export const CommunityPersonalSpacesSection = () => {
@@ -124,6 +125,7 @@ type ItemProps = {
 };
 
 const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
+  const { addSpaceLocal } = useHossiiStore();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,6 +141,10 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
       setError('個人スペースの作成に失敗しました。時間をおいてお試しください。');
       return;
     }
+    const fetched = await fetchPersonalSpaceForStore(res.spaceUrl);
+    if (fetched) {
+      addSpaceLocal(fetched);
+    }
     setCreating(false);
     onCreated(item.communityId, res.spaceId, res.spaceUrl);
   };
@@ -148,7 +154,9 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
       <div className={styles.itemMain}>
         <span className={styles.communityName}>{item.communityName}</span>
         {created ? (
-          <span className={styles.subtle}>あなたの個人スペース</span>
+          <span className={styles.subtle}>
+            マイスペースがあります。共有スペースの「マイスペース」タブから開けます。
+          </span>
         ) : (
           <span className={styles.subtle}>
             このコミュニティ内に、あなた専用のスペース（初期タブと背景つき）を1つ作成します。
@@ -159,16 +167,10 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
       </div>
 
       {created ? (
-        item.personalSpaceUrl ? (
-          <a className={styles.openLink} href={`/s/${item.personalSpaceUrl}`}>
-            <ExternalLink size={14} />
-            開く
-          </a>
-        ) : (
-          <span className={styles.openDisabled} title="このスペースは現在開けません">
-            開けません
-          </span>
-        )
+        <span className={styles.createdBadge}>
+          <Check size={14} />
+          作成済み
+        </span>
       ) : (
         <button
           type="button"

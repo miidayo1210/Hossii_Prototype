@@ -93,7 +93,7 @@ import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
 import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
-import { canShowPersonalShortcut, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
+import { canShowPersonalShortcut, isSharedSpaceShell, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
   buildTabFolderPatch,
@@ -354,7 +354,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     return memberships.find((m) => m.communityId === communityId) ?? null;
   }, [activeSpace?.communityId, memberships]);
   const personalShortcutEligible =
-    activeSpace?.spaceType === 'shared' &&
+    isSharedSpaceShell(activeSpace?.spaceType) &&
     canShowPersonalShortcut({
       isAuthenticated,
       isVisiting,
@@ -362,7 +362,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       membershipStatus: spaceCommunityMembership?.status,
     });
   const personalShortcutActive =
-    (personalViewSpaceId != null && activeSpace?.spaceType === 'shared') ||
+    (personalViewSpaceId != null && isSharedSpaceShell(activeSpace?.spaceType)) ||
     isViewingOwnPersonalSpace({
       spaceType: activeSpace?.spaceType,
       spaceOwnerUserId: activeSpace?.ownerUserId,
@@ -1252,10 +1252,20 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const handlePersonalShortcut = useCallback(async () => {
     const communityId = activeSpace?.communityId;
-    if (!communityId || personalShortcutBusy || activeSpace?.spaceType !== 'shared') return;
+    if (!communityId || personalShortcutBusy || !isSharedSpaceShell(activeSpace?.spaceType)) return;
     if (personalViewSpaceId) return;
     setPersonalShortcutBusy(true);
     try {
+      const existingPersonal = state.spaces.find(
+        (s) =>
+          s.spaceType === 'personal' &&
+          s.communityId === communityId &&
+          s.ownerUserId === currentUser?.uid,
+      );
+      if (existingPersonal) {
+        setPersonalViewSpaceId(existingPersonal.id);
+        return;
+      }
       const res = await ensureMyPersonalSpace(communityId);
       if (!res.ok) {
         window.alert(res.message);
@@ -1281,6 +1291,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     activeSpace?.communityId,
     activeSpace?.spaceType,
     addSpaceLocal,
+    currentUser?.uid,
     personalShortcutBusy,
     personalViewSpaceId,
     state.spaces,

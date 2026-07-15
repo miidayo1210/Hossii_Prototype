@@ -24,6 +24,13 @@ export function canShowPersonalShortcut(params: PersonalSpaceShortcutParams): bo
   return params.membershipStatus === 'active';
 }
 
+/** shared スペース画面の shell か（legacy で spaceType 未設定のときも shared 扱い）。 */
+export function isSharedSpaceShell(
+  spaceType: 'shared' | 'personal' | null | undefined,
+): boolean {
+  return spaceType !== 'personal';
+}
+
 /**
  * 現在開いているスペースが「ログイン本人のコミュニティ個人スペース」かどうかを
  * DB 正本（spaces.space_type / owner_user_id）だけで判定する純粋関数。

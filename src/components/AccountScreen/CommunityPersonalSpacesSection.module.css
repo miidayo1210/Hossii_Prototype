@@ -135,3 +135,17 @@
   font-size: 0.8rem;
   font-weight: 600;
 }
+
+.createdBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.55rem;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}

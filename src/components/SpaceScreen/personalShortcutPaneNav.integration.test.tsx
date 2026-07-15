@@ -22,6 +22,7 @@ import { SpacePaneBar } from './SpacePaneBar';
 import { normalizeSpace } from '../../core/hooks/HossiiStoreProvider';
 import {
   canShowPersonalShortcut,
+  isSharedSpaceShell,
   isViewingOwnPersonalSpace,
 } from '../../core/utils/personalSpaceShortcut';
 import { resolveContentSpaceId } from '../../core/utils/personalSpaceTabView';
@@ -117,7 +118,7 @@ function PaneNavHarness({
   }, [activeSpace.communityId, memberships]);
 
   const eligible =
-    activeSpace.spaceType === 'shared' &&
+    isSharedSpaceShell(activeSpace.spaceType) &&
     canShowPersonalShortcut({
       isAuthenticated,
       isVisiting: false,
@@ -126,7 +127,7 @@ function PaneNavHarness({
     });
 
   const active =
-    (personalViewSpaceId != null && activeSpace.spaceType === 'shared') ||
+    (personalViewSpaceId != null && isSharedSpaceShell(activeSpace.spaceType)) ||
     isViewingOwnPersonalSpace({
       spaceType: activeSpace.spaceType,
       spaceOwnerUserId: activeSpace.ownerUserId,
@@ -270,6 +271,11 @@ describe('Pane tab bar 「マイスペース」 shortcut (integration via real n
   it('space without community_id → no 「マイスペース」', () => {
     renderHarness({ rawSpace: sharedSpaceRaw({ communityId: undefined }) });
     expect(tablistPersonalButtons()).toHaveLength(0);
+  });
+
+  it('legacy shared space without spaceType → still shows 「マイスペース」', () => {
+    renderHarness({ rawSpace: sharedSpaceRaw({ spaceType: undefined }) });
+    expect(tablistPersonalButtons()).toHaveLength(1);
   });
 
   it('personal space URL (direct access) → no 「マイスペース」 shortcut', () => {
