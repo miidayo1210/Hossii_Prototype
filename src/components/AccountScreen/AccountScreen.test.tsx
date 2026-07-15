@@ -91,6 +91,7 @@ describe('AccountScreen section routing', () => {
     render(<AccountScreen />);
 
     expect(screen.getByTestId('account-section-profile')).toBeTruthy();
+    expect(screen.getByText('アカウント情報')).toBeTruthy();
     expect(screen.queryByTestId('joined-spaces-section')).toBeNull();
   });
 

@@ -8,6 +8,7 @@ import { resolveAccountIdentity } from '../../core/utils/resolveAccountIdentity'
 import { resolveAccountSection } from './accountSection';
 import { AccountSectionNav } from './AccountSectionNav';
 import { AccountHomeSection } from './AccountHomeSection';
+import { AccountProfileSection } from './AccountProfileSection';
 import { resolveCommunitySummary } from './accountCommunitySummary';
 import styles from './AccountScreen.module.css';
 
@@ -17,8 +18,6 @@ type Props = {
 };
 
 export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) => {
-  void onLoginRequested;
-  void onSignUpRequested;
   const { currentUser } = useAuth();
   const { screenParam, navigate } = useRouter();
   const activeSection = resolveAccountSection(screenParam);
@@ -69,10 +68,11 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
         )}
 
         {activeSection === 'profile' && (
-          <div data-testid="account-section-profile" className={styles.sectionPlaceholder}>
-            <h2 className={styles.sectionTitle}>プロフィール</h2>
-            <p className={styles.sectionDesc}>表示名・ニックネーム・認証操作（移管予定）</p>
-          </div>
+          <AccountProfileSection
+            identity={identity}
+            onLoginRequested={onLoginRequested}
+            onSignUpRequested={onSignUpRequested}
+          />
         )}
 
         {activeSection === 'spaces' && (
