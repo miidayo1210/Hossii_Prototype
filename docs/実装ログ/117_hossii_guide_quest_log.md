@@ -67,24 +67,67 @@
   - `docs/実装ログ/117_hossii_guide_quest_log.md`
 - **実装内容:** Phase 1 向けプール構築（package のみ）、ランダム 1 件選択、管理保存バリデーション、`formatGuideMessageText`、`GUIDE_BUBBLE_INITIAL_DELAY_MS` 定数。
 - **テスト結果:** `npm test src/core/utils/hossiiGuide.test.ts` — 20 passed。lint/build OK。
-- **commit:** （このコミット）
+- **commit:** `572dffb`
 - **状態:** DONE
-- **ブロッカー:** なし（dev/prod DB への apply は未実施・意図的）
-- **次の Quest:** Q4
+- **次の Quest:** Q3
 
 ---
 
 ## Q3 — migration: hossii_guide JSONB
 
 - **目的:** `space_settings.hossii_guide` 列追加（append-only migration）
-- **変更ファイル:**
-  - `supabase/migrations/20260718100000_add_hossii_guide_to_space_settings.sql`
-  - `docs/実装ログ/117_hossii_guide_quest_log.md`
-- **実装内容:** nullable JSONB 列 `hossii_guide` を追加。backfill なし、destructive 操作なし。
-- **テスト結果:** 全テスト 836 passed。lint/build OK。DB apply は未実施。
-- **commit:** （このコミット）
+- **変更ファイル:** `supabase/migrations/20260718100000_add_hossii_guide_to_space_settings.sql`
+- **実装内容:** nullable JSONB 列 `hossii_guide` を追加。backfill なし。
+- **テスト結果:** lint/build OK。DB apply なし。
+- **commit:** `bdcc8d4`
 - **状態:** DONE
-- **DB 適用:** なし（ファイル作成と静的確認のみ）
 - **次の Quest:** Q4
+
+---
+
+## Q4 — spaceSettingsApi / settingsStorage
+
+- **commit:** `7aa1603`
+- **状態:** DONE
+- **次の Quest:** Q5
+
+---
+
+## Q5 — CharacterTab 管理 UI
+
+- **commit:** `1e5726c`
+- **状態:** DONE
+- **次の Quest:** Q6
+
+---
+
+## Q6 / Q8 / Q9 — HossiiLive guideBubble
+
+- **commit:** `88ce5fe`
+- **状態:** DONE（idle/brain 抑止、B2 暫定、スマホ clamp CSS 含む）
+- **次の Quest:** Q7
+
+---
+
+## Q7 — SpaceScreen 表示タイミング
+
+- **commit:** `f7c2fe3`（テスト修正: 追記予定）
+- **状態:** DONE
+- **次の Quest:** V11 手動確認
+
+---
+
+## BLOCKED
+
+| Quest | 理由 |
+|-------|------|
+| V1 | migration 未 apply のため DB 反映確認不可 |
+| E2E DB 保存確認 | dev/prod DB 操作禁止 |
+
+## 残り Todo（Phase 1）
+
+- [ ] V11 総合受入・手動確認（320px、NicknameModal 相当、DB 保存後の復元）
+- [ ] B1/B2 確定後の本実装（T22/T23）
+- [ ] migration dev DB apply（別作業）
 
 ---

@@ -12,7 +12,7 @@ describe('useHossiiGuideBubble', () => {
     vi.useRealTimers();
   });
 
-  it('shows guide message after delay when enabled', () => {
+  it('shows guide message after delay when enabled', async () => {
     const { result, rerender } = renderHook(
       (props) => useHossiiGuideBubble(props),
       {
@@ -27,8 +27,8 @@ describe('useHossiiGuideBubble', () => {
 
     expect(result.current.guideMessage).toBeNull();
 
-    act(() => {
-      vi.advanceTimersByTime(1500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
     });
 
     expect(result.current.guideMessage).toBeTruthy();
@@ -40,8 +40,8 @@ describe('useHossiiGuideBubble', () => {
       blocked: false,
     });
 
-    act(() => {
-      vi.advanceTimersByTime(5000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
     });
 
     expect(result.current.guideMessage).toBeTruthy();
@@ -64,7 +64,7 @@ describe('useHossiiGuideBubble', () => {
     expect(result.current.guideMessage).toBeNull();
   });
 
-  it('dismiss prevents re-show in same hook instance', () => {
+  it('dismiss prevents re-show in same hook instance', async () => {
     const { result } = renderHook(() =>
       useHossiiGuideBubble({
         spaceId: 's1',
@@ -74,8 +74,8 @@ describe('useHossiiGuideBubble', () => {
       }),
     );
 
-    act(() => {
-      vi.advanceTimersByTime(1500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
     });
     expect(result.current.guideMessage).toBeTruthy();
 
@@ -84,13 +84,13 @@ describe('useHossiiGuideBubble', () => {
     });
     expect(result.current.guideMessage).toBeNull();
 
-    act(() => {
-      vi.advanceTimersByTime(5000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
     });
     expect(result.current.guideMessage).toBeNull();
   });
 
-  it('resets when spaceId changes', () => {
+  it('resets when spaceId changes', async () => {
     const { result, rerender } = renderHook(
       (props) => useHossiiGuideBubble(props),
       {
@@ -103,8 +103,8 @@ describe('useHossiiGuideBubble', () => {
       },
     );
 
-    act(() => {
-      vi.advanceTimersByTime(1500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
     });
     expect(result.current.guideMessage).toBeTruthy();
 
@@ -117,13 +117,13 @@ describe('useHossiiGuideBubble', () => {
 
     expect(result.current.guideMessage).toBeNull();
 
-    act(() => {
-      vi.advanceTimersByTime(1500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
     });
     expect(result.current.guideMessage).toBeTruthy();
   });
 
-  it('waits while blocked', () => {
+  it('waits while blocked', async () => {
     const { result, rerender } = renderHook(
       (props) => useHossiiGuideBubble(props),
       {
@@ -136,8 +136,8 @@ describe('useHossiiGuideBubble', () => {
       },
     );
 
-    act(() => {
-      vi.advanceTimersByTime(3000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
     });
     expect(result.current.guideMessage).toBeNull();
 
@@ -148,8 +148,8 @@ describe('useHossiiGuideBubble', () => {
       blocked: false,
     });
 
-    act(() => {
-      vi.advanceTimersByTime(1500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
     });
     expect(result.current.guideMessage).toBeTruthy();
   });
