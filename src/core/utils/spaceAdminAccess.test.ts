@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AppUser } from '../contexts/AuthContext';
 import type { Space } from '../types/space';
-import { canManageSpace } from './spaceAdminAccess';
+import type { SpaceMembership } from '../types/spaceMembership';
+import {
+  canManageSpace,
+  canManageSpaceArchive,
+  isActiveSpaceMembershipAdmin,
+} from './spaceAdminAccess';
 
 const baseSpace: Space = {
   id: 's1',
@@ -66,6 +71,57 @@ describe('canManageSpace', () => {
   it('denies when communityId is missing on user', () => {
     expect(
       canManageSpace({ ...communityAdmin, communityId: undefined }, baseSpace),
+    ).toBe(false);
+  });
+});
+
+const activeSpaceAdminMembership: SpaceMembership = {
+  id: 'm1',
+  spaceId: 's1',
+  authUserId: 'user',
+  role: 'admin',
+  status: 'active',
+  spaceNickname: null,
+  joinedAt: '2026-01-01T00:00:00Z',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+};
+
+describe('isActiveSpaceMembershipAdmin', () => {
+  it('returns true for active admin/owner', () => {
+    expect(isActiveSpaceMembershipAdmin(activeSpaceAdminMembership)).toBe(true);
+    expect(
+      isActiveSpaceMembershipAdmin({ ...activeSpaceAdminMembership, role: 'owner' }),
+    ).toBe(true);
+  });
+
+  it('returns false for member or inactive', () => {
+    expect(
+      isActiveSpaceMembershipAdmin({ ...activeSpaceAdminMembership, role: 'member' }),
+    ).toBe(false);
+    expect(
+      isActiveSpaceMembershipAdmin({ ...activeSpaceAdminMembership, status: 'removed' }),
+    ).toBe(false);
+  });
+});
+
+describe('canManageSpaceArchive', () => {
+  it('allows community admin and super_admin', () => {
+    expect(canManageSpaceArchive(communityAdmin, baseSpace, null)).toBe(true);
+    expect(canManageSpaceArchive(superAdmin, baseSpace, null)).toBe(true);
+  });
+
+  it('allows active space admin membership', () => {
+    expect(canManageSpaceArchive(participant, baseSpace, activeSpaceAdminMembership)).toBe(true);
+  });
+
+  it('denies general member without admin roles', () => {
+    expect(canManageSpaceArchive(participant, baseSpace, null)).toBe(false);
+    expect(
+      canManageSpaceArchive(participant, baseSpace, {
+        ...activeSpaceAdminMembership,
+        role: 'member',
+      }),
     ).toBe(false);
   });
 });
