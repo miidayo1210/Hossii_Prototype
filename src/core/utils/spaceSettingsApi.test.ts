@@ -3,6 +3,7 @@ import {
   parseSpaceSettingsRow,
   timelineDepthEnabledToDbColumn,
   updateTimelineDepthEnabled,
+  hossiiGuideToJson,
 } from './spaceSettingsApi';
 import { resolvePostFields } from './postFieldSettings';
 
@@ -87,6 +88,42 @@ describe('parseSpaceSettingsRow', () => {
       'Test',
     );
     expect(settings.timelineDepthEnabled).toBe(false);
+  });
+
+  it('parses hossii_guide JSONB into hossiiGuide settings', () => {
+    const settings = parseSpaceSettingsRow(
+      {
+        space_id: 's1',
+        bottle_frequency: '3d-7d',
+        hossii_guide: { enabled: true, mode: 'package', packageKey: 'reflection' },
+      },
+      'Test',
+    );
+    expect(settings.hossiiGuide).toEqual({
+      enabled: true,
+      mode: 'package',
+      packageKey: 'reflection',
+    });
+  });
+
+  it('omits hossiiGuide when column is null', () => {
+    const settings = parseSpaceSettingsRow(
+      { space_id: 's1', bottle_frequency: '3d-7d', hossii_guide: null },
+      'Test',
+    );
+    expect(settings.hossiiGuide).toBeUndefined();
+  });
+});
+
+describe('hossiiGuideToJson', () => {
+  it('serializes enabled guide settings', () => {
+    expect(
+      hossiiGuideToJson({ enabled: true, mode: 'package', packageKey: 'ideas' }),
+    ).toEqual({ enabled: true, mode: 'package', packageKey: 'ideas' });
+  });
+
+  it('returns null when guide is undefined', () => {
+    expect(hossiiGuideToJson(undefined)).toBeNull();
   });
 });
 
