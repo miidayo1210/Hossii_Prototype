@@ -21,7 +21,7 @@ describe('buildJoinedSpaces', () => {
     const result = buildJoinedSpaces(
       [membership({ id: 'm1', spaceId: 's1', spaceNickname: 'にっく' })],
       [{ id: 's1', name: 'スペース1', space_url: 'space-1', community_id: 'c1' }],
-      [{ id: 'c1', name: 'コミュA' }],
+      [{ id: 'c1', name: 'コミュA', slug: 'comm-a' }],
     );
     expect(result).toEqual([
       {
@@ -32,6 +32,7 @@ describe('buildJoinedSpaces', () => {
         spaceName: 'スペース1',
         spaceUrl: 'space-1',
         communityName: 'コミュA',
+        communitySlug: 'comm-a',
         isArchived: false,
       },
     ]);
@@ -52,6 +53,7 @@ describe('buildJoinedSpaces', () => {
       [{ id: 'c1', name: 'C' }],
     );
     expect(result[0].communityName).toBeNull();
+    expect(result[0].communitySlug).toBeNull();
     expect(result[0].spaceUrl).toBeNull();
   });
 
@@ -83,6 +85,7 @@ describe('buildJoinedSpaces', () => {
     expect(Object.keys(result[0]).sort()).toEqual(
       [
         'communityName',
+        'communitySlug',
         'isArchived',
         'joinedAt',
         'membershipId',

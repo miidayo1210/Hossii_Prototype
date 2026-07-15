@@ -45,6 +45,13 @@ import { CommunityHomeScreen } from './components/Community/CommunityHomeScreen'
 import { CommunityAcceptInviteScreen } from './components/Community/CommunityAcceptInviteScreen';
 import { DevelopmentBanner } from './components/DevelopmentBanner/DevelopmentBanner';
 import { SupabaseConfigError } from './components/SupabaseConfigError/SupabaseConfigError';
+import { useSelectedCommunity } from './core/contexts/useSelectedCommunity';
+import {
+  buildCanonicalSpacePathname,
+  replaceLocationWithCanonicalSpacePath,
+  resolveCommunitySlugForSpace,
+  shouldReplaceWithCanonicalSpacePath,
+} from './core/utils/spaceScreenRoute';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
 const URL_PATH_SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
@@ -70,6 +77,7 @@ const authResolvingScreenStyle = {
 const AppContent = () => {
   const { currentUser, isResolvingAuth, logout } = useAuth();
   const { screen, screenParam, navigate } = useRouter();
+  const { memberships } = useSelectedCommunity();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
@@ -272,13 +280,23 @@ const AppContent = () => {
 
         setSpaceURLNotFound(false);
 
+        const communitySlug = resolveCommunitySlugForSpace(
+          targetSpace,
+          memberships,
+          currentUser?.communitySlug ?? null,
+        );
+        const screenPath =
+          communitySlug && targetSpace.spaceURL
+            ? buildCanonicalSpacePathname(communitySlug, targetSpace.spaceURL)
+            : originalPath;
+
         if (currentUser) {
           setActiveSpace(targetSpace.id);
           if (!hasNicknameForSpace(targetSpace.id)) {
             setPendingSpaceId(targetSpace.id);
             setShowNicknameModal(true);
           }
-          window.history.replaceState({}, '', originalPath);
+          window.history.replaceState({}, '', screenPath);
           navigate('screen');
         } else if (!isGuestMode) {
           if (targetSpace.isPrivate) {
@@ -287,7 +305,7 @@ const AppContent = () => {
           } else if (hasNicknameForSpace(targetSpace.id)) {
             setActiveSpace(targetSpace.id);
             setIsGuestMode(true);
-            window.history.replaceState({}, '', originalPath);
+            window.history.replaceState({}, '', screenPath);
             navigate('screen');
           } else {
             setGuestSpaceId(targetSpace.id);
@@ -306,7 +324,35 @@ const AppContent = () => {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.spaces, currentUser, spacesLoadedFromSupabase, slugFetchOutcome]);
+  }, [state.spaces, currentUser, spacesLoadedFromSupabase, slugFetchOutcome, memberships]);
+
+  // legacy `/?pane=...#screen` や `/s/...` を、解決済み active space の正規 URL へ復旧する。
+  useEffect(() => {
+    if (screen !== 'screen') return;
+    if (!isSupabaseConfigured || !spacesLoadedFromSupabase) return;
+
+    const space = state.spaces.find((s) => s.id === state.activeSpaceId);
+    if (!space?.spaceURL) return;
+
+    const communitySlug = resolveCommunitySlugForSpace(
+      space,
+      memberships,
+      currentUser?.communitySlug ?? null,
+    );
+    if (!communitySlug) return;
+
+    const canonicalPathname = buildCanonicalSpacePathname(communitySlug, space.spaceURL);
+    if (!shouldReplaceWithCanonicalSpacePath(window.location.pathname, canonicalPathname)) return;
+
+    replaceLocationWithCanonicalSpacePath(canonicalPathname);
+  }, [
+    screen,
+    spacesLoadedFromSupabase,
+    state.activeSpaceId,
+    state.spaces,
+    memberships,
+    currentUser?.communitySlug,
+  ]);
 
   // ?space=xxx でスペースを切り替え（招待リンク対応）
   useEffect(() => {

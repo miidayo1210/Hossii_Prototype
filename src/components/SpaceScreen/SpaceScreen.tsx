@@ -8,6 +8,7 @@ import { DISPLAY_SCALE_VALUES } from '../../core/utils/displayScaleStorage';
 import { useSpeechRecognition } from '../../core/hooks/useSpeechRecognition';
 import { useReactionBroadcast, type ReactionEvent } from '../../core/hooks/useReactionBroadcast';
 import { useMediaQuery } from '../../core/hooks/useMediaQuery';
+import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiBrain } from '../../core/hooks/useHossiiBrain';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
@@ -132,7 +133,8 @@ import { LogListBody } from '../CommentsScreen/LogListBody';
 import { ScaledContent } from '../ScaledContent/ScaledContent';
 import { HossiiToast } from '../../core/ui/HossiiToast';
 import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
-import { ActiveSpaceUnavailableBanner } from './ActiveSpaceUnavailableBanner';
+import { isActiveSpaceShellUnavailable } from '../../core/utils/spaceShellAvailability';
+import { SpaceShellUnavailableView } from './SpaceShellUnavailableView';
 import {
   getDefaultQuickLogBottomRect,
   getDefaultQuickLogSideRect,
@@ -335,14 +337,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     getExistingHossiis: () => hossiisRef.current,
   });
 
-  const showActiveSpaceUnavailableBanner =
-    isSupabaseConfigured &&
-    spacesLoadedFromSupabase &&
-    !!activeSpaceId &&
-    !activeSpace;
+  const showActiveSpaceUnavailableBanner = isActiveSpaceShellUnavailable({
+    isSupabaseConfigured,
+    spacesLoadedFromSupabase,
+    activeSpaceId,
+    hasActiveSpace: !!activeSpace,
+  });
   const isVisiting = visitingSpaceId !== null;
+  const { navigate } = useRouter();
   const { currentUser } = useAuth();
-  const { memberships } = useSelectedCommunity();
+  const { memberships, selectedCommunityId } = useSelectedCommunity();
   const isAdmin = currentUser?.isAdmin ?? false;
   const isAuthenticated = !!currentUser;
 
@@ -1798,7 +1802,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     panesLoading || paneContext === null || !hossiiLoadedFromSupabase;
 
   const showInitialLoadingOverlay =
-    filteredHossiis.length === 0 && awaitingFirstHossiis;
+    !showActiveSpaceUnavailableBanner &&
+    filteredHossiis.length === 0 &&
+    awaitingFirstHossiis;
 
   const showByAuthorLoadingOverlay =
     layoutMode === 'byAuthor' &&
@@ -2042,6 +2048,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     />
   );
 
+  if (showActiveSpaceUnavailableBanner) {
+    return (
+      <SpaceShellUnavailableView
+        onGoAccount={() => navigate('account')}
+        onGoCommunity={
+          selectedCommunityId
+            ? () => navigate('community', selectedCommunityId)
+            : undefined
+        }
+      />
+    );
+  }
+
   return (
     <div
       ref={attachSpaceRoot}
@@ -2050,12 +2069,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       <ScaledContent
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
       >
-      {showActiveSpaceUnavailableBanner && (
-        <ActiveSpaceUnavailableBanner
-          message="このスペースはDevelopment環境に存在しません。"
-          hint="Communities から Dev Community を開くか、/c/dev-community/s/dev-public など seed スペースへ移動してください。"
-        />
-      )}
       {isContentArchived && !isVisiting && <SpaceArchiveBanner />}
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
