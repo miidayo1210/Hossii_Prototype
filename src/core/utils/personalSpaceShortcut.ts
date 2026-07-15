@@ -24,6 +24,32 @@ export function canShowPersonalShortcut(params: PersonalSpaceShortcutParams): bo
   return params.membershipStatus === 'active';
 }
 
+/**
+ * マイスペースタブが表示されないとき、ユーザーに伝える短い理由（121）。
+ * 表示不要なら null（ゲスト・visiting など）。
+ */
+export function getPersonalShortcutHiddenReason(
+  params: PersonalSpaceShortcutParams,
+): string | null {
+  if (params.isVisiting) return null;
+  if (!params.spaceCommunityId) return null;
+  if (!params.isAuthenticated) {
+    return 'ログインすると、タブ列の右端にマイスペースが表示されます。';
+  }
+  switch (params.membershipStatus) {
+    case 'suspended':
+      return 'コミュニティの利用が一時停止されているため、マイスペースタブは表示されません。';
+    case 'removed':
+      return 'このコミュニティのメンバーではないため、マイスペースタブは表示されません。';
+    case 'invited':
+      return '招待を承認すると、マイスペースタブが使えるようになります。';
+    case 'active':
+      return null;
+    default:
+      return 'コミュニティに参加すると、マイスペースタブが表示されます。';
+  }
+}
+
 /** shared スペース画面の shell か（legacy で spaceType 未設定のときも shared 扱い）。 */
 export function isSharedSpaceShell(
   spaceType: 'shared' | 'personal' | null | undefined,

@@ -4,6 +4,13 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import type { CommunityMembershipRole } from '../../core/types/communityMembership';
 import {
+  MY_SPACE_ARCHIVED_NOTE,
+  MY_SPACE_INTRO,
+  MY_SPACE_PER_COMMUNITY,
+  MY_SPACE_PRIVACY,
+  MY_SPACE_UNCREATED_HINT,
+} from '../../core/utils/mySpaceCopy';
+import {
   fetchAccountCommunityPersonalSpaces,
   ensureMyPersonalSpace,
   fetchPersonalSpaceForStore,
@@ -70,6 +77,7 @@ export const CommunityPersonalSpacesSection = () => {
                 personalSpaceId: spaceId,
                 personalSpaceUrl: spaceUrl,
                 personalSpaceStatus: 'active',
+                personalSpaceIsArchived: false,
               }
             : it,
         ),
@@ -112,11 +120,11 @@ export const CommunityPersonalSpacesSection = () => {
 
   return (
     <>
+      <p className={styles.introNote}>{MY_SPACE_INTRO}</p>
+      <p className={styles.introSubtle}>{MY_SPACE_PER_COMMUNITY}</p>
       <div className={styles.privacyNote}>
         <Lock size={13} />
-        <span>
-          マイスペースは、あなたとそのコミュニティの管理者が閲覧できます。他のメンバーには公開されません。
-        </span>
+        <span>{MY_SPACE_PRIVACY}</span>
       </div>
       <ul className={styles.list}>
         {items.map((it) => (
@@ -138,7 +146,7 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const created = !!item.personalSpaceId;
-  const archived = item.personalSpaceStatus === 'archived';
+  const archived = item.personalSpaceIsArchived;
 
   const create = async () => {
     if (creating || created) return;
@@ -177,16 +185,21 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
                 </span>
               )}
             </div>
-            <span className={styles.subtle}>
-              共有スペースの「マイスペース」タブから利用できます
-            </span>
+            {archived ? (
+              <span className={styles.subtle}>{MY_SPACE_ARCHIVED_NOTE}</span>
+            ) : (
+              <span className={styles.subtle}>
+                共有スペースの「マイスペース」タブ（右端）から利用できます
+              </span>
+            )}
           </>
         ) : (
           <>
             <span className={styles.statusLabel}>マイスペース未作成</span>
             <span className={styles.subtle}>
-              このコミュニティ内に、あなた専用のスペースを1つ作成します。
+              このコミュニティに、あなた専用のマイスペースを1つ作れます。
             </span>
+            <span className={styles.subtle}>{MY_SPACE_UNCREATED_HINT}</span>
           </>
         )}
         {error && <span className={styles.error}>{error}</span>}

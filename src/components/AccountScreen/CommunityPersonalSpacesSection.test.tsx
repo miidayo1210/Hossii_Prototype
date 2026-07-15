@@ -62,6 +62,7 @@ function baseItem(communityId: string, communityName: string, membershipRole: 'a
     personalSpaceId: null as string | null,
     personalSpaceUrl: null as string | null,
     personalSpaceStatus: null as string | null,
+    personalSpaceIsArchived: false,
   };
 }
 
@@ -113,6 +114,7 @@ describe('CommunityPersonalSpacesSection', () => {
     render(<CommunityPersonalSpacesSection />);
     expect(await screen.findByRole('button', { name: /マイスペースを作る/ })).toBeTruthy();
     expect(screen.getByText('マイスペース未作成')).toBeTruthy();
+    expect(screen.getByText(/共有スペースのタブ列の右端からも/)).toBeTruthy();
   });
 
   it('personal space ありでは案内文を表示し作成ボタンは出さない', async () => {
@@ -120,18 +122,19 @@ describe('CommunityPersonalSpacesSection', () => {
     render(<CommunityPersonalSpacesSection />);
 
     expect(await screen.findByText('マイスペースあり')).toBeTruthy();
-    expect(screen.getByText(/共有スペースの「マイスペース」タブから利用できます/)).toBeTruthy();
+    expect(screen.getByText(/共有スペースの「マイスペース」タブ（右端）から利用できます/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /マイスペースを作る/ })).toBeNull();
   });
 
   it('archived personal space にアーカイブバッジを表示する', async () => {
     h.fetchAccountCommunityPersonalSpaces.mockResolvedValue([
-      createdItem(COMMUNITY_A, 'Community A', { personalSpaceStatus: 'archived' }),
+      createdItem(COMMUNITY_A, 'Community A', { personalSpaceIsArchived: true }),
     ]);
     render(<CommunityPersonalSpacesSection />);
 
     expect(await screen.findByText('アーカイブ')).toBeTruthy();
     expect(screen.getByText('マイスペースあり')).toBeTruthy();
+    expect(screen.getByText(/アーカイブ中 — 見ることはできます/)).toBeTruthy();
   });
 
   it('指定 community にだけ personal space を作成し、画面遷移しない', async () => {

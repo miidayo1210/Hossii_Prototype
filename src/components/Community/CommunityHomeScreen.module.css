@@ -76,6 +76,16 @@
   margin: 0;
 }
 
+.mySpaceArchivedNote {
+  margin: 0 0 0.65rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .error {
   color: #b91c1c;
   font-size: 0.9rem;

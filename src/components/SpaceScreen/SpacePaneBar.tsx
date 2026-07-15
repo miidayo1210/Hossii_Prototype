@@ -18,6 +18,7 @@ import {
   splitPanesByFolders,
 } from '../../core/utils/spacePaneTabBar';
 import { loadTabFolderOpen, resolveFolderInsertBeforeIndex, saveTabFolderOpen } from '../../core/utils/tabFolderStorage';
+import { MY_SPACE_TAB_HINT } from '../../core/utils/mySpaceCopy';
 import styles from './SpacePaneBar.module.css';
 
 const DRAG_THRESHOLD_PX = 6;
@@ -61,6 +62,8 @@ type Props = {
   rootRef?: Ref<HTMLElement>;
   /** 個人スペースへのショートカット（Pane ではなく UI ボタン） */
   personalShortcut?: PersonalShortcut | null;
+  /** 初回のみ: マイスペースタブの短い補助案内 */
+  mySpaceTabHint?: { onDismiss: () => void } | null;
 };
 
 type DragState = {
@@ -309,6 +312,7 @@ export function SpacePaneBar({
   onReorderFolder,
   rootRef,
   personalShortcut = null,
+  mySpaceTabHint = null,
 }: Props) {
   const { barPanes, folderMap } = useMemo(
     () => splitPanesByFolders(visiblePanes),
@@ -898,27 +902,45 @@ export function SpacePaneBar({
         )}
 
         {personalShortcut && (
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!!personalShortcut.active}
-            aria-label={
-              personalShortcut.active
-                ? 'マイスペースを表示中'
-                : 'マイスペースを開く'
-            }
-            title="マイスペース"
-            className={`${styles.personalShortcut} ${
-              personalShortcut.active ? styles.personalShortcutActive : ''
-            }`}
-            disabled={disabled || personalShortcut.loading}
-            onClick={(e) => {
-              e.stopPropagation();
-              personalShortcut.onClick();
-            }}
-          >
-            {personalShortcut.loading ? '…' : personalShortcut.label}
-          </button>
+          <span className={styles.personalShortcutWrap}>
+            {mySpaceTabHint && (
+              <div className={styles.mySpaceTabHint} role="status">
+                <span className={styles.mySpaceTabHintText}>{MY_SPACE_TAB_HINT}</span>
+                <button
+                  type="button"
+                  className={styles.mySpaceTabHintDismiss}
+                  aria-label="案内を閉じる"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    mySpaceTabHint.onDismiss();
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!!personalShortcut.active}
+              aria-label={
+                personalShortcut.active
+                  ? 'マイスペースを表示中'
+                  : 'マイスペースを開く'
+              }
+              title="マイスペース"
+              className={`${styles.personalShortcut} ${
+                personalShortcut.active ? styles.personalShortcutActive : ''
+              }`}
+              disabled={disabled || personalShortcut.loading}
+              onClick={(e) => {
+                e.stopPropagation();
+                personalShortcut.onClick();
+              }}
+            >
+              {personalShortcut.loading ? '…' : personalShortcut.label}
+            </button>
+          </span>
         )}
       </div>
     </nav>

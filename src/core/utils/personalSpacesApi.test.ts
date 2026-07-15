@@ -19,6 +19,16 @@ vi.mock('./communityMembershipsApi', () => ({
   fetchMyCommunityMemberships: h.fetchMyCommunityMemberships,
 }));
 
+vi.mock('./spaceArchiveApi', () => ({
+  fetchSpaceArchiveFlags: vi.fn(async (ids: string[]) => {
+    const map = new Map<string, boolean>();
+    for (const id of ids) {
+      if (id === 'ps-archived') map.set(id, true);
+    }
+    return map;
+  }),
+}));
+
 import {
   mapCommunityPersonalSpaceRow,
   fetchMyCommunityPersonalSpaces,
@@ -105,8 +115,23 @@ describe('fetchAccountCommunityPersonalSpaces', () => {
 
     const rows = await fetchAccountCommunityPersonalSpaces();
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatchObject({ communityId: 'c1', membershipRole: 'admin', personalSpaceId: null });
-    expect(rows[1]).toMatchObject({ communityId: 'c2', membershipRole: 'member', personalSpaceId: 'ps-2' });
+    expect(rows[0]).toMatchObject({ communityId: 'c1', membershipRole: 'admin', personalSpaceId: null, personalSpaceIsArchived: false });
+    expect(rows[1]).toMatchObject({ communityId: 'c2', membershipRole: 'member', personalSpaceId: 'ps-2', personalSpaceIsArchived: false });
+  });
+
+  it('is_archived を personalSpaceIsArchived として付与する', async () => {
+    h.rpc.mockResolvedValue({
+      data: [
+        { community_id: 'c1', community_name: 'A', membership_status: 'active', personal_space_id: 'ps-archived', personal_space_url: 'p-a', personal_space_status: 'active' },
+      ],
+      error: null,
+    });
+    h.fetchMyCommunityMemberships.mockResolvedValue([
+      { communityId: 'c1', communityName: 'A', role: 'member', status: 'active', communityNickname: null },
+    ]);
+
+    const rows = await fetchAccountCommunityPersonalSpaces();
+    expect(rows[0].personalSpaceIsArchived).toBe(true);
   });
 
   it('pending / suspended / removed は除外する', async () => {

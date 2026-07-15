@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { fetchMyCommunityMemberships } from './communityMembershipsApi';
+import { fetchSpaceArchiveFlags } from './spaceArchiveApi';
 import { fetchSpaceByUrl } from './spacesApi';
 import type { CommunityMembershipRole } from '../types/communityMembership';
 import type { Space } from '../types/space';
@@ -26,6 +27,8 @@ export type CommunityPersonalSpace = {
 /** アカウント画面向け: active community の個人スペース行 + membership role。 */
 export type AccountCommunityPersonalSpace = CommunityPersonalSpace & {
   membershipRole: CommunityMembershipRole;
+  /** 112 正本: spaces.is_archived（クライアントで fetchSpaceArchiveFlags から付与） */
+  personalSpaceIsArchived: boolean;
 };
 
 type Row = {
@@ -85,12 +88,25 @@ export async function fetchAccountCommunityPersonalSpaces(): Promise<AccountComm
       .map((m) => [m.communityId, m.role] as const),
   );
 
-  return personalRows
+  const activeRows = personalRows
     .filter((row) => row.membershipStatus === 'active')
     .map((row) => ({
       ...row,
       membershipRole: roleByCommunityId.get(row.communityId) ?? 'member',
+      personalSpaceIsArchived: false,
     }));
+
+  const personalIds = activeRows
+    .map((row) => row.personalSpaceId)
+    .filter((id): id is string => !!id);
+  const archiveFlags = await fetchSpaceArchiveFlags(personalIds);
+
+  return activeRows.map((row) => ({
+    ...row,
+    personalSpaceIsArchived: row.personalSpaceId
+      ? archiveFlags.get(row.personalSpaceId) === true
+      : false,
+  }));
 }
 
 export type EnsurePersonalSpaceResult =

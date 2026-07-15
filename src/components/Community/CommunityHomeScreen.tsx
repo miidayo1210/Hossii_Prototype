@@ -15,6 +15,13 @@ import {
 } from '../../core/utils/communityHomeApi';
 import { updateMyCommunityNickname } from '../../core/utils/communityInvitationsApi';
 import { ensureMyPersonalSpace } from '../../core/utils/personalSpacesApi';
+import { fetchSpaceArchiveFlags } from '../../core/utils/spaceArchiveApi';
+import {
+  MY_SPACE_ARCHIVED_NOTE,
+  MY_SPACE_INTRO,
+  MY_SPACE_OPEN_ERROR,
+  MY_SPACE_UNCREATED_HINT,
+} from '../../core/utils/mySpaceCopy';
 import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
 import styles from './CommunityHomeScreen.module.css';
 
@@ -23,9 +30,9 @@ type Props = {
 };
 
 const statusBanner: Record<string, string> = {
-  suspended: 'このコミュニティでの利用は一時停止されています。スペースや個人スペースには入れません。',
+  suspended: 'このコミュニティでの利用は一時停止されています。スペースやマイスペースには入れません。',
   removed: 'このコミュニティからの所属は解除されています。',
-  invited: '招待を受け取っています。承認後に利用できます。',
+  invited: '招待を受け取っています。承認後にマイスペースが使えるようになります。',
 };
 
 export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => {
@@ -38,6 +45,7 @@ export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => 
   const [error, setError] = useState<string | null>(null);
   const [nicknameInput, setNicknameInput] = useState('');
   const [savingNick, setSavingNick] = useState(false);
+  const [personalSpaceArchived, setPersonalSpaceArchived] = useState(false);
   const [adminView, setAdminView] = useState<
     'overview' | 'members' | 'invites' | 'template' | 'spaces'
   >('overview');
@@ -57,6 +65,12 @@ export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => 
       setHome(h);
       setSpaces(s);
       setNicknameInput(h?.myCommunityNickname ?? '');
+      if (h?.personalSpaceId) {
+        const flags = await fetchSpaceArchiveFlags([h.personalSpaceId]);
+        setPersonalSpaceArchived(flags.get(h.personalSpaceId) === true);
+      } else {
+        setPersonalSpaceArchived(false);
+      }
     } catch {
       setError('コミュニティ情報の取得に失敗しました。');
     } finally {
@@ -89,7 +103,7 @@ export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => 
         window.location.href = `/c/${home.communitySlug}/s/${res.spaceUrl}#screen`;
       }
     } catch {
-      setError('個人スペースを開けませんでした。');
+      setError(MY_SPACE_OPEN_ERROR);
     }
   };
 
@@ -195,15 +209,22 @@ export const CommunityHomeScreen = ({ communityId: propCommunityId }: Props) => 
 
           {home.canViewPrivate && (
             <section className={styles.card}>
-              <h3 className={styles.sectionTitle}>個人スペース</h3>
+              <h3 className={styles.sectionTitle}>マイスペース</h3>
+              <p className={styles.muted}>{MY_SPACE_INTRO}</p>
+              {personalSpaceArchived && (
+                <p className={styles.mySpaceArchivedNote}>{MY_SPACE_ARCHIVED_NOTE}</p>
+              )}
               {home.personalSpaceUrl ? (
                 <button type="button" className={styles.primaryBtn} onClick={handleOpenPersonal}>
-                  個人スペースを開く
+                  マイスペースを開く
                 </button>
               ) : (
-                <button type="button" className={styles.primaryBtn} onClick={handleOpenPersonal}>
-                  個人スペースを作成して開く
-                </button>
+                <>
+                  <p className={styles.muted}>{MY_SPACE_UNCREATED_HINT}</p>
+                  <button type="button" className={styles.primaryBtn} onClick={handleOpenPersonal}>
+                    マイスペースを作る
+                  </button>
+                </>
               )}
             </section>
           )}
