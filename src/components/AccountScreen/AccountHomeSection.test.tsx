@@ -3,6 +3,15 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { AccountHomeSection } from './AccountHomeSection';
 
+vi.mock('./useAccountHomeEntryBadges', () => ({
+  useAccountHomeEntryBadges: () => ({
+    spaces: null,
+    myHossii: null,
+    loading: false,
+  }),
+  badgeForSection: () => null,
+}));
+
 const identity = {
   displayName: 'テストユーザー',
   status: 'account' as const,
