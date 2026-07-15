@@ -1,0 +1,31 @@
+.banner {
+  margin: 0.75rem 1rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(254, 243, 199, 0.95);
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  color: #92400e;
+  pointer-events: none;
+}
+
+.message {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+@media (prefers-color-scheme: dark) {
+  .banner {
+    background: rgba(120, 53, 15, 0.45);
+    border-color: rgba(251, 191, 36, 0.35);
+    color: #fde68a;
+  }
+}

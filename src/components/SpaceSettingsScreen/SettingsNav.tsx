@@ -8,6 +8,7 @@ type Props = {
   activeScreen: SettingsScreenId;
   onNavigate: (id: SettingsScreenId) => void;
   isAdmin: boolean;
+  canManageSpaceArchive?: boolean;
 };
 
 function getInitialOpenGroups(activeScreen: SettingsScreenId): Set<string> {
@@ -20,7 +21,7 @@ function getInitialOpenGroups(activeScreen: SettingsScreenId): Set<string> {
   return open;
 }
 
-export const SettingsNav = ({ activeScreen, onNavigate, isAdmin }: Props) => {
+export const SettingsNav = ({ activeScreen, onNavigate, isAdmin, canManageSpaceArchive = false }: Props) => {
   const [openGroups, setOpenGroups] = useState<Set<string>>(() =>
     getInitialOpenGroups(activeScreen),
   );
@@ -42,7 +43,11 @@ export const SettingsNav = ({ activeScreen, onNavigate, isAdmin }: Props) => {
   return (
     <nav className={styles.nav}>
       {SETTINGS_NAV_GROUPS.map((group) => {
-        const items = group.items.filter((item) => !item.adminOnly || isAdmin);
+        const items = group.items.filter((item) => {
+          if (item.archiveManagerOnly) return canManageSpaceArchive;
+          if (item.adminOnly && !isAdmin) return false;
+          return true;
+        });
         if (items.length === 0) return null;
         const isOpen = openGroups.has(group.heading);
 

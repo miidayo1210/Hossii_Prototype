@@ -8,7 +8,9 @@ import type { SpaceSettings } from '../../core/types/settings';
 import { DEFAULT_STAR_MARKER, DEFAULT_SPACE_MODE_STATE } from '../../core/types/settings';
 import type { Space, SpaceUpdatePatch } from '../../core/types/space';
 import { refreshModeCustomization } from '../../core/utils/spaceModeCustomize';
-import { canManageSpace } from '../../core/utils/spaceAdminAccess';
+import { canManageSpace, canManageSpaceArchive } from '../../core/utils/spaceAdminAccess';
+import { fetchMyMembershipForSpace } from '../../core/utils/spaceMembershipsApi';
+import type { SpaceMembership } from '../../core/types/spaceMembership';
 import { SettingsLayout } from './SettingsLayout';
 import { SpaceModeTab } from './SpaceModeTab';
 import { BasicInfoTab } from './BasicInfoTab';
@@ -25,6 +27,7 @@ import { ExportRecordTab } from './ExportRecordTab';
 import { NeighborsTab } from './NeighborsTab';
 import { ParticipantAccountsTab } from './ParticipantAccountsTab';
 import { SpaceMembersTab } from './SpaceMembersTab';
+import { SpaceArchiveTab } from './SpaceArchiveTab';
 import { PaneManagementTab } from './PaneManagementTab';
 import { SettingsEditPaneProvider } from './SettingsEditPaneContext';
 import {
@@ -42,6 +45,19 @@ export const SpaceSettingsScreen = () => {
 
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
   const canManageActiveSpace = canManageSpace(currentUser, activeSpace);
+  const [mySpaceMembershipState, setMySpaceMembershipState] = useState<{
+    spaceId: string | null;
+    membership: SpaceMembership | null;
+  }>({ spaceId: null, membership: null });
+  const mySpaceMembership =
+    mySpaceMembershipState.spaceId === activeSpace?.id
+      ? mySpaceMembershipState.membership
+      : null;
+  const canManageActiveSpaceArchive = canManageSpaceArchive(
+    currentUser,
+    activeSpace,
+    mySpaceMembership,
+  );
   const [settingsSyncedSpaceId, setSettingsSyncedSpaceId] = useState<string | null>(null);
   const settingsDbSynced =
     activeSpace != null && settingsSyncedSpaceId === activeSpace.id;
@@ -72,6 +88,22 @@ export const SpaceSettingsScreen = () => {
       setSettingsSyncedSpaceId(activeSpace.id);
     });
   }, [activeSpace?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!activeSpace?.id) return;
+    const spaceId = activeSpace.id;
+    let cancelled = false;
+    fetchMyMembershipForSpace(spaceId)
+      .then((membership) => {
+        if (!cancelled) setMySpaceMembershipState({ spaceId, membership });
+      })
+      .catch(() => {
+        if (!cancelled) setMySpaceMembershipState({ spaceId, membership: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSpace?.id]);
 
   const handleDirtyChange = useCallback((dirty: boolean) => {
     setScreenDirty(dirty);
@@ -113,6 +145,14 @@ export const SpaceSettingsScreen = () => {
       }
     },
     [activeSpace, settings, updateSpace, persistModeCustomization],
+  );
+
+  const handleArchiveChange = useCallback(
+    (patch: { isArchived: boolean; archivedAt: Date | undefined; archivedBy: string | undefined }) => {
+      if (!activeSpace) return;
+      updateSpace(activeSpace.id, patch);
+    },
+    [activeSpace, updateSpace],
   );
 
   const handleNavigate = useCallback(
@@ -259,6 +299,14 @@ export const SpaceSettingsScreen = () => {
         );
       case 'moderation':
         return <ModerationTab spaceId={activeSpace.id} space={activeSpace} />;
+      case 'spaceArchive':
+        return (
+          <SpaceArchiveTab
+            key={`archive-${activeSpace.id}`}
+            space={activeSpace}
+            onArchiveChange={handleArchiveChange}
+          />
+        );
       case 'spaceMembers':
         return <SpaceMembersTab key={`members-${activeSpace.id}`} space={activeSpace} />;
       case 'exportRecord':
@@ -291,6 +339,7 @@ export const SpaceSettingsScreen = () => {
         spaceName={activeSpace.name}
         activeScreen={activeScreen}
         isAdmin={isAdmin}
+        canManageSpaceArchive={canManageActiveSpaceArchive}
         onBack={handleBack}
         onNavigate={handleNavigate}
       >

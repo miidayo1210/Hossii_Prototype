@@ -32,6 +32,7 @@ describe('buildJoinedSpaces', () => {
         spaceName: 'スペース1',
         spaceUrl: 'space-1',
         communityName: 'コミュA',
+        isArchived: false,
       },
     ]);
   });
@@ -41,6 +42,7 @@ describe('buildJoinedSpaces', () => {
     expect(result[0].spaceName).toBeNull();
     expect(result[0].spaceUrl).toBeNull();
     expect(result[0].communityName).toBeNull();
+    expect(result[0].isArchived).toBe(false);
   });
 
   it('leaves communityName null when space has no community or community not found', () => {
@@ -79,7 +81,16 @@ describe('buildJoinedSpaces', () => {
       [],
     );
     expect(Object.keys(result[0]).sort()).toEqual(
-      ['communityName', 'joinedAt', 'membershipId', 'spaceId', 'spaceName', 'spaceNickname', 'spaceUrl'].sort(),
+      [
+        'communityName',
+        'isArchived',
+        'joinedAt',
+        'membershipId',
+        'spaceId',
+        'spaceName',
+        'spaceNickname',
+        'spaceUrl',
+      ].sort(),
     );
   });
 });

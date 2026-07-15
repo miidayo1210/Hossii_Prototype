@@ -14,13 +14,16 @@ export type SettingsScreenId =
   | 'exportRecord'
   | 'neighbors'
   | 'participantAccounts'
-  | 'spaceMembers';
+  | 'spaceMembers'
+  | 'spaceArchive';
 
 export type NavItem = {
   id: SettingsScreenId;
   label: string;
   description?: string;
   adminOnly?: boolean;
+  /** 112: アーカイブ ON/OFF 権限（space / community admin / super_admin） */
+  archiveManagerOnly?: boolean;
 };
 
 export type NavGroup = {
@@ -61,6 +64,12 @@ export const SETTINGS_NAV_GROUPS: NavGroup[] = [
   {
     heading: '運営',
     items: [
+      {
+        id: 'spaceArchive',
+        label: 'アーカイブ',
+        description: '閲覧専用状態の切り替え',
+        archiveManagerOnly: true,
+      },
       { id: 'moderation', label: '投稿管理', adminOnly: true },
       { id: 'spaceMembers', label: 'スペースメンバー', description: '招待制スペースの参加メンバーを管理', adminOnly: true },
       { id: 'participantAccounts', label: '参加者アカウント', adminOnly: true },
