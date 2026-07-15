@@ -256,6 +256,10 @@ export const normalizeSpace = (f: unknown): Space => {
   const communityId = typeof raw.communityId === 'string' && raw.communityId ? raw.communityId : undefined;
   const spaceType = raw.spaceType === 'personal' ? 'personal' : raw.spaceType === 'shared' ? 'shared' : undefined;
   const ownerUserId = typeof raw.ownerUserId === 'string' && raw.ownerUserId ? raw.ownerUserId : undefined;
+  const isArchived = typeof raw.isArchived === 'boolean' ? raw.isArchived : false;
+  const archivedAt =
+    typeof raw.archivedAt === 'string' && raw.archivedAt ? new Date(raw.archivedAt) : undefined;
+  const archivedBy = typeof raw.archivedBy === 'string' && raw.archivedBy ? raw.archivedBy : undefined;
 
   return {
     id,
@@ -282,6 +286,9 @@ export const normalizeSpace = (f: unknown): Space => {
     communityId,
     spaceType,
     ownerUserId,
+    isArchived,
+    archivedAt,
+    archivedBy,
   };
 };
 

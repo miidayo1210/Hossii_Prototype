@@ -32,6 +32,9 @@ type SpaceRow = {
   my_hossii_enabled?: boolean | null;
   my_hossii_motion_mode?: string | null;
   my_hossii_log_visibility?: string | null;
+  is_archived?: boolean | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
 };
 
 // SpaceRow → Space（camelCase）
@@ -70,6 +73,9 @@ function rowToSpace(row: SpaceRow): Space {
     communityId: row.community_id ?? undefined,
     spaceType: row.space_type === 'personal' ? 'personal' : 'shared',
     ownerUserId: row.owner_user_id ?? undefined,
+    isArchived: row.is_archived ?? false,
+    archivedAt: row.archived_at ? new Date(row.archived_at) : undefined,
+    archivedBy: row.archived_by ?? undefined,
   };
 }
 

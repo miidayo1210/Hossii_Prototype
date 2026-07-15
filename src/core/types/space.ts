@@ -103,6 +103,10 @@ export type Space = {
    * 本人の personal スペースでは currentUser.uid と一致する。
    */
   ownerUserId?: string;
+  /** アーカイブ状態（DB: spaces.is_archived）。true のとき閲覧専用。 */
+  isArchived?: boolean;
+  archivedAt?: Date;
+  archivedBy?: string;
 };
 
 /** Partial update for Space; null clears nullable DB-backed fields. */
