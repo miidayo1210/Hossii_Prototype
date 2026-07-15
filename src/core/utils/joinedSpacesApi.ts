@@ -15,9 +15,11 @@ export type JoinedSpace = {
   joinedAt: string;
   /** space が見つからない（削除済み等）場合は null → UI で fallback 表示 */
   spaceName: string | null;
-  /** slug 未設定なら null → /s 導線を出さない */
+  /** slug 未設定なら null → 導線を出さない */
   spaceUrl: string | null;
   communityName: string | null;
+  /** canonical URL 用。community が見つからない場合は null */
+  communitySlug: string | null;
   isArchived: boolean;
 };
 
@@ -32,6 +34,7 @@ export type SpaceLookupRow = {
 export type CommunityLookupRow = {
   id: string;
   name: string;
+  slug?: string | null;
 };
 
 /**
@@ -47,12 +50,17 @@ export function buildJoinedSpaces(
   const spaceById = new Map<string, SpaceLookupRow>();
   for (const r of spaceRows) spaceById.set(r.id, r);
   const communityNameById = new Map<string, string>();
-  for (const r of communityRows) communityNameById.set(r.id, r.name);
+  const communitySlugById = new Map<string, string>();
+  for (const r of communityRows) {
+    communityNameById.set(r.id, r.name);
+    if (r.slug) communitySlugById.set(r.id, r.slug);
+  }
 
   return memberships
     .filter((m) => m.status === 'active')
     .map((m) => {
       const s = spaceById.get(m.spaceId);
+      const communityId = s?.community_id ?? null;
       return {
         membershipId: m.id,
         spaceId: m.spaceId,
@@ -60,9 +68,8 @@ export function buildJoinedSpaces(
         joinedAt: m.joinedAt,
         spaceName: s?.name ?? null,
         spaceUrl: s?.space_url ?? null,
-        communityName: s?.community_id
-          ? communityNameById.get(s.community_id) ?? null
-          : null,
+        communityName: communityId ? communityNameById.get(communityId) ?? null : null,
+        communitySlug: communityId ? communitySlugById.get(communityId) ?? null : null,
         isArchived: s?.is_archived === true,
       };
     });
@@ -103,7 +110,7 @@ export async function fetchMyJoinedSpaces(): Promise<JoinedSpace[]> {
   if (communityIds.length > 0) {
     const { data: commData, error: commError } = await supabase
       .from('communities')
-      .select('id, name')
+      .select('id, name, slug')
       .in('id', communityIds);
     if (commError) {
       // community 名は補助情報。取得できなくても一覧は表示する。

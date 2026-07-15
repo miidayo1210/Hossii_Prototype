@@ -9,6 +9,7 @@ import {
   MAX_SPACE_NICKNAME_LENGTH,
 } from '../../core/utils/spaceNicknameRules';
 import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
+import { buildCanonicalSpaceScreenHref } from '../../core/utils/spaceScreenRoute';
 import styles from './JoinedSpacesSection.module.css';
 
 type Status = 'idle' | 'loading' | 'error' | 'ready';
@@ -18,7 +19,7 @@ type Status = 'idle' | 'loading' | 'error' | 'ready';
  * 各スペースの自分のニックネームを変更できるようにする。
  * - 未ログイン（ゲスト）は取得せず、ログイン案内を表示する。
  * - loading / empty / error / success の各状態を持つ。
- * - スペースを開く導線は既存の /s/{slug} を使う（slug 欠損時は導線を出さない）。
+ * - スペースを開く導線は正規 URL（/c/{community}/s/{slug}#screen）を使う。
  * - ニックネーム変更は SECURITY DEFINER RPC 経由（本人・space_nickname のみ）。
  * - 管理者権限判定には使わない（role/status は取得・表示しない）。
  */
@@ -225,8 +226,19 @@ const JoinedSpaceItem = ({ space, onSaved }: JoinedSpaceItemProps) => {
           </span>
         )}
       </div>
-      {space.spaceUrl ? (
-        <a className={styles.openLink} href={`/s/${space.spaceUrl}`}>
+      {space.spaceUrl && space.communitySlug ? (
+        <a
+          className={styles.openLink}
+          href={buildCanonicalSpaceScreenHref({
+            communitySlug: space.communitySlug,
+            spaceUrl: space.spaceUrl,
+          })}
+        >
+          <ExternalLink size={14} />
+          開く
+        </a>
+      ) : space.spaceUrl ? (
+        <a className={styles.openLink} href={`/s/${space.spaceUrl}#screen`}>
           <ExternalLink size={14} />
           開く
         </a>

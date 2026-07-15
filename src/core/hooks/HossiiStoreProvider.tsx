@@ -1291,11 +1291,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces, preserveIds });
         lastScopedCommunityFetchKeyRef.current = effectiveId;
         const st = stateRef.current;
-        if (
-          supabaseSpaces.length > 0 &&
-          !supabaseSpaces.some((s) => s.id === st.activeSpaceId)
-        ) {
-          dispatch({ type: 'SET_ACTIVE_SPACE', payload: supabaseSpaces[0].id });
+        const activeStillValid = supabaseSpaces.some((s) => s.id === st.activeSpaceId);
+        if (!activeStillValid) {
+          dispatch({
+            type: 'SET_ACTIVE_SPACE',
+            payload: supabaseSpaces[0]?.id ?? '',
+          });
         }
       }
       setSpacesLoadedFromSupabase(true);
