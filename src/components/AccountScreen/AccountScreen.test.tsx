@@ -100,7 +100,7 @@ describe('AccountScreen section routing', () => {
     render(<AccountScreen />);
 
     expect(screen.getByTestId('account-section-spaces')).toBeTruthy();
-    expect(screen.queryByTestId('joined-spaces-section')).toBeNull();
+    expect(screen.getByTestId('joined-spaces-section')).toBeTruthy();
   });
 
   it('renders my-hossii section when screenParam is my-hossii', () => {
@@ -108,6 +108,6 @@ describe('AccountScreen section routing', () => {
     render(<AccountScreen />);
 
     expect(screen.getByTestId('account-section-my-hossii')).toBeTruthy();
-    expect(screen.queryByTestId('my-hossii-settings-section')).toBeNull();
+    expect(screen.getByTestId('my-hossii-settings-section')).toBeTruthy();
   });
 });

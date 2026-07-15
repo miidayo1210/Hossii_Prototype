@@ -9,6 +9,8 @@ import { resolveAccountSection } from './accountSection';
 import { AccountSectionNav } from './AccountSectionNav';
 import { AccountHomeSection } from './AccountHomeSection';
 import { AccountProfileSection } from './AccountProfileSection';
+import { AccountSpacesSection } from './AccountSpacesSection';
+import { AccountMyHossiiSection } from './AccountMyHossiiSection';
 import { resolveCommunitySummary } from './accountCommunitySummary';
 import styles from './AccountScreen.module.css';
 
@@ -76,17 +78,11 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
         )}
 
         {activeSection === 'spaces' && (
-          <div data-testid="account-section-spaces" className={styles.sectionPlaceholder}>
-            <h2 className={styles.sectionTitle}>参加先</h2>
-            <p className={styles.sectionDesc}>コミュニティとスペース（移管予定）</p>
-          </div>
+          <AccountSpacesSection />
         )}
 
         {activeSection === 'my-hossii' && (
-          <div data-testid="account-section-my-hossii" className={styles.sectionPlaceholder}>
-            <h2 className={styles.sectionTitle}>マイHossii</h2>
-            <p className={styles.sectionDesc}>Hossiiの登録と登場（移管予定）</p>
-          </div>
+          <AccountMyHossiiSection />
         )}
 
       </main>
