@@ -4,6 +4,7 @@ import { DEFAULT_POST_FIELD_SETTINGS } from '../types/settings';
 import {
   applyPostFieldChange,
   allPostFieldsDisabled,
+  mergePanePostFieldOverride,
   mergePostFieldSettings,
   resolvePostFields,
 } from './postFieldSettings';
@@ -69,6 +70,18 @@ describe('applyPostFieldChange', () => {
     const updated = applyPostFieldChange(withRequired, 'photo', 'enabled', false);
     expect(updated.postFields?.photo.enabled).toBe(false);
     expect(updated.postFields?.photo.required).toBe(false);
+  });
+});
+
+describe('mergePanePostFieldOverride', () => {
+  it('部分上書きでも base の required を維持する', () => {
+    const base = mergePostFieldSettings({
+      tags: { enabled: true, required: true },
+    });
+    const merged = mergePanePostFieldOverride(base, {
+      tags: { enabled: true },
+    });
+    expect(merged.tags).toEqual({ enabled: true, required: true });
   });
 });
 

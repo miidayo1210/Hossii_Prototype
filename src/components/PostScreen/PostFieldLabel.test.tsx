@@ -19,4 +19,10 @@ describe('PostFieldLabel', () => {
     expect(screen.getByText('任意')).toBeTruthy();
     expect(screen.queryByText('必須')).toBeNull();
   });
+
+  it('タグ必須設定では「必須」を表示する', () => {
+    render(<PostFieldLabel label="ハッシュタグ" required />);
+    expect(screen.getByText('ハッシュタグ')).toBeTruthy();
+    expect(screen.getByText('必須')).toBeTruthy();
+  });
 });

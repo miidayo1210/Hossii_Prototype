@@ -11,7 +11,7 @@ import { isSupabaseConfigured } from '../supabase';
 import { updateSpaceInDb } from './spacesApi';
 import { updateSpacePane } from './spacePanesApi';
 import { upsertSpaceSettings } from './spaceSettingsApi';
-import { saveSpaceSettings } from './settingsStorage';
+import { saveSpaceSettings, SPACE_SETTINGS_UPDATED_EVENT } from './settingsStorage';
 import { mergePostFieldSettings } from './postFieldSettings';
 import {
   buildPaneBackgroundPatch,
@@ -95,6 +95,11 @@ export async function savePanePostFieldsOverride(
     const updated: SpaceSettings = { ...ctx.settings, postFields: merged };
     ctx.onUpdateSettings(updated);
     saveSpaceSettings(updated);
+    window.dispatchEvent(
+      new CustomEvent(SPACE_SETTINGS_UPDATED_EVENT, {
+        detail: { spaceId: ctx.space.id },
+      }),
+    );
     await upsertSpaceSettings(updated);
     return;
   }
@@ -102,6 +107,11 @@ export async function savePanePostFieldsOverride(
   await saveAdditionalPanePatch(
     ctx,
     buildPaneSettingsPatch(ctx.editPane, 'postFields', merged),
+  );
+  window.dispatchEvent(
+    new CustomEvent(SPACE_SETTINGS_UPDATED_EVENT, {
+      detail: { spaceId: ctx.space.id },
+    }),
   );
 }
 
