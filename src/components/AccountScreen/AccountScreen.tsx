@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
@@ -49,6 +49,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
     Boolean(currentUser),
     selectedMembership?.communityName,
   );
+  const [nicknameSaveRevision, setNicknameSaveRevision] = useState(0);
 
   return (
     <div className={styles.container}>
@@ -75,6 +76,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
             identity={identity}
             onLoginRequested={onLoginRequested}
             onSignUpRequested={onSignUpRequested}
+            onSpaceNicknameSaved={() => setNicknameSaveRevision((revision) => revision + 1)}
           />
         )}
 
@@ -83,7 +85,7 @@ export const AccountScreen = ({ onLoginRequested, onSignUpRequested }: Props) =>
         )}
 
         {activeSection === 'my-hossii' && (
-          <AccountMyHossiiSection />
+          <AccountMyHossiiSection nicknameSaveRevision={nicknameSaveRevision} />
         )}
 
       </main>

@@ -50,4 +50,12 @@ describe('AccountSpacesSection', () => {
 
     expect(screen.getByTestId('community-switcher')).toBeTruthy();
   });
+
+  it('shows my-space intro copy in personal spaces section description', () => {
+    h.currentUser = { uid: 'u1', displayName: 'User', isAdmin: false };
+    render(<AccountSpacesSection />);
+
+    expect(screen.getByText(/コミュニティごとに、自分だけのマイスペースがあります/)).toBeTruthy();
+    expect(screen.getByText(/未作成の場合はここから作れます/)).toBeTruthy();
+  });
 });

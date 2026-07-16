@@ -12,12 +12,14 @@ type Props = {
   identity: AccountIdentity;
   onLoginRequested?: () => void;
   onSignUpRequested?: () => void;
+  onSpaceNicknameSaved?: () => void;
 };
 
 export const AccountProfileSection = ({
   identity,
   onLoginRequested,
   onSignUpRequested,
+  onSpaceNicknameSaved,
 }: Props) => {
   const { currentUser, logout } = useAuth();
   const { navigate } = useRouter();
@@ -47,6 +49,7 @@ export const AccountProfileSection = ({
     const trimmed = spaceNicknameInput.trim();
     if (!trimmed) return;
     setSpaceNickname(activeSpaceId, trimmed);
+    onSpaceNicknameSaved?.();
     setSavedSpace(true);
     setTimeout(() => setSavedSpace(false), 2000);
   };

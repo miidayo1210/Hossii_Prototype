@@ -3,6 +3,7 @@ import { useRouter } from '../../core/hooks/useRouter';
 import { CommunitySwitcher } from '../Community/CommunitySwitcher';
 import { JoinedSpacesSection } from './JoinedSpacesSection';
 import { CommunityPersonalSpacesSection } from './CommunityPersonalSpacesSection';
+import { MY_SPACE_INTRO } from '../../core/utils/mySpaceCopy';
 import styles from './AccountScreen.module.css';
 
 export const AccountSpacesSection = () => {
@@ -32,7 +33,7 @@ export const AccountSpacesSection = () => {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>コミュニティ内のマイスペース</h2>
         <p className={styles.sectionDesc}>
-          参加中のコミュニティごとに、マイスペースの有無を確認し、未作成の場合はここから作成できます。
+          {MY_SPACE_INTRO} 参加中のコミュニティごとに、有無を確認し、未作成の場合はここから作れます。
         </p>
         <CommunityPersonalSpacesSection />
       </section>
