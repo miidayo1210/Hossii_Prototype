@@ -1,8 +1,8 @@
 # 117 Hossiiガイド吹き出し — Quest ログ
 
 > 正本: `docs/仕様書/現在の仕様/117_Hossiiガイド吹き出し.md`  
-> 作業ブランチ: `feat/hossii-guide-bubble`  
-> 基準ブランチ: `origin/docs/account-ui-navigation`
+> 作業ブランチ: `feat/hossii-guide-bubble-v2`（2026-07-16: main `e28bae0` 基準に載せ替え）  
+> 旧ブランチ: `feat/hossii-guide-bubble`（古い base・migration 番号重複のため使用禁止）
 
 ## Phase 1 Quest 一覧（計画）
 
@@ -79,7 +79,7 @@
 - **変更ファイル:** `supabase/migrations/20260718100000_add_hossii_guide_to_space_settings.sql`
 - **実装内容:** nullable JSONB 列 `hossii_guide` を追加。backfill なし。
 - **テスト結果:** lint/build OK。DB apply なし。
-- **commit:** `bdcc8d4`
+- **commit:** `7b045d3` → v2 では `20260718140000_add_hossii_guide_to_space_settings.sql` に rename
 - **状態:** DONE
 - **次の Quest:** Q4
 
