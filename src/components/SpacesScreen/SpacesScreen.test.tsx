@@ -7,7 +7,9 @@ import type { Space } from '../../core/types/space';
 const h = vi.hoisted(() => ({
   navigate: vi.fn(),
   setActiveSpace: vi.fn(),
+  updateSpace: vi.fn(),
   fetchPersonalSpaceOwnerLabels: vi.fn(),
+  runBulkPersonalSpaceArchive: vi.fn(),
   currentUser: {
     uid: 'admin-1',
     displayName: 'Admin',
@@ -24,7 +26,7 @@ vi.mock('../../core/hooks/useHossiiStore', () => ({
   useHossiiStore: () => ({
     state: { spaces: h.spaces },
     addSpace: vi.fn(),
-    updateSpace: vi.fn(),
+    updateSpace: h.updateSpace,
     removeSpace: vi.fn(),
     setActiveSpace: h.setActiveSpace,
     communitySlug: 'dev-community',
@@ -62,6 +64,15 @@ vi.mock('../../core/utils/personalSpaceOwnerLabelsApi', async (importOriginal) =
   return {
     ...actual,
     fetchPersonalSpaceOwnerLabels: h.fetchPersonalSpaceOwnerLabels,
+  };
+});
+
+vi.mock('../../core/utils/adminPersonalSpaceBulkArchive', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../core/utils/adminPersonalSpaceBulkArchive')>();
+  return {
+    ...actual,
+    runBulkPersonalSpaceArchive: h.runBulkPersonalSpaceArchive,
   };
 });
 
@@ -431,5 +442,211 @@ describe('SpacesScreen admin search and sort', () => {
     await expandPersonalSection();
     expect(screen.getByLabelText('個人スペースを検索')).toBeTruthy();
     expect(screen.getByLabelText('個人スペースの並び替え')).toBeTruthy();
+  });
+});
+
+describe('SpacesScreen admin bulk archive', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    h.updateSpace.mockReset();
+    h.runBulkPersonalSpaceArchive.mockReset();
+    h.fetchPersonalSpaceOwnerLabels.mockReset();
+    h.fetchPersonalSpaceOwnerLabels.mockResolvedValue(
+      new Map([
+        [
+          'owner-1',
+          {
+            communityNickname: '田中',
+            profileNickname: null,
+            participantDisplayName: null,
+            adminEmail: null,
+          },
+        ],
+        [
+          'owner-2',
+          {
+            communityNickname: '佐藤',
+            profileNickname: null,
+            participantDisplayName: null,
+            adminEmail: null,
+          },
+        ],
+      ]),
+    );
+
+    h.spaces = [
+      space({
+        id: 'ps-1',
+        name: 'マイスペースA',
+        communityId: 'comm-a',
+        spaceType: 'personal',
+        ownerUserId: 'owner-1',
+        createdAt: new Date('2026-01-01'),
+      }),
+      space({
+        id: 'ps-2',
+        name: 'マイスペースB',
+        communityId: 'comm-a',
+        spaceType: 'personal',
+        ownerUserId: 'owner-2',
+        isArchived: true,
+        createdAt: new Date('2026-02-01'),
+      }),
+      space({
+        id: 'shared-1',
+        name: 'Team Space',
+        communityId: 'comm-a',
+        spaceType: 'shared',
+      }),
+    ];
+
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    h.runBulkPersonalSpaceArchive.mockResolvedValue({
+      operation: 'archive',
+      successCount: 0,
+      failureCount: 0,
+      skippedWrongStateCount: 0,
+      failures: [],
+      successfulPatches: [],
+    });
+  });
+
+  async function expandPersonalSection() {
+    render(<SpacesScreen />);
+    fireEvent.click(screen.getByRole('button', { name: /個人スペース/ }));
+    await waitFor(() => expect(screen.getByLabelText('表示中の個人スペースをすべて選択')).toBeTruthy());
+  }
+
+  it('1件選択で一括操作バーを表示する', async () => {
+    await expandPersonalSection();
+    await waitFor(() => expect(screen.getByText('田中さん')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('田中さんのマイスペースを選択'));
+    expect(screen.getByText('1件選択中')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'アーカイブする' })).toBeTruthy();
+  });
+
+  it('表示中をすべて選択はフィルタ結果のみ', async () => {
+    await expandPersonalSection();
+    fireEvent.change(screen.getByLabelText('個人スペースを検索'), { target: { value: '田中' } });
+    fireEvent.click(screen.getByLabelText('表示中の個人スペースをすべて選択'));
+    expect(screen.getByText('1件選択中')).toBeTruthy();
+  });
+
+  it('active のみアーカイブできる', async () => {
+    h.runBulkPersonalSpaceArchive.mockResolvedValue({
+      operation: 'archive',
+      successCount: 1,
+      failureCount: 0,
+      skippedWrongStateCount: 0,
+      failures: [],
+      successfulPatches: [
+        {
+          spaceId: 'ps-1',
+          patch: { isArchived: true, archivedAt: new Date(), archivedBy: 'admin-1' },
+        },
+      ],
+    });
+
+    await expandPersonalSection();
+    await waitFor(() => expect(screen.getByText('田中さん')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('田中さんのマイスペースを選択'));
+    fireEvent.click(screen.getByRole('button', { name: 'アーカイブする' }));
+
+    await waitFor(() => {
+      expect(h.runBulkPersonalSpaceArchive).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: 'ps-1' })],
+        'archive',
+      );
+    });
+    expect(h.updateSpace).toHaveBeenCalledWith('ps-1', expect.objectContaining({ isArchived: true }));
+    expect(screen.queryByText(/件選択中/)).toBeNull();
+  });
+
+  it('archived のみ解除できる', async () => {
+    h.runBulkPersonalSpaceArchive.mockResolvedValue({
+      operation: 'unarchive',
+      successCount: 1,
+      failureCount: 0,
+      skippedWrongStateCount: 0,
+      failures: [],
+      successfulPatches: [
+        {
+          spaceId: 'ps-2',
+          patch: { isArchived: false, archivedAt: undefined, archivedBy: undefined },
+        },
+      ],
+    });
+
+    await expandPersonalSection();
+    fireEvent.click(screen.getByLabelText('佐藤さんのマイスペースを選択'));
+    fireEvent.click(screen.getByRole('button', { name: 'アーカイブを解除する' }));
+
+    await waitFor(() => {
+      expect(h.runBulkPersonalSpaceArchive).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: 'ps-2', isArchived: true })],
+        'unarchive',
+      );
+    });
+  });
+
+  it('状態混在時は対象外件数を伝える', async () => {
+    await expandPersonalSection();
+    fireEvent.click(screen.getByLabelText('表示中の個人スペースをすべて選択'));
+    fireEvent.click(screen.getByRole('button', { name: 'アーカイブする' }));
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('すでにアーカイブ済み'),
+    );
+  });
+
+  it('一部失敗時に結果を表示する', async () => {
+    h.runBulkPersonalSpaceArchive.mockResolvedValue({
+      operation: 'archive',
+      successCount: 1,
+      failureCount: 1,
+      skippedWrongStateCount: 0,
+      failures: [{ spaceId: 'ps-x', spaceName: '失敗スペース', message: 'denied' }],
+      successfulPatches: [
+        {
+          spaceId: 'ps-1',
+          patch: { isArchived: true },
+        },
+      ],
+    });
+
+    await expandPersonalSection();
+    await waitFor(() => expect(screen.getByText('田中さん')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('田中さんのマイスペースを選択'));
+    fireEvent.click(screen.getByRole('button', { name: 'アーカイブする' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('失敗スペース');
+    });
+  });
+
+  it('検索条件変更で選択を解除する', async () => {
+    await expandPersonalSection();
+    await waitFor(() => expect(screen.getByText('田中さん')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('田中さんのマイスペースを選択'));
+    expect(screen.getByText('1件選択中')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('個人スペースを検索'), { target: { value: '佐藤' } });
+    expect(screen.queryByText(/件選択中/)).toBeNull();
+  });
+
+  it('共有スペースに checkbox がない', async () => {
+    render(<SpacesScreen />);
+    expect(screen.queryByLabelText(/Team Space/)).toBeNull();
+    expect(screen.queryByRole('toolbar', { name: '一括操作' })).toBeNull();
+  });
+
+  it('確認をキャンセルすると RPC を呼ばない', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => false));
+    await expandPersonalSection();
+    await waitFor(() => expect(screen.getByText('田中さん')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('田中さんのマイスペースを選択'));
+    fireEvent.click(screen.getByRole('button', { name: 'アーカイブする' }));
+    expect(h.runBulkPersonalSpaceArchive).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

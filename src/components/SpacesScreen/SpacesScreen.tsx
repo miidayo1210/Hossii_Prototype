@@ -21,6 +21,15 @@ import {
   type SharedSpacesSortKey,
 } from '../../core/utils/adminSpacesListSort';
 import {
+  areAllVisiblePersonalSpacesSelected,
+  buildBulkPersonalArchiveConfirmMessage,
+  formatBulkPersonalArchiveResultMessage,
+  isPartialPersonalSpaceSelection,
+  partitionBulkPersonalArchiveTargets,
+  runBulkPersonalSpaceArchive,
+  type BulkPersonalArchiveOperation,
+} from '../../core/utils/adminPersonalSpaceBulkArchive';
+import {
   fetchPersonalSpaceOwnerLabels,
   resolvePersonalSpaceOwnerDisplay,
   type OwnerLookupRow,
@@ -147,6 +156,115 @@ export const SpacesScreen = () => {
   const personalDisplayedCount = personalSearchActive
     ? filteredPersonalSpaces.length
     : personalSpaces.length;
+
+  const [selectedPersonalSpaceIds, setSelectedPersonalSpaceIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [bulkActionMessage, setBulkActionMessage] = useState<string | null>(null);
+  const [bulkActionRunning, setBulkActionRunning] = useState(false);
+
+  const visiblePersonalSpaceIds = useMemo(
+    () => new Set(displayedPersonalSpaces.map((s) => s.id)),
+    [displayedPersonalSpaces],
+  );
+
+  const allVisiblePersonalSelected = useMemo(
+    () =>
+      areAllVisiblePersonalSpacesSelected(displayedPersonalSpaces, selectedPersonalSpaceIds),
+    [displayedPersonalSpaces, selectedPersonalSpaceIds],
+  );
+
+  const partialVisiblePersonalSelected = useMemo(
+    () => isPartialPersonalSpaceSelection(displayedPersonalSpaces, selectedPersonalSpaceIds),
+    [displayedPersonalSpaces, selectedPersonalSpaceIds],
+  );
+
+  const selectedPersonalCount = useMemo(() => {
+    let count = 0;
+    for (const id of selectedPersonalSpaceIds) {
+      if (visiblePersonalSpaceIds.has(id)) count += 1;
+    }
+    return count;
+  }, [selectedPersonalSpaceIds, visiblePersonalSpaceIds]);
+
+  useEffect(() => {
+    setSelectedPersonalSpaceIds(new Set());
+    setBulkActionMessage(null);
+  }, [personalSearchQuery, personalSortKey, communityId, personalSpaces]);
+
+  useEffect(() => {
+    setSelectedPersonalSpaceIds((prev) => {
+      const next = new Set([...prev].filter((id) => visiblePersonalSpaceIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visiblePersonalSpaceIds]);
+
+  const togglePersonalSpaceSelection = (spaceId: string) => {
+    setSelectedPersonalSpaceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(spaceId)) next.delete(spaceId);
+      else next.add(spaceId);
+      return next;
+    });
+    setBulkActionMessage(null);
+  };
+
+  const toggleSelectAllVisiblePersonal = () => {
+    if (allVisiblePersonalSelected) {
+      setSelectedPersonalSpaceIds(new Set());
+    } else {
+      setSelectedPersonalSpaceIds(new Set(displayedPersonalSpaces.map((s) => s.id)));
+    }
+    setBulkActionMessage(null);
+  };
+
+  const clearPersonalSelection = () => {
+    setSelectedPersonalSpaceIds(new Set());
+  };
+
+  const handleBulkPersonalArchive = async (operation: BulkPersonalArchiveOperation) => {
+    const partition = partitionBulkPersonalArchiveTargets(
+      displayedPersonalSpaces,
+      selectedPersonalSpaceIds,
+      operation,
+    );
+
+    if (partition.actionable.length === 0) {
+      setBulkActionMessage(
+        formatBulkPersonalArchiveResultMessage({
+          operation,
+          successCount: 0,
+          failureCount: 0,
+          skippedWrongStateCount: partition.skippedWrongState.length,
+          failures: [],
+          successfulPatches: [],
+        }),
+      );
+      clearPersonalSelection();
+      return;
+    }
+
+    const confirmMessage = buildBulkPersonalArchiveConfirmMessage(partition, operation);
+    if (!window.confirm(confirmMessage)) return;
+
+    setBulkActionRunning(true);
+    setBulkActionMessage(null);
+    try {
+      const result = await runBulkPersonalSpaceArchive(partition.actionable, operation);
+      setBulkActionMessage(
+        formatBulkPersonalArchiveResultMessage({
+          ...result,
+          skippedWrongStateCount: partition.skippedWrongState.length,
+        }),
+      );
+      for (const { spaceId, patch } of result.successfulPatches) {
+        updateSpace(spaceId, patch);
+      }
+      clearPersonalSelection();
+    } finally {
+      setBulkActionRunning(false);
+    }
+  };
 
   // objectURL 追跡（クリーンアップ用）
   const objectURLsRef = useRef<Set<string>>(new Set());
@@ -801,7 +919,51 @@ export const SpacesScreen = () => {
                     「{personalSearchQuery.trim()}」に一致する個人スペースはありません
                   </p>
                 ) : (
-                  <ul className={styles.personalList}>
+                  <>
+                    {selectedPersonalCount > 0 && (
+                      <div className={styles.personalBulkBar} role="toolbar" aria-label="一括操作">
+                        <span className={styles.personalBulkCount}>{selectedPersonalCount}件選択中</span>
+                        <button
+                          type="button"
+                          className={styles.personalBulkButton}
+                          disabled={bulkActionRunning}
+                          onClick={() => void handleBulkPersonalArchive('archive')}
+                        >
+                          アーカイブする
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.personalBulkButtonSecondary}
+                          disabled={bulkActionRunning}
+                          onClick={() => void handleBulkPersonalArchive('unarchive')}
+                        >
+                          アーカイブを解除する
+                        </button>
+                      </div>
+                    )}
+
+                    {bulkActionMessage && (
+                      <p className={styles.personalBulkResult} role="status">
+                        {bulkActionMessage}
+                      </p>
+                    )}
+
+                    <div className={styles.personalListHeader}>
+                      <label className={styles.personalSelectAll}>
+                        <input
+                          type="checkbox"
+                          checked={allVisiblePersonalSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = partialVisiblePersonalSelected;
+                          }}
+                          onChange={toggleSelectAllVisiblePersonal}
+                          aria-label="表示中の個人スペースをすべて選択"
+                        />
+                        <span>表示中をすべて選択</span>
+                      </label>
+                    </div>
+
+                    <ul className={styles.personalList}>
                     {displayedPersonalSpaces.map((space) => {
                       const lookup = space.ownerUserId
                         ? ownerLabels.get(space.ownerUserId)
@@ -810,6 +972,14 @@ export const SpacesScreen = () => {
 
                       return (
                         <li key={space.id} className={styles.personalRow}>
+                          <label className={styles.personalRowCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={selectedPersonalSpaceIds.has(space.id)}
+                              onChange={() => togglePersonalSpaceSelection(space.id)}
+                              aria-label={`${ownerDisplay.displayName}のマイスペースを選択`}
+                            />
+                          </label>
                           <div className={styles.personalRowMain}>
                             <div className={styles.personalOwnerLine}>
                               <span className={styles.personalOwnerPrimary}>
@@ -852,6 +1022,7 @@ export const SpacesScreen = () => {
                       );
                     })}
                   </ul>
+                  </>
                 )}
               </div>
             )}
