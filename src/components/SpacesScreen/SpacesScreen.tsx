@@ -13,6 +13,13 @@ import { DEFAULT_QUICK_EMOTIONS } from '../../core/types/space';
 import { PersonalSpaceTemplateEditor } from './PersonalSpaceTemplateEditor';
 import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
 import { partitionAdminCommunitySpaces } from '../../core/utils/adminSpacesListView';
+import { filterPersonalSpacesBySearch } from '../../core/utils/adminSpacesListSearch';
+import {
+  sortPersonalSpaces,
+  sortSharedSpaces,
+  type PersonalSpacesSortKey,
+  type SharedSpacesSortKey,
+} from '../../core/utils/adminSpacesListSort';
 import {
   fetchPersonalSpaceOwnerLabels,
   resolvePersonalSpaceOwnerDisplay,
@@ -117,6 +124,29 @@ export const SpacesScreen = () => {
   // 個人スペースセクション（デフォルト折りたたみ）
   const [personalSectionExpanded, setPersonalSectionExpanded] = useState(false);
   const [ownerLabels, setOwnerLabels] = useState<Map<string, OwnerLookupRow>>(new Map());
+  const [personalSearchQuery, setPersonalSearchQuery] = useState('');
+  const [sharedSortKey, setSharedSortKey] = useState<SharedSpacesSortKey>('current');
+  const [personalSortKey, setPersonalSortKey] = useState<PersonalSpacesSortKey>('current');
+
+  const displayedSharedSpaces = useMemo(
+    () => sortSharedSpaces(sharedSpaces, sharedSortKey),
+    [sharedSpaces, sharedSortKey],
+  );
+
+  const filteredPersonalSpaces = useMemo(
+    () => filterPersonalSpacesBySearch(personalSpaces, personalSearchQuery, ownerLabels),
+    [personalSpaces, personalSearchQuery, ownerLabels],
+  );
+
+  const displayedPersonalSpaces = useMemo(
+    () => sortPersonalSpaces(filteredPersonalSpaces, personalSortKey, ownerLabels),
+    [filteredPersonalSpaces, personalSortKey, ownerLabels],
+  );
+
+  const personalSearchActive = personalSearchQuery.trim().length > 0;
+  const personalDisplayedCount = personalSearchActive
+    ? filteredPersonalSpaces.length
+    : personalSpaces.length;
 
   // objectURL 追跡（クリーンアップ用）
   const objectURLsRef = useRef<Set<string>>(new Set());
@@ -495,10 +525,26 @@ export const SpacesScreen = () => {
       {/* 共有 / 個人スペース */}
       <main className={styles.main}>
         <section className={styles.sectionBlock} aria-labelledby="shared-spaces-heading">
-          <div className={styles.sectionHeader}>
+          <div className={styles.sectionHeaderRow}>
             <h2 id="shared-spaces-heading" className={styles.sectionTitle}>
               共有スペース
             </h2>
+            {sharedSpaces.length > 0 && (
+              <label className={styles.listSortControl}>
+                <span className={styles.listSortLabel}>並び替え</span>
+                <select
+                  className={styles.listSortSelect}
+                  value={sharedSortKey}
+                  onChange={(e) => setSharedSortKey(e.target.value as SharedSpacesSortKey)}
+                  aria-label="共有スペースの並び替え"
+                >
+                  <option value="current">現在の順</option>
+                  <option value="created_desc">作成が新しい順</option>
+                  <option value="name_asc">名前順</option>
+                  <option value="archived_last">アーカイブを下へ</option>
+                </select>
+              </label>
+            )}
           </div>
 
           <div className={styles.spaceGrid}>
@@ -518,7 +564,7 @@ export const SpacesScreen = () => {
               </div>
             )}
 
-            {sharedSpaces.map((space) => (
+            {displayedSharedSpaces.map((space) => (
             <div key={space.id} className={styles.spaceCard}>
               {/* 背景サムネイル */}
               <div
@@ -700,7 +746,7 @@ export const SpacesScreen = () => {
               aria-expanded={personalSectionExpanded}
             >
               <span>個人スペース</span>
-              <span className={styles.personalCountBadge}>{personalSpaces.length}件</span>
+              <span className={styles.personalCountBadge}>{personalDisplayedCount}件</span>
               <ChevronDown
                 size={18}
                 aria-hidden
@@ -716,13 +762,47 @@ export const SpacesScreen = () => {
               <div className={styles.personalSectionBody}>
                 <PersonalSpaceTemplateEditor communityId={communityId} />
 
+                {personalSpaces.length > 0 && (
+                  <div className={styles.personalListControls}>
+                    <input
+                      type="search"
+                      className={styles.personalSearchInput}
+                      placeholder="名前・メール・スペース名でさがす"
+                      value={personalSearchQuery}
+                      onChange={(e) => setPersonalSearchQuery(e.target.value)}
+                      aria-label="個人スペースを検索"
+                    />
+                    <label className={styles.listSortControl}>
+                      <span className={styles.listSortLabel}>並び替え</span>
+                      <select
+                        className={styles.listSortSelect}
+                        value={personalSortKey}
+                        onChange={(e) =>
+                          setPersonalSortKey(e.target.value as PersonalSpacesSortKey)
+                        }
+                        aria-label="個人スペースの並び替え"
+                      >
+                        <option value="current">現在の順</option>
+                        <option value="owner_asc">所有者名順</option>
+                        <option value="created_desc">作成が新しい順</option>
+                        <option value="name_asc">スペース名順</option>
+                        <option value="archived_last">アーカイブを下へ</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+
                 {personalSpaces.length === 0 ? (
                   <p className={styles.personalEmptyNote}>
                     まだ個人スペースはありません（メンバーが作成するとここに表示されます）
                   </p>
+                ) : displayedPersonalSpaces.length === 0 ? (
+                  <p className={styles.personalEmptyNote}>
+                    「{personalSearchQuery.trim()}」に一致する個人スペースはありません
+                  </p>
                 ) : (
                   <ul className={styles.personalList}>
-                    {personalSpaces.map((space) => {
+                    {displayedPersonalSpaces.map((space) => {
                       const lookup = space.ownerUserId
                         ? ownerLabels.get(space.ownerUserId)
                         : undefined;
