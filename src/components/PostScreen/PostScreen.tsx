@@ -17,8 +17,9 @@ import { useAuth } from '../../core/contexts/useAuth';
 import { useFeatureFlags } from '../../core/hooks/useFeatureFlags';
 import { resolvePanePositionMode } from '../../core/utils/resolvePanePositionMode';
 import { resolvePanePostFields } from '../../core/utils/resolvePanePostFields';
-import { loadSpaceSettings } from '../../core/utils/settingsStorage';
+import { loadSpaceSettings, SPACE_SETTINGS_UPDATED_EVENT, type SpaceSettingsUpdatedDetail } from '../../core/utils/settingsStorage';
 import { allPostFieldsDisabled } from '../../core/utils/postFieldSettings';
+import { hasCommittedTags, isTagsFieldSatisfied, normalizeTagInput } from '../../core/utils/postTagValidation';
 import { addStamp } from '../../core/utils/stampStorage';
 import { upsertStampCount } from '../../core/utils/stampsApi';
 import { uploadHossiiImage } from '../../core/utils/imageStorageApi';
@@ -255,8 +256,14 @@ export const PostScreen = ({
   }, []);
 
   const { state, addHossii, getActiveSpace } = useHossiiStore();
-  const { activePaneId, activePane, isLoading: panesLoading } = useSpacePane();
+  const { activePaneId, activePane, panes, isLoading: panesLoading } = useSpacePane();
   const effectivePostPaneId = postTargetOverride?.paneId ?? activePaneId;
+  const effectivePane = useMemo(() => {
+    if (postTargetOverride?.paneId) {
+      return panes.find((pane) => pane.id === postTargetOverride.paneId) ?? activePane;
+    }
+    return activePane;
+  }, [postTargetOverride, panes, activePane]);
   const canPost = !panesLoading && effectivePostPaneId != null;
   const { prefs: { showHossii } } = useDisplayPrefs();
   const { navigate } = useRouter();
@@ -265,7 +272,10 @@ export const PostScreen = ({
 
   // スペース設定の読み込み
   const [spaceSettings, setSpaceSettings] = useState<SpaceSettings | null>(null);
-  const pf = useMemo(() => resolvePanePostFields(activePane, spaceSettings), [activePane, spaceSettings]);
+  const pf = useMemo(
+    () => resolvePanePostFields(effectivePane, spaceSettings),
+    [effectivePane, spaceSettings],
+  );
   const showBubbleShape = pf.bubbleShape.enabled && featureFlags.bubble_shapes_extended;
   const positionSelectorEnabled = useMemo(
     () => resolvePanePositionMode(activePane, spaceSettings) === 'selector',
@@ -286,7 +296,9 @@ export const PostScreen = ({
     setSelectedArea(null);
   }, [state.activeSpaceId]);
 
-  useEffect(() => {
+  const settingsSpaceId = postTargetOverride?.spaceId ?? state.activeSpaceId;
+
+  const loadSettingsForPost = useCallback(() => {
     const activeSpace = postTargetOverride
       ? state.spaces.find((s) => s.id === postTargetOverride.spaceId) ?? getActiveSpace()
       : getActiveSpace();
@@ -295,6 +307,33 @@ export const PostScreen = ({
       setSpaceSettings(settings);
     }
   }, [getActiveSpace, postTargetOverride, state.spaces]);
+
+  useEffect(() => {
+    loadSettingsForPost();
+  }, [loadSettingsForPost]);
+
+  // 設定画面の保存・タブ復帰時に最新設定を再読み込み
+  useEffect(() => {
+    const handleFocus = () => loadSettingsForPost();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadSettingsForPost();
+    };
+    const handleSettingsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<SpaceSettingsUpdatedDetail>).detail;
+      if (!detail?.spaceId || detail.spaceId === settingsSpaceId) {
+        loadSettingsForPost();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener(SPACE_SETTINGS_UPDATED_EVENT, handleSettingsUpdated);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener(SPACE_SETTINGS_UPDATED_EVENT, handleSettingsUpdated);
+    };
+  }, [loadSettingsForPost, settingsSpaceId]);
 
   const submitAddHossii = useCallback(
     (input: AddHossiiInput) =>
@@ -309,20 +348,6 @@ export const PostScreen = ({
     [addHossii, postTargetOverride],
   );
 
-  // フォーカス時に設定を再読み込み
-  useEffect(() => {
-    const handleFocus = () => {
-      const activeSpace = getActiveSpace();
-      if (activeSpace) {
-        const settings = loadSpaceSettings(activeSpace.id, activeSpace.name);
-        setSpaceSettings(settings);
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [getActiveSpace]);
-
   // activeSpace から quickEmotions を取得（毎回取得、固定配列NG）
   const quickEmotions = useMemo(() => {
     const activeSpace = getActiveSpace();
@@ -330,7 +355,8 @@ export const PostScreen = ({
   }, [getActiveSpace]);
 
   // activeSpace からプリセットタグを取得（state から直接読み取り）
-  const presetTags = state.spaces.find((s) => s.id === state.activeSpaceId)?.presetTags ?? [];
+  const presetTags =
+    state.spaces.find((s) => s.id === settingsSpaceId)?.presetTags ?? [];
 
   const canvasPosition = useMemo(() => {
     if (panelMode && initialPosition) return initialPosition;
@@ -362,11 +388,12 @@ export const PostScreen = ({
     !pf.message.enabled || !pf.message.required || message.trim() !== '';
   const isEmotionSatisfied =
     !pf.emotion.enabled || !pf.emotion.required || selectedEmotion !== null;
-  const isTagsSatisfied =
-    !pf.tags.enabled ||
-    !pf.tags.required ||
-    hashtags.length > 0 ||
-    selectedPresetTags.length > 0;
+  const isTagsSatisfied = isTagsFieldSatisfied(
+    pf.tags,
+    hashtags,
+    selectedPresetTags,
+    hashtagInput,
+  );
   const isPhotoSatisfied =
     !pf.photo.enabled || !pf.photo.required || imagePreview !== null;
   const isNumberSatisfied =
@@ -384,7 +411,7 @@ export const PostScreen = ({
     if (pf.message.enabled && message.trim()) return true;
     if (pf.photo.enabled && imagePreview) return true;
     if (pf.numberPost.enabled && numberInput.trim()) return true;
-    if (pf.tags.enabled && (hashtags.length > 0 || selectedPresetTags.length > 0)) return true;
+    if (pf.tags.enabled && hasCommittedTags(hashtags, selectedPresetTags, hashtagInput)) return true;
     return false;
   }, [
     pf,
@@ -394,6 +421,7 @@ export const PostScreen = ({
     numberInput,
     hashtags,
     selectedPresetTags,
+    hashtagInput,
   ]);
 
   const canSubmit = allRequiredSatisfied && hasAnyInput && !sending && canPost;
@@ -530,8 +558,7 @@ export const PostScreen = ({
   };
 
   const addHashtagFromInput = () => {
-    // 全角 ＃ も半角 # と同様に先頭から除去する
-    const raw = hashtagInput.trim().replace(/^[#＃]+/, '');
+    const raw = normalizeTagInput(hashtagInput);
     if (!raw) return;
     if (!hashtags.includes(raw)) {
       setHashtags((prev) => [...prev, raw]);
@@ -661,6 +688,16 @@ export const PostScreen = ({
   const handleSubmit = async () => {
     if (sending || !canPost) return;
 
+    const pendingTag = normalizeTagInput(hashtagInput);
+    const committedHashtags =
+      pendingTag && !hashtags.includes(pendingTag) ? [...hashtags, pendingTag] : hashtags;
+
+    if (!isTagsFieldSatisfied(pf.tags, committedHashtags, selectedPresetTags, '')) {
+      setSubmitAttempted(true);
+      requestAnimationFrame(() => scrollToFirstFieldError());
+      return;
+    }
+
     if (!allRequiredSatisfied) {
       setSubmitAttempted(true);
       return;
@@ -679,7 +716,7 @@ export const PostScreen = ({
 
       // F09: メッセージ本文からもハッシュタグを抽出してマージ（自由入力のみ）
       const parsedFromMessage = parseHashtags(message);
-      const allHashtags = [...new Set([...hashtags, ...parsedFromMessage])];
+      const allHashtags = [...new Set([...committedHashtags, ...parsedFromMessage])];
 
       // F10: 画像アップロード
       let imageUrl: string | undefined;

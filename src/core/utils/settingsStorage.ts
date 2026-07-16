@@ -5,6 +5,12 @@ import { normalizeHossiiGuideSettings } from './hossiiGuide';
 
 const SETTINGS_KEY_PREFIX = 'space_settings_';
 
+export const SPACE_SETTINGS_UPDATED_EVENT = 'space-settings-updated';
+
+export type SpaceSettingsUpdatedDetail = {
+  spaceId: string;
+};
+
 function normalizeStoredFeatures(raw: unknown): SpaceSettings['features'] {
   const f = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const legacy = f as { commentPost?: boolean; messagePost?: boolean };

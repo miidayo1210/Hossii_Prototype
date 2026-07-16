@@ -55,6 +55,22 @@ describe('resolvePanePostFields', () => {
     expect(pf.emotion.enabled).toBe(false);
   });
 
+  it('inherits required from space when pane override only sets enabled', () => {
+    const pane: SpacePane = {
+      ...extraPane,
+      settings: { postFields: { tags: { enabled: true } } },
+    };
+    const settings: SpaceSettings = {
+      ...baseSettings,
+      postFields: {
+        ...baseSettings.postFields!,
+        tags: { enabled: true, required: true },
+      },
+    };
+    const pf = resolvePanePostFields(pane, settings);
+    expect(pf.tags).toEqual({ enabled: true, required: true });
+  });
+
   it('inherits space when additional pane has null postFields override', () => {
     const pane: SpacePane = { ...extraPane, settings: { postFields: null } };
     expect(resolvePanePostFields(pane, baseSettings).message.enabled).toBe(true);
