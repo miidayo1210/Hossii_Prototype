@@ -96,7 +96,6 @@ import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace'
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
 import { canShowPersonalShortcut, getPersonalShortcutHiddenReason, isSharedSpaceShell, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
 import { MY_SPACE_OPEN_ERROR } from '../../core/utils/mySpaceCopy';
-import { hasSeenMySpaceTabHint, markMySpaceTabHintSeen } from '../../core/utils/mySpaceTabHint';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
   buildTabFolderPatch,
@@ -1314,25 +1313,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     };
   }, [personalShortcutEligible, personalShortcutActive, handlePersonalShortcut, personalShortcutBusy]);
 
-  const [showMySpaceTabHint, setShowMySpaceTabHint] = useState(false);
-
-  useEffect(() => {
-    if (!personalShortcutEligible || hasSeenMySpaceTabHint()) {
-      setShowMySpaceTabHint(false);
-      return;
-    }
-    setShowMySpaceTabHint(true);
-  }, [personalShortcutEligible]);
-
-  const mySpaceTabHint = showMySpaceTabHint
-    ? {
-        onDismiss: () => {
-          markMySpaceTabHintSeen();
-          setShowMySpaceTabHint(false);
-        },
-      }
-    : null;
-
   const personalShortcutHiddenReason = useMemo(() => {
     if (!isSharedSpaceShell(activeSpace?.spaceType) || isVisiting || panesLoading) return null;
     if (personalShortcutEligible) return null;
@@ -2525,7 +2505,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           onMoveToFolder={isAdmin && !isContentArchived ? handleMoveToFolder : undefined}
           onReorderFolder={isAdmin && !isContentArchived ? handleReorderFolder : undefined}
           personalShortcut={personalShortcut}
-          mySpaceTabHint={mySpaceTabHint}
         />
       )}
       {personalShortcutHiddenReason && (
@@ -2874,7 +2853,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               onMoveToFolder={isAdmin && !isContentArchived ? handleMoveToFolder : undefined}
               onReorderFolder={isAdmin && !isContentArchived ? handleReorderFolder : undefined}
               personalShortcut={personalShortcut}
-              mySpaceTabHint={mySpaceTabHint}
             />
           )}
           {personalShortcutHiddenReason && !isMobile && (

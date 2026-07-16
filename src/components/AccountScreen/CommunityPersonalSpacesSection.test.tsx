@@ -114,7 +114,7 @@ describe('CommunityPersonalSpacesSection', () => {
     render(<CommunityPersonalSpacesSection />);
     expect(await screen.findByRole('button', { name: /マイスペースを作る/ })).toBeTruthy();
     expect(screen.getByText('マイスペース未作成')).toBeTruthy();
-    expect(screen.getByText(/共有スペースのタブ列の右端からも/)).toBeTruthy();
+    expect(screen.getByText(/共有スペースのマイスペースタブからも/)).toBeTruthy();
   });
 
   it('personal space ありでは案内文を表示し作成ボタンは出さない', async () => {
@@ -122,7 +122,7 @@ describe('CommunityPersonalSpacesSection', () => {
     render(<CommunityPersonalSpacesSection />);
 
     expect(await screen.findByText('マイスペースあり')).toBeTruthy();
-    expect(screen.getByText(/共有スペースの「マイスペース」タブ（右端）から利用できます/)).toBeTruthy();
+    expect(screen.getByText(/共有スペースの「マイスペース」タブから利用できます/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /マイスペースを作る/ })).toBeNull();
   });
 

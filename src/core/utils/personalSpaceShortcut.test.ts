@@ -76,7 +76,7 @@ describe('getPersonalShortcutHiddenReason', () => {
         isAuthenticated: false,
         membershipStatus: undefined,
       }),
-    ).toMatch(/ログイン/);
+    ).toBe('ログインすると、マイスペースタブが使えるようになります。');
   });
 });
 
