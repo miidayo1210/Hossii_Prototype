@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, X, Plus, Trash2 } from 'lucide-react';
 import { generateId } from '../../core/utils';
 import type { Space, CustomEmotion } from '../../core/types/space';
+import type { SpaceSettings } from '../../core/types/settings';
 import type { MyHossiiLogVisibility, MyHossiiMotionMode } from '../../core/types/myHossii';
 import {
   DEFAULT_MY_HOSSII_LOG_VISIBILITY,
@@ -25,6 +26,10 @@ import { SettingsSection } from './SettingsSection';
 import { SettingsSaveBar } from './SettingsSaveBar';
 import sharedStyles from './SettingsShared.module.css';
 import formStyles from './GeneralTab.module.css';
+import { saveSpaceSettings } from '../../core/utils/settingsStorage';
+import { upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
+import { validateHossiiGuideSettingsForSave, buildHossiiGuideDraft } from '../../core/utils/hossiiGuide';
+import { HossiiGuideSettingsSection } from './HossiiGuideSettingsSection';
 import styles from './HossiiCustomTab.module.css';
 
 type CharacterDraft = {
@@ -38,6 +43,8 @@ type CharacterDraft = {
 
 type Props = {
   space: Space;
+  settings: SpaceSettings | null;
+  onUpdateSettings: (settings: SpaceSettings) => void;
   onUpdateSpace: (patch: Partial<Space>) => void;
   onDirtyChange: (dirty: boolean) => void;
 };
@@ -56,11 +63,29 @@ function buildInitialDraft(space: Space, editPane: ReturnType<typeof useSettings
   };
 }
 
-export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => {
+export const CharacterTab = ({
+  space,
+  settings,
+  onUpdateSettings,
+  onUpdateSpace,
+  onDirtyChange,
+}: Props) => {
   const { editPane, saveContext } = useSettingsEditPane();
   const initial = useMemo(() => buildInitialDraft(space, editPane), [space, editPane]);
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
+  const guideInitial = useMemo(
+    () => buildHossiiGuideDraft(settings?.hossiiGuide),
+    [settings?.hossiiGuide],
+  );
+  const {
+    draft: guideDraft,
+    setDraft: setGuideDraft,
+    isDirty: guideDirty,
+    discard: discardGuide,
+    commitSaved: commitGuideSaved,
+  } = useScreenDraft(guideInitial);
   const [isSaving, setIsSaving] = useState(false);
+  const [guideValidationError, setGuideValidationError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emotionFileInputRef = useRef<HTMLInputElement>(null);
@@ -72,8 +97,9 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
   const [emotionUploadError, setEmotionUploadError] = useState<string | null>(null);
 
   useEffect(() => {
-    onDirtyChange(isDirty);
-  }, [isDirty, onDirtyChange]);
+    const editingGuide = saveContext?.editPane.isDefault ?? true;
+    onDirtyChange(isDirty || (editingGuide && guideDirty));
+  }, [isDirty, guideDirty, onDirtyChange, saveContext?.editPane.isDefault]);
 
   useEffect(() => {
     if (!toast) return;
@@ -107,7 +133,24 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
   const handleSave = async () => {
     if (!saveContext) return;
     setIsSaving(true);
+    setGuideValidationError(null);
     try {
+      if (saveContext.editPane.isDefault && settings) {
+        const validation = validateHossiiGuideSettingsForSave(guideDraft);
+        if (!validation.ok) {
+          setGuideValidationError(validation.message);
+          return;
+        }
+        const nextSettings: SpaceSettings = {
+          ...settings,
+          hossiiGuide: validation.settings,
+        };
+        onUpdateSettings(nextSettings);
+        saveSpaceSettings(nextSettings);
+        await upsertSpaceSettings(nextSettings);
+        commitGuideSaved();
+      }
+
       await savePaneCharacterOverride(saveContext, {
         characterName: draft.characterName,
         characterImageUrl: draft.characterImageUrl,
@@ -443,7 +486,24 @@ export const CharacterTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => 
           )}
         </SettingsSection>
 
-        <SettingsSaveBar isDirty={isDirty} isSaving={isSaving} onDiscard={discard} onSave={handleSave} />
+        {saveContext?.editPane.isDefault && settings && (
+          <HossiiGuideSettingsSection
+            draft={guideDraft}
+            onChange={setGuideDraft}
+            validationError={guideValidationError}
+          />
+        )}
+
+        <SettingsSaveBar
+          isDirty={isDirty || (Boolean(saveContext?.editPane.isDefault) && guideDirty)}
+          isSaving={isSaving}
+          onDiscard={() => {
+            discard();
+            discardGuide();
+            setGuideValidationError(null);
+          }}
+          onSave={handleSave}
+        />
       </SettingsPageHeader>
 
       {toast && (

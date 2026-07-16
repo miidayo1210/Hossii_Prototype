@@ -84,6 +84,7 @@ export const SpaceSettingsScreen = () => {
         posting: loaded.posting ?? local.posting,
         reflection: loaded.reflection ?? local.reflection,
         mode: loaded.mode ?? local.mode ?? DEFAULT_SPACE_MODE_STATE,
+        hossiiGuide: loaded.hossiiGuide ?? local.hossiiGuide,
       };
       setSettings(merged);
       saveSpaceSettings(merged);
@@ -283,14 +284,16 @@ export const SpaceSettingsScreen = () => {
           />
         );
       case 'character':
-        return (
+        return settings ? (
           <CharacterTab
             key={`char-${activeSpace.id}`}
             space={activeSpace}
+            settings={settings}
+            onUpdateSettings={handleSettingsUpdate}
             onUpdateSpace={handleSpaceUpdate}
             onDirtyChange={handleDirtyChange}
           />
-        );
+        ) : null;
       case 'decoration':
         return (
           <DecorationTab

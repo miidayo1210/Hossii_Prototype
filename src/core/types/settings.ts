@@ -92,6 +92,26 @@ export const DEFAULT_SPACE_MODE_STATE: SpaceModeState = {
   isCustomized: false,
 };
 
+/** Hossiiガイド吹き出しの話し方（117 仕様 9章） */
+export type HossiiGuideMode = 'package' | 'custom' | 'mixed';
+
+/** スペース単位の Hossii ガイド設定（117 仕様 18章） */
+export type HossiiGuideSettings = {
+  /** 機能 ON/OFF */
+  enabled: boolean;
+  /** 話し方。Phase 1 は 'package' のみ有効 */
+  mode: HossiiGuideMode;
+  /** 選択パッケージ key（Phase 1: enabled 時必須） */
+  packageKey?: string;
+  /** 手動メッセージ（Phase 2）。Phase 1 では表示に未使用 */
+  customMessages?: string[];
+};
+
+export const DEFAULT_HOSSII_GUIDE_SETTINGS: HossiiGuideSettings = {
+  enabled: false,
+  mode: 'package',
+};
+
 export type SpaceSettings = {
   spaceId: string;
   /** 表示用。正本は Space.name（DB には保存しない） */
@@ -106,6 +126,8 @@ export type SpaceSettings = {
   mode?: SpaceModeState;
   /** 時系列奥行き表示 ON/OFF。未設定は OFF（108） */
   timelineDepthEnabled?: boolean;
+  /** Hossiiガイド吹き出し（117）。未設定は OFF 相当 */
+  hossiiGuide?: HossiiGuideSettings;
 };
 
 export const DEFAULT_SPACE_FEATURES: SpaceFeatures = {

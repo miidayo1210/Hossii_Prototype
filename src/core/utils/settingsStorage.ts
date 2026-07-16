@@ -1,6 +1,7 @@
 import type { SpaceSettings } from '../types/settings';
 import { DEFAULT_SPACE_SETTINGS } from '../types/settings';
 import { mergePostFieldSettings } from './postFieldSettings';
+import { normalizeHossiiGuideSettings } from './hossiiGuide';
 
 const SETTINGS_KEY_PREFIX = 'space_settings_';
 
@@ -33,6 +34,7 @@ export const loadSpaceSettings = (spaceId: string, spaceName: string): SpaceSett
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
+      const hossiiGuide = normalizeHossiiGuideSettings(parsed.hossiiGuide);
       const merged: SpaceSettings = {
         ...DEFAULT_SPACE_SETTINGS,
         ...parsed,
@@ -43,6 +45,7 @@ export const loadSpaceSettings = (spaceId: string, spaceName: string): SpaceSett
         posting: parsed.posting ?? DEFAULT_SPACE_SETTINGS.posting,
         reflection: parsed.reflection ?? DEFAULT_SPACE_SETTINGS.reflection,
         mode: parsed.mode ?? DEFAULT_SPACE_SETTINGS.mode,
+        ...(hossiiGuide ? { hossiiGuide } : {}),
       };
       return merged;
     } catch (error) {
