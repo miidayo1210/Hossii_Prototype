@@ -3,6 +3,7 @@ import { useRouter } from '../../core/hooks/useRouter';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
 import { loadSpaceSettings, saveSpaceSettings } from '../../core/utils/settingsStorage';
+import { mergePostFieldSettings } from '../../core/utils/postFieldSettings';
 import { fetchSpaceSettings, upsertSpaceSettings } from '../../core/utils/spaceSettingsApi';
 import type { SpaceSettings } from '../../core/types/settings';
 import { DEFAULT_STAR_MARKER, DEFAULT_SPACE_MODE_STATE } from '../../core/types/settings';
@@ -77,6 +78,7 @@ export const SpaceSettingsScreen = () => {
       const local = loadSpaceSettings(activeSpace.id, activeSpace.name);
       const merged: SpaceSettings = {
         ...loaded,
+        postFields: mergePostFieldSettings(loaded.postFields ?? local.postFields),
         timelineDepthEnabled: loaded.timelineDepthEnabled,
         starMarkerType: loaded.starMarkerType ?? local.starMarkerType ?? DEFAULT_STAR_MARKER,
         posting: loaded.posting ?? local.posting,

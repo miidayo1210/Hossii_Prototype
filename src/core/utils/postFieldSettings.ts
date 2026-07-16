@@ -22,6 +22,23 @@ function parseFieldConfig(raw: unknown, fallback: PostFieldConfig): PostFieldCon
   };
 }
 
+/** Pane 上書きをベース設定にマージ（部分指定でも required を継承） */
+export function mergePanePostFieldOverride(
+  base: PostFieldSettings,
+  override: Partial<PostFieldSettings> | undefined | null,
+): PostFieldSettings {
+  if (!override) return mergePostFieldSettings(base);
+
+  const merged: Partial<PostFieldSettings> = { ...base };
+  for (const key of FIELD_KEYS) {
+    const fieldOverride = override[key];
+    if (fieldOverride != null) {
+      merged[key] = { ...base[key], ...fieldOverride };
+    }
+  }
+  return mergePostFieldSettings(merged);
+}
+
 export function mergePostFieldSettings(partial: Partial<PostFieldSettings> | undefined): PostFieldSettings {
   const result = { ...DEFAULT_POST_FIELD_SETTINGS };
   if (!partial) return result;

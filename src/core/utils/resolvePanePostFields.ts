@@ -1,6 +1,6 @@
 import type { PostFieldSettings, SpaceSettings } from '../types/settings';
 import type { SpacePane } from '../types/spacePane';
-import { mergePostFieldSettings, resolvePostFields } from './postFieldSettings';
+import { mergePanePostFieldOverride, resolvePostFields } from './postFieldSettings';
 
 /**
  * Resolves post form field config for a pane. Default pane uses space_settings;
@@ -16,5 +16,5 @@ export function resolvePanePostFields(
   const override = pane.settings?.postFields;
   if (override == null) return base;
 
-  return mergePostFieldSettings({ ...base, ...override });
+  return mergePanePostFieldOverride(base, override);
 }
