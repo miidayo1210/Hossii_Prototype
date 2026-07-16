@@ -5,9 +5,8 @@
 }
 
 .header {
-  padding: 5rem 1.5rem 1rem;
+  padding: 5rem 1.5rem 0.75rem;
   background: #fff;
-  border-bottom: 1px solid #e5e7eb;
 }
 
 .title {
@@ -15,6 +14,8 @@
   font-weight: 700;
   color: #1f2937;
   margin: 0;
+  max-width: 32rem;
+  margin-inline: auto;
 }
 
 .content {
@@ -26,32 +27,16 @@
   gap: 1rem;
 }
 
-.identityBanner {
-  background: linear-gradient(135deg, #ede9fe 0%, #fce7f3 100%);
-  border-radius: 0.875rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid #e9d5ff;
-}
-
-.identityGreeting {
-  margin: 0 0 0.35rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #4c1d95;
-  line-height: 1.45;
-}
-
-.identityStatus {
-  margin: 0;
-  font-size: 0.75rem;
-  color: #7c3aed;
-  font-weight: 500;
+.sectionStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 /* セクション共通 */
 .section {
   background: #fff;
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   padding: 1.25rem;
   border: 1px solid #e5e7eb;
 }
@@ -77,7 +62,7 @@
   gap: 0.875rem;
   padding: 0.75rem;
   background: linear-gradient(135deg, #faf5ff 0%, #fdf4ff 100%);
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   margin-bottom: 1rem;
 }
 
@@ -173,7 +158,7 @@ button.guestAuthLocked.signUpButton {
 .loginButton {
   width: 100%;
   padding: 0.75rem 1rem;
-  border-radius: 0.625rem;
+  border-radius: 0.875rem;
   border: 1.5px solid #e5e7eb;
   background: #fff;
   color: #374151;
@@ -191,7 +176,7 @@ button.guestAuthLocked.signUpButton {
 .signUpButton {
   width: 100%;
   padding: 0.75rem 1rem;
-  border-radius: 0.625rem;
+  border-radius: 0.875rem;
   border: none;
   background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
   color: #fff;
@@ -221,7 +206,7 @@ button.guestAuthLocked.signUpButton {
   flex: 1;
   padding: 0.625rem 0.75rem;
   border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
+  border-radius: 0.875rem;
   font-size: 0.875rem;
   color: #1f2937;
   background: #fff;
@@ -242,7 +227,7 @@ button.guestAuthLocked.signUpButton {
 .saveButton {
   padding: 0.625rem 1rem;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.875rem;
   background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
   color: #fff;
   font-size: 0.875rem;
@@ -277,7 +262,7 @@ button.guestAuthLocked.signUpButton {
   width: 100%;
   padding: 0.75rem;
   border: 1.5px solid #ef4444;
-  border-radius: 0.625rem;
+  border-radius: 0.875rem;
   background: #fff;
   color: #ef4444;
   font-size: 0.875rem;
@@ -303,7 +288,11 @@ button.guestAuthLocked.signUpButton {
   }
 
   .header {
-    padding: 2rem 2rem 1rem;
+    padding: 2rem 2rem 0.75rem;
+  }
+
+  .content {
+    padding: 1.25rem 2rem 2rem;
   }
 }
 

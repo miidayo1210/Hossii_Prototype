@@ -1,0 +1,124 @@
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.greetingBlock {
+  background: linear-gradient(135deg, #ede9fe 0%, #fce7f3 100%);
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e9d5ff;
+}
+
+.greeting {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4c1d95;
+  line-height: 1.45;
+}
+
+.summaryBlock {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 0.25rem 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.summaryRow:last-child {
+  border-bottom: none;
+}
+
+.summaryLabel {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.summaryValue {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1f2937;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.entryCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.entryCard:hover {
+  border-color: #d8b4fe;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.08);
+  transform: translateY(-1px);
+}
+
+.entryText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.entryLabelRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.entryLabel {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.entryBadge {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: #f3e8ff;
+  color: #7c3aed;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.entryHint {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.entryArrow {
+  color: #a855f7;
+  flex-shrink: 0;
+}
