@@ -34,7 +34,7 @@ export function getPersonalShortcutHiddenReason(
   if (params.isVisiting) return null;
   if (!params.spaceCommunityId) return null;
   if (!params.isAuthenticated) {
-    return 'ログインすると、タブ列の右端にマイスペースが表示されます。';
+    return 'ログインすると、マイスペースタブが使えるようになります。';
   }
   switch (params.membershipStatus) {
     case 'suspended':

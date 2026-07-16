@@ -189,7 +189,7 @@ const CommunityPersonalSpaceItem = ({ item, onCreated }: ItemProps) => {
               <span className={styles.subtle}>{MY_SPACE_ARCHIVED_NOTE}</span>
             ) : (
               <span className={styles.subtle}>
-                共有スペースの「マイスペース」タブ（右端）から利用できます
+                共有スペースの「マイスペース」タブから利用できます
               </span>
             )}
           </>
