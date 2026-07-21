@@ -242,6 +242,8 @@
 
 @media (max-height: 600px) and (orientation: landscape) {
   .clusterLandscapeClamp {
+    /* cardFloat の transform と競合しないよう停止（clamp translate を優先） */
+    animation: none !important;
     transform: translate(var(--cluster-clamp-x, 0px), var(--cluster-clamp-y, 0px));
   }
 

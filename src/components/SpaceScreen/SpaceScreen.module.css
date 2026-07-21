@@ -1228,6 +1228,8 @@
 /* カスタムモード: SP 横向き — 吹き出しを bubbleArea 内に収める（星モード対象外） */
 @media (max-height: 600px) and (orientation: landscape) {
   .bubbleLandscapeClamp {
+    /* bubbleFloat の transform と競合しないよう停止（clamp translate を優先） */
+    animation: none !important;
     transform: translate(var(--bubble-clamp-x, 0px), var(--bubble-clamp-y, 0px));
   }
 
