@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BULK_ISSUE_FAILURE_MESSAGE,
+  BULK_ISSUE_WAITING_HINT,
+  BULK_ISSUE_WAITING_LONG_MS,
   buildParticipantAccountRows,
   clampBulkIssueCount,
+  formatBulkIssueInProgressButtonLabel,
+  formatBulkIssuePartialMessage,
+  formatBulkIssueSuccessMessage,
+  formatBulkIssueWaitingLongMessage,
+  formatBulkIssueWaitingMessage,
   formatParticipantCredentialsForCopy,
   getAvailableParticipantSlots,
   getOccupiedSlotNumbers,
@@ -191,5 +199,24 @@ describe('formatParticipantCredentialsForCopy', () => {
 
   it('returns empty string for no accounts', () => {
     expect(formatParticipantCredentialsForCopy([])).toBe('');
+  });
+});
+
+describe('bulk issue UX messages', () => {
+  it('formats waiting, progress, success, partial, and failure messages', () => {
+    expect(formatBulkIssueWaitingMessage(10)).toBe('10件のアカウントを発行しています…');
+    expect(formatBulkIssueWaitingLongMessage()).toBe(
+      '少し時間がかかっています。このままお待ちください。',
+    );
+    expect(formatBulkIssueInProgressButtonLabel(10)).toBe('10件を発行中…');
+    expect(formatBulkIssueSuccessMessage(10)).toBe('10件のアカウントを発行しました');
+    expect(formatBulkIssuePartialMessage(10, 8)).toBe(
+      '10件中8件を発行しました。2件は発行できませんでした。',
+    );
+    expect(BULK_ISSUE_FAILURE_MESSAGE).toBe(
+      'アカウントを発行できませんでした。もう一度お試しください。',
+    );
+    expect(BULK_ISSUE_WAITING_HINT).toContain('この画面を閉じずにお待ちください');
+    expect(BULK_ISSUE_WAITING_LONG_MS).toBe(5000);
   });
 });

@@ -279,6 +279,40 @@
   font-size: 0.875rem;
 }
 
+.partialSuccess {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.bulkWaiting {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.bulkWaitingMessage {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #374151;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.bulkWaitingHint {
+  margin: 0.375rem 0 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
 .recentlyIssued {
   margin-bottom: 1rem;
   padding: 1rem;

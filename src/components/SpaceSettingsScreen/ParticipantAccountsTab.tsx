@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react';
 import type { Space } from '../../core/types/space';
 import {
   buildParticipantAccountRows,
   fetchParticipantAccountManagementSnapshot,
+  formatBulkIssueInProgressButtonLabel,
+  formatBulkIssuePartialMessage,
+  formatBulkIssueSuccessMessage,
+  formatBulkIssueWaitingLongMessage,
+  formatBulkIssueWaitingMessage,
+  BULK_ISSUE_FAILURE_MESSAGE,
+  BULK_ISSUE_WAITING_HINT,
+  BULK_ISSUE_WAITING_LONG_MS,
   formatParticipantCredentialsForCopy,
   getAvailableParticipantSlots,
   isParticipantSlotOccupied,
@@ -51,10 +59,14 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
   const [loading, setLoading] = useState(true);
   const [busySlot, setBusySlot] = useState<number | null>(null);
   const [bulkIssuing, setBulkIssuing] = useState(false);
+  const [bulkIssuingCount, setBulkIssuingCount] = useState<number | null>(null);
+  const [bulkWaitingLong, setBulkWaitingLong] = useState(false);
+  const bulkWaitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [bulkCountInput, setBulkCountInput] = useState(String(DEFAULT_BULK_COUNT));
   const [recentlyIssued, setRecentlyIssued] = useState<ParticipantAccountIssueResult[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [partialMsg, setPartialMsg] = useState('');
   const [copyFeedback, setCopyFeedback] = useState('');
   const [credentialModal, setCredentialModal] = useState<CredentialModal | null>(null);
   const [linkCommunityMembership, setLinkCommunityMembership] = useState(false);
@@ -88,6 +100,37 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
     setBulkCountInput(String(clamped));
   }, [availableCount]);
 
+  const clearBulkWaitingTimer = useCallback(() => {
+    if (bulkWaitingTimerRef.current) {
+      clearTimeout(bulkWaitingTimerRef.current);
+      bulkWaitingTimerRef.current = null;
+    }
+    setBulkWaitingLong(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearBulkWaitingTimer();
+    };
+  }, [clearBulkWaitingTimer]);
+
+  const startBulkWaiting = useCallback(
+    (count: number) => {
+      clearBulkWaitingTimer();
+      setBulkIssuingCount(count);
+      bulkWaitingTimerRef.current = setTimeout(() => {
+        setBulkWaitingLong(true);
+        bulkWaitingTimerRef.current = null;
+      }, BULK_ISSUE_WAITING_LONG_MS);
+    },
+    [clearBulkWaitingTimer],
+  );
+
+  const stopBulkWaiting = useCallback(() => {
+    clearBulkWaitingTimer();
+    setBulkIssuingCount(null);
+  }, [clearBulkWaitingTimer]);
+
   const showError = (message: string) => {
     setErrorMsg(message);
     setTimeout(() => setErrorMsg(''), 4000);
@@ -96,6 +139,11 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
   const showSuccess = (message: string) => {
     setSuccessMsg(message);
     setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const showPartial = (message: string) => {
+    setPartialMsg(message);
+    setTimeout(() => setPartialMsg(''), 6000);
   };
 
   const showCopyFeedback = (message: string) => {
@@ -130,30 +178,34 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
   const handleBulkIssue = async () => {
     if (bulkIssuing || isFullyIssued || !bulkCountValid) return;
 
+    const requestedCount = parsedBulkCount;
     setBulkIssuing(true);
+    startBulkWaiting(requestedCount);
     setErrorMsg('');
     setSuccessMsg('');
+    setPartialMsg('');
     setCopyFeedback('');
 
     try {
       const result = await issueParticipantAccountsBulk(
         space.id,
-        parsedBulkCount,
+        requestedCount,
         membershipOptions,
       );
 
       setRecentlyIssued(result.issued);
       await reload();
 
-      if (result.partial && result.error) {
-        showError(`${result.count} 件発行しましたが、途中で失敗しました: ${result.error}`);
+      if (result.partial) {
+        showPartial(formatBulkIssuePartialMessage(requestedCount, result.count));
       } else {
-        showSuccess(`${result.count} 件のアカウントを発行しました`);
+        showSuccess(formatBulkIssueSuccessMessage(result.count));
       }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : '一括発行に失敗しました');
+    } catch {
+      showError(BULK_ISSUE_FAILURE_MESSAGE);
     } finally {
       setBulkIssuing(false);
+      stopBulkWaiting();
     }
   };
 
@@ -290,13 +342,28 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
             disabled={isFullyIssued || bulkIssuing || loading || !bulkCountValid}
           >
             <Plus size={14} />
-            {bulkIssuing ? '発行中…' : 'まとめて発行'}
+            {bulkIssuing && bulkIssuingCount !== null
+              ? formatBulkIssueInProgressButtonLabel(bulkIssuingCount)
+              : 'まとめて発行'}
           </button>
         </div>
         {!loading && bulkCountInput !== '' && bulkCountValidation && (
           <p className={styles.bulkValidation}>{bulkCountValidation}</p>
         )}
+        {bulkIssuing && bulkIssuingCount !== null && (
+          <div className={styles.bulkWaiting} role="status" aria-live="polite">
+            <p className={styles.bulkWaitingMessage}>
+              {bulkWaitingLong
+                ? formatBulkIssueWaitingLongMessage()
+                : formatBulkIssueWaitingMessage(bulkIssuingCount)}
+            </p>
+            {!bulkWaitingLong && (
+              <p className={styles.bulkWaitingHint}>{BULK_ISSUE_WAITING_HINT}</p>
+            )}
+          </div>
+        )}
         {successMsg && <p className={styles.success}>{successMsg}</p>}
+        {partialMsg && <p className={styles.partialSuccess}>{partialMsg}</p>}
       </div>
 
       {recentlyIssued.length > 0 && (

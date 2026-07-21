@@ -97,3 +97,32 @@ export function selectBulkIssueSlots(
 ): number[] {
   return getAvailableParticipantSlots(occupiedSlotNumbers).slice(0, count);
 }
+
+export const BULK_ISSUE_WAITING_LONG_MS = 5000;
+
+export const BULK_ISSUE_WAITING_HINT =
+  '件数によっては少し時間がかかります。この画面を閉じずにお待ちください。';
+
+export const BULK_ISSUE_FAILURE_MESSAGE =
+  'アカウントを発行できませんでした。もう一度お試しください。';
+
+export function formatBulkIssueWaitingMessage(count: number): string {
+  return `${count}件のアカウントを発行しています…`;
+}
+
+export function formatBulkIssueWaitingLongMessage(): string {
+  return '少し時間がかかっています。このままお待ちください。';
+}
+
+export function formatBulkIssueInProgressButtonLabel(count: number): string {
+  return `${count}件を発行中…`;
+}
+
+export function formatBulkIssueSuccessMessage(count: number): string {
+  return `${count}件のアカウントを発行しました`;
+}
+
+export function formatBulkIssuePartialMessage(requested: number, succeeded: number): string {
+  const failed = Math.max(0, requested - succeeded);
+  return `${requested}件中${succeeded}件を発行しました。${failed}件は発行できませんでした。`;
+}

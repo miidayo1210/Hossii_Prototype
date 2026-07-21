@@ -6,8 +6,16 @@ import {
 
 export { buildParticipantAccountRows, MAX_PARTICIPANT_ACCOUNT_SLOTS };
 export {
+  BULK_ISSUE_FAILURE_MESSAGE,
+  BULK_ISSUE_WAITING_HINT,
+  BULK_ISSUE_WAITING_LONG_MS,
   clampBulkIssueCount,
   countActiveParticipantAccounts,
+  formatBulkIssueInProgressButtonLabel,
+  formatBulkIssuePartialMessage,
+  formatBulkIssueSuccessMessage,
+  formatBulkIssueWaitingLongMessage,
+  formatBulkIssueWaitingMessage,
   formatParticipantCredentialsForCopy,
   getAvailableParticipantSlots,
   getOccupiedSlotNumbers,
