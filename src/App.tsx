@@ -657,6 +657,9 @@ const AppContent = () => {
     setShowTutorial(false);
   };
 
+  const shouldShowLegacyTutorial =
+    showTutorial && !!userProfile && screen !== 'screen';
+
   const renderScreen = () => {
     switch (screen) {
       case 'post':
@@ -727,7 +730,7 @@ const AppContent = () => {
         duration={2000}
         onClose={() => setVisitingToast(false)}
       />
-      {showTutorial && userProfile && (
+      {shouldShowLegacyTutorial && userProfile && (
         <TutorialOverlay
           userId={userProfile.userId}
           onComplete={handleTutorialComplete}
