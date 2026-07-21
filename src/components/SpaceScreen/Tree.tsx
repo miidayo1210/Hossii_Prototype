@@ -541,6 +541,7 @@ export function BubbleInner({
       )}
 
       <div
+        data-bubble-clamp-content
         className={[
           styles.bubbleInner,
           !isCanvasPost && bubbleShapePng ? styles.bubbleInnerShaped : '',

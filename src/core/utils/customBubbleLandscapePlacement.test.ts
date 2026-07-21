@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUBBLE_VIEWPORT_MARGIN_PX,
+  LANDSCAPE_BUBBLE_HOVER_SCALE,
+  bubbleRectAfterClamp,
   computeBubbleViewportClampOffset,
+  inflateRectForScale,
+  isRectInsideArea,
   measureBubbleClampOffset,
   rectWithoutTranslate,
   snapClampOffset,
+  type AxisRect,
 } from './customBubbleLandscapePlacement';
+
+/** Production 844×390 landscape bubbleArea（小数 px） */
+const PRODUCTION_AREA: AxisRect = {
+  left: 0,
+  top: 112,
+  right: 844,
+  bottom: 502,
+};
 
 describe('computeBubbleViewportClampOffset', () => {
   const area = { left: 0, top: 0, right: 844, bottom: 390 };
@@ -139,5 +152,168 @@ describe('measureBubbleClampOffset', () => {
     expect(bubble.top + offset.y).toBeGreaterThanOrEqual(
       area.top + BUBBLE_VIEWPORT_MARGIN_PX - 0.01,
     );
+  });
+});
+
+describe('fractional / DPR-like rects', () => {
+  it('handles subpixel container and bubble rects from production', () => {
+    const area = {
+      left: 0,
+      top: 112.5,
+      right: 843.6875,
+      bottom: 501.984375,
+    };
+    const bubble = {
+      left: 798.7581481933594,
+      top: 329.605224609375,
+      right: 869.7268981933594,
+      bottom: 450.902099609375,
+    };
+    const offset = computeBubbleViewportClampOffset(bubble, area);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), area, 8),
+    ).toBe(true);
+  });
+
+  it('handles hover-scale enlarged rect (5% larger, centered expansion approx)', () => {
+    const bubble = { left: 700, top: 300, right: 900, bottom: 420 };
+    const scaled = inflateRectForScale(bubble, LANDSCAPE_BUBBLE_HOVER_SCALE);
+    const offset = computeBubbleViewportClampOffset(scaled, PRODUCTION_AREA);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(scaled, offset), PRODUCTION_AREA, 8),
+    ).toBe(true);
+  });
+
+  it('measureBubbleClampOffset with visualScale is more conservative at edges', () => {
+    const bubble = {
+      left: 798.758,
+      top: 329.605,
+      right: 869.727,
+      bottom: 450.902,
+    };
+    const withoutScale = measureBubbleClampOffset(bubble, PRODUCTION_AREA, {
+      x: 0,
+      y: 0,
+    });
+    const withScale = measureBubbleClampOffset(
+      bubble,
+      PRODUCTION_AREA,
+      { x: 0, y: 0 },
+      { visualScale: LANDSCAPE_BUBBLE_HOVER_SCALE },
+    );
+    expect(withScale.x).toBeLessThanOrEqual(withoutScale.x);
+    const clampedNatural = bubbleRectAfterClamp(bubble, withScale);
+    const hoverBox = inflateRectForScale(clampedNatural, LANDSCAPE_BUBBLE_HOVER_SCALE);
+    expect(isRectInsideArea(hoverBox, PRODUCTION_AREA, 8)).toBe(true);
+  });
+});
+
+describe('safe margin 4px vs 8px', () => {
+  const bubble = { left: 790, top: 320, right: 852.6875, bottom: 441.5 };
+
+  it('respects 8px default margin', () => {
+    const offset = computeBubbleViewportClampOffset(bubble, PRODUCTION_AREA, 8);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), PRODUCTION_AREA, 8),
+    ).toBe(true);
+  });
+
+  it('respects 4px verification margin', () => {
+    const offset = computeBubbleViewportClampOffset(bubble, PRODUCTION_AREA, 4);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), PRODUCTION_AREA, 4),
+    ).toBe(true);
+  });
+
+  it('8px margin is stricter than 4px margin', () => {
+    const o4 = computeBubbleViewportClampOffset(bubble, PRODUCTION_AREA, 4);
+    const o8 = computeBubbleViewportClampOffset(bubble, PRODUCTION_AREA, 8);
+    expect(o8.x).toBeLessThanOrEqual(o4.x);
+  });
+});
+
+describe('right + bottom simultaneous overflow (production-like)', () => {
+  it('clamps both axes for wide bottom-right bubble', () => {
+    const bubble = {
+      left: 531.109375,
+      top: 411.730712890625,
+      right: 731.109375,
+      bottom: 533.027587890625,
+    };
+    const offset = computeBubbleViewportClampOffset(bubble, PRODUCTION_AREA);
+    expect(offset.x).toBeLessThanOrEqual(0);
+    expect(offset.y).toBeLessThan(0);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), PRODUCTION_AREA, 8),
+    ).toBe(true);
+  });
+});
+
+describe('bubble larger than container', () => {
+  it('pins oversized bubble to margins without NaN', () => {
+    const bubble = { left: 10, top: 100, right: 900, bottom: 520 };
+    const offset = computeBubbleViewportClampOffset(bubble, PRODUCTION_AREA);
+    expect(Number.isFinite(offset.x)).toBe(true);
+    expect(Number.isFinite(offset.y)).toBe(true);
+    expect(bubble.left + offset.x).toBeGreaterThanOrEqual(
+      PRODUCTION_AREA.left + BUBBLE_VIEWPORT_MARGIN_PX - 0.01,
+    );
+    expect(bubble.top + offset.y).toBeGreaterThanOrEqual(
+      PRODUCTION_AREA.top + BUBBLE_VIEWPORT_MARGIN_PX - 0.01,
+    );
+  });
+});
+
+describe('clamp後再計測', () => {
+  it('measureBubbleClampOffset stabilizes after clamp is applied', () => {
+    const natural = {
+      left: 798.758,
+      top: 329.605,
+      right: 869.727,
+      bottom: 450.902,
+    };
+    const measureOpts = { visualScale: LANDSCAPE_BUBBLE_HOVER_SCALE };
+    const first = measureBubbleClampOffset(
+      natural,
+      PRODUCTION_AREA,
+      { x: 0, y: 0 },
+      measureOpts,
+    );
+    const clampedRect = bubbleRectAfterClamp(natural, first);
+    const second = measureBubbleClampOffset(
+      clampedRect,
+      PRODUCTION_AREA,
+      first,
+      measureOpts,
+    );
+    expect(second).toEqual(first);
+    expect(
+      isRectInsideArea(clampedRect, PRODUCTION_AREA, 8),
+    ).toBe(true);
+  });
+
+  it('re-measures correctly when content height grows after initial clamp', () => {
+    const naturalShort = {
+      left: 531.109375,
+      top: 387.404846,
+      right: 731.109375,
+      bottom: 468.701721,
+    };
+    const first = computeBubbleViewportClampOffset(naturalShort, PRODUCTION_AREA);
+    expect(first.y).toBe(0);
+
+    const naturalTall = {
+      ...naturalShort,
+      bottom: naturalShort.top + 121.296875,
+    };
+    const remeasured = measureBubbleClampOffset(
+      bubbleRectAfterClamp(naturalTall, first),
+      PRODUCTION_AREA,
+      first,
+    );
+    expect(remeasured.y).toBeLessThan(0);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(naturalTall, remeasured), PRODUCTION_AREA, 8),
+    ).toBe(true);
   });
 });

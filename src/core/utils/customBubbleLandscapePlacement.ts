@@ -4,6 +4,15 @@ export const MOBILE_LANDSCAPE_BUBBLE_MQ =
 
 export const BUBBLE_VIEWPORT_MARGIN_PX = 8;
 
+/** SP 横向き clamp 時の hover/active scale（SpaceScreen.module.css と一致） */
+export const LANDSCAPE_BUBBLE_HOVER_SCALE = 1.05;
+
+export type MeasureBubbleClampOptions = {
+  marginPx?: number;
+  /** hover scale 込みの bounding box で clamp（既定: 1 = scale 無視） */
+  visualScale?: number;
+};
+
 export type AxisRect = {
   left: number;
   top: number;
@@ -81,16 +90,88 @@ export function rectWithoutTranslate(
   };
 }
 
+/** 中心基準で矩形を拡大（CSS transform: scale の近似 bounding box） */
+export function inflateRectForScale(rect: AxisRect, scale: number): AxisRect {
+  if (scale <= 1) return rect;
+  const cx = (rect.left + rect.right) / 2;
+  const cy = (rect.top + rect.bottom) / 2;
+  const halfW = ((rect.right - rect.left) / 2) * scale;
+  const halfH = ((rect.bottom - rect.top) / 2) * scale;
+  return {
+    left: cx - halfW,
+    top: cy - halfH,
+    right: cx + halfW,
+    bottom: cy + halfH,
+  };
+}
+
 export function measureBubbleClampOffset(
   bubbleRect: AxisRect,
   areaRect: AxisRect,
   currentClamp: { x: number; y: number },
-  marginPx = BUBBLE_VIEWPORT_MARGIN_PX,
+  options: MeasureBubbleClampOptions | number = {},
 ): { x: number; y: number } {
+  const opts: MeasureBubbleClampOptions =
+    typeof options === 'number' ? { marginPx: options } : options;
+  const marginPx = opts.marginPx ?? BUBBLE_VIEWPORT_MARGIN_PX;
+  const visualScale = opts.visualScale ?? 1;
+
   const naturalRect = rectWithoutTranslate(
     bubbleRect,
     currentClamp.x,
     currentClamp.y,
   );
-  return computeBubbleViewportClampOffset(naturalRect, areaRect, marginPx);
+  const clampTarget =
+    visualScale > 1
+      ? inflateRectForScale(naturalRect, visualScale)
+      : naturalRect;
+
+  let offset = computeBubbleViewportClampOffset(
+    clampTarget,
+    areaRect,
+    marginPx,
+  );
+
+  // translate 適用後に scale されるため、clamp 後の hover bounding box で 1 回だけ検証
+  const clampedNatural = bubbleRectAfterClamp(naturalRect, offset);
+  const verifyRect =
+    visualScale > 1
+      ? inflateRectForScale(clampedNatural, visualScale)
+      : clampedNatural;
+  if (!isRectInsideArea(verifyRect, areaRect, marginPx)) {
+    const fix = computeBubbleViewportClampOffset(
+      verifyRect,
+      areaRect,
+      marginPx,
+    );
+    offset = snapClampOffset(offset.x + fix.x, offset.y + fix.y);
+  }
+
+  return offset;
+}
+
+/** clamp 適用後の表示矩形（テスト・検証用） */
+export function bubbleRectAfterClamp(
+  naturalRect: AxisRect,
+  offset: { x: number; y: number },
+): AxisRect {
+  return {
+    left: naturalRect.left + offset.x,
+    top: naturalRect.top + offset.y,
+    right: naturalRect.right + offset.x,
+    bottom: naturalRect.bottom + offset.y,
+  };
+}
+
+export function isRectInsideArea(
+  rect: AxisRect,
+  areaRect: AxisRect,
+  marginPx: number,
+): boolean {
+  return (
+    rect.left >= areaRect.left + marginPx - 0.01 &&
+    rect.top >= areaRect.top + marginPx - 0.01 &&
+    rect.right <= areaRect.right - marginPx + 0.01 &&
+    rect.bottom <= areaRect.bottom - marginPx + 0.01
+  );
 }
