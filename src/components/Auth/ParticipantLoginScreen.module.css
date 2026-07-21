@@ -1,0 +1,311 @@
+/* ===== 背景（GuestEntryScreen と同系） ===== */
+.container {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(150deg, #ede9fe 0%, #f5f3ff 40%, #fce7f3 100%);
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+  padding: 1.5rem;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.blob1 {
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.35) 0%, transparent 70%);
+  top: -80px;
+  right: -80px;
+}
+
+.blob2 {
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, transparent 70%);
+  bottom: -60px;
+  left: -60px;
+}
+
+.blob3 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.card {
+  position: relative;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  padding: 2.25rem 2rem;
+  width: 100%;
+  max-width: 400px;
+  max-height: calc(100dvh - 3rem);
+  overflow-y: auto;
+  box-shadow:
+    0 4px 6px rgba(124, 58, 237, 0.06),
+    0 20px 40px rgba(124, 58, 237, 0.12);
+}
+
+.stepBackButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.375rem 0.75rem 0.375rem 0;
+  margin: -0.25rem 0 0.5rem -0.125rem;
+  background: none;
+  border: none;
+  color: #6d28d9;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.stepBackButton:hover {
+  color: #4c1d95;
+}
+
+.stepBackButton:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #4c1d95;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.spaceName {
+  font-size: clamp(1.0625rem, 4.5vw, 1.25rem);
+  font-weight: 700;
+  color: #4c1d95;
+  margin: 0.5rem 0 0;
+  line-height: 1.5;
+  word-break: break-word;
+  text-align: center;
+}
+
+.hossiiArea {
+  display: flex;
+  justify-content: center;
+  margin: 0.75rem 0 0.875rem;
+}
+
+.hossiiImage {
+  width: clamp(72px, 22vw, 96px);
+  height: clamp(72px, 22vw, 96px);
+  object-fit: contain;
+  display: block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hossiiImage {
+    animation: hossiiEnter 0.25s ease;
+  }
+}
+
+@keyframes hossiiEnter {
+  from {
+    opacity: 0.65;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.speechBubble {
+  position: relative;
+  background: #f5f3ff;
+  border: 1.5px solid #ddd6fe;
+  border-radius: 16px;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.speechBubble::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 9px solid #ddd6fe;
+}
+
+.speechBubble::after {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 8px solid #f5f3ff;
+}
+
+.speechText {
+  font-size: 0.875rem;
+  color: #4c1d95;
+  margin: 0;
+  line-height: 1.6;
+  text-align: center;
+  font-weight: 500;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-top: 1.125rem;
+}
+
+.fieldLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #5b21b6;
+  margin: 0;
+}
+
+.textInput {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  color: #111827;
+  font-size: 1rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.textInput::placeholder {
+  color: #d1d5db;
+}
+
+.textInput:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+}
+
+.textInput:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.passwordRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.passwordRow .textInput {
+  padding-right: 2.75rem;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.passwordToggle:hover:not(:disabled) {
+  color: #6d28d9;
+}
+
+.passwordToggle:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 1px;
+}
+
+.passwordToggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.formError {
+  font-size: 0.8125rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 0.625rem 0.75rem;
+  margin: 0.25rem 0 0;
+  line-height: 1.5;
+}
+
+.primaryButton {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  min-height: 44px;
+  margin-top: 0.375rem;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+}
+
+.primaryButton:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45);
+  transform: translateY(-1px);
+}
+
+.primaryButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.primaryButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
