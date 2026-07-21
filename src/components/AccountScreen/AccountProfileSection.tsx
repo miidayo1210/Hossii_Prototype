@@ -6,6 +6,7 @@ import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { ACCOUNT_AUTH_COMING_SOON } from '../../core/config/features';
 import { useRouter } from '../../core/hooks/useRouter';
 import type { AccountIdentity } from '../../core/utils/resolveAccountIdentity';
+import { HossiiAboutSection } from './HossiiAboutSection';
 import styles from './AccountScreen.module.css';
 
 type Props = {
@@ -87,14 +88,6 @@ export const AccountProfileSection = ({
                 <div className={styles.userName}>{identity.displayName}</div>
               </div>
             </div>
-            <button
-              className={styles.logoutButton}
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-            >
-              <LogOut size={16} />
-              <span>{isLoggingOut ? 'ログアウト中...' : 'ログアウト'}</span>
-            </button>
           </>
         ) : (
           <div className={styles.guestInfo}>
@@ -186,6 +179,20 @@ export const AccountProfileSection = ({
           <p className={styles.currentValue}>現在の設定: {profile.defaultNickname}</p>
         )}
       </section>
+
+      <HossiiAboutSection />
+
+      {currentUser ? (
+        <button
+          type="button"
+          className={styles.logoutButton}
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+        >
+          <LogOut size={16} />
+          <span>{isLoggingOut ? 'ログアウト中...' : 'ログアウト'}</span>
+        </button>
+      ) : null}
     </div>
   );
 };
