@@ -31,7 +31,6 @@ import { ParticipantLoginScreen } from './components/Auth/ParticipantLoginScreen
 import { GuestEntryScreen } from './components/Auth/GuestEntryScreen';
 import { PrivateSpaceScreen } from './components/Auth/PrivateSpaceScreen';
 import { OnboardingModal } from './components/Auth/OnboardingModal';
-import { TutorialOverlay } from './components/Tutorial/TutorialOverlay';
 import { NicknameModal } from './components/NicknameModal/NicknameModal';
 import { BottomNavBar } from './components/Navigation/BottomNavBar';
 import { DEFAULT_QUICK_EMOTIONS } from './core/types/space';
@@ -87,7 +86,6 @@ const AppContent = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [visitingToast, setVisitingToast] = useState(false);
   const [userProfile, setUserProfile] = useState<{ userId: string; nickname: string } | null>(null);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [pendingQuickPostOpen, setPendingQuickPostOpen] = useState(false);
   const spaceScreenRef = useRef<SpaceScreenHandle>(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -232,16 +230,6 @@ const AppContent = () => {
         : `/s/${slug}${preservedHash}`;
     }
   }, [currentUser, pendingLoginSlug]);
-
-  // Check if user needs tutorial (first time user)
-  useEffect(() => {
-    if (currentUser && userProfile && !showOnboarding) {
-      const tutorialSeen = localStorage.getItem(`hossii_tutorial_seen_${userProfile.userId}`);
-      if (!tutorialSeen) {
-        setShowTutorial(true);
-      }
-    }
-  }, [currentUser, userProfile, showOnboarding]);
 
   // ===== URL スラッグ ファストパス =====
   // fetchSpaces（全件取得）の完了を待たずに、スラッグで1件だけ直接取得して state にマージする。
@@ -691,13 +679,6 @@ const AppContent = () => {
     return <OnboardingModal onComplete={handleOnboardingComplete} />;
   }
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-  };
-
-  const shouldShowLegacyTutorial =
-    showTutorial && !!userProfile && screen !== 'screen';
-
   const renderScreen = () => {
     switch (screen) {
       case 'post':
@@ -768,12 +749,6 @@ const AppContent = () => {
         duration={2000}
         onClose={() => setVisitingToast(false)}
       />
-      {shouldShowLegacyTutorial && userProfile && (
-        <TutorialOverlay
-          userId={userProfile.userId}
-          onComplete={handleTutorialComplete}
-        />
-      )}
     </div>
   );
 };
