@@ -176,6 +176,39 @@
   line-height: 1.45;
 }
 
+/* ===== 再訪確認（revisit step） ===== */
+.revisitActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  align-items: stretch;
+}
+
+.revisitAlternateButton {
+  background: none;
+  border: none;
+  color: #7c3aed;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem;
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  min-height: 44px;
+}
+
+.revisitAlternateButton:hover {
+  color: #5b21b6;
+}
+
+.revisitAlternateButton:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 /* ===== ヘッダー ===== */
 .header {
   text-align: center;

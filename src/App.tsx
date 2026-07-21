@@ -301,11 +301,6 @@ const AppContent = () => {
           if (targetSpace.isPrivate) {
             setGuestSpaceId(targetSpace.id);
             setGuestSpaceIsPrivate(true);
-          } else if (hasNicknameForSpace(targetSpace.id)) {
-            setActiveSpace(targetSpace.id);
-            setIsGuestMode(true);
-            window.history.replaceState({}, '', screenPath);
-            navigate('screen');
           } else {
             setGuestSpaceId(targetSpace.id);
           }
@@ -592,6 +587,7 @@ const AppContent = () => {
   if (!currentUser && !isResolvingAuth && guestSpaceId && !isGuestMode && !pendingLoginSlug) {
     return (
       <GuestEntryScreen
+        key={guestSpaceId}
         spaceId={guestSpaceId}
         onEnterAsGuest={() => {
           setActiveSpace(guestSpaceId);

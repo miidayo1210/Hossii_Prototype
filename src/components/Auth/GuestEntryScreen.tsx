@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { HOSSII_IDLE } from '../../core/assets/hossiiIdle';
 import type { Space } from '../../core/types/space';
+import type { SpaceNicknames } from '../../core/types/profile';
 import styles from './GuestEntryScreen.module.css';
 
-type Step = 'select' | 'nickname';
+type Step = 'select' | 'nickname' | 'revisit';
 
 const DEFAULT_PARTICIPATION_INTRO = `こんにちは！
 ここは、みんなの気づきや想いを
@@ -24,6 +25,10 @@ function getParticipationIntroMessage(space: Space | undefined): string {
   return DEFAULT_PARTICIPATION_INTRO;
 }
 
+function resolveInitialStep(spaceNicknames: SpaceNicknames, spaceId: string): Step {
+  return spaceNicknames[spaceId]?.trim() ? 'revisit' : 'select';
+}
+
 type Props = {
   spaceId: string;
   onEnterAsGuest: () => void;
@@ -35,21 +40,32 @@ type Props = {
 
 export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
-  const [step, setStep] = useState<Step>('select');
+  const savedSpaceNickname = state.spaceNicknames[spaceId]?.trim() ?? '';
+  const [step, setStep] = useState<Step>(() => resolveInitialStep(state.spaceNicknames, spaceId));
   // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
   const savedNickname = state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '';
   const [nickname, setNickname] = useState(savedNickname);
   const [isJoining, setIsJoining] = useState(false);
+
+  useEffect(() => {
+    setStep(resolveInitialStep(state.spaceNicknames, spaceId));
+    setNickname(state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '');
+  // spaceId が変わったときだけ step / nickname を初期化（「別の方法で参加」後は維持）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId]);
 
   const space = state.spaces.find((s) => s.id === spaceId);
   const spaceName = space?.name ?? 'スペース';
   const participationIntroMessage = getParticipationIntroMessage(space);
   const trimmedNickname = nickname.trim();
   const canJoin = trimmedNickname.length > 0;
+  const displayStep = step === 'revisit' && !savedSpaceNickname ? 'select' : step;
 
   const nicknameSpeechText = canJoin
     ? `${trimmedNickname}さんだね！\n準備できたよ`
     : NICKNAME_PROMPT;
+
+  const revisitSpeechText = `おかえり！\n${savedSpaceNickname}さんとして参加する？`;
 
   const handleGuestEnter = () => {
     const trimmed = nickname.trim();
@@ -66,7 +82,45 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
       <div className={`${styles.blob} ${styles.blob3}`} />
 
       <div className={styles.card}>
-        {step === 'select' && (
+        {displayStep === 'revisit' && (
+          <>
+            <div className={styles.selectHeader}>
+              <h1 className={styles.logo}>✨ Hossii</h1>
+              <p className={styles.selectSpaceName}>{spaceName}</p>
+            </div>
+
+            <div className={styles.selectHossiiArea}>
+              <img
+                src={HOSSII_IDLE.smile}
+                alt="Hossii"
+                className={styles.selectHossiiImage}
+              />
+            </div>
+
+            <div className={styles.speechBubble}>
+              <p className={styles.speechText}>{revisitSpeechText}</p>
+            </div>
+
+            <div className={styles.revisitActions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={onEnterAsGuest}
+              >
+                このまま参加
+              </button>
+              <button
+                type="button"
+                className={styles.revisitAlternateButton}
+                onClick={() => setStep('select')}
+              >
+                別の方法で参加
+              </button>
+            </div>
+          </>
+        )}
+
+        {displayStep === 'select' && (
           <>
             <div className={styles.selectHeader}>
               <h1 className={styles.logo}>✨ Hossii</h1>
@@ -107,7 +161,7 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
           </>
         )}
 
-        {step === 'nickname' && (
+        {displayStep === 'nickname' && (
           <>
             <button
               type="button"
