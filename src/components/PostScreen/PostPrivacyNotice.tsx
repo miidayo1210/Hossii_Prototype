@@ -1,7 +1,6 @@
 import styles from './PostPrivacyNotice.module.css';
+import { POST_PRIVACY_NOTICE_TEXT } from '../../core/constants/postPrivacyNotice';
 
-export const POST_PRIVACY_NOTICE_TEXT =
-  '安心して使うために、名前・住所・連絡先などの個人情報は、できるだけ投稿しないでね。';
 
 export function PostPrivacyNotice() {
   return (
