@@ -30,6 +30,7 @@ function serializeSpace(f: Space): Record<string, unknown> {
   if (f.spaceType) base.spaceType = f.spaceType;
   if (f.ownerUserId) base.ownerUserId = f.ownerUserId;
   if (f.accessMode) base.accessMode = f.accessMode;
+  if (f.participationMode) base.participationMode = f.participationMode;
   return base;
 }
 
