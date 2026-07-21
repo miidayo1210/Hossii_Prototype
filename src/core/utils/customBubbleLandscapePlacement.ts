@@ -42,7 +42,15 @@ export function computeBubbleViewportClampOffset(
     dy = minTop - bubbleRect.top;
   }
 
-  return { x: dx, y: dy };
+  return snapClampOffset(dx, dy);
+}
+
+/** subpixel 丸めで 1px 未満のはみ出しを防ぐ（内側方向へ寄せる） */
+export function snapClampOffset(x: number, y: number): { x: number; y: number } {
+  return {
+    x: x === 0 ? 0 : x < 0 ? Math.floor(x) : Math.ceil(x),
+    y: y === 0 ? 0 : y < 0 ? Math.floor(y) : Math.ceil(y),
+  };
 }
 
 export function domRectToAxisRect(rect: DOMRect): AxisRect {
