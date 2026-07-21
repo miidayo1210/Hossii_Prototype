@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import {
-  PostPrivacyNotice,
-  POST_PRIVACY_NOTICE_TEXT,
-} from './PostPrivacyNotice';
+import { POST_PRIVACY_NOTICE_TEXT } from '../../core/constants/postPrivacyNotice';
+import { PostPrivacyNotice } from './PostPrivacyNotice';
 import styles from './PostPrivacyNotice.module.css';
 
 describe('PostPrivacyNotice', () => {
