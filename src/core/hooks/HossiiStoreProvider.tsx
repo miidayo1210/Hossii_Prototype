@@ -412,6 +412,7 @@ type ExtendedHossiiAction =
   | { type: 'UPDATE_HOSSII_POSITION'; payload: { id: string; positionX: number; positionY: number } }
   | { type: 'UPDATE_HOSSII_SCALE'; payload: { id: string; scale: number } }
   | { type: 'UPDATE_HOSSII_COLOR'; payload: { id: string; color: string | null } }
+  | { type: 'UPDATE_HOSSII_LIKE_COUNT'; payload: { id: string; likeCount: number } }
   | { type: 'HIDE_HOSSII'; payload: { hossiiId: string; adminId?: string } }
   | { type: 'RESTORE_HOSSII'; payload: string }
   | { type: 'EDIT_HOSSII_CONTENT'; payload: { id: string; message: string; contentEditedAt: Date | null } }
@@ -767,6 +768,17 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
         return withEntitiesUpdate(state, entities);
       }
 
+      case 'UPDATE_HOSSII_LIKE_COUNT': {
+        const { id, likeCount } = action.payload;
+        const prev = state.entities.entitiesById[id];
+        if (!prev) return state;
+        const entities = patchEntity(state.entities, {
+          ...prev,
+          likeCount: Math.max(0, likeCount),
+        });
+        return withEntitiesUpdate(state, entities);
+      }
+
       case 'HIDE_HOSSII': {
         const { hossiiId, adminId } = action.payload;
         const prev = state.entities.entitiesById[hossiiId];
@@ -913,6 +925,7 @@ export type HossiiContextValue = {
   updateHossiiColorAction: (id: string, color: string | null) => void;
   updateHossiiPositionAction: (id: string, positionX: number, positionY: number) => void;
   updateHossiiScaleAction: (id: string, scale: number) => void;
+  updateHossiiLikeCountAction: (id: string, likeCount: number) => void;
   hideHossii: (id: string, adminId?: string) => void;
   restoreHossii: (id: string, adminId?: string) => void;
   moveHossiiToPane: (id: string, targetPaneId: string) => Promise<void>;
@@ -1848,6 +1861,10 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
   }, []);
 
+  const updateHossiiLikeCountAction = useCallback((id: string, likeCount: number) => {
+    dispatch({ type: 'UPDATE_HOSSII_LIKE_COUNT', payload: { id, likeCount } });
+  }, []);
+
   const hideHossii = useCallback((id: string, adminId?: string) => {
     const hossii = state.hossiis.find((h) => h.id === id);
     dispatch({ type: 'HIDE_HOSSII', payload: { hossiiId: id, adminId } });
@@ -2021,6 +2038,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         updateHossiiColorAction,
         updateHossiiPositionAction,
         updateHossiiScaleAction,
+        updateHossiiLikeCountAction,
         hideHossii,
         restoreHossii,
         moveHossiiToPane,
@@ -2055,6 +2073,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           updateHossiiColorAction,
           updateHossiiPositionAction,
           updateHossiiScaleAction,
+          updateHossiiLikeCountAction,
           hideHossii,
           restoreHossii,
           moveHossiiToPane,

@@ -3,6 +3,7 @@ import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { X } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { fetchLikedIds, type LikeMutationResult } from '../../core/utils/likesApi';
 import { useAuth } from '../../core/contexts/useAuth';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
@@ -15,7 +16,7 @@ type Props = {
   hossii: Hossii;
   onClose: () => void;
   likesEnabled?: boolean;
-  onLike?: (id: string) => void;
+  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
   readOnlyArchived?: boolean;
 };
 
@@ -47,6 +48,18 @@ export const PostDetailModal = ({
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isBouncing, setIsBouncing] = useState(false);
+  const [likePending, setLikePending] = useState(false);
+
+  useEffect(() => {
+    setLocalLikeCount(hossii.likeCount ?? 0);
+  }, [hossii.likeCount]);
+
+  useEffect(() => {
+    if (!currentUser?.uid || !likesEnabled) return;
+    fetchLikedIds(currentUser.uid, [hossii.id]).then((ids) => {
+      setIsLiked(ids.has(hossii.id));
+    });
+  }, [currentUser?.uid, hossii.id, likesEnabled]);
 
   // Handle Escape key
   useEffect(() => {
@@ -60,13 +73,21 @@ export const PostDetailModal = ({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
-  const handleLikeClick = () => {
-    if (!onLike) return;
-    setLocalLikeCount((c) => c + 1);
-    setIsLiked(true);
-    setIsBouncing(true);
-    setTimeout(() => setIsBouncing(false), 400);
-    onLike(hossii.id);
+  const handleLikeClick = async () => {
+    if (!onLike || likePending) return;
+    setLikePending(true);
+    try {
+      const result = await onLike(hossii.id);
+      if (!result) return;
+      setLocalLikeCount(result.likeCount);
+      setIsLiked(result.liked);
+      if (result.liked) {
+        setIsBouncing(true);
+        setTimeout(() => setIsBouncing(false), 400);
+      }
+    } finally {
+      setLikePending(false);
+    }
   };
 
   return (
@@ -113,6 +134,7 @@ export const PostDetailModal = ({
               <button
                 className={`${styles.likeButton} ${isLiked ? styles.likeButtonActive : ''} ${isBouncing ? styles.likeButtonBounce : ''}`}
                 onClick={handleLikeClick}
+                disabled={likePending}
                 aria-label="いいね"
               >
                 <span className={styles.likeHeart}>{isLiked ? '❤️' : '🤍'}</span>

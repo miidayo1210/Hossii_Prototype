@@ -6,6 +6,8 @@ import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getEmotionColor } from '../../core/assets/emotionColors';
 import { renderHossiiText } from '../../core/utils/render';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
+import { fetchLikedIds, type LikeMutationResult } from '../../core/utils/likesApi';
+import { useAuth } from '../../core/contexts/useAuth';
 import styles from './AuthorTimelineModal.module.css';
 
 function formatTime(date: Date): string {
@@ -22,20 +24,33 @@ function getPostEmoji(hossii: Hossii): string {
 type PostRowProps = {
   post: Hossii;
   likesEnabled?: boolean;
-  onLike?: (id: string) => void;
+  likedByMe?: boolean;
+  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
   onSelect: (id: string) => void;
 };
 
-function TimelinePostRow({ post, likesEnabled, onLike, onSelect }: PostRowProps) {
+function TimelinePostRow({ post, likesEnabled, likedByMe = false, onLike, onSelect }: PostRowProps) {
   const [localLikeCount, setLocalLikeCount] = useState(post.likeCount ?? 0);
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(likedByMe);
+  const [likePending, setLikePending] = useState(false);
+  const heartLiked = isLiked || likedByMe;
 
-  const handleLike = (e: React.MouseEvent) => {
+  useEffect(() => {
+    queueMicrotask(() => setLocalLikeCount(post.likeCount ?? 0));
+  }, [post.likeCount]);
+
+  const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!onLike) return;
-    setLocalLikeCount((c) => c + 1);
-    setIsLiked(true);
-    onLike(post.id);
+    if (!onLike || likePending) return;
+    setLikePending(true);
+    try {
+      const result = await onLike(post.id);
+      if (!result) return;
+      setLocalLikeCount(result.likeCount);
+      setIsLiked(result.liked);
+    } finally {
+      setLikePending(false);
+    }
   };
 
   return (
@@ -63,11 +78,12 @@ function TimelinePostRow({ post, likesEnabled, onLike, onSelect }: PostRowProps)
         <div className={styles.rowFooter}>
           <button
             type="button"
-            className={`${styles.likeButton} ${isLiked ? styles.likeButtonActive : ''}`}
+            className={`${styles.likeButton} ${heartLiked ? styles.likeButtonActive : ''}`}
             onClick={handleLike}
+            disabled={likePending}
             aria-label="いいね"
           >
-            {isLiked ? '❤️' : '🤍'}
+            {heartLiked ? '❤️' : '🤍'}
             {localLikeCount > 0 && <span>{localLikeCount}</span>}
           </button>
         </div>
@@ -83,7 +99,7 @@ type Props = {
   onClose: () => void;
   onSelectPost: (id: string) => void;
   likesEnabled?: boolean;
-  onLike?: (id: string) => void;
+  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
   isMobilePortrait?: boolean;
 };
 
@@ -97,6 +113,14 @@ export const AuthorTimelineModal = ({
   isMobilePortrait = false,
 }: Props) => {
   const hasPosts = group.posts.length > 0;
+  const { currentUser } = useAuth();
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!currentUser?.uid || !likesEnabled) return;
+    const ids = group.posts.map((p) => p.id);
+    fetchLikedIds(currentUser.uid, ids).then(setLikedIds);
+  }, [currentUser?.uid, likesEnabled, group.posts]);
   const emotionColor = hasPosts ? getEmotionColor(group.latestPost.emotion) : '#a78bfa';
   // Phase 2C: 現在名を主表示（投稿時名との併記はタイトルでは簡潔さのため主表示のみ）。
   const primaryAuthorName =
@@ -161,6 +185,7 @@ export const AuthorTimelineModal = ({
                 key={`${post.id}-${post.likeCount ?? 0}`}
                 post={post}
                 likesEnabled={likesEnabled}
+                likedByMe={likedIds.has(post.id)}
                 onLike={onLike}
                 onSelect={onSelectPost}
               />

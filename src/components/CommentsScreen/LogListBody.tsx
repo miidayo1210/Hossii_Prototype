@@ -9,7 +9,7 @@ import { FilterBar } from '../FilterBar/FilterBar';
 import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
-import { fetchLikedIds, toggleLike } from '../../core/utils/likesApi';
+import { fetchLikedIds, mutateLike } from '../../core/utils/likesApi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { resolveLogScopeSelection } from '../../core/utils/resolveLogScopeSelection';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
@@ -27,35 +27,29 @@ import styles from './CommentsScreen.module.css';
 type LikeButtonProps = {
   hossii: Hossii;
   likedByMe: boolean;
-  onLike: (id: string) => void;
+  onLike: (id: string) => Promise<void>;
 };
 
 const LikeButton = ({ hossii, likedByMe, onLike }: LikeButtonProps) => {
-  const [localLiked, setLocalLiked] = useState(likedByMe);
-  const [delta, setDelta] = useState(0);
-
-  useEffect(() => {
-    setLocalLiked(likedByMe);
-  }, [likedByMe]);
-
-  useEffect(() => {
-    setDelta(0);
-  }, [hossii.likeCount]);
-
-  const displayCount = Math.max(0, (hossii.likeCount ?? 0) + delta);
+  const [pending, setPending] = useState(false);
+  const displayCount = Math.max(0, hossii.likeCount ?? 0);
 
   return (
     <button
-      className={`${styles.likeButton} ${localLiked ? styles.likeButtonActive : ''}`}
-      onClick={() => {
-        const newLiked = !localLiked;
-        setLocalLiked(newLiked);
-        setDelta((d) => (newLiked ? d + 1 : d - 1));
-        onLike(hossii.id);
+      className={`${styles.likeButton} ${likedByMe ? styles.likeButtonActive : ''}`}
+      disabled={pending}
+      onClick={async () => {
+        if (pending) return;
+        setPending(true);
+        try {
+          await onLike(hossii.id);
+        } finally {
+          setPending(false);
+        }
       }}
-      aria-label={localLiked ? 'いいねを取り消す' : 'いいね'}
+      aria-label={likedByMe ? 'いいねを取り消す' : 'いいね'}
     >
-      {localLiked ? '❤️' : '🤍'} {displayCount}
+      {likedByMe ? '❤️' : '🤍'} {displayCount}
     </button>
   );
 };
@@ -127,7 +121,7 @@ export function LogListBody({
   readOnlyArchived = false,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
-  const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames } =
+  const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames, updateHossiiLikeCountAction } =
     useHossiiStore();
   const isAdmin = currentUser?.isAdmin ?? false;
   const isAuthenticatedUser = !!currentUser;
@@ -229,18 +223,19 @@ export function LogListBody({
     async (hossiiId: string) => {
       if (!currentUser) return;
       try {
-        const nowLiked = await toggleLike(hossiiId, currentUser.uid);
+        const result = await mutateLike(hossiiId, currentUser.uid);
+        updateHossiiLikeCountAction(hossiiId, result.likeCount);
         setLikedIds((prev) => {
           const next = new Set(prev);
-          if (nowLiked) next.add(hossiiId);
+          if (result.liked) next.add(hossiiId);
           else next.delete(hossiiId);
           return next;
         });
       } catch (err) {
-        console.error('[LogListBody] toggleLike error:', err);
+        console.error('[LogListBody] mutateLike error:', err);
       }
     },
-    [currentUser]
+    [currentUser, updateHossiiLikeCountAction]
   );
 
   const sortedHossiis = useMemo(() => {
