@@ -1096,7 +1096,6 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       if (isSupabaseConfigured) {
         const nicknames = await fetchSpaceNicknames(currentUser.uid);
         dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
-        saveSpaceNicknames(nicknames);
       }
     };
 
