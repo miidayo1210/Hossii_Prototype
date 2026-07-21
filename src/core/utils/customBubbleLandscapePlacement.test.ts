@@ -4,6 +4,7 @@ import {
   computeBubbleViewportClampOffset,
   measureBubbleClampOffset,
   rectWithoutTranslate,
+  snapClampOffset,
 } from './customBubbleLandscapePlacement';
 
 describe('computeBubbleViewportClampOffset', () => {
@@ -80,6 +81,16 @@ describe('computeBubbleViewportClampOffset', () => {
     const margin = 16;
     const offset = computeBubbleViewportClampOffset(bubble, area, margin);
     expect(bubble.right + offset.x).toBeLessThanOrEqual(area.right - margin + 0.01);
+  });
+});
+
+describe('snapClampOffset', () => {
+  it('floors negative offsets inward', () => {
+    expect(snapClampOffset(-17.04, -21.39)).toEqual({ x: -18, y: -22 });
+  });
+
+  it('ceilings positive offsets inward', () => {
+    expect(snapClampOffset(8.2, 0.1)).toEqual({ x: 9, y: 1 });
   });
 });
 

@@ -7,16 +7,25 @@ import {
   parseClampPx,
 } from '../utils/customBubbleLandscapePlacement';
 
-function readCurrentClamp(el: HTMLElement): { x: number; y: number } {
-  const style = getComputedStyle(el);
-  return {
-    x:
-      parseClampPx(style.getPropertyValue('--bubble-clamp-x')) ||
-      parseClampPx(style.getPropertyValue('--cluster-clamp-x')),
-    y:
-      parseClampPx(style.getPropertyValue('--bubble-clamp-y')) ||
-      parseClampPx(style.getPropertyValue('--cluster-clamp-y')),
-  };
+function readAppliedTranslate(el: HTMLElement): { x: number; y: number } {
+  const transform = getComputedStyle(el).transform;
+  if (!transform || transform === 'none') {
+    return { x: 0, y: 0 };
+  }
+  try {
+    const matrix = new DOMMatrix(transform);
+    return { x: matrix.m41, y: matrix.m42 };
+  } catch {
+    const style = getComputedStyle(el);
+    return {
+      x:
+        parseClampPx(style.getPropertyValue('--bubble-clamp-x')) ||
+        parseClampPx(style.getPropertyValue('--cluster-clamp-x')),
+      y:
+        parseClampPx(style.getPropertyValue('--bubble-clamp-y')) ||
+        parseClampPx(style.getPropertyValue('--cluster-clamp-y')),
+    };
+  }
 }
 
 /**
@@ -44,7 +53,7 @@ export function useCustomBubbleLandscapeClamp(
       const next = measureBubbleClampOffset(
         domRectToAxisRect(el.getBoundingClientRect()),
         domRectToAxisRect(area.getBoundingClientRect()),
-        readCurrentClamp(el),
+        readAppliedTranslate(el),
       );
       setOffset((prev) =>
         prev.x === next.x && prev.y === next.y ? prev : next,
