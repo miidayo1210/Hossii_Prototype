@@ -5,14 +5,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-type Action = 'issue' | 'regenerate' | 'revoke';
+const MAX_PARTICIPANT_ACCOUNT_SLOTS = 50;
+
+type Action = 'issue' | 'issue_bulk' | 'regenerate' | 'revoke';
 
 type RequestBody = {
   spaceId: string;
   action: Action;
   slotNumber?: number;
+  count?: number;
   linkCommunityMembership?: boolean;
   linkSpaceMembership?: boolean;
+};
+
+type IssueResult = {
+  loginId: string;
+  password: string;
+  slotNumber: number;
+};
+
+type SpaceRow = {
+  id: string;
+  space_url: string | null;
+  community_id: string | null;
 };
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
@@ -49,6 +64,22 @@ function formatLoginId(prefix: string, slotNumber: number): string {
 function buildAuthEmail(spaceId: string, loginId: string): string {
   const safeLoginId = loginId.toLowerCase().replace(/[^a-z0-9-]/g, '');
   return `${spaceId}.${safeLoginId}@participants.internal`;
+}
+
+function validateBulkIssueCount(count: unknown, availableSlotCount: number): string | null {
+  if (typeof count !== 'number' || !Number.isInteger(count)) {
+    return '発行件数は整数で指定してください';
+  }
+  if (count < 1) {
+    return '発行件数は1以上で指定してください';
+  }
+  if (count > MAX_PARTICIPANT_ACCOUNT_SLOTS) {
+    return `発行件数は最大${MAX_PARTICIPANT_ACCOUNT_SLOTS}件までです`;
+  }
+  if (count > availableSlotCount) {
+    return `新規発行可能は${availableSlotCount}件です`;
+  }
+  return null;
 }
 
 async function ensureCommunityMembershipForSpaceMember(
@@ -102,6 +133,103 @@ async function assertAdminAccess(
   }
 }
 
+async function fetchOccupiedSlots(
+  adminClient: ReturnType<typeof createClient>,
+  spaceId: string,
+): Promise<Set<number>> {
+  const { data: existing, error: existingError } = await adminClient
+    .from('space_participant_accounts')
+    .select('slot_number')
+    .eq('space_id', spaceId);
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  return new Set((existing ?? []).map((row) => row.slot_number as number));
+}
+
+function getAvailableSlots(usedSlots: Set<number>): number[] {
+  return Array.from({ length: MAX_PARTICIPANT_ACCOUNT_SLOTS }, (_, index) => index + 1).filter(
+    (slotNumber) => !usedSlots.has(slotNumber),
+  );
+}
+
+async function issueAccountForSlot(
+  adminClient: ReturnType<typeof createClient>,
+  spaceRow: SpaceRow,
+  prefix: string,
+  targetSlot: number,
+  issuedBy: string,
+  linkCommunityMembership: boolean,
+  linkSpaceMembership: boolean,
+): Promise<IssueResult> {
+  const spaceId = spaceRow.id;
+  const loginId = formatLoginId(prefix, targetSlot);
+  const authEmail = buildAuthEmail(spaceId, loginId);
+  const password = generatePassword();
+
+  const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
+    email: authEmail,
+    password,
+    email_confirm: true,
+    app_metadata: { participant: true },
+  });
+
+  if (createError || !createdUser.user) {
+    throw new Error(createError?.message ?? 'Failed to create auth user');
+  }
+
+  const { error: insertError } = await adminClient.from('space_participant_accounts').insert({
+    space_id: spaceId,
+    slot_number: targetSlot,
+    login_id: loginId,
+    auth_user_id: createdUser.user.id,
+    auth_email: authEmail,
+    status: 'active',
+    issued_by: issuedBy,
+  });
+
+  if (insertError) {
+    await adminClient.auth.admin.deleteUser(createdUser.user.id);
+    throw new Error(insertError.message);
+  }
+
+  if (linkCommunityMembership && spaceRow.community_id) {
+    await adminClient.from('community_memberships').upsert(
+      {
+        community_id: spaceRow.community_id,
+        auth_user_id: createdUser.user.id,
+        role: 'member',
+        status: 'active',
+        invited_by: issuedBy,
+        accepted_at: new Date().toISOString(),
+      },
+      { onConflict: 'community_id,auth_user_id' },
+    );
+  }
+
+  if (linkSpaceMembership) {
+    await adminClient.from('space_memberships').upsert(
+      {
+        space_id: spaceId,
+        auth_user_id: createdUser.user.id,
+        role: 'member',
+        status: 'active',
+      },
+      { onConflict: 'space_id,auth_user_id' },
+    );
+
+    await ensureCommunityMembershipForSpaceMember(
+      adminClient,
+      spaceId,
+      createdUser.user.id,
+    );
+  }
+
+  return { loginId, password, slotNumber: targetSlot };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -136,7 +264,7 @@ Deno.serve(async (req) => {
     }
 
     const body = (await req.json()) as RequestBody;
-    const { spaceId, action, slotNumber, linkCommunityMembership, linkSpaceMembership } = body;
+    const { spaceId, action, slotNumber, count, linkCommunityMembership, linkSpaceMembership } = body;
 
     if (!spaceId || !action) {
       return jsonResponse({ error: 'spaceId and action are required' }, 400);
@@ -157,101 +285,103 @@ Deno.serve(async (req) => {
 
     const spaceSlug = (spaceRow.space_url as string | null) ?? spaceId;
     const prefix = slugPrefix(spaceSlug);
+    const linkCommunity = linkCommunityMembership ?? false;
+    const linkSpace = linkSpaceMembership ?? false;
 
-    if (action === 'issue') {
-      const { data: existing, error: existingError } = await adminClient
-        .from('space_participant_accounts')
-        .select('slot_number')
-        .eq('space_id', spaceId)
-        .eq('status', 'active');
-
-      if (existingError) {
-        return jsonResponse({ error: existingError.message }, 500);
+    if (action === 'issue' || action === 'issue_bulk') {
+      let occupiedSlots: Set<number>;
+      try {
+        occupiedSlots = await fetchOccupiedSlots(adminClient, spaceId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to fetch slots';
+        return jsonResponse({ error: message }, 500);
       }
 
-      const usedSlots = new Set((existing ?? []).map((row) => row.slot_number as number));
-      if (usedSlots.size >= 20) {
-        return jsonResponse({ error: 'Maximum 20 participant accounts per space' }, 400);
+      if (occupiedSlots.size >= MAX_PARTICIPANT_ACCOUNT_SLOTS) {
+        return jsonResponse(
+          { error: `Maximum ${MAX_PARTICIPANT_ACCOUNT_SLOTS} participant accounts per space` },
+          400,
+        );
+      }
+
+      const availableSlots = getAvailableSlots(occupiedSlots);
+
+      if (action === 'issue_bulk') {
+        const validationError = validateBulkIssueCount(count, availableSlots.length);
+        if (validationError) {
+          return jsonResponse({ error: validationError }, 400);
+        }
+
+        const slotsToIssue = availableSlots.slice(0, count as number);
+        const issued: IssueResult[] = [];
+
+        for (const targetSlot of slotsToIssue) {
+          try {
+            const result = await issueAccountForSlot(
+              adminClient,
+              spaceRow as SpaceRow,
+              prefix,
+              targetSlot,
+              userData.user.id,
+              linkCommunity,
+              linkSpace,
+            );
+            issued.push(result);
+            occupiedSlots.add(targetSlot);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to issue account';
+            if (issued.length === 0) {
+              return jsonResponse({ error: message }, 500);
+            }
+            return jsonResponse(
+              {
+                issued,
+                count: issued.length,
+                partial: true,
+                error: message,
+              },
+              207,
+            );
+          }
+        }
+
+        return jsonResponse({ issued, count: issued.length });
       }
 
       let targetSlot = slotNumber;
       if (targetSlot != null) {
-        if (targetSlot < 1 || targetSlot > 20 || usedSlots.has(targetSlot)) {
+        if (
+          targetSlot < 1 ||
+          targetSlot > MAX_PARTICIPANT_ACCOUNT_SLOTS ||
+          occupiedSlots.has(targetSlot)
+        ) {
           return jsonResponse({ error: 'Invalid or occupied slot number' }, 400);
         }
       } else {
-        targetSlot = Array.from({ length: 20 }, (_, i) => i + 1).find((n) => !usedSlots.has(n));
+        targetSlot = availableSlots[0];
         if (!targetSlot) {
           return jsonResponse({ error: 'No available slots' }, 400);
         }
       }
 
-      const loginId = formatLoginId(prefix, targetSlot);
-      const authEmail = buildAuthEmail(spaceId, loginId);
-      const password = generatePassword();
-
-      const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
-        email: authEmail,
-        password,
-        email_confirm: true,
-        app_metadata: { participant: true },
-      });
-
-      if (createError || !createdUser.user) {
-        return jsonResponse({ error: createError?.message ?? 'Failed to create auth user' }, 500);
-      }
-
-      const { error: insertError } = await adminClient.from('space_participant_accounts').insert({
-        space_id: spaceId,
-        slot_number: targetSlot,
-        login_id: loginId,
-        auth_user_id: createdUser.user.id,
-        auth_email: authEmail,
-        status: 'active',
-        issued_by: userData.user.id,
-      });
-
-      if (insertError) {
-        await adminClient.auth.admin.deleteUser(createdUser.user.id);
-        return jsonResponse({ error: insertError.message }, 500);
-      }
-
-      if (linkCommunityMembership && spaceRow.community_id) {
-        await adminClient.from('community_memberships').upsert(
-          {
-            community_id: spaceRow.community_id,
-            auth_user_id: createdUser.user.id,
-            role: 'member',
-            status: 'active',
-            invited_by: userData.user.id,
-            accepted_at: new Date().toISOString(),
-          },
-          { onConflict: 'community_id,auth_user_id' },
-        );
-      }
-
-      if (linkSpaceMembership) {
-        await adminClient.from('space_memberships').upsert(
-          {
-            space_id: spaceId,
-            auth_user_id: createdUser.user.id,
-            role: 'member',
-            status: 'active',
-          },
-          { onConflict: 'space_id,auth_user_id' },
-        );
-
-        await ensureCommunityMembershipForSpaceMember(
+      try {
+        const result = await issueAccountForSlot(
           adminClient,
-          spaceId,
-          createdUser.user.id,
+          spaceRow as SpaceRow,
+          prefix,
+          targetSlot,
+          userData.user.id,
+          linkCommunity,
+          linkSpace,
         );
+        return jsonResponse(result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to issue account';
+        return jsonResponse({ error: message }, 500);
       }
-
-      return jsonResponse({ loginId, password, slotNumber: targetSlot });
     }
 
-    if (slotNumber == null || slotNumber < 1 || slotNumber > 20) {
+    if (slotNumber == null || slotNumber < 1 || slotNumber > MAX_PARTICIPANT_ACCOUNT_SLOTS) {
       return jsonResponse({ error: 'slotNumber is required' }, 400);
     }
 
