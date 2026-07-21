@@ -51,6 +51,7 @@ import {
   resolveCommunitySlugForSpace,
   shouldReplaceWithCanonicalSpacePath,
 } from './core/utils/spaceScreenRoute';
+import { canEnterSpaceAsGuest } from './core/utils/guestParticipation';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
 const URL_PATH_SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
@@ -590,10 +591,13 @@ const AppContent = () => {
         key={guestSpaceId}
         spaceId={guestSpaceId}
         onEnterAsGuest={() => {
-          setActiveSpace(guestSpaceId);
-          setIsGuestMode(true);
           const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
-          const slugForGuest = guestSpace?.spaceURL;
+          if (!canEnterSpaceAsGuest(guestSpace)) {
+            return;
+          }
+          setActiveSpace(guestSpace.id);
+          setIsGuestMode(true);
+          const slugForGuest = guestSpace.spaceURL;
           window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}` : '/');
           navigate('screen');
         }}
