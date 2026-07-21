@@ -137,6 +137,8 @@ import { HossiiToast } from '../../core/ui/HossiiToast';
 import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
 import { isActiveSpaceShellUnavailable } from '../../core/utils/spaceShellAvailability';
 import { SpaceShellUnavailableView } from './SpaceShellUnavailableView';
+import { hasSeenSpaceGuide, markSpaceGuideSeen } from '../../core/utils/spaceGuideStorage';
+import { SpaceWelcomeGuide } from './SpaceWelcomeGuide';
 import {
   getDefaultQuickLogBottomRect,
   getDefaultQuickLogSideRect,
@@ -211,6 +213,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     myAuthorshipIds,
     myAuthorshipIdsStatus,
     postAuthorDisplayNames,
+    getActiveNickname,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
   const hossiisRef = useRef(state.hossiis);
@@ -1828,6 +1831,55 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     filteredHossiis.length === 0 &&
     awaitingFirstHossiis;
 
+  const welcomeGuideSpaceKey = contentSpaceId ?? activeSpaceId ?? '';
+  const [welcomeGuideDismissed, setWelcomeGuideDismissed] = useState(false);
+  const [welcomeGuideForceOpen, setWelcomeGuideForceOpen] = useState(false);
+  const [welcomeGuideSeenInStorage, setWelcomeGuideSeenInStorage] = useState(() =>
+    welcomeGuideSpaceKey ? hasSeenSpaceGuide(welcomeGuideSpaceKey) : true,
+  );
+
+  useEffect(() => {
+    setWelcomeGuideDismissed(false);
+    setWelcomeGuideForceOpen(false);
+    setWelcomeGuideSeenInStorage(
+      welcomeGuideSpaceKey ? hasSeenSpaceGuide(welcomeGuideSpaceKey) : true,
+    );
+  }, [welcomeGuideSpaceKey]);
+
+  const welcomeGuideNickname = getActiveNickname().trim();
+  const welcomeGuideDescription = spaceForVisual?.description?.trim() || undefined;
+  const welcomeGuideInteractionHint = isMobile
+    ? '画面をダブルタップするか、\n下の「投稿」から投稿できるよ。'
+    : '画面をダブルクリックするか、\n右上の「投稿する」から投稿できるよ。';
+
+  const welcomeGuideAllowed =
+    !!welcomeGuideSpaceKey &&
+    !isVisiting &&
+    !isContentArchived &&
+    viewMode !== 'slideshow' &&
+    !showInitialLoadingOverlay;
+
+  const welcomeGuideEligible =
+    welcomeGuideAllowed && !welcomeGuideDismissed && !welcomeGuideSeenInStorage;
+
+  const showWelcomeGuide =
+    welcomeGuideAllowed && (welcomeGuideForceOpen || welcomeGuideEligible);
+
+  const handleOpenWelcomeGuide = useCallback(() => {
+    if (!welcomeGuideAllowed) return;
+    setWelcomeGuideForceOpen(true);
+    setWelcomeGuideDismissed(false);
+  }, [welcomeGuideAllowed]);
+
+  const handleWelcomeGuideClose = useCallback(() => {
+    setWelcomeGuideForceOpen(false);
+    setWelcomeGuideDismissed(true);
+    if (welcomeGuideSpaceKey && !welcomeGuideSeenInStorage) {
+      markSpaceGuideSeen(welcomeGuideSpaceKey);
+      setWelcomeGuideSeenInStorage(true);
+    }
+  }, [welcomeGuideSpaceKey, welcomeGuideSeenInStorage]);
+
   const showByAuthorLoadingOverlay =
     layoutMode === 'byAuthor' &&
     displayLimit === 'unlimited' &&
@@ -2104,6 +2156,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
       >
       {isContentArchived && !isVisiting && <SpaceArchiveBanner />}
+      {showWelcomeGuide && (
+        <SpaceWelcomeGuide
+          nickname={welcomeGuideNickname}
+          description={welcomeGuideDescription}
+          interactionHint={welcomeGuideInteractionHint}
+          onClose={handleWelcomeGuideClose}
+        />
+      )}
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
         <SlideshowView
@@ -2912,6 +2972,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             tagFilterCandidates={isMobile ? tagCandidates : undefined}
             activeTagFilter={isMobile ? activeTagFilter : undefined}
             onTagFilterChange={isMobile ? applyTagFilter : undefined}
+            onOpenWelcomeGuide={welcomeGuideAllowed ? handleOpenWelcomeGuide : undefined}
           />
         </>
       )}

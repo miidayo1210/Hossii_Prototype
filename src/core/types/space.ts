@@ -7,6 +7,9 @@ export type { TabFolder };
 // Space ID
 export type SpaceId = string;
 
+/** 共有URLで未参加者が選べる参加方式（DB: spaces.participation_mode）。personal では無視。 */
+export type ParticipationMode = 'guest_only' | 'guest_and_account' | 'account_only';
+
 export type SpaceDecorationType = 'bulletin_board' | 'sign' | 'image';
 
 // パターンの種類
@@ -95,6 +98,8 @@ export type Space = {
   communityId?: string;
   /** 共有スペースの参加モード（DB: spaces.access_mode）。personal では無視。 */
   accessMode?: 'public' | 'invite_only';
+  /** 共有URLの参加方式（DB: spaces.participation_mode）。personal では無視。未設定時は guest_and_account。 */
+  participationMode?: ParticipationMode;
   /** スペース種別（DB: spaces.space_type）。未取得/旧データは 'shared' 相当。 */
   spaceType?: 'shared' | 'personal';
   /**

@@ -6,7 +6,6 @@ import { SpacePaneProvider } from './core/hooks/SpacePaneProvider';
 import { useHossiiStore } from './core/hooks/useHossiiStore';
 import { fetchSpaceByUrl } from './core/utils/spacesApi';
 import { checkCanAccessSpace } from './core/utils/spaceAccessApi';
-import { resolveSpaceSlug } from './core/utils/resolveSpaceSlug';
 import { isSupabaseConfigured, supabaseEnvironmentValidation } from './core/supabase';
 import { AuthProvider } from './core/contexts/AuthContext';
 import { SelectedCommunityProvider } from './core/contexts/SelectedCommunityContext';
@@ -52,6 +51,7 @@ import {
   resolveCommunitySlugForSpace,
   shouldReplaceWithCanonicalSpacePath,
 } from './core/utils/spaceScreenRoute';
+import { canEnterSpaceAsGuest } from './core/utils/guestParticipation';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
 const URL_PATH_SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
@@ -302,11 +302,6 @@ const AppContent = () => {
           if (targetSpace.isPrivate) {
             setGuestSpaceId(targetSpace.id);
             setGuestSpaceIsPrivate(true);
-          } else if (hasNicknameForSpace(targetSpace.id)) {
-            setActiveSpace(targetSpace.id);
-            setIsGuestMode(true);
-            window.history.replaceState({}, '', screenPath);
-            navigate('screen');
           } else {
             setGuestSpaceId(targetSpace.id);
           }
@@ -569,17 +564,6 @@ const AppContent = () => {
       <ParticipantLoginScreen
         spaceId={pendingParticipantSpaceId}
         onClose={() => setPendingParticipantSpaceId(null)}
-        onEmailLogin={() => {
-          // 参加者ログイン → メールログイン（既存 LoginScreen）へ切り替える。
-          // 戻り先スペースは既存の pendingLoginSlug 経路を再利用し、成功後に /s/[slug] へ戻す。
-          const slug = resolveSpaceSlug({
-            spaceId: pendingParticipantSpaceId,
-            spaces: state.spaces,
-            pathname: window.location.pathname,
-          });
-          setPendingParticipantSpaceId(null);
-          if (slug) setPendingLoginSlug(slug);
-        }}
       />
     );
   }
@@ -604,12 +588,16 @@ const AppContent = () => {
   if (!currentUser && !isResolvingAuth && guestSpaceId && !isGuestMode && !pendingLoginSlug) {
     return (
       <GuestEntryScreen
+        key={guestSpaceId}
         spaceId={guestSpaceId}
         onEnterAsGuest={() => {
-          setActiveSpace(guestSpaceId);
-          setIsGuestMode(true);
           const guestSpace = state.spaces.find((s) => s.id === guestSpaceId);
-          const slugForGuest = guestSpace?.spaceURL;
+          if (!canEnterSpaceAsGuest(guestSpace)) {
+            return;
+          }
+          setActiveSpace(guestSpace.id);
+          setIsGuestMode(true);
+          const slugForGuest = guestSpace.spaceURL;
           window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}` : '/');
           navigate('screen');
         }}
@@ -672,6 +660,9 @@ const AppContent = () => {
   const handleTutorialComplete = () => {
     setShowTutorial(false);
   };
+
+  const shouldShowLegacyTutorial =
+    showTutorial && !!userProfile && screen !== 'screen';
 
   const renderScreen = () => {
     switch (screen) {
@@ -743,7 +734,7 @@ const AppContent = () => {
         duration={2000}
         onClose={() => setVisitingToast(false)}
       />
-      {showTutorial && userProfile && (
+      {shouldShowLegacyTutorial && userProfile && (
         <TutorialOverlay
           userId={userProfile.userId}
           onComplete={handleTutorialComplete}

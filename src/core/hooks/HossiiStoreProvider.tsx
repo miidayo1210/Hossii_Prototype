@@ -29,6 +29,7 @@ import {
   saveHossiis,
 } from '../utils/storage';
 import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from '../utils/spaceDecorations';
+import { normalizeParticipationMode } from '../utils/participationMode';
 import { parseTabFolders } from '../utils/tabFolderStorage';
 import { persistHossiisLocal } from '../utils/hossiiPersistence';
 import {
@@ -228,6 +229,7 @@ export const normalizeSpace = (f: unknown): Space => {
   const isPrivate = typeof raw.isPrivate === 'boolean' ? raw.isPrivate : undefined;
   const accessMode =
     raw.accessMode === 'invite_only' ? 'invite_only' : raw.accessMode === 'public' ? 'public' : undefined;
+  const participationMode = normalizeParticipationMode(raw.participationMode);
   const welcomeMessage = typeof raw.welcomeMessage === 'string' ? raw.welcomeMessage : undefined;
   const description = typeof raw.description === 'string' ? raw.description : undefined;
   const characterName = typeof raw.characterName === 'string' ? raw.characterName : undefined;
@@ -274,6 +276,7 @@ export const normalizeSpace = (f: unknown): Space => {
     presetTags,
     isPrivate,
     accessMode,
+    participationMode,
     welcomeMessage,
     description,
     characterName,

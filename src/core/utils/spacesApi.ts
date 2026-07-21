@@ -5,6 +5,7 @@ import type { MyHossiiLogVisibility, MyHossiiMotionMode } from '../types/myHossi
 import { parseCustomEmotionsFromJson, parseDecorationsFromJson } from './spaceDecorations';
 import { parseTabFolders } from './tabFolderStorage';
 import { ensureDefaultSpacePane } from './ensureDefaultSpacePane';
+import { normalizeParticipationMode } from './participationMode';
 
 // Supabase の行型（snake_case）
 type SpaceRow = {
@@ -20,6 +21,7 @@ type SpaceRow = {
   created_at: string;
   is_private?: boolean | null;
   access_mode?: string | null;
+  participation_mode?: string | null;
   preset_tags?: string[] | null;
   welcome_message?: string | null;
   description?: string | null;
@@ -49,6 +51,7 @@ function rowToSpace(row: SpaceRow): Space {
     createdAt: new Date(row.created_at),
     isPrivate: row.is_private ?? undefined,
     accessMode: row.access_mode === 'invite_only' ? 'invite_only' : 'public',
+    participationMode: normalizeParticipationMode(row.participation_mode),
     presetTags: row.preset_tags ?? undefined,
     welcomeMessage: row.welcome_message ?? undefined,
     description: row.description ?? undefined,
@@ -166,6 +169,9 @@ export async function updateSpaceInDb(id: SpaceId, patch: SpaceUpdatePatch): Pro
   if (patch.savedBackgroundImages !== undefined) updateObj.saved_background_images = patch.savedBackgroundImages ?? null;
   if (patch.isPrivate !== undefined) updateObj.is_private = patch.isPrivate ?? null;
   if (patch.accessMode !== undefined) updateObj.access_mode = patch.accessMode;
+  if (patch.participationMode !== undefined) {
+    updateObj.participation_mode = patch.participationMode;
+  }
   if (patch.presetTags !== undefined) updateObj.preset_tags = patch.presetTags ?? null;
   if (patch.welcomeMessage !== undefined) updateObj.welcome_message = patch.welcomeMessage ?? null;
   if (patch.description !== undefined) updateObj.description = patch.description ?? null;
@@ -275,4 +281,9 @@ export async function fetchSpaceByUrl(spaceUrl: string): Promise<Space | null> {
   const space = rowToSpace(data as SpaceRow);
   void ensureDefaultSpacePane(space.id);
   return space;
+}
+
+/** @internal Row → Space mapping for unit tests. */
+export function mapSpaceRowToSpace(row: SpaceRow): Space {
+  return rowToSpace(row);
 }
