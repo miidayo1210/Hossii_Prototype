@@ -4,7 +4,7 @@ import type { Screen } from '../types';
 const VALID_SCREENS: Screen[] = [
   'post', 'screen', 'comments', 'spaces', 'profile',
   'mylogs', 'account', 'settings', 'card', 'communities', 'reflection',
-  'community', 'community-invite',
+  'neighbors', 'community', 'community-invite',
 ];
 
 type RouterState = {
@@ -12,7 +12,7 @@ type RouterState = {
   screenParam?: string;
 };
 
-const parseHash = (hash: string): RouterState => {
+export const parseRouterHash = (hash: string): RouterState => {
   const cleaned = hash.replace('#', '');
   const slashIdx = cleaned.indexOf('/');
   const screenPart = slashIdx >= 0 ? cleaned.slice(0, slashIdx) : cleaned;
@@ -27,12 +27,12 @@ const parseHash = (hash: string): RouterState => {
 
 export const useRouter = () => {
   const [routerState, setRouterState] = useState<RouterState>(() =>
-    parseHash(window.location.hash)
+    parseRouterHash(window.location.hash)
   );
 
   useEffect(() => {
     const handleHashChange = () => {
-      setRouterState(parseHash(window.location.hash));
+      setRouterState(parseRouterHash(window.location.hash));
     };
 
     window.addEventListener('hashchange', handleHashChange);

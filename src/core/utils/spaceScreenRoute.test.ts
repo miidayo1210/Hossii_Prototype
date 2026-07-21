@@ -42,4 +42,14 @@ describe('spaceScreenRoute', () => {
     expect(isCanonicalOrLegacySpacePath('/s/b')).toBe(true);
     expect(isCanonicalOrLegacySpacePath('/')).toBe(false);
   });
+
+  it('builds canonical href with custom hash', () => {
+    expect(
+      buildCanonicalSpaceScreenHref({
+        communitySlug: 'dev-community',
+        spaceUrl: 'dev-public',
+        hash: '#account',
+      }),
+    ).toBe('/c/dev-community/s/dev-public#account');
+  });
 });
