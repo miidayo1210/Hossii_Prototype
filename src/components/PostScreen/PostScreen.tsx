@@ -47,6 +47,7 @@ import {
 } from '../../core/utils/bubbleColorPalettes';
 import styles from './PostScreen.module.css';
 import { PostFieldLabel } from './PostFieldLabel';
+import { PostPrivacyNotice } from './PostPrivacyNotice';
 import { CanvasPostEditor, type CanvasPostEditorHandle } from './CanvasPostEditor';
 import {
   isWebSerialSupported,
@@ -1353,6 +1354,8 @@ export const PostScreen = ({
             連続で気持ちを置く
           </label>
         )}
+
+        <PostPrivacyNotice />
       </main>
 
       {/* Toast */}
