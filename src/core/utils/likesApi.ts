@@ -1,8 +1,13 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 
+export type LikeMutationResult = {
+  likeCount: number;
+  liked: boolean;
+};
+
 /**
  * いいね数を1インクリメントする（匿名・何回でも可）
- * @returns 更新後の like_count
+ * @returns 更新後の like_count（失敗時は 0）
  */
 export async function incrementLike(hossiiId: string): Promise<number> {
   if (!isSupabaseConfigured) {
@@ -18,24 +23,45 @@ export async function incrementLike(hossiiId: string): Promise<number> {
     return 0;
   }
 
-  return (data as number) ?? 0;
+  return Math.max(0, (data as number) ?? 0);
 }
 
 /**
- * いいねをトグルする（旧 API・廃止予定）
- * すでにいいねしていれば削除（unlike）、していなければ追加（like）
- * @returns 操作後のいいね状態（true = いいね済み）
+ * DB 上の確定 like_count を取得する
+ */
+export async function fetchHossiiLikeCount(hossiiId: string): Promise<number> {
+  if (!isSupabaseConfigured) {
+    console.warn('[likesApi] Supabase not configured');
+    return 0;
+  }
+
+  const { data, error } = await supabase
+    .from('hossiis')
+    .select('like_count')
+    .eq('id', hossiiId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[likesApi] fetchHossiiLikeCount error:', error);
+    throw error;
+  }
+
+  return Math.max(0, (data?.like_count as number) ?? 0);
+}
+
+/**
+ * いいねをトグルする（ログイン済みユーザー向け）
+ * hossii_likes の insert/delete と DB trigger による like_count 更新後、確定値を返す
  */
 export async function toggleLike(
   hossiiId: string,
   userId: string
-): Promise<boolean> {
+): Promise<LikeMutationResult> {
   if (!isSupabaseConfigured) {
     console.warn('[likesApi] Supabase not configured');
-    return false;
+    throw new Error('[likesApi] Supabase not configured');
   }
 
-  // 既存のいいねを確認
   const { data: existing } = await supabase
     .from('hossii_likes')
     .select('hossii_id')
@@ -44,7 +70,6 @@ export async function toggleLike(
     .maybeSingle();
 
   if (existing) {
-    // いいね済み → 削除（unlike）
     const { error } = await supabase
       .from('hossii_likes')
       .delete()
@@ -55,19 +80,47 @@ export async function toggleLike(
       console.error('[likesApi] unlike error:', error);
       throw error;
     }
-    return false;
-  } else {
-    // 未いいね → 追加（like）
-    const { error } = await supabase
-      .from('hossii_likes')
-      .insert({ hossii_id: hossiiId, user_id: userId });
 
-    if (error) {
-      console.error('[likesApi] like error:', error);
-      throw error;
-    }
-    return true;
+    const likeCount = await fetchHossiiLikeCount(hossiiId);
+    return { liked: false, likeCount };
   }
+
+  const { error } = await supabase
+    .from('hossii_likes')
+    .insert({ hossii_id: hossiiId, user_id: userId });
+
+  if (error) {
+    console.error('[likesApi] like error:', error);
+    throw error;
+  }
+
+  const likeCount = await fetchHossiiLikeCount(hossiiId);
+  return { liked: true, likeCount };
+}
+
+/**
+ * ログイン状態に応じていいねをトグルまたはインクリメントする
+ * - ログイン済み: hossii_likes トグル + trigger 更新後の確定 like_count
+ * - ゲスト: increment_hossii_like RPC の返却値
+ */
+export async function mutateLike(
+  hossiiId: string,
+  userId?: string
+): Promise<LikeMutationResult> {
+  if (!isSupabaseConfigured) {
+    throw new Error('[likesApi] Supabase not configured');
+  }
+
+  if (userId) {
+    return toggleLike(hossiiId, userId);
+  }
+
+  const likeCount = await incrementLike(hossiiId);
+  if (likeCount <= 0) {
+    throw new Error('[likesApi] incrementLike failed');
+  }
+
+  return { likeCount, liked: true };
 }
 
 /**

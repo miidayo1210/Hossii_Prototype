@@ -1,6 +1,7 @@
 import { useRef, useEffect, useLayoutEffect, useState, memo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { Hossii } from '../../core/types';
+import type { LikeMutationResult } from '../../core/utils/likesApi';
 import { EMOJI_BY_EMOTION } from '../../core/utils/render';
 import type { ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { AnimationLevel } from '../../core/utils/animationLevel';
@@ -72,7 +73,7 @@ type BubbleProps = {
   /** SpaceSettings.features.likesEnabled が ON の場合のみ true */
   likesEnabled?: boolean;
   /** いいねトグル時のコールバック（楽観的更新は Bubble 内で行い、Supabase 処理は親で行う） */
-  onLike?: (id: string) => void;
+  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
   /** カスタム吹き出し形状PNGのパス（指定するとmask-imageでPNG形状に切り抜かれる） */
   bubbleShapePng?: string;
   /** 投稿順レイアウト時: 左上基準でスケール・見た目を揃える */
@@ -139,10 +140,10 @@ export function BubbleInner({
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [dragScale, setDragScale] = useState<number | null>(null);
 
-  // いいねのローカル楽観的状態（インクリメント専用）
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isBouncing, setIsBouncing] = useState(false);
+  const [likePending, setLikePending] = useState(false);
   // 案A: 吹き出しホバー中フラグ（0件時はホバーでのみいいねバッジを表示）
   const [isBubbleHovered, setIsBubbleHovered] = useState(false);
   /** リサイズ Phase A: 切り詰め解除して全文を吹き出し内に表示 */
@@ -688,23 +689,31 @@ export function BubbleInner({
           <button
             className={styles.likeFloatingBtn}
             onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              if (isBouncing) return;
-              setLocalLikeCount((c) => c + 1);
-              setIsLiked(true);
-              setIsBouncing(true);
-              setTimeout(() => setIsBouncing(false), 450);
-              const LIKE_EMOJIS = ['❤️', '💛', '⭐', '✨'];
-              const count = 3 + Math.floor(Math.random() * 3);
-              const particles: LikeParticle[] = Array.from({ length: count }, (_, i) => ({
-                id: `${Date.now()}-${i}`,
-                emoji: LIKE_EMOJIS[Math.floor(Math.random() * LIKE_EMOJIS.length)],
-                tx: Math.round((Math.random() - 0.5) * 40),
-              }));
-              setLikeParticles(particles);
-              setTimeout(() => setLikeParticles([]), 750);
-              onLike?.(hossii.id);
+              if (isBouncing || likePending) return;
+              setLikePending(true);
+              try {
+                const result = await onLike?.(hossii.id);
+                if (!result) return;
+                setLocalLikeCount(result.likeCount);
+                setIsLiked(result.liked);
+                if (result.liked) {
+                  setIsBouncing(true);
+                  setTimeout(() => setIsBouncing(false), 450);
+                  const LIKE_EMOJIS = ['❤️', '💛', '⭐', '✨'];
+                  const count = 3 + Math.floor(Math.random() * 3);
+                  const particles: LikeParticle[] = Array.from({ length: count }, (_, i) => ({
+                    id: `${Date.now()}-${i}`,
+                    emoji: LIKE_EMOJIS[Math.floor(Math.random() * LIKE_EMOJIS.length)],
+                    tx: Math.round((Math.random() - 0.5) * 40),
+                  }));
+                  setLikeParticles(particles);
+                  setTimeout(() => setLikeParticles([]), 750);
+                }
+              } finally {
+                setLikePending(false);
+              }
             }}
             aria-label="いいね"
           >

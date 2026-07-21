@@ -20,7 +20,7 @@ import type { SpaceDecoration } from '../../core/types/space';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { mapLogicalToContainerPercent, mapContainerPercentToLogical } from '../../core/utils/sharpContentRect';
 import { useSharpContentRect } from '../../core/hooks/useSharpContentRect';
-import { incrementLike } from '../../core/utils/likesApi';
+import { mutateLike, type LikeMutationResult } from '../../core/utils/likesApi';
 import { loadShowPostCountBadge, saveShowPostCountBadge } from '../../core/utils/displayPrefsStorage';
 import { resolveAnimationLevel, displayStackZFromIndex } from '../../core/utils/animationLevel';
 import { runDisplayPipeline } from '../../core/utils/hossiiDisplayPipeline';
@@ -204,6 +204,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     updateHossiiColorAction,
     updateHossiiPositionAction,
     updateHossiiScaleAction,
+    updateHossiiLikeCountAction,
     hideHossii,
     communitySlug,
     syncFetchedHossiis,
@@ -1063,15 +1064,20 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
 
-  const handleLike = useCallback(async (hossiiId: string) => {
-    if (isContentArchived) return;
+  const handleLike = useCallback(async (hossiiId: string): Promise<LikeMutationResult | null> => {
+    if (isContentArchived) return null;
     try {
-      await incrementLike(hossiiId);
-      setLikeReactionTrigger({ id: `like-${hossiiId}-${Date.now()}` });
+      const result = await mutateLike(hossiiId, currentUser?.uid);
+      updateHossiiLikeCountAction(hossiiId, result.likeCount);
+      if (result.liked) {
+        setLikeReactionTrigger({ id: `like-${hossiiId}-${Date.now()}` });
+      }
+      return result;
     } catch (err) {
-      console.error('[SpaceScreen] incrementLike error:', err);
+      console.error('[SpaceScreen] mutateLike error:', err);
+      return null;
     }
-  }, [isContentArchived]);
+  }, [isContentArchived, currentUser?.uid, updateHossiiLikeCountAction]);
 
   /** アプリ内「大画面」— 見た目の最大化（Fullscreen API は補助） */
   const [immersiveLayout, setImmersiveLayout] = useState(false);
