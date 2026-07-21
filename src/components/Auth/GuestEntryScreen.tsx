@@ -11,6 +11,11 @@ const DEFAULT_PARTICIPATION_INTRO = `こんにちは！
 ここは、みんなの気づきや想いを
 自由に残せるスペースだよ`;
 
+const NICKNAME_PROMPT = `このスペースで、
+なんて呼ばれたい？`;
+
+const NICKNAME_MAX_LENGTH = 10;
+
 function getParticipationIntroMessage(space: Space | undefined): string {
   const welcome = space?.welcomeMessage?.trim();
   if (welcome) return welcome;
@@ -34,15 +39,22 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
   // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
   const savedNickname = state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '';
   const [nickname, setNickname] = useState(savedNickname);
+  const [isJoining, setIsJoining] = useState(false);
 
   const space = state.spaces.find((s) => s.id === spaceId);
   const spaceName = space?.name ?? 'スペース';
-  const characterImageUrl = space?.characterImageUrl;
   const participationIntroMessage = getParticipationIntroMessage(space);
+  const trimmedNickname = nickname.trim();
+  const canJoin = trimmedNickname.length > 0;
+
+  const nicknameSpeechText = canJoin
+    ? `${trimmedNickname}さんだね！\n準備できたよ`
+    : NICKNAME_PROMPT;
 
   const handleGuestEnter = () => {
     const trimmed = nickname.trim();
-    if (!trimmed) return;
+    if (!trimmed || isJoining) return;
+    setIsJoining(true);
     setSpaceNickname(spaceId, trimmed);
     onEnterAsGuest();
   };
@@ -97,51 +109,64 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
 
         {step === 'nickname' && (
           <>
-            <div className={styles.header}>
+            <button
+              type="button"
+              className={styles.stepBackButton}
+              onClick={() => setStep('select')}
+            >
+              ← 戻る
+            </button>
+
+            <div className={styles.selectHeader}>
               <h1 className={styles.logo}>✨ Hossii</h1>
-              <p className={styles.spaceName}>「{spaceName}」に参加する</p>
-              <p className={styles.subtitle}>参加方法を選んでください</p>
+              <p className={styles.selectSpaceName}>{spaceName}</p>
             </div>
+
+            <div className={styles.nicknameHossiiArea}>
+              <img
+                key={canJoin ? 'smile' : 'base'}
+                src={canJoin ? HOSSII_IDLE.smile : HOSSII_IDLE.base}
+                alt="Hossii"
+                className={styles.nicknameHossiiImage}
+              />
+            </div>
+
+            <div className={styles.speechBubble}>
+              <p className={styles.speechText}>{nicknameSpeechText}</p>
+            </div>
+
             <div className={styles.nicknameForm}>
-              <div className={styles.welcomeArea}>
-                <div className={styles.characterIcon}>
-                  <img
-                    src={characterImageUrl ?? (nickname.trim() ? HOSSII_IDLE.smile : HOSSII_IDLE.base)}
-                    alt="Hossiiキャラ"
-                    className={styles.characterImage}
-                  />
-                </div>
-                <div className={styles.speechBubble}>
-                  <p className={styles.speechText}>ゲストとして参加する名前を入力してください</p>
-                </div>
-              </div>
+              <label className={styles.nicknameFieldLabel} htmlFor="guest-nickname-input">
+                ニックネーム
+              </label>
               <input
+                id="guest-nickname-input"
                 type="text"
                 className={styles.nicknameInput}
                 placeholder="ニックネームを入力"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                maxLength={30}
+                maxLength={NICKNAME_MAX_LENGTH}
                 autoFocus
+                enterKeyHint="done"
                 {...nicknameInputAntiAutofillProps}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleGuestEnter();
+                  if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                  e.preventDefault();
+                  if (canJoin && !isJoining) handleGuestEnter();
                 }}
               />
+              <p className={styles.nicknameCharCount} aria-live="polite">
+                {nickname.length} / {NICKNAME_MAX_LENGTH}
+              </p>
               <button
                 type="button"
                 className={styles.primaryButton}
                 onClick={handleGuestEnter}
-                disabled={!nickname.trim()}
+                disabled={!canJoin || isJoining}
+                aria-disabled={!canJoin || isJoining}
               >
-                入室する
-              </button>
-              <button
-                type="button"
-                className={styles.backButton}
-                onClick={() => setStep('select')}
-              >
-                戻る
+                {isJoining ? '参加しています…' : '参加する'}
               </button>
             </div>
           </>
