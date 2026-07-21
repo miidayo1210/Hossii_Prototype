@@ -14,6 +14,15 @@ export const ADMIN_EXPORT_DEFAULT_LIMIT = 200;
 export const ADMIN_EXPORT_MAX_LIMIT = 500;
 export const ADMIN_EXPORT_MAX_PAGES = 500;
 
+export const ADMIN_EXPORT_AUTHOR_TYPES = ['guest', 'account', 'participant_account'] as const;
+
+export function isValidAdminExportAuthorType(value: unknown): value is HossiiAuthorType {
+  return (
+    typeof value === 'string' &&
+    (ADMIN_EXPORT_AUTHOR_TYPES as readonly string[]).includes(value)
+  );
+}
+
 type RpcExportItem = {
   hossii_id: string;
   created_at: string;
@@ -55,7 +64,10 @@ function mapRpcCursor(cursor: RpcPageResponse['next_cursor']): AdminExportCursor
   return { createdAt: cursor.created_at, id: cursor.id };
 }
 
-export function mapRpcExportItem(row: RpcExportItem): AdminExportHossiiItem {
+export function mapRpcExportItem(row: RpcExportItem): AdminExportHossiiItem | null {
+  if (!isValidAdminExportAuthorType(row.author_type)) {
+    return null;
+  }
   const item: AdminExportHossiiItem = {
     hossiiId: row.hossii_id,
     createdAt: row.created_at,
@@ -84,8 +96,15 @@ export function mapRpcPageResponse(data: unknown): AdminExportPageResult | null 
   if (!Array.isArray(row.items) && row.items !== null && row.items !== undefined) return null;
   if (typeof row.has_more !== 'boolean' || typeof row.page_count !== 'number') return null;
 
+  const items = (row.items ?? [])
+    .map(mapRpcExportItem)
+    .filter((item): item is AdminExportHossiiItem => item !== null);
+  if ((row.items ?? []).length !== items.length) {
+    return null;
+  }
+
   return {
-    items: (row.items ?? []).map(mapRpcExportItem),
+    items,
     nextCursor: mapRpcCursor(row.next_cursor),
     hasMore: row.has_more,
     pageCount: row.page_count,

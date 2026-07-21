@@ -147,6 +147,21 @@ describe('CSV formula injection protection', () => {
   });
 
 
+
+  it('blocks zero-width and BOM prefixed formula injection attempts', () => {
+    expect(sanitizeCsvFormulaInjection('\u200B=1+1')).toBe("'\u200B=1+1");
+    expect(sanitizeCsvFormulaInjection('\u200C=1+1')).toBe("'\u200C=1+1");
+    expect(sanitizeCsvFormulaInjection('\u200D=1+1')).toBe("'\u200D=1+1");
+    expect(sanitizeCsvFormulaInjection('\u2060=1+1')).toBe("'\u2060=1+1");
+    expect(sanitizeCsvFormulaInjection('\uFEFF=1+1')).toBe("'\uFEFF=1+1");
+    expect(sanitizeCsvFormulaInjection('\u200B\u200C@SUM(A1:A2)')).toBe("'\u200B\u200C@SUM(A1:A2)");
+    expect(escapeCsvTextField('\u200B=1,2')).toBe('"\'\u200B=1,2"');
+  });
+
+  it('leaves Japanese text and system-like safe values unchanged', () => {
+    expect(sanitizeCsvFormulaInjection('挑戦と気づき')).toBe('挑戦と気づき');
+    expect(sanitizeCsvFormulaInjection('2026-07-21T10:00:00+09:00')).toBe('2026-07-21T10:00:00+09:00');
+  });
   it('handles LF-prefixed and multi-space formula injection attempts', () => {
     expect(sanitizeCsvFormulaInjection('\n=1+1')).toBe("'\n=1+1");
     expect(sanitizeCsvFormulaInjection('   @SUM(A1:A2)')).toBe("'   @SUM(A1:A2)");

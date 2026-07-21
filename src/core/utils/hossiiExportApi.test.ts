@@ -7,6 +7,7 @@ import {
   isValidAdminExportCursor,
   mapRpcExportItem,
   mapRpcPageResponse,
+  isValidAdminExportAuthorType,
 } from './hossiiExportApi';
 
 const supabaseMock = vi.hoisted(() => ({
@@ -60,6 +61,25 @@ describe('hossiiExportApi helpers', () => {
     });
   });
 
+
+  it('validates author_type allowlist', () => {
+    expect(isValidAdminExportAuthorType('guest')).toBe(true);
+    expect(isValidAdminExportAuthorType('account')).toBe(true);
+    expect(isValidAdminExportAuthorType('participant_account')).toBe(true);
+    expect(isValidAdminExportAuthorType('super_admin')).toBe(false);
+    expect(isValidAdminExportAuthorType(null)).toBe(false);
+  });
+
+  it('rejects page response with unknown author_type', () => {
+    expect(
+      mapRpcPageResponse({
+        items: [{ ...sampleRpcItem, author_type: 'unknown' }],
+        next_cursor: null,
+        has_more: false,
+        page_count: 1,
+      }),
+    ).toBeNull();
+  });
   it('maps page response', () => {
     expect(
       mapRpcPageResponse({

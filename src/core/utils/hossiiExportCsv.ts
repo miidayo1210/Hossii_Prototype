@@ -22,8 +22,8 @@ export const ADMIN_EXPORT_OPTIONAL_IMAGE_HEADER = '画像URL';
 
 const TAG_SEPARATOR = '｜';
 
-/** Leading chars that spreadsheet apps may interpret as formulas (incl. tab/CR bypass). */
-export const CSV_FORMULA_INJECTION_PREFIX_RE = /^[\t\r\n \u00a0]*[=+\-@]/;
+/** Leading chars that spreadsheet apps may interpret as formulas (incl. whitespace / zero-width bypass). */
+export const CSV_FORMULA_INJECTION_PREFIX_RE = /^[\s\uFEFF\u200B-\u200D\u2060]*[=+\-@]/;
 
 /** Prefix with a single quote so Excel / Google Sheets treat the cell as plain text. */
 export function sanitizeCsvFormulaInjection(value: string): string {
