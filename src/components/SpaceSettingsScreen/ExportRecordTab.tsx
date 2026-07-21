@@ -137,12 +137,9 @@ export const ExportRecordTab = ({ space }: Props) => {
   useEffect(() => {
     setExportError(null);
     setExportSuccess(null);
-    if (!canExport) {
-      setExportCount(null);
-      return;
-    }
-    void refreshCount();
-  }, [canExport, refreshCount]);
+    setCountError(null);
+    setExportCount(null);
+  }, [canExport, selectedPaneId, includeAuthorDisplayNames, includeImageUrls]);
 
   const handleExport = async () => {
     if (!canExport || exporting) return;

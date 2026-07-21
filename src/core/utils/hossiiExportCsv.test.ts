@@ -146,6 +146,37 @@ describe('CSV formula injection protection', () => {
     expect(sanitizeCsvFormulaInjection('@SUM(A1)')).toBe("'@SUM(A1)");
   });
 
+
+  it('handles LF-prefixed and multi-space formula injection attempts', () => {
+    expect(sanitizeCsvFormulaInjection('\n=1+1')).toBe("'\n=1+1");
+    expect(sanitizeCsvFormulaInjection('   @SUM(A1:A2)')).toBe("'   @SUM(A1:A2)");
+  });
+
+  it('does not prefix system columns in CSV rows', () => {
+    const row = buildAdminExportCsvRow({
+      item: {
+        ...baseItem,
+        hossiiId: 'post-001',
+        message: '=1+1',
+        emotion: '+joy',
+        hashtags: ['=tag'],
+      },
+      spaceName: '-Space',
+      exportedAt,
+      includeAuthorDisplayNames: false,
+      includeImageUrls: false,
+    });
+    const cols = row.split(',');
+    expect(cols[0]).toBe('post-001');
+    expect(cols[1]).toMatch(/^2026-07-21T/);
+    expect(cols[4]).toBe('guest');
+    expect(cols[5]).toBe('anon-001');
+    expect(cols[9]).toBe('42');
+    expect(cols[11]).toBe('true');
+    expect(row).toContain("'=1+1");
+    expect(row).toContain("'+joy");
+    expect(row).toContain("'-Space");
+  });
   it('handles tab and CR prefixed formula injection attempts', () => {
     expect(sanitizeCsvFormulaInjection('\t=cmd')).toBe("'\t=cmd");
     expect(sanitizeCsvFormulaInjection('\r=cmd')).toBe("'\r=cmd");

@@ -100,20 +100,32 @@ describe('ExportRecordTab', () => {
     ).toBeTruthy();
   });
 
-  it('loads count and exports CSV after confirm', async () => {
+  it('does not prefetch all rows on mount', async () => {
     render(<ExportRecordTab space={baseSpace} />);
 
     await waitFor(() => {
-      expect(screen.getByText('1件')).toBeTruthy();
+      expect(fetchSpacePanes).toHaveBeenCalled();
+    });
+
+    expect(fetchAllAdminExportHossiis).not.toHaveBeenCalled();
+    expect(screen.getByText('—')).toBeTruthy();
+  });
+
+  it('exports CSV after confirm without a prior count fetch', async () => {
+    render(<ExportRecordTab space={baseSpace} />);
+
+    await waitFor(() => {
+      expect(fetchSpacePanes).toHaveBeenCalled();
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
 
     await waitFor(() => {
-      expect(fetchAllAdminExportHossiis).toHaveBeenCalledTimes(2);
+      expect(fetchAllAdminExportHossiis).toHaveBeenCalledTimes(1);
       expect(buildAdminExportCsv).toHaveBeenCalled();
       expect(downloadAdminExportCsv).toHaveBeenCalledWith('csv-content', 'export.csv');
       expect(screen.getByText('1件の回答をCSVでダウンロードしました')).toBeTruthy();
+      expect(screen.getByText('1件')).toBeTruthy();
     });
   });
 
@@ -122,7 +134,7 @@ describe('ExportRecordTab', () => {
     render(<ExportRecordTab space={baseSpace} />);
 
     await waitFor(() => {
-      expect(screen.getByText('0件')).toBeTruthy();
+      expect(fetchSpacePanes).toHaveBeenCalled();
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
@@ -138,12 +150,81 @@ describe('ExportRecordTab', () => {
     render(<ExportRecordTab space={baseSpace} />);
 
     await waitFor(() => {
-      expect(screen.getByText('1件')).toBeTruthy();
+      expect(fetchSpacePanes).toHaveBeenCalled();
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
-    expect(fetchAllAdminExportHossiis).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(fetchAllAdminExportHossiis).not.toHaveBeenCalled();
     expect(downloadAdminExportCsv).not.toHaveBeenCalled();
+    expect(screen.queryByText('エクスポート中…')).toBeNull();
+    expect(screen.queryByText(/件を取得しました/)).toBeNull();
+  });
+
+  it('allows export again after cancel and after success', async () => {
+    confirmSpy.mockReturnValueOnce(false).mockReturnValueOnce(true).mockReturnValueOnce(true);
+    render(<ExportRecordTab space={baseSpace} />);
+
+    await waitFor(() => {
+      expect(fetchSpacePanes).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
+    expect(fetchAllAdminExportHossiis).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
+    await waitFor(() => {
+      expect(fetchAllAdminExportHossiis).toHaveBeenCalledTimes(1);
+      expect(downloadAdminExportCsv).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
+    await waitFor(() => {
+      expect(fetchAllAdminExportHossiis).toHaveBeenCalledTimes(2);
+      expect(downloadAdminExportCsv).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('ignores repeated clicks while exporting', async () => {
+    let resolveFetch: ((value: { ok: true; data: typeof sampleItem[] }) => void) | undefined;
+    vi.mocked(fetchAllAdminExportHossiis).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+
+    render(<ExportRecordTab space={baseSpace} />);
+
+    await waitFor(() => {
+      expect(fetchSpacePanes).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
+    expect(screen.getByRole('button', { name: 'エクスポート中…' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'エクスポート中…' }));
+    expect(fetchAllAdminExportHossiis).toHaveBeenCalledTimes(1);
+
+    resolveFetch?.({ ok: true, data: [sampleItem] });
+    await waitFor(() => {
+      expect(downloadAdminExportCsv).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('loads count only when manually requested', async () => {
+    render(<ExportRecordTab space={baseSpace} />);
+
+    await waitFor(() => {
+      expect(fetchSpacePanes).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '件数を再確認' }));
+
+    await waitFor(() => {
+      expect(fetchAllAdminExportHossiis).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('1件')).toBeTruthy();
+    });
   });
 
   it('shows opt-in warnings when toggles are enabled', async () => {
@@ -178,7 +259,7 @@ describe('ExportRecordTab', () => {
     const { unmount } = render(<ExportRecordTab space={baseSpace} />);
 
     await waitFor(() => {
-      expect(screen.getByText('1件')).toBeTruthy();
+      expect(fetchSpacePanes).toHaveBeenCalled();
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
