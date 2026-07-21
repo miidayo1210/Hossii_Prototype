@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUBBLE_VIEWPORT_MARGIN_PX,
+  LANDSCAPE_BUBBLE_HOVER_SCALE,
   bubbleRectAfterClamp,
   computeBubbleViewportClampOffset,
+  inflateRectForScale,
   isRectInsideArea,
   measureBubbleClampOffset,
   rectWithoutTranslate,
@@ -175,21 +177,34 @@ describe('fractional / DPR-like rects', () => {
 
   it('handles hover-scale enlarged rect (5% larger, centered expansion approx)', () => {
     const bubble = { left: 700, top: 300, right: 900, bottom: 420 };
-    const scale = 1.05;
-    const cx = (bubble.left + bubble.right) / 2;
-    const cy = (bubble.top + bubble.bottom) / 2;
-    const halfW = ((bubble.right - bubble.left) / 2) * scale;
-    const halfH = ((bubble.bottom - bubble.top) / 2) * scale;
-    const scaled = {
-      left: cx - halfW,
-      top: cy - halfH,
-      right: cx + halfW,
-      bottom: cy + halfH,
-    };
+    const scaled = inflateRectForScale(bubble, LANDSCAPE_BUBBLE_HOVER_SCALE);
     const offset = computeBubbleViewportClampOffset(scaled, PRODUCTION_AREA);
     expect(
       isRectInsideArea(bubbleRectAfterClamp(scaled, offset), PRODUCTION_AREA, 8),
     ).toBe(true);
+  });
+
+  it('measureBubbleClampOffset with visualScale is more conservative at edges', () => {
+    const bubble = {
+      left: 798.758,
+      top: 329.605,
+      right: 869.727,
+      bottom: 450.902,
+    };
+    const withoutScale = measureBubbleClampOffset(bubble, PRODUCTION_AREA, {
+      x: 0,
+      y: 0,
+    });
+    const withScale = measureBubbleClampOffset(
+      bubble,
+      PRODUCTION_AREA,
+      { x: 0, y: 0 },
+      { visualScale: LANDSCAPE_BUBBLE_HOVER_SCALE },
+    );
+    expect(withScale.x).toBeLessThanOrEqual(withoutScale.x);
+    const clampedNatural = bubbleRectAfterClamp(bubble, withScale);
+    const hoverBox = inflateRectForScale(clampedNatural, LANDSCAPE_BUBBLE_HOVER_SCALE);
+    expect(isRectInsideArea(hoverBox, PRODUCTION_AREA, 8)).toBe(true);
   });
 });
 
@@ -257,9 +272,20 @@ describe('clamp後再計測', () => {
       right: 869.727,
       bottom: 450.902,
     };
-    const first = computeBubbleViewportClampOffset(natural, PRODUCTION_AREA);
+    const measureOpts = { visualScale: LANDSCAPE_BUBBLE_HOVER_SCALE };
+    const first = measureBubbleClampOffset(
+      natural,
+      PRODUCTION_AREA,
+      { x: 0, y: 0 },
+      measureOpts,
+    );
     const clampedRect = bubbleRectAfterClamp(natural, first);
-    const second = measureBubbleClampOffset(clampedRect, PRODUCTION_AREA, first);
+    const second = measureBubbleClampOffset(
+      clampedRect,
+      PRODUCTION_AREA,
+      first,
+      measureOpts,
+    );
     expect(second).toEqual(first);
     expect(
       isRectInsideArea(clampedRect, PRODUCTION_AREA, 8),
