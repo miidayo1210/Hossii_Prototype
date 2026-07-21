@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   canShowPersonalShortcut,
-  getPersonalShortcutHiddenReason,
   isSharedSpaceShell,
   isViewingOwnPersonalSpace,
 } from './personalSpaceShortcut';
@@ -42,41 +41,6 @@ describe('canShowPersonalShortcut', () => {
   it('hides when there is no membership', () => {
     expect(canShowPersonalShortcut({ ...base, membershipStatus: null })).toBe(false);
     expect(canShowPersonalShortcut({ ...base, membershipStatus: undefined })).toBe(false);
-  });
-});
-
-describe('getPersonalShortcutHiddenReason', () => {
-  const base = {
-    isAuthenticated: true,
-    isVisiting: false,
-    spaceCommunityId: 'community-1',
-    membershipStatus: 'active',
-  };
-
-  it('returns null for active members (tab visible)', () => {
-    expect(getPersonalShortcutHiddenReason(base)).toBeNull();
-  });
-
-  it('returns null while visiting', () => {
-    expect(
-      getPersonalShortcutHiddenReason({ ...base, isVisiting: true, membershipStatus: 'suspended' }),
-    ).toBeNull();
-  });
-
-  it('explains suspended membership', () => {
-    expect(getPersonalShortcutHiddenReason({ ...base, membershipStatus: 'suspended' })).toMatch(
-      /一時停止/,
-    );
-  });
-
-  it('explains guest / login needed', () => {
-    expect(
-      getPersonalShortcutHiddenReason({
-        ...base,
-        isAuthenticated: false,
-        membershipStatus: undefined,
-      }),
-    ).toBe('ログインすると、マイスペースタブが使えるようになります。');
   });
 });
 
