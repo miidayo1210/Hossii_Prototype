@@ -94,29 +94,3 @@ export function measureBubbleClampOffset(
   );
   return computeBubbleViewportClampOffset(naturalRect, areaRect, marginPx);
 }
-
-/** clamp 適用後の表示矩形（テスト・検証用） */
-export function bubbleRectAfterClamp(
-  naturalRect: AxisRect,
-  offset: { x: number; y: number },
-): AxisRect {
-  return {
-    left: naturalRect.left + offset.x,
-    top: naturalRect.top + offset.y,
-    right: naturalRect.right + offset.x,
-    bottom: naturalRect.bottom + offset.y,
-  };
-}
-
-export function isRectInsideArea(
-  rect: AxisRect,
-  areaRect: AxisRect,
-  marginPx: number,
-): boolean {
-  return (
-    rect.left >= areaRect.left + marginPx - 0.01 &&
-    rect.top >= areaRect.top + marginPx - 0.01 &&
-    rect.right <= areaRect.right - marginPx + 0.01 &&
-    rect.bottom <= areaRect.bottom - marginPx + 0.01
-  );
-}

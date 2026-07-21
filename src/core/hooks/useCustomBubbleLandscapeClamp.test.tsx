@@ -2,17 +2,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, cleanup, waitFor } from '@testing-library/react';
 import { useLayoutEffect, useRef, useState } from 'react';
-import {
-  MOBILE_LANDSCAPE_BUBBLE_MQ,
-  type AxisRect,
-  isRectInsideArea,
-  bubbleRectAfterClamp,
-} from '../utils/customBubbleLandscapePlacement';
+import { MOBILE_LANDSCAPE_BUBBLE_MQ, type AxisRect } from '../utils/customBubbleLandscapePlacement';
 import { useCustomBubbleLandscapeClamp } from './useCustomBubbleLandscapeClamp';
 
 afterEach(cleanup);
 
 type RectInput = AxisRect;
+
+function bubbleRectAfterClamp(
+  naturalRect: RectInput,
+  offset: { x: number; y: number },
+): RectInput {
+  return {
+    left: naturalRect.left + offset.x,
+    top: naturalRect.top + offset.y,
+    right: naturalRect.right + offset.x,
+    bottom: naturalRect.bottom + offset.y,
+  };
+}
+
+function isRectInsideArea(
+  rect: RectInput,
+  areaRect: RectInput,
+  marginPx: number,
+): boolean {
+  return (
+    rect.left >= areaRect.left + marginPx - 0.01 &&
+    rect.top >= areaRect.top + marginPx - 0.01 &&
+    rect.right <= areaRect.right - marginPx + 0.01 &&
+    rect.bottom <= areaRect.bottom - marginPx + 0.01
+  );
+}
 
 function toDOMRect(r: RectInput): DOMRect {
   const width = r.right - r.left;
@@ -181,6 +201,7 @@ describe('useCustomBubbleLandscapeClamp', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    resizeObserverCallbacks.clear();
   });
 
   it('returns zero offset when not in landscape MQ', () => {
@@ -191,6 +212,33 @@ describe('useCustomBubbleLandscapeClamp', () => {
         areaRect={areaRect}
       />,
     );
+    expect(screen.getByTestId('offset-x').textContent).toBe('0');
+    expect(screen.getByTestId('offset-y').textContent).toBe('0');
+  });
+
+  it('clears offset when landscape MQ is off (portrait / landscape解除)', async () => {
+    const natural = {
+      left: 798.7581481933594,
+      top: 329.605224609375,
+      right: 869.7268981933594,
+      bottom: 450.902099609375,
+    };
+
+    mockMatchMedia(true);
+    const { unmount } = render(
+      <LandscapeClampProbe naturalRect={natural} areaRect={areaRect} />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(Number(screen.getByTestId('offset-x').textContent)).toBeLessThan(0);
+    unmount();
+
+    mockMatchMedia(false);
+    render(<LandscapeClampProbe naturalRect={natural} areaRect={areaRect} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(screen.getByTestId('offset-x').textContent).toBe('0');
     expect(screen.getByTestId('offset-y').textContent).toBe('0');
   });
@@ -263,7 +311,7 @@ describe('useCustomBubbleLandscapeClamp', () => {
     expect(isRectInsideArea(bubbleRectAfterClamp(tall, { x, y }), areaRect, 8)).toBe(true);
   });
 
-  it('recomputes when remeasureKeys change (操作メニュー展開相当)', async () => {
+  it('recomputes when remeasureKeys change (owner menu expansion equivalent)', async () => {
     const collapsed = {
       left: 531,
       top: 400,
