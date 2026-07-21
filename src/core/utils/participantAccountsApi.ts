@@ -1,4 +1,21 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
+import {
+  buildParticipantAccountRows,
+  MAX_PARTICIPANT_ACCOUNT_SLOTS,
+} from './participantAccountSlots';
+
+export { buildParticipantAccountRows, MAX_PARTICIPANT_ACCOUNT_SLOTS };
+export {
+  clampBulkIssueCount,
+  countActiveParticipantAccounts,
+  formatParticipantCredentialsForCopy,
+  getAvailableParticipantSlots,
+  getOccupiedSlotNumbers,
+  isParticipantSlotOccupied,
+  selectBulkIssueSlots,
+  selectNextIssueSlot,
+  validateBulkIssueCount,
+} from './participantAccountSlots';
 
 export type ParticipantAccountStatus = 'active' | 'revoked';
 
@@ -20,6 +37,18 @@ export type ParticipantAccountIssueResult = {
   slotNumber: number;
 };
 
+export type ParticipantAccountBulkIssueResult = {
+  issued: ParticipantAccountIssueResult[];
+  count: number;
+  partial?: boolean;
+  error?: string;
+};
+
+export type ParticipantAccountManagementSnapshot = {
+  activeAccounts: ParticipantAccount[];
+  occupiedSlotNumbers: number[];
+};
+
 type ParticipantAccountRow = {
   id: string;
   space_id: string;
@@ -32,7 +61,7 @@ type ParticipantAccountRow = {
   issued_by: string | null;
 };
 
-type EdgeFunctionAction = 'issue' | 'regenerate' | 'revoke';
+type EdgeFunctionAction = 'issue' | 'issue_bulk' | 'regenerate' | 'revoke';
 
 function rowToParticipantAccount(row: ParticipantAccountRow): ParticipantAccount {
   return {
@@ -49,29 +78,49 @@ function rowToParticipantAccount(row: ParticipantAccountRow): ParticipantAccount
 }
 
 export async function fetchParticipantAccounts(spaceId: string): Promise<ParticipantAccount[]> {
-  if (!isSupabaseConfigured) return [];
+  const snapshot = await fetchParticipantAccountManagementSnapshot(spaceId);
+  return snapshot.activeAccounts;
+}
+
+export async function fetchParticipantAccountManagementSnapshot(
+  spaceId: string,
+): Promise<ParticipantAccountManagementSnapshot> {
+  if (!isSupabaseConfigured) {
+    return { activeAccounts: [], occupiedSlotNumbers: [] };
+  }
 
   const { data, error } = await supabase
     .from('space_participant_accounts')
     .select('id, space_id, slot_number, login_id, auth_user_id, status, first_login_at, issued_at, issued_by')
     .eq('space_id', spaceId)
-    .eq('status', 'active')
     .order('slot_number', { ascending: true });
 
   if (error) {
-    console.error('[participantAccountsApi] fetchParticipantAccounts error:', error.message);
-    return [];
+    console.error('[participantAccountsApi] fetchParticipantAccountManagementSnapshot error:', error.message);
+    return { activeAccounts: [], occupiedSlotNumbers: [] };
   }
 
-  return (data as ParticipantAccountRow[]).map(rowToParticipantAccount);
+  const records = (data as ParticipantAccountRow[]).map(rowToParticipantAccount);
+  return {
+    activeAccounts: records.filter((record) => record.status === 'active'),
+    occupiedSlotNumbers: records.map((record) => record.slotNumber),
+  };
 }
 
 async function invokeParticipantAccountAction(
   spaceId: string,
   action: EdgeFunctionAction,
-  slotNumber?: number,
-  options?: { linkCommunityMembership?: boolean; linkSpaceMembership?: boolean },
-): Promise<ParticipantAccountIssueResult | { slotNumber: number; revoked: true }> {
+  options?: {
+    slotNumber?: number;
+    count?: number;
+    linkCommunityMembership?: boolean;
+    linkSpaceMembership?: boolean;
+  },
+): Promise<
+  | ParticipantAccountIssueResult
+  | ParticipantAccountBulkIssueResult
+  | { slotNumber: number; revoked: true }
+> {
   if (!isSupabaseConfigured) {
     throw new Error('Supabase is not configured');
   }
@@ -80,7 +129,8 @@ async function invokeParticipantAccountAction(
     body: {
       spaceId,
       action,
-      slotNumber,
+      slotNumber: options?.slotNumber,
+      count: options?.count,
       linkCommunityMembership: options?.linkCommunityMembership ?? false,
       linkSpaceMembership: options?.linkSpaceMembership ?? false,
     },
@@ -91,11 +141,14 @@ async function invokeParticipantAccountAction(
     throw error;
   }
 
-  if (data?.error) {
+  if (data?.error && !data?.issued) {
     throw new Error(String(data.error));
   }
 
-  return data as ParticipantAccountIssueResult | { slotNumber: number; revoked: true };
+  return data as
+    | ParticipantAccountIssueResult
+    | ParticipantAccountBulkIssueResult
+    | { slotNumber: number; revoked: true };
 }
 
 export type IssueParticipantOptions = {
@@ -108,15 +161,32 @@ export async function issueParticipantAccount(
   slotNumber?: number,
   options?: IssueParticipantOptions,
 ): Promise<ParticipantAccountIssueResult> {
-  const result = await invokeParticipantAccountAction(spaceId, 'issue', slotNumber, options);
+  const result = await invokeParticipantAccountAction(spaceId, 'issue', {
+    slotNumber,
+    linkCommunityMembership: options?.linkCommunityMembership,
+    linkSpaceMembership: options?.linkSpaceMembership,
+  });
   return result as ParticipantAccountIssueResult;
+}
+
+export async function issueParticipantAccountsBulk(
+  spaceId: string,
+  count: number,
+  options?: IssueParticipantOptions,
+): Promise<ParticipantAccountBulkIssueResult> {
+  const result = await invokeParticipantAccountAction(spaceId, 'issue_bulk', {
+    count,
+    linkCommunityMembership: options?.linkCommunityMembership,
+    linkSpaceMembership: options?.linkSpaceMembership,
+  });
+  return result as ParticipantAccountBulkIssueResult;
 }
 
 export async function regenerateParticipantPassword(
   spaceId: string,
   slotNumber: number
 ): Promise<ParticipantAccountIssueResult> {
-  const result = await invokeParticipantAccountAction(spaceId, 'regenerate', slotNumber);
+  const result = await invokeParticipantAccountAction(spaceId, 'regenerate', { slotNumber });
   return result as ParticipantAccountIssueResult;
 }
 
@@ -124,7 +194,7 @@ export async function revokeParticipantAccount(
   spaceId: string,
   slotNumber: number
 ): Promise<void> {
-  await invokeParticipantAccountAction(spaceId, 'revoke', slotNumber);
+  await invokeParticipantAccountAction(spaceId, 'revoke', { slotNumber });
 }
 
 export async function resolveParticipantLogin(
@@ -156,11 +226,4 @@ export async function markParticipantFirstLogin(authUserId: string): Promise<voi
   if (error) {
     console.error('[participantAccountsApi] markParticipantFirstLogin error:', error.message);
   }
-}
-
-export function buildParticipantAccountRows(
-  accounts: ParticipantAccount[]
-): Array<ParticipantAccount | null> {
-  const bySlot = new Map(accounts.map((account) => [account.slotNumber, account]));
-  return Array.from({ length: 20 }, (_, index) => bySlot.get(index + 1) ?? null);
 }

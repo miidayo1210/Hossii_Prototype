@@ -3,11 +3,18 @@ import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react';
 import type { Space } from '../../core/types/space';
 import {
   buildParticipantAccountRows,
-  fetchParticipantAccounts,
+  fetchParticipantAccountManagementSnapshot,
+  formatParticipantCredentialsForCopy,
+  getAvailableParticipantSlots,
+  isParticipantSlotOccupied,
   issueParticipantAccount,
+  issueParticipantAccountsBulk,
+  MAX_PARTICIPANT_ACCOUNT_SLOTS,
   regenerateParticipantPassword,
   revokeParticipantAccount,
+  validateBulkIssueCount,
   type ParticipantAccount,
+  type ParticipantAccountIssueResult,
 } from '../../core/utils/participantAccountsApi';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import sharedStyles from './SettingsShared.module.css';
@@ -24,25 +31,40 @@ type CredentialModal = {
   mode: 'issue' | 'regenerate';
 };
 
-function accountStatusLabel(account: ParticipantAccount | null): string {
-  if (!account) return '未発行';
-  if (!account.firstLoginAt) return '初回未使用';
-  return '利用中';
+const DEFAULT_BULK_COUNT = 10;
+
+function accountStatusLabel(
+  account: ParticipantAccount | null,
+  slotOccupied: boolean,
+): string {
+  if (account) {
+    if (!account.firstLoginAt) return '初回未使用';
+    return '利用中';
+  }
+  if (slotOccupied) return '無効化済み';
+  return '未発行';
 }
 
 export const ParticipantAccountsTab = ({ space }: Props) => {
   const [accounts, setAccounts] = useState<ParticipantAccount[]>([]);
+  const [occupiedSlotNumbers, setOccupiedSlotNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [busySlot, setBusySlot] = useState<number | null>(null);
+  const [bulkIssuing, setBulkIssuing] = useState(false);
+  const [bulkCountInput, setBulkCountInput] = useState(String(DEFAULT_BULK_COUNT));
+  const [recentlyIssued, setRecentlyIssued] = useState<ParticipantAccountIssueResult[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [copyFeedback, setCopyFeedback] = useState('');
   const [credentialModal, setCredentialModal] = useState<CredentialModal | null>(null);
   const [linkCommunityMembership, setLinkCommunityMembership] = useState(false);
   const [linkSpaceMembership, setLinkSpaceMembership] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const rows = await fetchParticipantAccounts(space.id);
-    setAccounts(rows);
+    const snapshot = await fetchParticipantAccountManagementSnapshot(space.id);
+    setAccounts(snapshot.activeAccounts);
+    setOccupiedSlotNumbers(snapshot.occupiedSlotNumbers);
     setLoading(false);
   }, [space.id]);
 
@@ -51,21 +73,46 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
   }, [reload]);
 
   const rows = buildParticipantAccountRows(accounts);
-  const issuedCount = accounts.length;
+  const activeAccountCount = accounts.length;
+  const availableSlots = getAvailableParticipantSlots(occupiedSlotNumbers);
+  const availableCount = availableSlots.length;
+  const isFullyIssued = availableCount === 0;
+
+  const parsedBulkCount = Number.parseInt(bulkCountInput, 10);
+  const bulkCountValidation = validateBulkIssueCount(parsedBulkCount, availableCount);
+  const bulkCountValid = bulkCountValidation === null;
+
+  useEffect(() => {
+    if (availableCount <= 0) return;
+    const clamped = Math.min(DEFAULT_BULK_COUNT, availableCount);
+    setBulkCountInput(String(clamped));
+  }, [availableCount]);
 
   const showError = (message: string) => {
     setErrorMsg(message);
     setTimeout(() => setErrorMsg(''), 4000);
   };
 
+  const showSuccess = (message: string) => {
+    setSuccessMsg(message);
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const showCopyFeedback = (message: string) => {
+    setCopyFeedback(message);
+    setTimeout(() => setCopyFeedback(''), 3000);
+  };
+
+  const membershipOptions = {
+    linkCommunityMembership,
+    linkSpaceMembership,
+  };
+
   const handleIssue = async (slotNumber: number) => {
     setBusySlot(slotNumber);
     setErrorMsg('');
     try {
-      const result = await issueParticipantAccount(space.id, slotNumber, {
-        linkCommunityMembership,
-        linkSpaceMembership,
-      });
+      const result = await issueParticipantAccount(space.id, slotNumber, membershipOptions);
       setCredentialModal({
         loginId: result.loginId,
         password: result.password,
@@ -77,6 +124,36 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
       showError(err instanceof Error ? err.message : '発行に失敗しました');
     } finally {
       setBusySlot(null);
+    }
+  };
+
+  const handleBulkIssue = async () => {
+    if (bulkIssuing || isFullyIssued || !bulkCountValid) return;
+
+    setBulkIssuing(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    setCopyFeedback('');
+
+    try {
+      const result = await issueParticipantAccountsBulk(
+        space.id,
+        parsedBulkCount,
+        membershipOptions,
+      );
+
+      setRecentlyIssued(result.issued);
+      await reload();
+
+      if (result.partial && result.error) {
+        showError(`${result.count} 件発行しましたが、途中で失敗しました: ${result.error}`);
+      } else {
+        showSuccess(`${result.count} 件のアカウントを発行しました`);
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : '一括発行に失敗しました');
+    } finally {
+      setBulkIssuing(false);
     }
   };
 
@@ -124,14 +201,26 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
     }
   };
 
+  const copyRecentlyIssued = async () => {
+    if (recentlyIssued.length === 0) return;
+    try {
+      await navigator.clipboard.writeText(formatParticipantCredentialsForCopy(recentlyIssued));
+      showCopyFeedback('今回発行したアカウントをコピーしました');
+    } catch {
+      showError('コピーに失敗しました');
+    }
+  };
+
   return (
     <div className={sharedStyles.page}>
       <SettingsPageHeader
         title="参加者アカウント"
-        description="このスペース専用のログイン ID を最大 20 件まで発行できます。参加者に ID とパスワードを共有してください。"
+        description={`このスペース専用のログイン ID を最大 ${MAX_PARTICIPANT_ACCOUNT_SLOTS} 件まで発行できます。参加者に ID とパスワードを共有してください。`}
       >
       <p className={styles.summary}>
-        発行済み: <strong>{issuedCount}</strong> / 20
+        利用可能アカウント: <strong>{activeAccountCount}</strong> 件
+        {' · '}
+        新規発行可能: <strong>{availableCount}</strong> 件
       </p>
       <div className={styles.linkOptions}>
         <p className={styles.optionIntro}>
@@ -173,6 +262,65 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
         )}
       </div>
 
+      <div className={styles.bulkIssue}>
+        <div className={styles.bulkIssueHeader}>
+          <h3 className={styles.bulkIssueTitle}>まとめて発行</h3>
+          <p className={styles.bulkIssueDesc}>
+            新規発行可能な slot の小さい番号から順に、指定件数を一括発行します。
+          </p>
+        </div>
+        <div className={styles.bulkIssueControls}>
+          <label className={styles.bulkCountLabel}>
+            発行件数
+            <input
+              type="number"
+              className={styles.bulkCountInput}
+              min={1}
+              max={Math.max(availableCount, 1)}
+              inputMode="numeric"
+              value={bulkCountInput}
+              onChange={(e) => setBulkCountInput(e.target.value)}
+              disabled={isFullyIssued || bulkIssuing || loading}
+            />
+          </label>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => void handleBulkIssue()}
+            disabled={isFullyIssued || bulkIssuing || loading || !bulkCountValid}
+          >
+            <Plus size={14} />
+            {bulkIssuing ? '発行中…' : 'まとめて発行'}
+          </button>
+        </div>
+        {!loading && bulkCountInput !== '' && bulkCountValidation && (
+          <p className={styles.bulkValidation}>{bulkCountValidation}</p>
+        )}
+        {successMsg && <p className={styles.success}>{successMsg}</p>}
+      </div>
+
+      {recentlyIssued.length > 0 && (
+        <div className={styles.recentlyIssued}>
+          <p className={styles.recentlyIssuedTitle}>
+            今回発行したアカウント: <strong>{recentlyIssued.length}</strong> 件
+          </p>
+          <p className={styles.recentlyIssuedNote}>
+            パスワードはこの画面でのみ表示できます。画面を閉じると再表示できません。必要な場合は「パスワード再発行」を使ってください。
+          </p>
+          <div className={styles.recentlyIssuedActions}>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={() => void copyRecentlyIssued()}
+            >
+              <Copy size={14} />
+              今回発行したアカウントをすべてコピー
+            </button>
+            {copyFeedback && <span className={styles.copyFeedback}>{copyFeedback}</span>}
+          </div>
+        </div>
+      )}
+
       {errorMsg && <p className={styles.error}>{errorMsg}</p>}
 
       {loading ? (
@@ -192,24 +340,26 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
               {rows.map((account, index) => {
                 const slotNumber = index + 1;
                 const isBusy = busySlot === slotNumber;
+                const slotOccupied = isParticipantSlotOccupied(slotNumber, occupiedSlotNumbers);
+                const canIssue = !account && !slotOccupied && !isFullyIssued;
                 return (
                   <tr key={slotNumber}>
                     <td>{slotNumber}</td>
                     <td>{account?.loginId ?? '—'}</td>
-                    <td>{accountStatusLabel(account)}</td>
+                    <td>{accountStatusLabel(account, slotOccupied)}</td>
                     <td>
                       <div className={styles.actions}>
-                        {!account ? (
+                        {canIssue ? (
                           <button
                             type="button"
                             className={styles.actionButton}
                             onClick={() => void handleIssue(slotNumber)}
-                            disabled={isBusy || issuedCount >= 20}
+                            disabled={isBusy || bulkIssuing}
                           >
                             <Plus size={14} />
                             発行
                           </button>
-                        ) : (
+                        ) : account ? (
                           <>
                             <button
                               type="button"
@@ -222,7 +372,7 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
                                   mode: 'issue',
                                 })
                               }
-                              disabled={isBusy}
+                              disabled={isBusy || bulkIssuing}
                             >
                               再表示
                             </button>
@@ -230,7 +380,7 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
                               type="button"
                               className={styles.actionButton}
                               onClick={() => void handleRegenerate(slotNumber)}
-                              disabled={isBusy}
+                              disabled={isBusy || bulkIssuing}
                             >
                               <KeyRound size={14} />
                               再発行
@@ -239,13 +389,13 @@ export const ParticipantAccountsTab = ({ space }: Props) => {
                               type="button"
                               className={`${styles.actionButton} ${styles.dangerButton}`}
                               onClick={() => void handleRevoke(slotNumber)}
-                              disabled={isBusy}
+                              disabled={isBusy || bulkIssuing}
                             >
                               <Trash2 size={14} />
                               無効化
                             </button>
                           </>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>

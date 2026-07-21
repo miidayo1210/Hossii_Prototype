@@ -208,3 +208,106 @@
   background: #fff;
   color: #374151;
 }
+
+.bulkIssue {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.bulkIssueHeader {
+  margin-bottom: 0.75rem;
+}
+
+.bulkIssueTitle {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  color: #111827;
+}
+
+.bulkIssueDesc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.bulkIssueControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.bulkCountLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.bulkCountInput {
+  width: 6rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  color: #111827;
+  background: #fff;
+}
+
+.bulkCountInput:disabled {
+  opacity: 0.55;
+}
+
+.bulkValidation {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: #b45309;
+}
+
+.success {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.875rem;
+}
+
+.recentlyIssued {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.recentlyIssuedTitle {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  color: #111827;
+}
+
+.recentlyIssuedNote {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.recentlyIssuedActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.copyFeedback {
+  font-size: 0.8125rem;
+  color: #047857;
+}
