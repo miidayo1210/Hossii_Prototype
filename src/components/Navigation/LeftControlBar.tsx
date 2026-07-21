@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Maximize2, Minimize2, Eye, EyeOff, Hash, Info, Mic, MicOff, MoreHorizontal, QrCode, Users, Volume2, VolumeX, ZoomIn } from 'lucide-react';
+import { BookOpen, Maximize2, Minimize2, Eye, EyeOff, Hash, Info, Mic, MicOff, MoreHorizontal, QrCode, Users, Volume2, VolumeX, ZoomIn } from 'lucide-react';
 import type { DisplayScale } from '../../core/utils/displayScaleStorage';
 import type { DisplayPeriod, DisplayLimit, ViewMode, LayoutMode } from '../../core/utils/displayPrefsStorage';
 import type { Space } from '../../core/types/space';
@@ -49,6 +49,8 @@ type Props = {
   tagFilterCandidates?: string[];
   activeTagFilter?: string | null;
   onTagFilterChange?: (tag: string | null) => void;
+  /** ウェルカムガイドを手動で再表示（未指定時はメニュー項目を出さない） */
+  onOpenWelcomeGuide?: () => void;
 };
 
 const PERIOD_OPTIONS: { value: DisplayPeriod; label: string }[] = [
@@ -106,6 +108,7 @@ export const LeftControlBar = ({
   tagFilterCandidates = [],
   activeTagFilter = null,
   onTagFilterChange,
+  onOpenWelcomeGuide,
 }: Props) => {
   const scalePercent = Math.round(displayScale * 100);
   const isMobileLayout = useMediaQuery('(max-width: 768px), (max-height: 600px) and (orientation: landscape)');
@@ -156,6 +159,11 @@ export const LeftControlBar = ({
     e.stopPropagation();
     setOverflowOpen((v) => !v);
   }, []);
+
+  const handleOpenWelcomeGuide = useCallback(() => {
+    setOverflowOpen(false);
+    onOpenWelcomeGuide?.();
+  }, [onOpenWelcomeGuide]);
 
   // オーバーフローパネル外タップで閉じる（開いた直後の同一タップを避けるため 1 フレーム遅延）
   useEffect(() => {
@@ -324,6 +332,7 @@ export const LeftControlBar = ({
               tagFilterCandidates,
               activeTagFilter,
               onTagFilterChange,
+              onOpenWelcomeGuide: onOpenWelcomeGuide ? handleOpenWelcomeGuide : undefined,
               styles,
             })}
           </div>
@@ -351,6 +360,7 @@ export const LeftControlBar = ({
               tagFilterCandidates,
               activeTagFilter,
               onTagFilterChange,
+              onOpenWelcomeGuide: onOpenWelcomeGuide ? handleOpenWelcomeGuide : undefined,
               styles,
             })}
           </div>,
@@ -372,6 +382,7 @@ type OverflowMenuContentProps = {
   tagFilterCandidates?: string[];
   activeTagFilter?: string | null;
   onTagFilterChange?: (tag: string | null) => void;
+  onOpenWelcomeGuide?: () => void;
   styles: typeof styles;
 };
 
@@ -387,10 +398,27 @@ function renderOverflowMenuContent({
   tagFilterCandidates = [],
   activeTagFilter = null,
   onTagFilterChange,
+  onOpenWelcomeGuide,
   styles,
 }: OverflowMenuContentProps) {
   return (
     <>
+            {onOpenWelcomeGuide && (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.overflowRowButton} ${styles.overflowActionItem}`}
+                  onClick={onOpenWelcomeGuide}
+                  role="menuitem"
+                  aria-label="このスペースの使い方"
+                >
+                  <BookOpen size={16} aria-hidden />
+                  このスペースの使い方
+                </button>
+                <div className={styles.overflowDivider} />
+              </>
+            )}
+
             {/* 表示モード */}
             <div className={styles.overflowSection}>
               <div className={styles.overflowLabel}>表示</div>

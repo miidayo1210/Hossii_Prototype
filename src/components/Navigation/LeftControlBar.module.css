@@ -310,6 +310,13 @@
   background: rgba(124, 58, 237, 0.1);
 }
 
+.overflowActionItem {
+  min-height: 44px;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
 .overflowPanelMobile {
   position: fixed;
   z-index: 1100;

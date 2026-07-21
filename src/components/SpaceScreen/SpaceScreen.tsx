@@ -1852,12 +1852,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const welcomeGuideSpaceKey = contentSpaceId ?? activeSpaceId ?? '';
   const [welcomeGuideDismissed, setWelcomeGuideDismissed] = useState(false);
+  const [welcomeGuideForceOpen, setWelcomeGuideForceOpen] = useState(false);
   const [welcomeGuideSeenInStorage, setWelcomeGuideSeenInStorage] = useState(() =>
     welcomeGuideSpaceKey ? hasSeenSpaceGuide(welcomeGuideSpaceKey) : true,
   );
 
   useEffect(() => {
     setWelcomeGuideDismissed(false);
+    setWelcomeGuideForceOpen(false);
     setWelcomeGuideSeenInStorage(
       welcomeGuideSpaceKey ? hasSeenSpaceGuide(welcomeGuideSpaceKey) : true,
     );
@@ -1869,23 +1871,33 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     ? '画面をダブルタップするか、\n下の「投稿」から投稿できるよ。'
     : '画面をダブルクリックするか、\n右上の「投稿する」から投稿できるよ。';
 
-  const welcomeGuideEligible =
-    !!welcomeGuideSpaceKey && !welcomeGuideDismissed && !welcomeGuideSeenInStorage;
-
-  const showWelcomeGuide =
-    welcomeGuideEligible &&
+  const welcomeGuideAllowed =
+    !!welcomeGuideSpaceKey &&
     !isVisiting &&
     !isContentArchived &&
     viewMode !== 'slideshow' &&
     !showInitialLoadingOverlay;
 
+  const welcomeGuideEligible =
+    welcomeGuideAllowed && !welcomeGuideDismissed && !welcomeGuideSeenInStorage;
+
+  const showWelcomeGuide =
+    welcomeGuideAllowed && (welcomeGuideForceOpen || welcomeGuideEligible);
+
+  const handleOpenWelcomeGuide = useCallback(() => {
+    if (!welcomeGuideAllowed) return;
+    setWelcomeGuideForceOpen(true);
+    setWelcomeGuideDismissed(false);
+  }, [welcomeGuideAllowed]);
+
   const handleWelcomeGuideClose = useCallback(() => {
+    setWelcomeGuideForceOpen(false);
     setWelcomeGuideDismissed(true);
-    if (welcomeGuideSpaceKey) {
+    if (welcomeGuideSpaceKey && !welcomeGuideSeenInStorage) {
       markSpaceGuideSeen(welcomeGuideSpaceKey);
       setWelcomeGuideSeenInStorage(true);
     }
-  }, [welcomeGuideSpaceKey]);
+  }, [welcomeGuideSpaceKey, welcomeGuideSeenInStorage]);
 
   const showByAuthorLoadingOverlay =
     layoutMode === 'byAuthor' &&
@@ -2967,6 +2979,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             tagFilterCandidates={isMobile ? tagCandidates : undefined}
             activeTagFilter={isMobile ? activeTagFilter : undefined}
             onTagFilterChange={isMobile ? applyTagFilter : undefined}
+            onOpenWelcomeGuide={welcomeGuideAllowed ? handleOpenWelcomeGuide : undefined}
           />
         </>
       )}
