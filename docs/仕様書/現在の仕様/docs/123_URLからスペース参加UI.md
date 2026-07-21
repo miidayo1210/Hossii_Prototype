@@ -2,7 +2,7 @@
 
 > **分類:** `[Core / Space / Entry / Onboarding]`
 > **機能名:** 共有URL参加・初回オンボーディング
-> **ステータス:** ✅ コア実装済み（`main` @ `55da577` / PR #26 + PR #27）。hotfix PR #27 マージ済み（main @ 55da577）
+> **ステータス:** ✅ コア実装済み（`main` @ `0c61228`）。hotfix PR #27 マージ済み。参加者アカウント一括発行 PR #31（`dc863c1`）・TutorialOverlay 廃止 PR #34（`d6a0c38`）マージ済み
 > **最終更新:** 2026-07-21
 > **対象:** スマートフォン優先、PC・タブレット対応
 > **正本の範囲:** 共有URLを開いてから、ゲストまたはアカウントとして参加し、スペースの利用を開始するまで
@@ -20,13 +20,13 @@
 | Phase 4 再訪確認 | ✅ | revisit step |
 | Phase 5 入室後初回ガイド | ✅ | `SpaceWelcomeGuide` |
 | Phase 6 参加方法管理設定 | ✅ | `spaces.participation_mode` + `PublicShareTab` |
-| Phase 7 全体統合・旧仕様整理 | ⏳ 部分 | 関連仕様書の123参照化は未着手 |
+| Phase 7 全体統合・旧仕様整理 | ⏳ 部分 | 16 / 37 へ 123 参照を追加済み。98 はリポジトリ内にファイルなし |
 | 読み込み画面（§8.1） | ⏳ 簡易 | Hossii付き専用UIは未実装。`読み込み中…` テキストのみ |
 | Hossii待機アニメーション（§11.5） | ❌ 未実装 | idle 素材の自動切替なし |
 | 初回ガイド DB 保存（アカウント） | ❌ 未実装 | localStorage のみ |
 | `guide_version` 再表示 | ❌ 未実装 | |
 | 管理画面：初回ガイド専用編集 | ⏳ 部分 | `description` をガイド本文に流用。専用カラムなし |
-| `TutorialOverlay` 廃止 | ⏳ 部分 | SpaceScreen では `SpaceWelcomeGuide` に統一。legacy は screen 以外で残存 |
+| `TutorialOverlay` 廃止 | ✅ 完了 | PR #34（`d6a0c38` / fix `f8dac21`）。`SpaceWelcomeGuide` を正式導線として継続。`hossii_tutorial_seen_*` は参照停止。localStorage cleanup 不要 |
 | guest nickname reload 保持 | ✅ PR #27 マージ済み | auth sync 時の server-only 上書きを解消 |
 
 **主なコミット:**
@@ -1336,9 +1336,14 @@ revisit   -- 追加
 
 ## 19.4 TutorialOverlay
 
-SpaceScreen 上の共有URLオンボーディングでは **SpaceWelcomeGuide** を使用 ✅。
+**✅ 完了（PR #34 @ `d6a0c38`）。** SpaceScreen 上の共有URLオンボーディングは **SpaceWelcomeGuide** を正式導線として継続する。
 
-`TutorialOverlay` は legacy として **screen 以外** のアカウント初回導線に残存 ⏳。SpaceScreen では二重表示しないよう `shouldShowLegacyTutorial` で screen 時は抑制。
+| 項目 | 状態 |
+|------|------|
+| TutorialOverlay 完全廃止判断 | ✅ 完了 |
+| TutorialOverlay 完全削除 | ✅ 完了 |
+| `hossii_tutorial_seen_*` | 参照停止（localStorage cleanup 不要） |
+| 二重表示 | SpaceWelcomeGuide のみ |
 
 魚の絵文字による案内は廃止または別用途へ整理する（未着手）。
 
@@ -1503,11 +1508,11 @@ SpaceScreen 上の共有URLオンボーディングでは **SpaceWelcomeGuide** 
 
 ## Phase 7 残タスク
 
-* 関連仕様書（§23）の123参照化
+* 関連仕様書（§23）の123参照化 — **16 / 37 追加済み**（98 はリポジトリ内にファイルなし）
 * 読み込み画面（§8.1）の Hossii 付き UI
 * Hossii 待機アニメーション（§11.5）
 * 初回ガイド DB 保存・アカウント向け `guide_version`
-* `TutorialOverlay` の完全廃止判断
+* ~~`TutorialOverlay` の完全廃止判断~~ → ✅ PR #34 完了
 * `ParticipantLoginScreen` の正認証確認
 
 ## hotfix
@@ -1522,13 +1527,13 @@ SpaceScreen 上の共有URLオンボーディングでは **SpaceWelcomeGuide** 
 
 本仕様書を、共有URLから参加完了までのオンボーディングに関する正本とする。
 
-以下の既存仕様書は、本仕様を参照する形に更新する（**Phase 7 残タスク**）。
+以下の既存仕様書は、本仕様を参照する形に更新する（**Phase 7 部分対応**）。
 
-* `16_ゲスト入室フロー.md`
-* `37_スペースシェアURLニックネーム.md`
+* `16_ゲスト入室フロー.md` — ✅ 123 参照追加済み
+* `37_スペースシェアURLニックネーム.md` — ✅ 123 参照追加済み
 * `41_個人ユーザー登録.md`
 * `43_ゲスト参加の人がアカウントからログインする.md`
-* `98_個人ログイン・新規登録・ゲスト参加UI.md`
+* `98_個人ログイン・新規登録・ゲスト参加UI.md` — **リポジトリ内にファイルなし**（作成または別名で存在する場合は要確認）
 * `104_メール登録.md`
 * `91_スペース説明表示.md`
 * `03_スペースURL機能.md`
@@ -1553,6 +1558,6 @@ SpaceScreen 上の共有URLオンボーディングでは **SpaceWelcomeGuide** 
 | 6 | 初回ガイドの保存先をlocalStorageとDBのどちらにするか | ⏳ localStorage のみ。DB は未実装 |
 | 7 | `greeting/sorry.png`など未参照素材の実際の見た目 | ✅ ParticipantLoginScreen で使用 |
 | 8 | `motion/point.png`など縦長素材を参加画面に表示した際のサイズ調整 | ⏳ 参加画面では idle 素材のみ使用 |
-| 9 | 旧TutorialOverlayを削除できるか、別導線で必要か | ⏳ SpaceScreen では不使用。legacy 残存 |
+| 9 | 旧TutorialOverlayを削除できるか、別導線で必要か | ✅ PR #34 完了。`SpaceWelcomeGuide` を正式導線として継続。`hossii_tutorial_seen_*` 参照停止 |
 | 10 | 参加IDとメールアドレスを将来的に同一ログイン窓口へ統合するための認証設計 | ⏳ 将来仕様 |
 | 11 | auth sync 時の nickname merge | ✅ PR #27 マージ済み（`7bb85ef` / `55da577`） |
