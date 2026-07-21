@@ -8,6 +8,9 @@ const DEFAULT_BODY = `ここでは、
 感じたことや気づいたことを
 自由に投稿してみてね。`;
 
+export const SPACE_WELCOME_PRIVACY_NOTICE_TEXT =
+  '投稿には、氏名・住所・電話番号・メールアドレスなど、個人を特定できる情報を書かないでください。';
+
 type Props = {
   nickname: string;
   description?: string;
@@ -42,6 +45,10 @@ export function SpaceWelcomeGuide({ nickname, description, interactionHint, onCl
         </p>
 
         <p className={styles.bodyText}>{bodyText}</p>
+
+        <p className={styles.privacyNotice} role="note" aria-live="off">
+          {SPACE_WELCOME_PRIVACY_NOTICE_TEXT}
+        </p>
 
         <p className={styles.interactionHint}>{interactionHint}</p>
 
