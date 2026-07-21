@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Space } from '../../core/types/space';
 import type { SpacePane } from '../../core/types/spacePane';
 import { useAuth } from '../../core/contexts/useAuth';
@@ -76,12 +76,37 @@ export const ExportRecordTab = ({ space }: Props) => {
     };
   }, [space.id]);
 
+  const countAbortRef = useRef<AbortController | null>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      countAbortRef.current?.abort();
+      exportAbortRef.current?.abort();
+    };
+  }, []);
+
+  const beginCountFetch = useCallback(() => {
+    countAbortRef.current?.abort();
+    const controller = new AbortController();
+    countAbortRef.current = controller;
+    return controller.signal;
+  }, []);
+
+  const beginExportFetch = useCallback(() => {
+    exportAbortRef.current?.abort();
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
+    return controller.signal;
+  }, []);
+
   const buildFetchOptions = useCallback(
-    (onProgress?: (fetchedCount: number, pageCount: number) => void) => ({
+    (signal: AbortSignal, onProgress?: (fetchedCount: number, pageCount: number) => void) => ({
       spaceId: space.id,
       spacePaneId: selectedPaneId === ALL_PANES_VALUE ? null : selectedPaneId,
       includeAuthorDisplayNames,
       includeImageUrls,
+      signal,
       onProgress: onProgress
         ? (progress: { fetchedCount: number; pageCount: number }) =>
             onProgress(progress.fetchedCount, progress.pageCount)
@@ -92,20 +117,22 @@ export const ExportRecordTab = ({ space }: Props) => {
 
   const refreshCount = useCallback(async () => {
     if (!canExport) return;
+    const signal = beginCountFetch();
     setCountLoading(true);
     setCountError(null);
     setExportCount(null);
     try {
-      const result = await fetchAllAdminExportHossiis(buildFetchOptions());
+      const result = await fetchAllAdminExportHossiis(buildFetchOptions(signal));
+      if (signal.aborted) return;
       if (!result.ok) {
-        setCountError(result.message);
+        if (result.message !== 'aborted') setCountError(result.message);
         return;
       }
       setExportCount(result.data.length);
     } finally {
       setCountLoading(false);
     }
-  }, [buildFetchOptions, canExport]);
+  }, [beginCountFetch, buildFetchOptions, canExport]);
 
   useEffect(() => {
     setExportError(null);
@@ -126,14 +153,19 @@ export const ExportRecordTab = ({ space }: Props) => {
     setExportSuccess(null);
     setExportProgress('回答を取得しています…');
 
+    const signal = beginExportFetch();
     try {
       const result = await fetchAllAdminExportHossiis(
-        buildFetchOptions((fetchedCount, pageCount) => {
+        buildFetchOptions(signal, (fetchedCount, pageCount) => {
+          if (signal.aborted) return;
           setExportProgress(`${fetchedCount}件を取得しました（${pageCount}ページ目）`);
         }),
       );
 
+      if (signal.aborted) return;
+
       if (!result.ok) {
+        if (result.message === 'aborted') return;
         const suffix =
           typeof result.partialCount === 'number' && result.partialCount > 0
             ? `（${result.partialCount}件まで取得済み）`

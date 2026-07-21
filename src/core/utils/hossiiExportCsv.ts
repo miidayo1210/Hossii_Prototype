@@ -22,12 +22,28 @@ export const ADMIN_EXPORT_OPTIONAL_IMAGE_HEADER = '画像URL';
 
 const TAG_SEPARATOR = '｜';
 
+/** Leading chars that spreadsheet apps may interpret as formulas (incl. tab/CR bypass). */
+export const CSV_FORMULA_INJECTION_PREFIX_RE = /^[\t\r \u00a0]*[=+\-@]/;
+
+/** Prefix with a single quote so Excel / Google Sheets treat the cell as plain text. */
+export function sanitizeCsvFormulaInjection(value: string): string {
+  if (CSV_FORMULA_INJECTION_PREFIX_RE.test(value)) {
+    return `'${value}`;
+  }
+  return value;
+}
+
 /** RFC 4180 field escaping. */
 export function escapeCsvField(value: string): string {
   if (/[",\r\n]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
+}
+
+/** User-provided text: formula-injection safe, then RFC 4180. */
+export function escapeCsvTextField(value: string): string {
+  return escapeCsvField(sanitizeCsvFormulaInjection(value));
 }
 
 export function formatIso8601(date: Date): string {
@@ -47,7 +63,12 @@ export function formatExportTags(tags: string[]): string {
 function formatCsvCell(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
-  return escapeCsvField(String(value));
+  if (typeof value === 'number') return String(value);
+  return escapeCsvTextField(String(value));
+}
+
+function formatCsvIsoField(value: string): string {
+  return escapeCsvField(value);
 }
 
 export function buildAdminExportCsvHeaders(options: {
@@ -68,24 +89,26 @@ export function buildAdminExportCsvRow(options: {
   includeImageUrls: boolean;
 }): string {
   const { item, spaceName, exportedAt, includeAuthorDisplayNames, includeImageUrls } = options;
-  const cols: Array<string | number | boolean | null | undefined> = [
-    item.hossiiId,
-    formatIso8601(new Date(item.createdAt)),
-    spaceName,
-    item.paneName,
-    item.authorType,
-    item.anonymousId,
-    item.message,
-    item.emotion,
-    formatExportTags(item.hashtags),
-    item.numberValue,
-    item.postKind,
-    item.hasImage,
-    formatIso8601(exportedAt),
+  const createdAt = formatCsvIsoField(formatIso8601(new Date(item.createdAt)));
+  const exportedAtText = formatCsvIsoField(formatIso8601(exportedAt));
+  const cols = [
+    formatCsvCell(item.hossiiId),
+    createdAt,
+    formatCsvCell(spaceName),
+    formatCsvCell(item.paneName),
+    formatCsvCell(item.authorType),
+    formatCsvCell(item.anonymousId),
+    formatCsvCell(item.message),
+    formatCsvCell(item.emotion),
+    formatCsvCell(formatExportTags(item.hashtags)),
+    formatCsvCell(item.numberValue),
+    formatCsvCell(item.postKind),
+    formatCsvCell(item.hasImage),
+    exportedAtText,
   ];
-  if (includeAuthorDisplayNames) cols.push(item.authorDisplayName ?? '');
-  if (includeImageUrls) cols.push(item.imageUrl ?? '');
-  return cols.map(formatCsvCell).join(',');
+  if (includeAuthorDisplayNames) cols.push(formatCsvCell(item.authorDisplayName ?? ''));
+  if (includeImageUrls) cols.push(formatCsvCell(item.imageUrl ?? ''));
+  return cols.join(',');
 }
 
 /** Returns null when there are zero rows (no CSV should be generated). */
@@ -122,6 +145,7 @@ export function buildAdminExportFilename(
   return buildSpaceExportFilename(['hossii', spaceName, paneLabel, '全回答', datePart], 'csv');
 }
 
+/** Trigger a client-side CSV download and always revoke the object URL. */
 export function downloadAdminExportCsv(csv: string, filename: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -129,8 +153,11 @@ export function downloadAdminExportCsv(csv: string, filename: string): void {
   anchor.href = url;
   anchor.download = filename;
   anchor.rel = 'noopener';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  try {
+    document.body.appendChild(anchor);
+    anchor.click();
+  } finally {
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
 }

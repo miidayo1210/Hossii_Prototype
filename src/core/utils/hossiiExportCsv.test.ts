@@ -6,6 +6,8 @@ import {
   buildAdminExportCsvRow,
   buildAdminExportFilename,
   escapeCsvField,
+  escapeCsvTextField,
+  sanitizeCsvFormulaInjection,
   formatExportTags,
   formatIso8601,
 } from './hossiiExportCsv';
@@ -133,5 +135,124 @@ describe('hossiiExportCsv', () => {
     expect(buildAdminExportFilename('Dev/Space', '全タブ', exportedAt)).toBe(
       'hossii_Dev-Space_全タブ_全回答_2026-07-21.csv',
     );
+  });
+});
+
+describe('CSV formula injection protection', () => {
+  it('prefixes dangerous leading characters with a single quote', () => {
+    expect(sanitizeCsvFormulaInjection('=1+1')).toBe("'=1+1");
+    expect(sanitizeCsvFormulaInjection('+1234')).toBe("'+1234");
+    expect(sanitizeCsvFormulaInjection('-alert(1)')).toBe("'-alert(1)");
+    expect(sanitizeCsvFormulaInjection('@SUM(A1)')).toBe("'@SUM(A1)");
+  });
+
+  it('handles tab and CR prefixed formula injection attempts', () => {
+    expect(sanitizeCsvFormulaInjection('\t=cmd')).toBe("'\t=cmd");
+    expect(sanitizeCsvFormulaInjection('\r=cmd')).toBe("'\r=cmd");
+    expect(sanitizeCsvFormulaInjection(' =cmd')).toBe("' =cmd");
+  });
+
+  it('leaves safe text unchanged', () => {
+    expect(sanitizeCsvFormulaInjection('本文')).toBe('本文');
+    expect(sanitizeCsvFormulaInjection('https://example.test/a.png')).toBe('https://example.test/a.png');
+  });
+
+  it('sanitizes message, display name, tags, and image URL in CSV rows', () => {
+    const row = buildAdminExportCsvRow({
+      item: {
+        ...baseItem,
+        message: '=HYPERLINK("http://evil")',
+        emotion: '+joy',
+        hashtags: ['=tag1', 'safe'],
+        authorDisplayName: '@admin',
+        imageUrl: '=IMAGE("http://evil")',
+      },
+      spaceName: '-Space',
+      exportedAt,
+      includeAuthorDisplayNames: true,
+      includeImageUrls: true,
+    });
+    expect(row).toMatch(/'=HYPERLINK\(""http:\/\/evil""\)/);
+    expect(row).toContain("'+joy");
+    expect(row).toContain("'=tag1｜safe");
+    expect(row).toContain("'@admin");
+    expect(row).toMatch(/'=IMAGE\(""http:\/\/evil""\)/);
+    expect(row).toContain("'-Space");
+  });
+
+  it('does not prefix numeric number_value or ISO8601 timestamps', () => {
+    const negativeNumberItem = { ...baseItem, numberValue: -12, message: '-12 as text' };
+    const row = buildAdminExportCsvRow({
+      item: negativeNumberItem,
+      spaceName: 'Dev Space',
+      exportedAt,
+      includeAuthorDisplayNames: false,
+      includeImageUrls: false,
+    });
+    const cols = row.split(',');
+    expect(cols[9]).toBe('-12');
+    expect(row).toContain("'-12 as text");
+    expect(row).toMatch(/2026-07-21T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/);
+    expect(row).not.toMatch(/,'2026-07-21T/);
+  });
+
+  it('combines formula injection protection with RFC4180 escaping', () => {
+    expect(escapeCsvTextField('=1,2')).toBe('"\'=1,2"');
+    expect(escapeCsvTextField('say "=bad"')).toBe('"say ""=bad"""');
+  });
+
+  it('builds full CSV with protected formula-like content', () => {
+    const csv = buildAdminExportCsv({
+      items: [{ ...baseItem, message: '=1+1', hashtags: ['+tag'] }],
+      spaceName: 'Dev Space',
+      exportedAt,
+      includeAuthorDisplayNames: false,
+      includeImageUrls: false,
+    });
+    expect(csv).toContain("'=1+1");
+    expect(csv).toContain("'+tag");
+  });
+});
+
+describe('CSV export benchmark (informational)', () => {
+  const exportedAt = new Date('2026-07-21T22:35:10+09:00');
+
+  function mockItems(count: number): AdminExportHossiiItem[] {
+    return Array.from({ length: count }, (_, index) => ({
+      ...baseItem,
+      hossiiId: `bench-h-${index}`,
+      message: `ベンチマーク投稿 ${index}。`.repeat(3),
+      hashtags: index % 3 === 0 ? ['挑戦', '気づき'] : ['共有'],
+      anonymousId: `anon-${String(index).padStart(4, '0')}`,
+    }));
+  }
+
+  it.each([100, 500, 1000, 2000])('records build/blob metrics for %i rows', (rowCount) => {
+    const items = mockItems(rowCount);
+    const started = performance.now();
+    const csv = buildAdminExportCsv({
+      items,
+      spaceName: 'Dev Space',
+      exportedAt,
+      includeAuthorDisplayNames: false,
+      includeImageUrls: false,
+    });
+    const buildMs = performance.now() - started;
+    const blob = new Blob([csv ?? ''], { type: 'text/csv;charset=utf-8' });
+    const heapMb =
+      typeof process !== 'undefined' && process.memoryUsage
+        ? Math.round((process.memoryUsage().heapUsed / 1024 / 1024) * 10) / 10
+        : null;
+    console.info(
+      JSON.stringify({
+        rows: rowCount,
+        buildMs: Math.round(buildMs * 100) / 100,
+        csvChars: csv?.length ?? 0,
+        blobBytes: blob.size,
+        heapUsedMb: heapMb,
+      }),
+    );
+    expect(csv).toBeTruthy();
+    expect(blob.size).toBeGreaterThan(0);
   });
 });

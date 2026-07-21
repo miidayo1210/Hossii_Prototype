@@ -155,4 +155,37 @@ describe('ExportRecordTab', () => {
     expect(screen.getByText(/個人情報が含まれる可能性があります/)).toBeTruthy();
     expect(screen.getByText(/CSVの共有先から閲覧される可能性があります/)).toBeTruthy();
   });
+
+  it('aborts export fetch on unmount before download', async () => {
+    vi.mocked(fetchAllAdminExportHossiis).mockImplementation(async (options) => {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 50);
+        options.signal?.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer);
+            resolve();
+          },
+          { once: true },
+        );
+      });
+      if (options.signal?.aborted) {
+        return { ok: false, message: 'aborted' };
+      }
+      return { ok: true, data: [sampleItem] };
+    });
+
+    const { unmount } = render(<ExportRecordTab space={baseSpace} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('1件')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'CSVをエクスポート' }));
+    unmount();
+
+    await waitFor(() => {
+      expect(downloadAdminExportCsv).not.toHaveBeenCalled();
+    });
+  });
 });
