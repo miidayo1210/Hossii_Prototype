@@ -6,6 +6,7 @@ import {
 } from '../../core/utils/floatingPanelStorage';
 import { FloatingPanelShell } from '../FloatingPanelShell/FloatingPanelShell';
 import styles from './SpeechPanel.module.css';
+import { POST_PRIVACY_NOTICE_TEXT } from '../../core/constants/postPrivacyNotice';
 
 type Props = {
   /** マイク（Listen）が有効か — 左バーまたはこのパネルのボタンと同期 */
@@ -69,7 +70,7 @@ function SpeechPanelInner({
   onSendCandidateToFreePost,
 }: Props) {
   const [panelLevel, setPanelLevel] = useState<PanelLevel>('short');
-  const textAreaRef = useRef<HTMLDivElement>(null);
+  const scrollBodyRef = useRef<HTMLDivElement>(null);
 
   const stopDrag = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
@@ -86,7 +87,7 @@ function SpeechPanelInner({
   };
 
   useEffect(() => {
-    const el = textAreaRef.current;
+    const el = scrollBodyRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [confirmedText, interimText]);
 
@@ -123,24 +124,25 @@ function SpeechPanelInner({
         </button>
       </div>
 
-      <div className={styles.textArea} ref={textAreaRef} data-no-drag>
-        {!listenMode ? (
-          <span className={styles.placeholderMuted}>
-            音声入力を ON にすると、話した内容がここに文字起こしされます。
-          </span>
-        ) : confirmedText || interimText ? (
-          <>
-            <span className={styles.confirmedText}>{confirmedText}</span>
-            {interimText && <span className={styles.interimText}>{interimText}</span>}
-          </>
-        ) : (
-          <span className={styles.placeholder}>話すとここに文字起こしが表示されます</span>
-        )}
-      </div>
+      <div className={styles.scrollBody} ref={scrollBodyRef} data-no-drag>
+        <div className={styles.textArea}>
+          {!listenMode ? (
+            <span className={styles.placeholderMuted}>
+              音声入力を ON にすると、話した内容がここに文字起こしされます。
+            </span>
+          ) : confirmedText || interimText ? (
+            <>
+              <span className={styles.confirmedText}>{confirmedText}</span>
+              {interimText && <span className={styles.interimText}>{interimText}</span>}
+            </>
+          ) : (
+            <span className={styles.placeholder}>話すとここに文字起こしが表示されます</span>
+          )}
+        </div>
 
-      <div className={styles.divider} />
+        <div className={styles.divider} />
 
-      <div className={styles.candidatesSection} data-no-drag>
+        <div className={styles.candidatesSection}>
         <div className={styles.candidatesLabel}>候補</div>
         {candidates.length > 0 ? (
           <ul className={styles.candidatesList}>
@@ -191,24 +193,31 @@ function SpeechPanelInner({
             {confirmedText ? '該当する候補がありません' : 'まだ候補がありません'}
           </p>
         )}
+        </div>
       </div>
 
-      <div className={styles.granularityRow} data-no-drag>
-        <span className={styles.granularityLabel}>粒度:</span>
-        <button
-          type="button"
-          className={`${styles.granularityButton} ${panelLevel === 'short' ? styles.granularityActive : ''}`}
-          onClick={() => handleLevelToggle('short')}
-        >
-          短め
-        </button>
-        <button
-          type="button"
-          className={`${styles.granularityButton} ${panelLevel === 'long' ? styles.granularityActive : ''}`}
-          onClick={() => handleLevelToggle('long')}
-        >
-          長め
-        </button>
+      <div className={styles.panelFooter}>
+        <div className={styles.granularityRow} data-no-drag>
+          <span className={styles.granularityLabel}>粒度:</span>
+          <button
+            type="button"
+            className={`${styles.granularityButton} ${panelLevel === 'short' ? styles.granularityActive : ''}`}
+            onClick={() => handleLevelToggle('short')}
+          >
+            短め
+          </button>
+          <button
+            type="button"
+            className={`${styles.granularityButton} ${panelLevel === 'long' ? styles.granularityActive : ''}`}
+            onClick={() => handleLevelToggle('long')}
+          >
+            長め
+          </button>
+        </div>
+
+        <p className={styles.privacyNotice} role="note" aria-live="off">
+          {POST_PRIVACY_NOTICE_TEXT}
+        </p>
       </div>
     </div>
   );
