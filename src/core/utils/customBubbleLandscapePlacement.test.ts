@@ -5,7 +5,61 @@ import {
   measureBubbleClampOffset,
   rectWithoutTranslate,
   snapClampOffset,
+  type AxisRect,
 } from './customBubbleLandscapePlacement';
+
+/** 844×390 landscape bubbleArea（小数 px、一般化 fixture） */
+const LANDSCAPE_AREA: AxisRect = {
+  left: 0,
+  top: 112,
+  right: 844,
+  bottom: 502,
+};
+
+const LANDSCAPE_AREA_SUBPIXEL: AxisRect = {
+  left: 0,
+  top: 112.5,
+  right: 843.6875,
+  bottom: 501.984375,
+};
+
+function bubbleRectAfterClamp(
+  naturalRect: AxisRect,
+  offset: { x: number; y: number },
+): AxisRect {
+  return {
+    left: naturalRect.left + offset.x,
+    top: naturalRect.top + offset.y,
+    right: naturalRect.right + offset.x,
+    bottom: naturalRect.bottom + offset.y,
+  };
+}
+
+function isRectInsideArea(
+  rect: AxisRect,
+  areaRect: AxisRect,
+  marginPx: number,
+): boolean {
+  return (
+    rect.left >= areaRect.left + marginPx - 0.01 &&
+    rect.top >= areaRect.top + marginPx - 0.01 &&
+    rect.right <= areaRect.right - marginPx + 0.01 &&
+    rect.bottom <= areaRect.bottom - marginPx + 0.01
+  );
+}
+
+function inflateRectForScale(rect: AxisRect, scale: number): AxisRect {
+  const cx = (rect.left + rect.right) / 2;
+  const cy = (rect.top + rect.bottom) / 2;
+  const halfW = ((rect.right - rect.left) / 2) * scale;
+  const halfH = ((rect.bottom - rect.top) / 2) * scale;
+  return {
+    left: cx - halfW,
+    top: cy - halfH,
+    right: cx + halfW,
+    bottom: cy + halfH,
+  };
+}
 
 describe('computeBubbleViewportClampOffset', () => {
   const area = { left: 0, top: 0, right: 844, bottom: 390 };
@@ -107,7 +161,7 @@ describe('rectWithoutTranslate', () => {
 });
 
 describe('measureBubbleClampOffset', () => {
-  const area = { left: 0, top: 112, right: 844, bottom: 502 };
+  const area = LANDSCAPE_AREA;
 
   it('returns zero when clamp is not needed', () => {
     const bubble = { left: 100, top: 200, right: 260, bottom: 290 };
@@ -139,5 +193,111 @@ describe('measureBubbleClampOffset', () => {
     expect(bubble.top + offset.y).toBeGreaterThanOrEqual(
       area.top + BUBBLE_VIEWPORT_MARGIN_PX - 0.01,
     );
+  });
+});
+
+describe('fractional / DPR-like rects', () => {
+  it('handles subpixel container and bubble rects', () => {
+    const bubble = {
+      left: 798.7581481933594,
+      top: 329.605224609375,
+      right: 869.7268981933594,
+      bottom: 450.902099609375,
+    };
+    const offset = computeBubbleViewportClampOffset(bubble, LANDSCAPE_AREA_SUBPIXEL);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), LANDSCAPE_AREA_SUBPIXEL, 8),
+    ).toBe(true);
+  });
+
+  it('handles hover-scale enlarged rect (5% larger, centered expansion)', () => {
+    const bubble = { left: 700, top: 300, right: 900, bottom: 420 };
+    const scaled = inflateRectForScale(bubble, 1.05);
+    const offset = computeBubbleViewportClampOffset(scaled, LANDSCAPE_AREA);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(scaled, offset), LANDSCAPE_AREA, 8),
+    ).toBe(true);
+  });
+});
+
+describe('safe margin 4px vs 8px', () => {
+  const bubble = { left: 790, top: 320, right: 852.6875, bottom: 441.5 };
+
+  it('respects 8px default margin', () => {
+    const offset = computeBubbleViewportClampOffset(bubble, LANDSCAPE_AREA, 8);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), LANDSCAPE_AREA, 8),
+    ).toBe(true);
+  });
+
+  it('respects 4px verification margin', () => {
+    const offset = computeBubbleViewportClampOffset(bubble, LANDSCAPE_AREA, 4);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), LANDSCAPE_AREA, 4),
+    ).toBe(true);
+  });
+
+  it('8px margin is stricter than 4px margin', () => {
+    const o4 = computeBubbleViewportClampOffset(bubble, LANDSCAPE_AREA, 4);
+    const o8 = computeBubbleViewportClampOffset(bubble, LANDSCAPE_AREA, 8);
+    expect(o8.x).toBeLessThanOrEqual(o4.x);
+  });
+});
+
+describe('right + bottom simultaneous overflow', () => {
+  it('clamps both axes for wide bottom-right bubble', () => {
+    const bubble = {
+      left: 531.109375,
+      top: 411.730712890625,
+      right: 731.109375,
+      bottom: 533.027587890625,
+    };
+    const offset = computeBubbleViewportClampOffset(bubble, LANDSCAPE_AREA);
+    expect(offset.x).toBeLessThanOrEqual(0);
+    expect(offset.y).toBeLessThan(0);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(bubble, offset), LANDSCAPE_AREA, 8),
+    ).toBe(true);
+  });
+});
+
+describe('clamp後再計測', () => {
+  it('measureBubbleClampOffset stabilizes after clamp is applied', () => {
+    const natural = {
+      left: 798.758,
+      top: 329.605,
+      right: 869.727,
+      bottom: 450.902,
+    };
+    const first = computeBubbleViewportClampOffset(natural, LANDSCAPE_AREA);
+    const clampedRect = bubbleRectAfterClamp(natural, first);
+    const second = measureBubbleClampOffset(clampedRect, LANDSCAPE_AREA, first);
+    expect(second).toEqual(first);
+    expect(isRectInsideArea(clampedRect, LANDSCAPE_AREA, 8)).toBe(true);
+  });
+
+  it('re-measures correctly when content height grows after initial clamp', () => {
+    const naturalShort = {
+      left: 531.109375,
+      top: 387.404846,
+      right: 731.109375,
+      bottom: 468.701721,
+    };
+    const first = computeBubbleViewportClampOffset(naturalShort, LANDSCAPE_AREA);
+    expect(first.y).toBe(0);
+
+    const naturalTall = {
+      ...naturalShort,
+      bottom: naturalShort.top + 121.296875,
+    };
+    const remeasured = measureBubbleClampOffset(
+      bubbleRectAfterClamp(naturalTall, first),
+      LANDSCAPE_AREA,
+      first,
+    );
+    expect(remeasured.y).toBeLessThan(0);
+    expect(
+      isRectInsideArea(bubbleRectAfterClamp(naturalTall, remeasured), LANDSCAPE_AREA, 8),
+    ).toBe(true);
   });
 });
