@@ -119,6 +119,18 @@
   margin-top: 1.25rem;
 }
 
+.participationOptionsSingle {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.participationOptionsSingle .participationCard {
+  width: 100%;
+  max-width: 100%;
+}
+
 .participationCard {
   width: 100%;
   min-height: 72px;

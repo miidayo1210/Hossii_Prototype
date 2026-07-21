@@ -1,12 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { normalizeParticipationMode } from '../../core/utils/participationMode';
 import { HOSSII_IDLE } from '../../core/assets/hossiiIdle';
 import type { Space } from '../../core/types/space';
-import type { SpaceNicknames } from '../../core/types/profile';
+import {
+  getAccountCardDescription,
+  getSelectPrompt,
+  resolveDisplayStep,
+  resolveInitialStep,
+  resolveStepAfterModeChange,
+  shouldShowAccountCard,
+  shouldShowGuestCard,
+  type GuestEntryStep,
+} from './guestEntrySteps';
 import styles from './GuestEntryScreen.module.css';
-
-type Step = 'select' | 'nickname' | 'revisit';
 
 const DEFAULT_PARTICIPATION_INTRO = `こんにちは！
 ここは、みんなの気づきや想いを
@@ -25,10 +33,6 @@ function getParticipationIntroMessage(space: Space | undefined): string {
   return DEFAULT_PARTICIPATION_INTRO;
 }
 
-function resolveInitialStep(spaceNicknames: SpaceNicknames, spaceId: string): Step {
-  return spaceNicknames[spaceId]?.trim() ? 'revisit' : 'select';
-}
-
 type Props = {
   spaceId: string;
   onEnterAsGuest: () => void;
@@ -40,26 +44,48 @@ type Props = {
 
 export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: Props) => {
   const { state, setSpaceNickname } = useHossiiStore();
+  const space = state.spaces.find((s) => s.id === spaceId);
+  const participationMode = normalizeParticipationMode(space?.participationMode);
   const savedSpaceNickname = state.spaceNicknames[spaceId]?.trim() ?? '';
-  const [step, setStep] = useState<Step>(() => resolveInitialStep(state.spaceNicknames, spaceId));
-  // スペース固有ニックネーム → デフォルトニックネーム → 空文字 の優先順で初期値を設定
+
+  const [step, setStep] = useState<GuestEntryStep>(() =>
+    resolveInitialStep(state.spaceNicknames, spaceId, participationMode),
+  );
   const savedNickname = state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '';
   const [nickname, setNickname] = useState(savedNickname);
   const [isJoining, setIsJoining] = useState(false);
 
-  useEffect(() => {
-    setStep(resolveInitialStep(state.spaceNicknames, spaceId));
-    setNickname(state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '');
-  // spaceId が変わったときだけ step / nickname を初期化（「別の方法で参加」後は維持）
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spaceId]);
+  const prevSpaceIdRef = useRef(spaceId);
+  const prevParticipationModeRef = useRef(participationMode);
 
-  const space = state.spaces.find((s) => s.id === spaceId);
+  // spaceId / participationMode 変更時のみ step を再初期化（「別の方法で参加」後の select は維持）
+  useEffect(() => {
+    if (prevSpaceIdRef.current !== spaceId) {
+      prevSpaceIdRef.current = spaceId;
+      prevParticipationModeRef.current = participationMode;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 別 space への切替時に step を初期化
+      setStep(resolveInitialStep(state.spaceNicknames, spaceId, participationMode));
+      setNickname(state.spaceNicknames[spaceId] ?? state.profile?.defaultNickname ?? '');
+      return;
+    }
+
+    if (prevParticipationModeRef.current !== participationMode) {
+      prevParticipationModeRef.current = participationMode;
+      setStep((current) =>
+        resolveStepAfterModeChange(current, state.spaceNicknames, spaceId, participationMode),
+      );
+    }
+  }, [spaceId, participationMode, state.spaceNicknames, state.profile?.defaultNickname]);
+
   const spaceName = space?.name ?? 'スペース';
   const participationIntroMessage = getParticipationIntroMessage(space);
   const trimmedNickname = nickname.trim();
   const canJoin = trimmedNickname.length > 0;
-  const displayStep = step === 'revisit' && !savedSpaceNickname ? 'select' : step;
+  const displayStep = resolveDisplayStep(step, participationMode, savedSpaceNickname);
+
+  const showGuestCard = shouldShowGuestCard(participationMode);
+  const showAccountCard = shouldShowAccountCard(participationMode);
+  const singleParticipationOption = (showGuestCard ? 1 : 0) + (showAccountCard ? 1 : 0) === 1;
 
   const nicknameSpeechText = canJoin
     ? `${trimmedNickname}さんだね！\n準備できたよ`
@@ -137,26 +163,40 @@ export const GuestEntryScreen = ({ spaceId, onEnterAsGuest, onLoginRequested }: 
 
             <div className={styles.speechBubble}>
               <p className={styles.speechText}>{participationIntroMessage}</p>
-              <p className={styles.speechPrompt}>どの方法で参加する？</p>
+              <p className={styles.speechPrompt}>{getSelectPrompt(participationMode)}</p>
             </div>
 
-            <div className={styles.participationOptions}>
-              <button
-                type="button"
-                className={`${styles.participationCard} ${styles.participationCardGuest}`}
-                onClick={() => setStep('nickname')}
-              >
-                <span className={styles.participationCardTitle}>ゲストとして参加</span>
-                <span className={styles.participationCardDesc}>ニックネームだけで参加できます</span>
-              </button>
-              <button
-                type="button"
-                className={styles.participationCard}
-                onClick={() => onLoginRequested?.()}
-              >
-                <span className={styles.participationCardTitle}>アカウントで参加</span>
-                <span className={styles.participationCardDesc}>参加した情報を引き継げます</span>
-              </button>
+            <div
+              className={`${styles.participationOptions} ${
+                singleParticipationOption ? styles.participationOptionsSingle : ''
+              }`}
+            >
+              {showGuestCard && (
+                <button
+                  type="button"
+                  className={`${styles.participationCard} ${styles.participationCardGuest}`}
+                  onClick={() => setStep('nickname')}
+                  aria-label="ゲストとして参加"
+                >
+                  <span className={styles.participationCardTitle}>ゲストとして参加</span>
+                  <span className={styles.participationCardDesc}>
+                    ニックネームだけで参加できます
+                  </span>
+                </button>
+              )}
+              {showAccountCard && (
+                <button
+                  type="button"
+                  className={styles.participationCard}
+                  onClick={() => onLoginRequested?.()}
+                  aria-label="アカウントで参加"
+                >
+                  <span className={styles.participationCardTitle}>アカウントで参加</span>
+                  <span className={styles.participationCardDesc}>
+                    {getAccountCardDescription(participationMode)}
+                  </span>
+                </button>
+              )}
             </div>
           </>
         )}
