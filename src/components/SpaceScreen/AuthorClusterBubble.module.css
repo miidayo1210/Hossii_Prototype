@@ -239,3 +239,25 @@
     overflow: hidden;
   }
 }
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .clusterLandscapeClamp {
+    transform: translate(var(--cluster-clamp-x, 0px), var(--cluster-clamp-y, 0px));
+  }
+
+  .clusterLandscapeCompact {
+    max-width: min(180px, 34vw);
+    min-width: 0;
+  }
+
+  .clusterLandscapeCompact .previewText {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .clusterLandscapeCompact .bodyExpanded {
+    max-height: min(120px, 28vh);
+  }
+}

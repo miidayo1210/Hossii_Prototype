@@ -8,6 +8,7 @@ import { getEmotionColor } from '../../core/assets/emotionColors';
 import { renderHossiiText } from '../../core/utils/render';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
+import { useCustomBubbleLandscapeClamp } from '../../core/hooks/useCustomBubbleLandscapeClamp';
 import styles from './AuthorClusterBubble.module.css';
 
 const MAX_PREVIEW_POSTS = 20;
@@ -84,6 +85,15 @@ function AuthorClusterBubbleInner({
   } | null>(null);
 
   const displayPos = dragPos ?? position;
+  const { offset: landscapeClampOffset, isLandscape: isCustomLandscape } =
+    useCustomBubbleLandscapeClamp(containerRef, [
+      displayPos.x,
+      displayPos.y,
+      expanded,
+      viewMode,
+      group.posts.length,
+      isDragging,
+    ]);
   const emotionColor = getEmotionColor(group.latestPost.emotion);
   // Phase 2C: グループ投稿者の現在名を主表示、投稿時名と異なれば補足。
   const authorDisplay = resolvePostAuthorDisplay({
@@ -197,12 +207,18 @@ function AuthorClusterBubbleInner({
   const clusterStyle: React.CSSProperties & {
     '--cluster-stack'?: number;
     '--glow-color'?: string;
+    '--cluster-clamp-x'?: string;
+    '--cluster-clamp-y'?: string;
   } = {
     left: `${displayPos.x}%`,
     top: `${displayPos.y}%`,
     borderLeft: `3px solid ${emotionColor}`,
     ['--glow-color']: `${emotionColor}59`,
   };
+  if (isCustomLandscape) {
+    clusterStyle['--cluster-clamp-x'] = `${landscapeClampOffset.x}px`;
+    clusterStyle['--cluster-clamp-y'] = `${landscapeClampOffset.y}px`;
+  }
   if (orderedStackZ != null) {
     clusterStyle['--cluster-stack'] = orderedStackZ;
   }
@@ -214,6 +230,8 @@ function AuthorClusterBubbleInner({
       ref={containerRef}
       className={[
         styles.cluster,
+        isCustomLandscape ? styles.clusterLandscapeCompact : '',
+        isCustomLandscape ? styles.clusterLandscapeClamp : '',
         isMobilePortrait ? styles.clusterMobile : '',
         group.isRecent ? styles.clusterRecent : '',
         isDragging ? styles.clusterDragging : '',

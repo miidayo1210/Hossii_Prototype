@@ -17,6 +17,7 @@ import {
   bubbleLineClampForScale,
 } from '../../core/utils/bubbleTextTruncation';
 import { withBubbleAlpha, BUBBLE_BG_ALPHA, BUBBLE_BG_ALPHA_HOVER } from '../../core/utils/bubbleColorAlpha';
+import { useCustomBubbleLandscapeClamp } from '../../core/hooks/useCustomBubbleLandscapeClamp';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
 import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
@@ -212,6 +213,21 @@ export function BubbleInner({
 
   const displayPos = dragPos ?? position;
   const displayScale = dragScale ?? (hossii.scale ?? 1.0);
+
+  const { offset: landscapeClampOffset, isLandscape: isCustomLandscape } =
+    useCustomBubbleLandscapeClamp(containerRef, [
+      displayPos.x,
+      displayPos.y,
+      displayScale,
+      contentExpanded,
+      viewMode,
+      hossii.imageUrl,
+      hossii.message,
+      layoutAlignTopLeft,
+      orderedStackZ,
+      isSelected,
+      isDragging,
+    ]);
 
   // native pointer event で確実にキャプチャ
   useEffect(() => {
@@ -409,6 +425,8 @@ export function BubbleInner({
     '--bubble-bg'?: string;
     '--bubble-bg-hover'?: string;
     '--bubble-border'?: string;
+    '--bubble-clamp-x'?: string;
+    '--bubble-clamp-y'?: string;
   } = {
     left: `${displayPos.x}%`,
     top: `${displayPos.y}%`,
@@ -416,6 +434,10 @@ export function BubbleInner({
     animationDuration,
     animationPlayState: isDragging || isSelected || layoutAlignTopLeft ? 'paused' : 'running',
   };
+  if (isCustomLandscape) {
+    bubbleStyle['--bubble-clamp-x'] = `${landscapeClampOffset.x}px`;
+    bubbleStyle['--bubble-clamp-y'] = `${landscapeClampOffset.y}px`;
+  }
   if (orderedStackZ != null) {
     bubbleStyle['--bubble-stack'] = orderedStackZ;
   }
@@ -452,6 +474,8 @@ export function BubbleInner({
 
   const classNames = [
     styles.bubble,
+    isCustomLandscape ? styles.bubbleLandscapeCompact : '',
+    isCustomLandscape ? styles.bubbleLandscapeClamp : '',
     visibleAnimLevel === 'none' ? styles.bubbleAnimNone : '',
     visibleAnimLevel === 'light' ? styles.bubbleAnimLight : '',
     isCanvasPost ? styles.bubbleCanvas : '',

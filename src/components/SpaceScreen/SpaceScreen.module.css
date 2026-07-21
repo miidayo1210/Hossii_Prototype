@@ -1225,6 +1225,50 @@
   z-index: 1;
 }
 
+/* カスタムモード: SP 横向き — 吹き出しを bubbleArea 内に収める（星モード対象外） */
+@media (max-height: 600px) and (orientation: landscape) {
+  .bubbleLandscapeClamp {
+    transform: translate(var(--bubble-clamp-x, 0px), var(--bubble-clamp-y, 0px));
+  }
+
+  .bubbleLandscapeClamp:hover {
+    transform: translate(var(--bubble-clamp-x, 0px), var(--bubble-clamp-y, 0px)) scale(1.05);
+  }
+
+  .bubbleLandscapeClamp.bubbleActive {
+    transform: translate(var(--bubble-clamp-x, 0px), var(--bubble-clamp-y, 0px)) scale(1.05);
+  }
+
+  .bubbleLandscapeClamp.bubbleLayoutGrid:hover,
+  .bubbleLandscapeClamp.bubbleLayoutGrid.bubbleActive,
+  .bubbleLandscapeClamp.bubbleDragging {
+    transform: translate(var(--bubble-clamp-x, 0px), var(--bubble-clamp-y, 0px));
+  }
+
+  .bubbleLandscapeCompact:not(.bubbleCanvas) {
+    max-width: min(200px, 36vw) !important;
+    padding: 0.5rem 0.625rem;
+  }
+
+  .bubbleLandscapeCompact.bubbleCanvas {
+    max-width: min(160px, 28vw) !important;
+  }
+
+  .bubbleLandscapeCompact.bubbleCustomShape {
+    width: min(160px, 30vw) !important;
+    max-width: min(160px, 30vw) !important;
+    min-height: auto !important;
+  }
+
+  .bubbleLandscapeCompact .bubbleImage {
+    max-height: 52px;
+  }
+
+  .bubbleLandscapeCompact .bubbleText:not(.bubbleTextExpanded) {
+    -webkit-line-clamp: 3;
+  }
+}
+
 /* F09: ハッシュタグ表示 */
 .bubbleNumber {
   font-size: 0.75rem;
