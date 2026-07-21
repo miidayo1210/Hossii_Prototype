@@ -25,12 +25,13 @@ import { SettingsSaveBar } from './SettingsSaveBar';
 import { PaneShareBlock } from './PaneShareBlock';
 import sharedStyles from './SettingsShared.module.css';
 import styles from './ShareTab.module.css';
-
-type PublicShareDraft = {
-  isPrivate: boolean;
-  accessMode: 'public' | 'invite_only';
-  spaceURLInput: string;
-};
+import {
+  buildPublicShareDbPatch,
+  buildPublicShareDraft,
+  buildPublicShareStorePatch,
+  PARTICIPATION_MODE_OPTIONS,
+  shouldShowParticipationModeSection,
+} from './publicShareDraft';
 
 type Props = {
   space: Space;
@@ -41,11 +42,7 @@ type Props = {
 export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) => {
   const { state, communitySlug } = useHossiiStore();
   const { panes } = useSpacePane();
-  const initial: PublicShareDraft = {
-    isPrivate: space.isPrivate ?? false,
-    accessMode: space.accessMode ?? 'public',
-    spaceURLInput: space.spaceURL ?? '',
-  };
+  const initial = buildPublicShareDraft(space);
   const { draft, setDraft, isDirty, discard, commitSaved } = useScreenDraft(initial);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -98,24 +95,19 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
     return () => clearTimeout(t);
   }, [toast]);
 
+  const showParticipationModeSection = shouldShowParticipationModeSection(space);
+
   const handleSave = async () => {
     if (draft.spaceURLInput && (!validation?.valid || !isUnique)) return;
     setIsSaving(true);
     try {
-      const patch: Partial<Space> = {
-        isPrivate: draft.isPrivate,
-        accessMode: draft.accessMode,
-        spaceURL: draft.spaceURLInput || undefined,
-      };
+      const patch = buildPublicShareStorePatch(draft, space);
       onUpdateSpace(patch);
       if (draft.accessMode !== (space.accessMode ?? 'public')) {
         const modeRes = await adminUpdateSpaceAccessMode(space.id, draft.accessMode);
         if (!modeRes.ok) throw new Error(modeRes.message);
       }
-      await updateSpaceInDb(space.id, {
-        isPrivate: draft.isPrivate,
-        spaceURL: draft.spaceURLInput || undefined,
-      });
+      await updateSpaceInDb(space.id, buildPublicShareDbPatch(draft, space));
       commitSaved();
       setToast({ message: '保存しました', type: 'success' });
     } catch (err) {
@@ -243,6 +235,38 @@ export const PublicShareTab = ({ space, onUpdateSpace, onDirtyChange }: Props) =
             非公開にすると、未ログインのゲストはこのスペースにアクセスできません（招待制とは別設定です）。
           </p>
         </SettingsSection>
+
+        {showParticipationModeSection && (
+          <SettingsSection title="参加方法">
+            <p className={styles.sectionHint}>
+              共有URLを開いた人が選べる参加方法を設定します
+            </p>
+            {draft.isPrivate && (
+              <p className={styles.sectionHint}>
+                ログイン必須がONの間は、未ログインの人にはこの参加方法画面は表示されません
+              </p>
+            )}
+            <div className={styles.radioList}>
+              {PARTICIPATION_MODE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`${styles.radioOption} ${styles.radioOptionTouch}`}
+                >
+                  <input
+                    type="radio"
+                    name="participationMode"
+                    checked={draft.participationMode === option.value}
+                    onChange={() => setDraft({ ...draft, participationMode: option.value })}
+                  />
+                  <span className={styles.radioLabelBlock}>
+                    <span className={styles.radioTitle}>{option.title}</span>
+                    <span className={styles.radioDesc}>{option.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </SettingsSection>
+        )}
 
         <SettingsSection title="スペース URL">
           <p className={styles.description}>

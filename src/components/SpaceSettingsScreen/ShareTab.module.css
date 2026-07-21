@@ -12,6 +12,30 @@
   color: #1f2937;
 }
 
+.radioOptionTouch {
+  min-height: 44px;
+  padding: 0.625rem 0.75rem;
+  border-radius: 12px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.radioOptionTouch:hover {
+  border-color: #c4b5fd;
+  background: #faf5ff;
+}
+
+.radioOptionTouch:has(input:checked) {
+  border-color: #a78bfa;
+  background: #f5f3ff;
+}
+
+.radioOptionTouch:focus-within {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+
 .radioOption input {
   margin-top: 0.2rem;
   flex-shrink: 0;
