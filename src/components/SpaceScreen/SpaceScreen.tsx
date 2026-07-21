@@ -137,6 +137,7 @@ import { HossiiToast } from '../../core/ui/HossiiToast';
 import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
 import { isActiveSpaceShellUnavailable } from '../../core/utils/spaceShellAvailability';
 import { SpaceShellUnavailableView } from './SpaceShellUnavailableView';
+import { SpaceWelcomeGuide } from './SpaceWelcomeGuide';
 import {
   getDefaultQuickLogBottomRect,
   getDefaultQuickLogSideRect,
@@ -211,6 +212,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     myAuthorshipIds,
     myAuthorshipIdsStatus,
     postAuthorDisplayNames,
+    getActiveNickname,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
   const hossiisRef = useRef(state.hossiis);
@@ -1847,6 +1849,26 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     filteredHossiis.length === 0 &&
     awaitingFirstHossiis;
 
+  const welcomeGuideSpaceKey = contentSpaceId ?? activeSpaceId ?? '';
+  const [welcomeGuideDismissed, setWelcomeGuideDismissed] = useState(false);
+
+  useEffect(() => {
+    setWelcomeGuideDismissed(false);
+  }, [welcomeGuideSpaceKey]);
+
+  const welcomeGuideNickname = getActiveNickname().trim();
+  const welcomeGuideDescription = spaceForVisual?.description?.trim() || undefined;
+  const welcomeGuideInteractionHint = isMobile
+    ? '画面をダブルタップするか、\n下の「投稿」から投稿できるよ。'
+    : '画面をダブルクリックするか、\n右上の「投稿する」から投稿できるよ。';
+
+  const showWelcomeGuide =
+    !welcomeGuideDismissed &&
+    !isVisiting &&
+    !isContentArchived &&
+    viewMode !== 'slideshow' &&
+    !showInitialLoadingOverlay;
+
   const showByAuthorLoadingOverlay =
     layoutMode === 'byAuthor' &&
     displayLimit === 'unlimited' &&
@@ -2111,6 +2133,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         className={`${styles.scaledCanvas} ${immersiveLayout ? styles.scaledCanvasImmersive : ''} ${mobilePostLandscapeSplit ? styles.scaledCanvasMobilePostLandscapeSplit : ''}`}
       >
       {isContentArchived && !isVisiting && <SpaceArchiveBanner />}
+      {showWelcomeGuide && (
+        <SpaceWelcomeGuide
+          nickname={welcomeGuideNickname}
+          description={welcomeGuideDescription}
+          interactionHint={welcomeGuideInteractionHint}
+          onClose={() => setWelcomeGuideDismissed(true)}
+        />
+      )}
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
       {viewMode === 'slideshow' && (
         <SlideshowView
