@@ -28,4 +28,16 @@ describe('resolveStarPreviewVertical', () => {
     expect(resolveStarPreviewVertical(STAR_PREVIEW_Y_THRESHOLD)).toBe('above');
     expect(resolveStarPreviewVertical(92)).toBe('above');
   });
+
+  it('uses landscape y threshold when requested', () => {
+    expect(resolveStarPreviewVertical(36, { landscape: true })).toBe('below');
+    expect(resolveStarPreviewVertical(38, { landscape: true })).toBe('above');
+  });
+});
+
+describe('resolveStarPreviewHorizontal landscape', () => {
+  it('uses landscape x threshold when requested', () => {
+    expect(resolveStarPreviewHorizontal(56, { landscape: true })).toBe('left');
+    expect(resolveStarPreviewHorizontal(55, { landscape: true })).toBe('right');
+  });
 });

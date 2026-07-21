@@ -13,9 +13,11 @@ import { formatPostDateLabel } from '../../core/utils/relativeTime';
 import {
   resolveStarPreviewHorizontal,
   resolveStarPreviewVertical,
+  MOBILE_LANDSCAPE_STAR_PREVIEW_MQ,
 } from '../../core/utils/starPreviewPlacement';
 import { resolveStarDotDepthScale } from '../../core/utils/timelineDepthScale';
 import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
+import { useMediaQuery } from '../../core/hooks/useMediaQuery';
 import { HossiiFullTextPopover } from './HossiiFullTextPopover';
 import { PinButton } from './PinButton';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
@@ -112,12 +114,22 @@ function StarViewInner({
   const floatDelay = ((x * 53 + y * 71) % 100) / 100;
   const pulseDuration = 3 + ((x * y) % 20) / 10;
 
-  const previewHorizontal = resolveStarPreviewHorizontal(x);
-  const previewVertical = resolveStarPreviewVertical(y);
+  const isMobileLandscape = useMediaQuery(MOBILE_LANDSCAPE_STAR_PREVIEW_MQ);
+  const isMobileLandscapeRef = useRef(isMobileLandscape);
+
+  const previewPlacementOptions = isMobileLandscape ? { landscape: true as const } : {};
+  const previewHorizontal = resolveStarPreviewHorizontal(x, previewPlacementOptions);
+  const previewVertical = resolveStarPreviewVertical(y, previewPlacementOptions);
   const previewDateLabel = formatPostDateLabel(hossii.createdAt);
 
   const fullText = getHossiiBubbleFullText(hossii);
   const previewText = fullText ? truncateStarPreviewText(fullText) : null;
+  const hasPreviewContent = Boolean(
+    previewText || hossii.imageUrl || hossii.authorName || previewDateLabel,
+  );
+  /** SP横: 親のローテ選択に依存せず常時インライン表示 */
+  const isPreviewVisible =
+    hasPreviewContent && (Boolean(showPreview) || isMobileLandscape);
   const depthScale = resolveStarDotDepthScale(timelineDepthActive, displayIndex);
   const starDotStyle =
     depthScale === 1
@@ -125,7 +137,7 @@ function StarViewInner({
       : ({ '--timeline-depth-scale': depthScale } as CSSProperties);
 
   useLayoutEffect(() => {
-    if (!fullText || !showPreview) {
+    if (!fullText || !isPreviewVisible) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset truncation when preview hides
       setIsPreviewTruncated(false);
       return;
@@ -136,15 +148,19 @@ function StarViewInner({
       previewTextRef.current,
     );
     setIsPreviewTruncated(truncated);
-  }, [fullText, previewText, showPreview]);
+  }, [fullText, previewText, isPreviewVisible]);
 
   useEffect(() => {
     isZoneHoveredRef.current = isZoneHovered;
   }, [isZoneHovered]);
 
   useEffect(() => {
+    isMobileLandscapeRef.current = isMobileLandscape;
+  }, [isMobileLandscape]);
+
+  useEffect(() => {
     const el = previewTextRef.current;
-    if (!el || !fullText || !showPreview) return;
+    if (!el || !fullText || !isPreviewVisible) return;
     const update = () => {
       const truncated = isHossiiTextTruncated(fullText, previewText ?? '', el);
       setIsPreviewTruncated(truncated);
@@ -161,7 +177,7 @@ function StarViewInner({
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [fullText, previewText, showPreview]);
+  }, [fullText, previewText, isPreviewVisible]);
 
   const cancelHideFullText = useCallback(() => {
     if (fullTextLeaveTimerRef.current) clearTimeout(fullTextLeaveTimerRef.current);
@@ -178,7 +194,7 @@ function StarViewInner({
   }, [cancelHideFullText]);
 
   const showFullTextIfTruncated = useCallback(() => {
-    if (!showPreview || !isPreviewTruncated) return;
+    if (!isPreviewVisible || !isPreviewTruncated) return;
     const rect =
       previewBubbleRef.current?.getBoundingClientRect() ??
       wrapperRef.current?.getBoundingClientRect();
@@ -186,7 +202,7 @@ function StarViewInner({
     cancelHideFullText();
     setFullTextAnchorRect(rect);
     setShowFullTextPopover(true);
-  }, [showPreview, isPreviewTruncated, cancelHideFullText]);
+  }, [isPreviewVisible, isPreviewTruncated, cancelHideFullText]);
 
   const isStillInsideHoverGroup = useCallback((target: EventTarget | null) => {
     const wrapper = wrapperRef.current;
@@ -200,7 +216,9 @@ function StarViewInner({
       wrapperRef.current?.classList.add(styles.starHoverGroupActive);
       if (!isZoneHoveredRef.current) {
         setIsZoneHovered(true);
-        onMouseEnter?.(e);
+        if (!isMobileLandscapeRef.current) {
+          onMouseEnter?.(e);
+        }
       }
       showFullTextIfTruncated();
     },
@@ -212,7 +230,9 @@ function StarViewInner({
       if (isStillInsideHoverGroup(e.relatedTarget)) return;
       wrapperRef.current?.classList.remove(styles.starHoverGroupActive);
       setIsZoneHovered(false);
-      onMouseLeave?.();
+      if (!isMobileLandscapeRef.current) {
+        onMouseLeave?.();
+      }
       scheduleHideFullText();
     },
     [isStillInsideHoverGroup, onMouseLeave, scheduleHideFullText],
@@ -231,7 +251,7 @@ function StarViewInner({
       ref={mergeWrapperRef}
       data-hossii-bubble
       data-hossii-id={hossii.id}
-      className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${showPreview ? styles.starHighlight : ''} ${isPcStarMode ? styles.starPc : ''} ${showPreview && isPcStarMode ? styles.starPreviewRotate : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''} ${isRecentHighlight ? styles.starRecentGlow : ''}`}
+      className={`${styles.star} ${anchor === 'topLeft' ? styles.starAnchorTopLeft : ''} ${isPreviewVisible ? styles.starHighlight : ''} ${isMobileLandscape ? styles.starLandscapeInline : ''} ${isPcStarMode ? styles.starPc : ''} ${showPreview && isPcStarMode ? styles.starPreviewRotate : ''} ${orderedStackZ != null ? styles.starOrderedStack : ''} ${isRecentHighlight ? styles.starRecentGlow : ''}`}
       style={{
         left: `${x}%`,
         top: `${y}%`,
@@ -239,6 +259,7 @@ function StarViewInner({
         '--float-delay': `${floatDelay}s`,
         '--pulse-duration': `${pulseDuration}s`,
         ...(orderedStackZ != null ? { '--star-stack': orderedStackZ } : {}),
+        ...(isMobileLandscape ? { '--preview-stack': displayIndex } : {}),
       } as React.CSSProperties}
       onPointerEnter={handleGroupPointerEnter}
       onPointerLeave={handleGroupPointerLeave}
@@ -262,7 +283,7 @@ function StarViewInner({
         {isLaughter && <span className={styles.laughterBadge}>😂</span>}
       </button>
 
-      {showPreview && (previewText || hossii.imageUrl || hossii.authorName || previewDateLabel) && (
+      {isPreviewVisible && (
         <div
           ref={previewBubbleRef}
           className={[
