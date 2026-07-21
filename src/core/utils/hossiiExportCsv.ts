@@ -2,19 +2,14 @@ import { buildSpaceExportFilename } from './spaceExportFilename';
 import type { AdminExportHossiiItem } from './hossiiExportTypes';
 
 export const ADMIN_EXPORT_STANDARD_HEADERS = [
-  '投稿ID',
   '投稿日時',
-  'スペース名',
   'タブ名',
-  '投稿者種別',
   'スペース内匿名ID',
   '本文',
   '気持ち',
   'タグ',
   '数値',
-  '投稿種別',
   '画像あり',
-  'エクスポート日時',
 ];
 
 export const ADMIN_EXPORT_OPTIONAL_AUTHOR_HEADER = '投稿者表示名';
@@ -83,28 +78,20 @@ export function buildAdminExportCsvHeaders(options: {
 
 export function buildAdminExportCsvRow(options: {
   item: AdminExportHossiiItem;
-  spaceName: string;
-  exportedAt: Date;
   includeAuthorDisplayNames: boolean;
   includeImageUrls: boolean;
 }): string {
-  const { item, spaceName, exportedAt, includeAuthorDisplayNames, includeImageUrls } = options;
+  const { item, includeAuthorDisplayNames, includeImageUrls } = options;
   const createdAt = formatCsvIsoField(formatIso8601(new Date(item.createdAt)));
-  const exportedAtText = formatCsvIsoField(formatIso8601(exportedAt));
   const cols = [
-    formatCsvCell(item.hossiiId),
     createdAt,
-    formatCsvCell(spaceName),
     formatCsvCell(item.paneName),
-    formatCsvCell(item.authorType),
     formatCsvCell(item.anonymousId),
     formatCsvCell(item.message),
     formatCsvCell(item.emotion),
     formatCsvCell(formatExportTags(item.hashtags)),
     formatCsvCell(item.numberValue),
-    formatCsvCell(item.postKind),
     formatCsvCell(item.hasImage),
-    exportedAtText,
   ];
   if (includeAuthorDisplayNames) cols.push(formatCsvCell(item.authorDisplayName ?? ''));
   if (includeImageUrls) cols.push(formatCsvCell(item.imageUrl ?? ''));
@@ -126,8 +113,6 @@ export function buildAdminExportCsv(options: {
   const body = options.items.map((item) =>
     buildAdminExportCsvRow({
       item,
-      spaceName: options.spaceName,
-      exportedAt: options.exportedAt,
       includeAuthorDisplayNames: options.includeAuthorDisplayNames,
       includeImageUrls: options.includeImageUrls,
     }),

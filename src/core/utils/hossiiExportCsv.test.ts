@@ -30,23 +30,18 @@ const baseItem: AdminExportHossiiItem = {
 };
 
 describe('hossiiExportCsv', () => {
-  it('keeps standard 13-column order', () => {
+  it('keeps standard 8-column order', () => {
     expect(ADMIN_EXPORT_STANDARD_HEADERS).toEqual([
-      '投稿ID',
       '投稿日時',
-      'スペース名',
       'タブ名',
-      '投稿者種別',
       'スペース内匿名ID',
       '本文',
       '気持ち',
       'タグ',
       '数値',
-      '投稿種別',
       '画像あり',
-      'エクスポート日時',
     ]);
-    expect(buildAdminExportCsvHeaders({ includeAuthorDisplayNames: false, includeImageUrls: false }).length).toBe(13);
+    expect(buildAdminExportCsvHeaders({ includeAuthorDisplayNames: false, includeImageUrls: false }).length).toBe(8);
   });
 
   it('adds optional columns only when enabled', () => {
@@ -83,8 +78,6 @@ describe('hossiiExportCsv', () => {
   it('builds Japanese row content', () => {
     const row = buildAdminExportCsvRow({
       item: baseItem,
-      spaceName: 'Dev Space',
-      exportedAt,
       includeAuthorDisplayNames: false,
       includeImageUrls: false,
     });
@@ -93,6 +86,23 @@ describe('hossiiExportCsv', () => {
     expect(row).toContain('true');
   });
 
+
+  it('omits metadata columns that live in the filename instead', () => {
+    const csv = buildAdminExportCsv({
+      items: [baseItem],
+      spaceName: 'Dev Space',
+      exportedAt,
+      includeAuthorDisplayNames: false,
+      includeImageUrls: false,
+    });
+    expect(csv).not.toContain('投稿ID');
+    expect(csv).not.toContain('スペース名');
+    expect(csv).not.toContain('投稿者種別');
+    expect(csv).not.toContain('投稿種別');
+    expect(csv).not.toContain('エクスポート日時');
+    expect(csv).not.toContain('Dev Space');
+    expect(csv).not.toContain('bubble');
+  });
   it('omits optional columns when opt-in is OFF', () => {
     const csv = buildAdminExportCsv({
       items: [baseItem],
@@ -171,26 +181,24 @@ describe('CSV formula injection protection', () => {
     const row = buildAdminExportCsvRow({
       item: {
         ...baseItem,
-        hossiiId: 'post-001',
+        paneName: '-Ideas',
         message: '=1+1',
         emotion: '+joy',
         hashtags: ['=tag'],
       },
-      spaceName: '-Space',
-      exportedAt,
       includeAuthorDisplayNames: false,
       includeImageUrls: false,
     });
     const cols = row.split(',');
-    expect(cols[0]).toBe('post-001');
-    expect(cols[1]).toMatch(/^2026-07-21T/);
-    expect(cols[4]).toBe('guest');
-    expect(cols[5]).toBe('anon-001');
-    expect(cols[9]).toBe('42');
-    expect(cols[11]).toBe('true');
+    expect(cols[0]).toMatch(/^2026-07-21T/);
+    expect(cols[2]).toBe('anon-001');
+    expect(cols[6]).toBe('42');
+    expect(cols[7]).toBe('true');
     expect(row).toContain("'=1+1");
     expect(row).toContain("'+joy");
-    expect(row).toContain("'-Space");
+    expect(row).toContain("'-Ideas");
+    expect(row).not.toContain('guest');
+    expect(row).not.toContain('bubble');
   });
   it('handles tab and CR prefixed formula injection attempts', () => {
     expect(sanitizeCsvFormulaInjection('\t=cmd')).toBe("'\t=cmd");
@@ -213,8 +221,6 @@ describe('CSV formula injection protection', () => {
         authorDisplayName: '@admin',
         imageUrl: '=IMAGE("http://evil")',
       },
-      spaceName: '-Space',
-      exportedAt,
       includeAuthorDisplayNames: true,
       includeImageUrls: true,
     });
@@ -223,22 +229,20 @@ describe('CSV formula injection protection', () => {
     expect(row).toContain("'=tag1｜safe");
     expect(row).toContain("'@admin");
     expect(row).toMatch(/'=IMAGE\(""http:\/\/evil""\)/);
-    expect(row).toContain("'-Space");
   });
 
   it('does not prefix numeric number_value or ISO8601 timestamps', () => {
     const negativeNumberItem = { ...baseItem, numberValue: -12, message: '-12 as text' };
     const row = buildAdminExportCsvRow({
       item: negativeNumberItem,
-      spaceName: 'Dev Space',
-      exportedAt,
       includeAuthorDisplayNames: false,
       includeImageUrls: false,
     });
     const cols = row.split(',');
-    expect(cols[9]).toBe('-12');
+    expect(cols[6]).toBe('-12');
     expect(row).toContain("'-12 as text");
     expect(row).toMatch(/2026-07-21T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/);
+    expect(cols[0]).toMatch(/^2026-07-21T/);
     expect(row).not.toMatch(/,'2026-07-21T/);
   });
 
