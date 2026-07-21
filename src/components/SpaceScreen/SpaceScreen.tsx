@@ -95,7 +95,7 @@ import { SpacePaneCreateDialog } from './SpacePaneCreateDialog';
 import { resolvePaneBackground } from '../../core/utils/resolvePaneBackground';
 import { resolvePaneVisualSpace } from '../../core/utils/resolvePaneVisualSpace';
 import { shouldShowSpacePaneBar } from '../../core/utils/spacePaneBarVisibility';
-import { canShowPersonalShortcut, getPersonalShortcutHiddenReason, isSharedSpaceShell, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
+import { canShowPersonalShortcut, isSharedSpaceShell, isViewingOwnPersonalSpace } from '../../core/utils/personalSpaceShortcut';
 import { MY_SPACE_OPEN_ERROR } from '../../core/utils/mySpaceCopy';
 import { applySpacePaneSortOrders, updateSpacePane } from '../../core/utils/spacePanesApi';
 import {
@@ -1316,25 +1316,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       onClick: () => void handlePersonalShortcut(),
     };
   }, [personalShortcutEligible, personalShortcutActive, handlePersonalShortcut, personalShortcutBusy]);
-
-  const personalShortcutHiddenReason = useMemo(() => {
-    if (!isSharedSpaceShell(activeSpace?.spaceType) || isVisiting || panesLoading) return null;
-    if (personalShortcutEligible) return null;
-    return getPersonalShortcutHiddenReason({
-      isAuthenticated,
-      isVisiting,
-      spaceCommunityId: activeSpace?.communityId,
-      membershipStatus: spaceCommunityMembership?.status,
-    });
-  }, [
-    activeSpace?.communityId,
-    activeSpace?.spaceType,
-    isAuthenticated,
-    isVisiting,
-    panesLoading,
-    personalShortcutEligible,
-    spaceCommunityMembership?.status,
-  ]);
 
   // F06: 非表示（管理者のみ）
   const handleHideBubble = useCallback(() => {
@@ -2582,12 +2563,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           personalShortcut={personalShortcut}
         />
       )}
-      {personalShortcutHiddenReason && (
-        <p className={styles.mySpaceHiddenNote} data-space-export="exclude">
-          {personalShortcutHiddenReason}
-        </p>
-      )}
-
       {/* 右上: 書き出し / 投稿数バッジ / 投稿順ツールバー / タグ・星 */}
       {(showPostCountBadge ||
         (layoutMode === 'ordered' && viewMode !== 'slideshow') ||
@@ -2929,11 +2904,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
               onReorderFolder={isAdmin && !isContentArchived ? handleReorderFolder : undefined}
               personalShortcut={personalShortcut}
             />
-          )}
-          {personalShortcutHiddenReason && !isMobile && (
-            <p className={styles.mySpaceHiddenNoteDesktop} data-space-export="exclude">
-              {personalShortcutHiddenReason}
-            </p>
           )}
           <TopRightMenu onPostClick={handleTopRightPostClick} postNavDisabled={isContentArchived} />
           <LeftControlBar
