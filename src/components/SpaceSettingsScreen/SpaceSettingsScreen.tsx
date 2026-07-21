@@ -315,7 +315,7 @@ export const SpaceSettingsScreen = () => {
       case 'spaceMembers':
         return <SpaceMembersTab key={`members-${activeSpace.id}`} space={activeSpace} />;
       case 'exportRecord':
-        return <ExportRecordTab />;
+        return <ExportRecordTab key={`export-${activeSpace.id}`} space={activeSpace} />;
       case 'neighbors':
         return (
           <NeighborsTab
