@@ -9,6 +9,11 @@ import {
   isHossiiTextTruncated,
   truncateStarPreviewText,
 } from '../../core/utils/bubbleTextTruncation';
+import { formatPostDateLabel } from '../../core/utils/relativeTime';
+import {
+  resolveStarPreviewHorizontal,
+  resolveStarPreviewVertical,
+} from '../../core/utils/starPreviewPlacement';
 import { resolveStarDotDepthScale } from '../../core/utils/timelineDepthScale';
 import { useVisibleAnimationLevel } from '../../core/hooks/useVisibleAnimationLevel';
 import { HossiiFullTextPopover } from './HossiiFullTextPopover';
@@ -107,7 +112,9 @@ function StarViewInner({
   const floatDelay = ((x * 53 + y * 71) % 100) / 100;
   const pulseDuration = 3 + ((x * y) % 20) / 10;
 
-  const previewSide = x > 60 ? 'left' : 'right';
+  const previewHorizontal = resolveStarPreviewHorizontal(x);
+  const previewVertical = resolveStarPreviewVertical(y);
+  const previewDateLabel = formatPostDateLabel(hossii.createdAt);
 
   const fullText = getHossiiBubbleFullText(hossii);
   const previewText = fullText ? truncateStarPreviewText(fullText) : null;
@@ -255,17 +262,26 @@ function StarViewInner({
         {isLaughter && <span className={styles.laughterBadge}>😂</span>}
       </button>
 
-      {showPreview && (previewText || hossii.imageUrl || hossii.authorName) && (
+      {showPreview && (previewText || hossii.imageUrl || hossii.authorName || previewDateLabel) && (
         <div
           ref={previewBubbleRef}
           className={[
             styles.previewBubble,
-            previewSide === 'left' ? styles.previewLeft : styles.previewRight,
+            previewHorizontal === 'left' ? styles.previewLeft : styles.previewRight,
+            previewVertical === 'below' ? styles.previewBelow : styles.previewAbove,
           ]
             .filter(Boolean)
             .join(' ')}
           aria-hidden="true"
         >
+          {previewDateLabel && (
+            <time
+              className={styles.previewDate}
+              dateTime={hossii.createdAt.toISOString()}
+            >
+              {previewDateLabel}
+            </time>
+          )}
           {hossii.imageUrl && (
             <img
               src={hossii.imageUrl}
