@@ -137,6 +137,7 @@ import { HossiiToast } from '../../core/ui/HossiiToast';
 import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail } from '../../core/utils/postFeedback';
 import { isActiveSpaceShellUnavailable } from '../../core/utils/spaceShellAvailability';
 import { SpaceShellUnavailableView } from './SpaceShellUnavailableView';
+import { hasSeenSpaceGuide, markSpaceGuideSeen } from '../../core/utils/spaceGuideStorage';
 import { SpaceWelcomeGuide } from './SpaceWelcomeGuide';
 import {
   getDefaultQuickLogBottomRect,
@@ -1851,9 +1852,15 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const welcomeGuideSpaceKey = contentSpaceId ?? activeSpaceId ?? '';
   const [welcomeGuideDismissed, setWelcomeGuideDismissed] = useState(false);
+  const [welcomeGuideSeenInStorage, setWelcomeGuideSeenInStorage] = useState(() =>
+    welcomeGuideSpaceKey ? hasSeenSpaceGuide(welcomeGuideSpaceKey) : true,
+  );
 
   useEffect(() => {
     setWelcomeGuideDismissed(false);
+    setWelcomeGuideSeenInStorage(
+      welcomeGuideSpaceKey ? hasSeenSpaceGuide(welcomeGuideSpaceKey) : true,
+    );
   }, [welcomeGuideSpaceKey]);
 
   const welcomeGuideNickname = getActiveNickname().trim();
@@ -1862,12 +1869,23 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     ? '画面をダブルタップするか、\n下の「投稿」から投稿できるよ。'
     : '画面をダブルクリックするか、\n右上の「投稿する」から投稿できるよ。';
 
+  const welcomeGuideEligible =
+    !!welcomeGuideSpaceKey && !welcomeGuideDismissed && !welcomeGuideSeenInStorage;
+
   const showWelcomeGuide =
-    !welcomeGuideDismissed &&
+    welcomeGuideEligible &&
     !isVisiting &&
     !isContentArchived &&
     viewMode !== 'slideshow' &&
     !showInitialLoadingOverlay;
+
+  const handleWelcomeGuideClose = useCallback(() => {
+    setWelcomeGuideDismissed(true);
+    if (welcomeGuideSpaceKey) {
+      markSpaceGuideSeen(welcomeGuideSpaceKey);
+      setWelcomeGuideSeenInStorage(true);
+    }
+  }, [welcomeGuideSpaceKey]);
 
   const showByAuthorLoadingOverlay =
     layoutMode === 'byAuthor' &&
@@ -2138,7 +2156,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           nickname={welcomeGuideNickname}
           description={welcomeGuideDescription}
           interactionHint={welcomeGuideInteractionHint}
-          onClose={() => setWelcomeGuideDismissed(true)}
+          onClose={handleWelcomeGuideClose}
         />
       )}
       {/* スライドショーモード（書き出し対象外・全画面オーバーレイ） */}
