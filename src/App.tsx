@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useRouter } from './core/hooks/useRouter';
+import { parseRouterHash, useRouter } from './core/hooks/useRouter';
 import { useMediaQuery } from './core/hooks/useMediaQuery';
 import { HossiiProvider } from './core/hooks/HossiiStoreProvider';
 import { SpacePaneProvider } from './core/hooks/SpacePaneProvider';
@@ -51,6 +51,12 @@ import {
   resolveCommunitySlugForSpace,
   shouldReplaceWithCanonicalSpacePath,
 } from './core/utils/spaceScreenRoute';
+import {
+  isSlugUrlStillResolving,
+  parseSpaceSlugFromPathname,
+  RE_IS_SLUG_URL_PATH,
+  type SlugFetchOutcome,
+} from './core/utils/slugUrlResolution';
 import { canEnterSpaceAsGuest } from './core/utils/guestParticipation';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
@@ -59,9 +65,6 @@ const RE_PATH_COMMUNITY_AND_SPACE = new RegExp(
   `^\\/c\\/(${URL_PATH_SLUG})\\/s\\/(${URL_PATH_SLUG})$`
 );
 const RE_PATH_LEGACY_SPACE = new RegExp(`^\\/s\\/(${URL_PATH_SLUG})$`);
-const RE_IS_SLUG_URL_PATH = new RegExp(
-  `^\\/c\\/${URL_PATH_SLUG}\\/s\\/${URL_PATH_SLUG}$|^\\/s\\/${URL_PATH_SLUG}$`
-);
 
 const authResolvingScreenStyle = {
   minHeight: '100dvh',
@@ -91,12 +94,13 @@ const AppContent = () => {
   const [spaceURLNotFound, setSpaceURLNotFound] = useState(false);
   // slug 直リンクの単体取得結果。loading 中は not-found にしない。
   // hit 後も addSpaceLocal の state 反映前に effect が走るため、empty だけでは判定しない。
-  type SlugFetchOutcome = 'idle' | 'loading' | 'hit' | 'miss';
   const [slugFetchOutcome, setSlugFetchOutcome] = useState<SlugFetchOutcome>(() => {
     const path = window.location.pathname;
     if (!isSupabaseConfigured || !RE_IS_SLUG_URL_PATH.test(path)) return 'idle';
     return 'loading';
   });
+  // can_access_space 確認中。完了前に SpaceScreen / not-found を出さない。
+  const [slugAccessPending, setSlugAccessPending] = useState(false);
   // 初回 URL スラッグ解決済みフラグ（スペース設定変更後に再トリガーされるのを防ぐ）
   const initialSlugHandledRef = useRef(false);
 
@@ -134,6 +138,21 @@ const AppContent = () => {
   };
   // isPrivate なスペースへの未ログインアクセス時に true になる
   const [guestSpaceIsPrivate, setGuestSpaceIsPrivate] = useState(false);
+
+  const slugFromPath = parseSpaceSlugFromPathname(p);
+  const hasSlugSpaceInStore = slugFromPath
+    ? state.spaces.some((space) => space.spaceURL === slugFromPath)
+    : false;
+  const slugUrlStillResolving = isSlugUrlStillResolving({
+    isOnSlugPath,
+    slugFetchOutcome,
+    slugFromPath,
+    hasSlugSpaceInStore,
+    slugAccessPending,
+    spaceURLNotFound,
+    guestSpaceId,
+    guestSpaceIsPrivate,
+  });
 
   // /admin/login パスを検出（pathname ベース）
   const [appRoute, setAppRoute] = useState<'admin-login' | 'default'>(() =>
@@ -190,7 +209,10 @@ const AppContent = () => {
       setPendingSpaceId(spaceId);
       setShowNicknameModal(true);
     }
-    navigate('screen');
+    const hash = window.location.hash;
+    if (!hash || hash === '#') {
+      navigate('screen');
+    }
   }, [currentUser, pendingParticipantSpaceId, setActiveSpace, hasNicknameForSpace, navigate]);
 
   // ログイン/新規登録完了後にpendingLoginSlugへリダイレクト
@@ -201,9 +223,13 @@ const AppContent = () => {
       setPendingAuthMode('login');
       // 現在のパスが /c/*/s/* 形式ならそのまま維持、そうでなければ /s/[slug] にリダイレクト
       const isCommunityPath = window.location.pathname.match(RE_PATH_COMMUNITY_AND_SPACE);
+      const preservedHash =
+        window.location.hash && window.location.hash !== '#'
+          ? window.location.hash
+          : '#screen';
       window.location.href = isCommunityPath
-        ? window.location.pathname
-        : `/s/${slug}`;
+        ? `${window.location.pathname}${preservedHash}`
+        : `/s/${slug}${preservedHash}`;
     }
   }, [currentUser, pendingLoginSlug]);
 
@@ -271,8 +297,10 @@ const AppContent = () => {
 
     if (targetSpace) {
       initialSlugHandledRef.current = true;
+      setSlugAccessPending(true);
 
       void checkCanAccessSpace(targetSpace.id).then((allowed) => {
+        setSlugAccessPending(false);
         if (!allowed) {
           setSpaceURLNotFound(true);
           return;
@@ -296,8 +324,7 @@ const AppContent = () => {
             setPendingSpaceId(targetSpace.id);
             setShowNicknameModal(true);
           }
-          window.history.replaceState({}, '', screenPath);
-          navigate('screen');
+          replaceLocationWithCanonicalSpacePath(screenPath);
         } else if (!isGuestMode) {
           if (targetSpace.isPrivate) {
             setGuestSpaceId(targetSpace.id);
@@ -598,8 +625,16 @@ const AppContent = () => {
           setActiveSpace(guestSpace.id);
           setIsGuestMode(true);
           const slugForGuest = guestSpace.spaceURL;
-          window.history.replaceState({}, '', slugForGuest ? `/s/${slugForGuest}` : '/');
-          navigate('screen');
+          const slugPath = slugForGuest ? `/s/${slugForGuest}` : '/';
+          const existingHash = window.location.hash;
+          if (existingHash && existingHash !== '#') {
+            const { screen: hashScreen, screenParam } = parseRouterHash(existingHash);
+            window.history.replaceState({}, '', `${slugPath}${existingHash}`);
+            navigate(hashScreen, screenParam);
+          } else {
+            window.history.replaceState({}, '', slugPath);
+            navigate('screen');
+          }
         }}
         onLoginRequested={() => setPendingParticipantSpaceId(guestSpaceId)}
       />
@@ -637,9 +672,8 @@ const AppContent = () => {
     }
   }
 
-  // /s/[slug] アクセス中にスペースがまだ解決されていない間は空白を表示
-  // GuestEntryScreen と同じ背景色にすることでフラッシュを防ぐ
-  if (!currentUser && !isGuestMode && isOnSlugPath && !guestSpaceId && !guestSpaceIsPrivate && !spaceURLNotFound) {
+  // slug 直リンクの解決中は not-found / SpaceScreen を出さず待機する（ゲスト・ログイン共通）
+  if (slugUrlStillResolving) {
     return (
       <div style={authResolvingScreenStyle}>
         読み込み中…
