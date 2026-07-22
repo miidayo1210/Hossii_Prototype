@@ -175,6 +175,110 @@ describe('LogListBody like mutations', () => {
     });
   });
 
+  it('logged-in unlike 28→27 stays at 27 after store sync (no double delta)', async () => {
+    mockState.currentUser = { uid: 'user-1', isAdmin: false };
+    vi.mocked(fetchLikedIds).mockResolvedValue(new Set(['h1']));
+    mockState.mutateLike.mockResolvedValue({ liked: false, likeCount: 27 });
+
+    const { rerender } = render(
+      <LogListBody
+        hossiis={[makeHossii({ id: 'h1', likeCount: 28 })]}
+        spaceId="s1"
+        panelMode
+        initialLogScope="all"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'いいねを取り消す' }).textContent).toContain('28');
+    });
+
+    const button = screen.getByRole('button', { name: 'いいねを取り消す' });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(mockState.mutateLike).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <LogListBody
+        hossiis={[makeHossii({ id: 'h1', likeCount: 27 })]}
+        spaceId="s1"
+        panelMode
+        initialLogScope="all"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'いいね' }).textContent).toContain('27');
+      expect(screen.getByRole('button', { name: 'いいね' }).textContent).not.toContain('26');
+    });
+    expect(mockState.updateLikeCount).toHaveBeenCalledWith('h1', 27);
+  });
+
+  it('logged-in like 27→28 stays at 28 after store sync (no double delta)', async () => {
+    mockState.currentUser = { uid: 'user-1', isAdmin: false };
+    mockState.mutateLike.mockResolvedValue({ liked: true, likeCount: 28 });
+
+    const { rerender } = render(
+      <LogListBody
+        hossiis={[makeHossii({ id: 'h1', likeCount: 27 })]}
+        spaceId="s1"
+        panelMode
+        initialLogScope="all"
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: 'いいね' });
+    expect(button.textContent).toContain('27');
+    fireEvent.click(button);
+
+    await waitFor(() => expect(mockState.mutateLike).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <LogListBody
+        hossiis={[makeHossii({ id: 'h1', likeCount: 28 })]}
+        spaceId="s1"
+        panelMode
+        initialLogScope="all"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'いいねを取り消す' }).textContent).toContain('28');
+      expect(screen.getByRole('button', { name: 'いいねを取り消す' }).textContent).not.toContain('29');
+    });
+  });
+
+  it('ignores rapid clicks while pending (single mutateLike)', async () => {
+    mockState.currentUser = { uid: 'user-1', isAdmin: false };
+    vi.mocked(fetchLikedIds).mockResolvedValue(new Set(['h1']));
+    let resolveMutate!: (v: { liked: boolean; likeCount: number }) => void;
+    mockState.mutateLike.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveMutate = resolve;
+        }),
+    );
+
+    render(
+      <LogListBody
+        hossiis={[makeHossii({ id: 'h1', likeCount: 28 })]}
+        spaceId="s1"
+        panelMode
+        initialLogScope="all"
+      />,
+    );
+
+    await waitFor(() => screen.getByRole('button', { name: 'いいねを取り消す' }));
+    const button = screen.getByRole('button', { name: 'いいねを取り消す' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(mockState.mutateLike).toHaveBeenCalledTimes(1);
+
+    resolveMutate({ liked: false, likeCount: 27 });
+    await waitFor(() => expect(button.textContent).toContain('27'));
+  });
+
   it('calls onLikeCountUpdated on success', async () => {
     mockState.mutateLike.mockResolvedValue({ liked: true, likeCount: 4 });
     render(
