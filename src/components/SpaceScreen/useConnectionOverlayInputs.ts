@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
 import type { RefObject } from 'react';
 import type { Hossii } from '../../core/types';
-import type { LayoutMode } from '../../core/utils/displayPrefsStorage';
+import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
 import { useHossiiConnections } from '../../core/hooks/useHossiiConnections';
-import { shouldFetchHossiiConnections } from '../../core/utils/connectionFetchGate';
+import {
+  isConnectionsContextEnabled,
+  shouldFetchHossiiConnections,
+} from '../../core/utils/connectionFetchGate';
 import {
   countDirectConnections,
   filterVisibleConnections,
@@ -18,7 +21,8 @@ type UseConnectionOverlayInputsOptions = {
   filteredHossiis: Hossii[];
   selectedBubbleId: string | null;
   presentationMode: PresentationMode;
-  isMobile: boolean;
+  renderAsStar: boolean;
+  viewMode: ViewMode;
   layoutMode: LayoutMode;
 };
 
@@ -36,7 +40,8 @@ export function useConnectionOverlayInputs({
   filteredHossiis,
   selectedBubbleId,
   presentationMode,
-  isMobile,
+  renderAsStar,
+  viewMode,
   layoutMode,
 }: UseConnectionOverlayInputsOptions): ConnectionOverlayInputs {
   const visibleHossiiIds = useMemo(
@@ -44,10 +49,17 @@ export function useConnectionOverlayInputs({
     [filteredHossiis],
   );
 
-  const fetchEnabled = shouldFetchHossiiConnections({
+  const contextGate = {
+    renderAsStar,
+    viewMode,
     presentationMode,
-    isMobile,
     layoutMode,
+  };
+
+  const contextEnabled = isConnectionsContextEnabled(contextGate);
+
+  const fetchEnabled = shouldFetchHossiiConnections({
+    ...contextGate,
     spaceId,
     paneId,
   });
@@ -59,21 +71,22 @@ export function useConnectionOverlayInputs({
   });
 
   const selectedDirectConnectionCount = useMemo(() => {
-    if (!selectedBubbleId) return 0;
+    if (!contextEnabled || !selectedBubbleId) return 0;
     return countDirectConnections({
       connections,
       selectedBubbleId,
       activePaneId: paneId,
       visibleHossiiIds,
     });
-  }, [connections, selectedBubbleId, paneId, visibleHossiiIds]);
+  }, [contextEnabled, connections, selectedBubbleId, paneId, visibleHossiiIds]);
 
   const overlayProps: ConnectionOverlayProps = {
     bubbleAreaRef,
     connections,
     selectedBubbleId,
+    renderAsStar,
+    viewMode,
     presentationMode,
-    isMobile,
     layoutMode,
     activePaneId: paneId,
     visibleHossiiIds,

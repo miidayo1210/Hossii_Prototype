@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { LayoutMode } from '../../core/utils/displayPrefsStorage';
+import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
 import type { HossiiConnection } from '../../core/types/hossiiConnection';
 import {
@@ -18,7 +18,8 @@ export type ConnectionOverlayProps = {
   connections: HossiiConnection[];
   selectedBubbleId: string | null;
   presentationMode: PresentationMode;
-  isMobile: boolean;
+  renderAsStar: boolean;
+  viewMode: ViewMode;
   layoutMode: LayoutMode;
   activePaneId: string;
   visibleHossiiIds: ReadonlySet<string>;
@@ -92,7 +93,8 @@ export function ConnectionOverlay({
   connections,
   selectedBubbleId,
   presentationMode,
-  isMobile,
+  renderAsStar,
+  viewMode,
   layoutMode,
   activePaneId,
   visibleHossiiIds,
@@ -103,7 +105,8 @@ export function ConnectionOverlay({
 
   const gateOpen = shouldShowConnectionOverlay({
     presentationMode,
-    isMobile,
+    renderAsStar,
+    viewMode,
     layoutMode,
     selectedBubbleId,
   });

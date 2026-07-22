@@ -41,7 +41,8 @@ function renderOverlay(overrides: Partial<ComponentProps<typeof ConnectionOverla
     connections,
     selectedBubbleId: 'h1' as string | null,
     presentationMode: 'custom' as const,
-    isMobile: false,
+    renderAsStar: false,
+    viewMode: 'full' as const,
     layoutMode: 'random' as const,
     activePaneId: 'pane-a',
     visibleHossiiIds: new Set(['h1', 'h2']),
@@ -67,13 +68,18 @@ describe('ConnectionOverlay', () => {
     expect(document.querySelector('[data-connection-id="c1"]')).not.toBeNull();
   });
 
-  it('does not render in star mode', () => {
+  it('does not render in slideshow', () => {
+    renderOverlay({ viewMode: 'slideshow' });
+    expect(queryOverlay()).toBeNull();
+  });
+
+  it('does not render in star presentation mode', () => {
     renderOverlay({ presentationMode: 'stars' });
     expect(queryOverlay()).toBeNull();
   });
 
-  it('does not render on mobile', () => {
-    renderOverlay({ isMobile: true });
+  it('does not render when renderAsStar is true', () => {
+    renderOverlay({ renderAsStar: true });
     expect(queryOverlay()).toBeNull();
   });
 

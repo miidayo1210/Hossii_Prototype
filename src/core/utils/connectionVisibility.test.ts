@@ -12,6 +12,13 @@ const connectionMeta = {
   updatedAt: '2026-07-22T00:00:00Z',
 };
 
+const baseGate = {
+  presentationMode: 'custom' as const,
+  renderAsStar: false,
+  viewMode: 'full' as const,
+  layoutMode: 'random' as const,
+};
+
 const baseConnections: HossiiConnection[] = [
   {
     id: 'c1',
@@ -43,34 +50,40 @@ const baseConnections: HossiiConnection[] = [
 ];
 
 describe('shouldShowConnectionOverlay', () => {
-  it('shows only in custom mode on desktop with selection', () => {
+  it('shows only in custom mode on desktop bubble with selection', () => {
     expect(
       shouldShowConnectionOverlay({
-        presentationMode: 'custom',
-        isMobile: false,
-        layoutMode: 'random',
+        ...baseGate,
         selectedBubbleId: 'h1',
       }),
     ).toBe(true);
   });
 
-  it('hides in star mode', () => {
+  it('hides in slideshow', () => {
     expect(
       shouldShowConnectionOverlay({
-        presentationMode: 'stars',
-        isMobile: false,
-        layoutMode: 'random',
+        ...baseGate,
+        viewMode: 'slideshow',
         selectedBubbleId: 'h1',
       }),
     ).toBe(false);
   });
 
-  it('hides on mobile', () => {
+  it('hides when renderAsStar is true (mobile landscape)', () => {
     expect(
       shouldShowConnectionOverlay({
-        presentationMode: 'custom',
-        isMobile: true,
-        layoutMode: 'random',
+        ...baseGate,
+        renderAsStar: true,
+        selectedBubbleId: 'h1',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides in star presentation mode', () => {
+    expect(
+      shouldShowConnectionOverlay({
+        ...baseGate,
+        presentationMode: 'stars',
         selectedBubbleId: 'h1',
       }),
     ).toBe(false);
@@ -79,8 +92,7 @@ describe('shouldShowConnectionOverlay', () => {
   it('hides in byAuthor layout', () => {
     expect(
       shouldShowConnectionOverlay({
-        presentationMode: 'custom',
-        isMobile: false,
+        ...baseGate,
         layoutMode: 'byAuthor',
         selectedBubbleId: 'h1',
       }),
@@ -90,8 +102,7 @@ describe('shouldShowConnectionOverlay', () => {
   it('hides when nothing is selected', () => {
     expect(
       shouldShowConnectionOverlay({
-        presentationMode: 'custom',
-        isMobile: false,
+        ...baseGate,
         layoutMode: 'ordered',
         selectedBubbleId: null,
       }),
@@ -101,9 +112,7 @@ describe('shouldShowConnectionOverlay', () => {
   it('allows overlay in archived spaces (view-only; mutation is out of scope here)', () => {
     expect(
       shouldShowConnectionOverlay({
-        presentationMode: 'custom',
-        isMobile: false,
-        layoutMode: 'random',
+        ...baseGate,
         selectedBubbleId: 'h1',
       }),
     ).toBe(true);

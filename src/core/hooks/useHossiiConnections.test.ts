@@ -106,4 +106,44 @@ describe('useHossiiConnections', () => {
       expect(result.current.connections).toHaveLength(1);
     });
   });
+
+  it('clears stale connections immediately when pane changes before fetch resolves', async () => {
+    fetchConnectionsMock.mockResolvedValueOnce({
+      ok: true,
+      connections: [
+        {
+          id: 'c-old',
+          spaceId: 's1',
+          paneId: 'p1',
+          sourceHossiiId: 'a',
+          targetHossiiId: 'b',
+          strength: 'soft',
+          createdBy: null,
+          createdAt: 't1',
+          updatedAt: 't1',
+        },
+      ],
+    });
+
+    const { result, rerender } = renderHook(
+      ({ paneId }: { paneId: string }) =>
+        useHossiiConnections({ spaceId: 's1', paneId, enabled: true }),
+      { initialProps: { paneId: 'p1' } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.connections).toHaveLength(1);
+    });
+
+    fetchConnectionsMock.mockImplementation(
+      () =>
+        new Promise(() => {
+          /* never resolves */
+        }),
+    );
+
+    rerender({ paneId: 'p2' });
+
+    expect(result.current.connections).toEqual([]);
+  });
 });

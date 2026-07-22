@@ -1635,7 +1635,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     filteredHossiis,
     selectedBubbleId,
     presentationMode,
-    isMobile,
+    renderAsStar,
+    viewMode,
     layoutMode,
   });
 

@@ -34,6 +34,9 @@ export function useHossiiConnections({
     const reqId = ++requestIdRef.current;
     let cancelled = false;
 
+    // Pane / space 変更直後に旧件数を残さない（race guard は reqId で維持）
+    setConnections([]);
+
     void (async () => {
       const result = await fetchConnections(spaceId, paneId);
       if (cancelled || reqId !== requestIdRef.current) return;

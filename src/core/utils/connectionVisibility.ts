@@ -1,11 +1,7 @@
-import type { LayoutMode } from './displayPrefsStorage';
-import type { PresentationMode } from './presentationModeStorage';
 import type { HossiiConnection } from '../types/hossiiConnection';
+import { isConnectionsContextEnabled, type ConnectionContextGate } from './connectionFetchGate';
 
-export type ConnectionOverlayGate = {
-  presentationMode: PresentationMode;
-  isMobile: boolean;
-  layoutMode: LayoutMode;
+export type ConnectionOverlayGate = ConnectionContextGate & {
   selectedBubbleId: string | null;
 };
 
@@ -13,12 +9,7 @@ export type ConnectionOverlayGate = {
  *  archived スペースでも閲覧可（作成・変更・解除は後続 UI / API 担当）。
  *  isContentArchived は gate に含めない。 */
 export function shouldShowConnectionOverlay(gate: ConnectionOverlayGate): boolean {
-  return (
-    gate.presentationMode === 'custom' &&
-    !gate.isMobile &&
-    gate.layoutMode !== 'byAuthor' &&
-    gate.selectedBubbleId != null
-  );
+  return isConnectionsContextEnabled(gate) && gate.selectedBubbleId != null;
 }
 
 export type VisibleConnectionFilter = {
