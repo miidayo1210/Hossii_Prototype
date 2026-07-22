@@ -76,3 +76,20 @@
   font-size: 0.75rem;
   color: #6b7280;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .connectedBubble {
+    transition: none;
+  }
+
+  .pullSource {
+    transition: none;
+    /* glow は progress に追従する静的 box-shadow（hook 側で glow を cap） */
+    box-shadow: 0 0 calc(4px + 6px * var(--glow-progress))
+      rgba(236, 72, 153, calc(0.2 + 0.2 * var(--glow-progress)));
+  }
+
+  .starParticles span {
+    animation: none;
+  }
+}

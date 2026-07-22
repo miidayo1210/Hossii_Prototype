@@ -7,13 +7,13 @@ export function ConnectionPullInteractionDemo() {
   const sourceRef = useRef<HTMLDivElement>(null);
   const connectedRef = useRef<HTMLDivElement>(null);
 
-  const { phase, handlers, starParticleCount } = useConnectionPullInteraction({
+  const { phase, isPulling, handlers, starParticleCount } = useConnectionPullInteraction({
     sourceRef,
     connectedRef,
   });
 
   return (
-    <div data-connection-pull-demo>
+    <div data-connection-pull-demo data-is-pulling={isPulling ? 'true' : 'false'}>
       <div className={styles.stage}>
         <div
           ref={connectedRef}
