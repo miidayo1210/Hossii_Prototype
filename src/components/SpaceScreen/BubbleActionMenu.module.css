@@ -15,6 +15,57 @@
   white-space: nowrap;
 }
 
+.pullHandleRow {
+  display: flex;
+  justify-content: center;
+  padding: 0.1rem 0 0.2rem;
+}
+
+.pullHandle {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  padding: 0;
+}
+
+.pullHandle::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+.pullHandleIcon {
+  font-size: 0.65rem;
+  line-height: 1;
+  color: rgba(168, 85, 247, 0.5);
+}
+
+.pullHandleActive {
+  cursor: grabbing;
+}
+
+.pullHandleActive .pullHandleIcon {
+  color: rgba(168, 85, 247, 0.75);
+}
+
+.pullStars {
+  display: flex;
+  gap: 0.05rem;
+  font-size: 0.45rem;
+  line-height: 1;
+  color: rgba(168, 85, 247, 0.7);
+  pointer-events: none;
+}
+
 .menuItem {
   appearance: none;
   border: none;
@@ -45,5 +96,9 @@
 
   .menuItem:active {
     transform: none;
+  }
+
+  .pullStars span {
+    animation: none;
   }
 }

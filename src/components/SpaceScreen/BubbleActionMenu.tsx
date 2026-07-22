@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import styles from './BubbleActionMenu.module.css';
 
 const GAP = 10;
@@ -15,6 +15,11 @@ type Props = {
   onConnect?: () => void;
   connectionCount?: number;
   onConnectionsClick?: () => void;
+  /** 直接 connection が 1 件以上のとき表示 */
+  showPullHandle?: boolean;
+  onPullHandlePointerDown?: (event: ReactPointerEvent<HTMLElement>) => void;
+  pullStarParticleCount?: number;
+  isPulling?: boolean;
 };
 
 export function BubbleActionMenu({
@@ -23,11 +28,15 @@ export function BubbleActionMenu({
   onConnect,
   connectionCount,
   onConnectionsClick,
+  showPullHandle = false,
+  onPullHandlePointerDown,
+  pullStarParticleCount = 1,
+  isPulling = false,
 }: Props) {
   const showConnections =
     onConnectionsClick != null && connectionCount != null;
 
-  if (!onViewDetail && !onConnect && !showConnections) {
+  if (!onViewDetail && !onConnect && !showConnections && !showPullHandle) {
     return null;
   }
 
@@ -48,9 +57,35 @@ export function BubbleActionMenu({
       style={style}
       data-bubble-action-menu
       data-space-export="exclude"
+      data-connection-pull-active={isPulling ? 'true' : 'false'}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
+      {showPullHandle && onPullHandlePointerDown && (
+        <div className={styles.pullHandleRow}>
+          <button
+            type="button"
+            className={`${styles.pullHandle} ${isPulling ? styles.pullHandleActive : ''}`}
+            data-connection-pull-handle
+            aria-label="つながりを引っ張る"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onPullHandlePointerDown(e);
+            }}
+          >
+            <span className={styles.pullHandleIcon} aria-hidden>
+              ✦
+            </span>
+            {isPulling && pullStarParticleCount > 0 && (
+              <span className={styles.pullStars} aria-hidden data-testid="pull-star-particles">
+                {Array.from({ length: pullStarParticleCount }, (_, index) => (
+                  <span key={index}>✦</span>
+                ))}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
       {onViewDetail && (
         <button
           type="button"

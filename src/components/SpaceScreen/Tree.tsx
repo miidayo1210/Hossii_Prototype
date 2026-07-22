@@ -116,6 +116,15 @@ type BubbleProps = {
   isConnectionPickTarget?: boolean;
   /** 糸編集中はメニュー toggle を抑止 */
   suppressActionMenuToggle?: boolean;
+  /** compact menu 内 pull ハンドル */
+  showPullHandle?: boolean;
+  onPullHandlePointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
+  pullStarParticleCount?: number;
+  isConnectionPulling?: boolean;
+  /** pull 中は Bubble drag / resize を抑止 */
+  suppressBubbleDrag?: boolean;
+  suppressClickAfterPullRef?: React.MutableRefObject<boolean>;
+  onBubbleDragStateChange?: (state: { isDragging: boolean; isResizing: boolean }) => void;
 };
 
 export function BubbleInner({
@@ -154,6 +163,13 @@ export function BubbleInner({
   connectionBadgeCount,
   isConnectionPickTarget = false,
   suppressActionMenuToggle = false,
+  showPullHandle = false,
+  onPullHandlePointerDown,
+  pullStarParticleCount = 1,
+  isConnectionPulling = false,
+  suppressBubbleDrag = false,
+  suppressClickAfterPullRef,
+  onBubbleDragStateChange,
 }: BubbleProps) {
   const { ref: visibilityRef, level: visibleAnimLevel } = useVisibleAnimationLevel(
     animationLevel,
@@ -223,6 +239,7 @@ export function BubbleInner({
   const onScaleSaveRef = useRef(onScaleSave);
   const onColorSaveRef = useRef(onColorSave);
   const canEditRef = useRef(canEdit);
+  const suppressBubbleDragRef = useRef(suppressBubbleDrag);
   const hossiiRef = useRef(hossii);
   useLayoutEffect(() => {
     positionRef.current = position;
@@ -232,6 +249,7 @@ export function BubbleInner({
     onScaleSaveRef.current = onScaleSave;
     onColorSaveRef.current = onColorSave;
     canEditRef.current = canEdit;
+    suppressBubbleDragRef.current = suppressBubbleDrag;
     hossiiRef.current = hossii;
   });
 
@@ -291,6 +309,10 @@ export function BubbleInner({
       // preventDefault で click が潰れないよう、ここで早期 return する。
       if ((e.target as HTMLElement).closest('[data-owner-actions]')) return;
       if ((e.target as HTMLElement).closest('[data-bubble-action-menu]')) return;
+      if ((e.target as HTMLElement).closest('[data-connection-pull-handle]')) return;
+
+      // pull 中 / 排他時は drag 開始しない
+      if (suppressBubbleDragRef.current) return;
 
       // 未選択 → 選択のみ（ドラッグは次のクリックから）
       if (!isSelectedRef.current) {
@@ -353,6 +375,10 @@ export function BubbleInner({
         dragStateRef.current.moved = true;
         wasDraggingRef.current = true;
         setIsDragging(true);
+        onBubbleDragStateChange?.({
+          isDragging: dragStateRef.current.mode === 'moving',
+          isResizing: dragStateRef.current.mode === 'resizing',
+        });
       }
 
       if (mode === 'moving') {
@@ -405,6 +431,7 @@ export function BubbleInner({
       setIsDragging(false);
       setContentExpanded(false);
       if (moved) {
+        onBubbleDragStateChange?.({ isDragging: false, isResizing: false });
         window.setTimeout(() => {
           wasDraggingRef.current = false;
         }, 0);
@@ -417,7 +444,7 @@ export function BubbleInner({
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
     };
-  }, [hossii.id]);
+  }, [hossii.id, onBubbleDragStateChange]);
 
   const fullText = getHossiiBubbleFullText(hossii);
   const isLaughter = hossii.autoType === 'laughter';
@@ -576,7 +603,7 @@ export function BubbleInner({
       data-hossii-id={hossii.id}
       data-hossii-post-kind={isCanvasPost ? 'canvas' : 'bubble'}
       onClick={() => {
-        if (wasDraggingRef.current || isDragging) return;
+        if (wasDraggingRef.current || isDragging || suppressClickAfterPullRef?.current) return;
         if (!isSelected) {
           onSelect?.(hossii.id);
           return;
@@ -855,6 +882,10 @@ export function BubbleInner({
           onConnect={onConnect}
           connectionCount={connectionCount}
           onConnectionsClick={onConnectionsClick}
+          showPullHandle={showPullHandle}
+          onPullHandlePointerDown={onPullHandlePointerDown}
+          pullStarParticleCount={pullStarParticleCount}
+          isPulling={isConnectionPulling}
         />
       )}
 
@@ -976,7 +1007,14 @@ function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
     prev.onConnectionsClick === next.onConnectionsClick &&
     prev.connectionBadgeCount === next.connectionBadgeCount &&
     prev.isConnectionPickTarget === next.isConnectionPickTarget &&
-    prev.suppressActionMenuToggle === next.suppressActionMenuToggle
+    prev.suppressActionMenuToggle === next.suppressActionMenuToggle &&
+    prev.showPullHandle === next.showPullHandle &&
+    prev.onPullHandlePointerDown === next.onPullHandlePointerDown &&
+    prev.pullStarParticleCount === next.pullStarParticleCount &&
+    prev.isConnectionPulling === next.isConnectionPulling &&
+    prev.suppressBubbleDrag === next.suppressBubbleDrag &&
+    prev.suppressClickAfterPullRef === next.suppressClickAfterPullRef &&
+    prev.onBubbleDragStateChange === next.onBubbleDragStateChange
   );
 }
 

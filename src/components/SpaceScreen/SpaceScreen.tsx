@@ -75,6 +75,7 @@ import { useCustomBubbleActionMenu } from './useCustomBubbleActionMenu';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
 import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
+import { useSpaceConnectionPull } from './useSpaceConnectionPull';
 import { ConnectionEditorPortals } from './ConnectionEditorPortals';
 import { ConnectionListPopover } from './ConnectionListPopover';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
@@ -1640,6 +1641,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     [observeBubbleArea],
   );
 
+  const [bubbleInteractionLock, setBubbleInteractionLock] = useState({
+    isDragging: false,
+    isResizing: false,
+  });
+
+  const handleBubbleDragStateChange = useCallback(
+    (state: { isDragging: boolean; isResizing: boolean }) => {
+      setBubbleInteractionLock(state);
+    },
+    [],
+  );
+
   const connectionOverlayInputs = useConnectionOverlayInputs({
     bubbleAreaRef,
     spaceId: contentSpaceId ?? activeSpaceId ?? '',
@@ -1685,6 +1698,22 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     viewMode,
     presentationMode,
     contextActivePaneId,
+  });
+
+  const visibleHossiiIdsForPull = useMemo(
+    () => new Set(filteredHossiis.map((h) => h.id)),
+    [filteredHossiis],
+  );
+
+  const connectionPull = useSpaceConnectionPull({
+    bubbleAreaRef,
+    connections: connectionOverlayInputs.connections,
+    selectedBubbleId,
+    activePaneId: connectionActivePaneId,
+    visibleHossiiIds: visibleHossiiIdsForPull,
+    isConnectionsContextEnabled,
+    editorPhase: connectionEditor.phase,
+    bubbleInteractionLock,
   });
 
   shouldAllowBubbleResetRef.current = () =>
@@ -2308,7 +2337,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             </button>
           </div>
         )}
-        <ConnectionOverlay {...connectionOverlayProps} />
+        <ConnectionOverlay
+          {...connectionOverlayProps}
+          hitPathsDisabled={connectionPull.isPulling}
+        />
         <ConnectionEditorPortals
           editor={connectionEditor}
           selectedBubbleId={selectedBubbleId}
@@ -2448,6 +2480,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 suppressActionMenuToggle={
                   connectionEditor.phase !== 'idle' && connectionEditor.phase !== 'error'
                 }
+                showPullHandle={isThisSelected && connectionPull.pullHandleVisible}
+                onPullHandlePointerDown={connectionPull.handlers.onPointerDown}
+                pullStarParticleCount={connectionPull.starParticleCount}
+                isConnectionPulling={connectionPull.isPulling}
+                suppressBubbleDrag={connectionPull.isPulling}
+                suppressClickAfterPullRef={connectionPull.suppressClickAfterPullRef}
+                onBubbleDragStateChange={handleBubbleDragStateChange}
                 {...getIntegratedBubbleActionMenuProps(hossii.id, isThisSelected)}
               />
               </div>

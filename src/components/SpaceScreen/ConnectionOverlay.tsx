@@ -25,6 +25,8 @@ export type ConnectionOverlayProps = {
   visibleHossiiIds: ReadonlySet<string>;
   /** QA / #55 メニュー連携用（overlay 描画件数と一致） */
   directConnectionCount?: number;
+  /** pull 中など hit path の pointer イベントを無効化 */
+  hitPathsDisabled?: boolean;
   /** admin 向け: 糸クリックで編集開始 */
   onConnectionClick?: (connection: HossiiConnection) => void;
 };
@@ -32,6 +34,7 @@ export type ConnectionOverlayProps = {
 type ConnectionPathPairProps = {
   connection: HossiiConnection;
   isHovered: boolean;
+  hitPathsDisabled: boolean;
   onHoverChange: (connectionId: string | null) => void;
   onRegister: (connectionId: string, refs: ConnectionPathRefs | null) => void;
   onConnectionClick?: (connection: HossiiConnection) => void;
@@ -40,6 +43,7 @@ type ConnectionPathPairProps = {
 function ConnectionPathPair({
   connection,
   isHovered,
+  hitPathsDisabled,
   onHoverChange,
   onRegister,
   onConnectionClick,
@@ -84,11 +88,20 @@ function ConnectionPathPair({
           syncRegistry();
         }}
         className={styles.hitPath}
-        style={{ strokeWidth: stroke.hitStrokeWidth }}
-        onPointerEnter={() => onHoverChange(connection.id)}
-        onPointerLeave={() => onHoverChange(null)}
+        style={{
+          strokeWidth: stroke.hitStrokeWidth,
+          pointerEvents: hitPathsDisabled ? 'none' : 'stroke',
+        }}
+        onPointerEnter={() => {
+          if (hitPathsDisabled) return;
+          onHoverChange(connection.id);
+        }}
+        onPointerLeave={() => {
+          if (hitPathsDisabled) return;
+          onHoverChange(null);
+        }}
         onPointerDown={(e) => {
-          if (!onConnectionClick) return;
+          if (hitPathsDisabled || !onConnectionClick) return;
           e.preventDefault();
           e.stopPropagation();
           onConnectionClick(connection);
@@ -109,6 +122,7 @@ export function ConnectionOverlay({
   activePaneId,
   visibleHossiiIds,
   directConnectionCount,
+  hitPathsDisabled = false,
   onConnectionClick,
 }: ConnectionOverlayProps) {
   const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
@@ -134,6 +148,7 @@ export function ConnectionOverlay({
 
   const effectiveHoveredConnectionId =
     hoveredConnectionId != null &&
+    !hitPathsDisabled &&
     visibleConnections.some((connection) => connection.id === hoveredConnectionId)
       ? hoveredConnectionId
       : null;
@@ -162,6 +177,7 @@ export function ConnectionOverlay({
       className={styles.overlay}
       data-connection-overlay
       data-direct-connection-count={directConnectionCount ?? visibleConnections.length}
+      data-hit-paths-disabled={hitPathsDisabled ? 'true' : 'false'}
       data-space-export="exclude"
       aria-hidden
     >
@@ -171,6 +187,7 @@ export function ConnectionOverlay({
             key={connection.id}
             connection={connection}
             isHovered={effectiveHoveredConnectionId === connection.id}
+            hitPathsDisabled={hitPathsDisabled}
             onHoverChange={setHoveredConnectionId}
             onRegister={registerPathRefs}
             onConnectionClick={onConnectionClick}

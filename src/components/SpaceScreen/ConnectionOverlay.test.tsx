@@ -92,4 +92,12 @@ describe('ConnectionOverlay', () => {
     renderOverlay({ activePaneId: 'pane-b' });
     expect(queryOverlay()).toBeNull();
   });
+
+  it('marks hit paths disabled while pulling', () => {
+    renderOverlay({ hitPathsDisabled: true });
+    const overlay = queryOverlay();
+    expect(overlay?.getAttribute('data-hit-paths-disabled')).toBe('true');
+    const hitPath = document.querySelector('[data-connection-id="c1"] path:nth-of-type(2)') as SVGPathElement | null;
+    expect(hitPath?.style.pointerEvents).toBe('none');
+  });
 });
