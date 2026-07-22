@@ -71,6 +71,8 @@ import {
   SPACE_EXPORT_MAX_BUBBLES,
 } from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
+import { ConnectionOverlay } from './ConnectionOverlay';
+import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { StarView } from './StarView';
 import { StarHoverPreview } from './StarHoverPreview';
@@ -292,6 +294,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     }
     return paneContext;
   }, [personalViewSpaceId, contentSpaceId, paneContext]);
+
+  const connectionActivePaneId =
+    contentPaneContext?.activePaneId ?? contextActivePaneId ?? defaultPane?.id ?? '';
 
   const screenQueryKey = useMemo(() => {
     if (!contentSpaceId || !contentPaneContext) return null;
@@ -1623,6 +1628,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     [observeBubbleArea],
   );
 
+  const { overlayProps: connectionOverlayProps } = useConnectionOverlayInputs({
+    bubbleAreaRef,
+    spaceId: contentSpaceId ?? activeSpaceId ?? '',
+    paneId: connectionActivePaneId,
+    filteredHossiis,
+    selectedBubbleId,
+    presentationMode,
+    renderAsStar,
+    viewMode,
+    layoutMode,
+  });
+
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
       if (shouldMapToSharp && containerW > 0 && containerH > 0) {
@@ -2237,6 +2254,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             </button>
           </div>
         )}
+        <ConnectionOverlay {...connectionOverlayProps} />
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
               const pos = authorClusterPositions[index] ?? { x: 8, y: 22 };
