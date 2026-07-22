@@ -1,0 +1,134 @@
+.popover {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 8px 24px rgba(168, 85, 247, 0.14),
+    0 2px 8px rgba(17, 24, 39, 0.08);
+}
+
+.title {
+  margin: 0;
+  padding: 0.15rem 0.45rem 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.strengthList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.strengthOption {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 0.85rem;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.strengthOption:hover:not(:disabled) {
+  background: #faf5ff;
+}
+
+.strengthOptionActive {
+  background: #f3e8ff;
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+.strengthOption:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.strengthLabel {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.strengthDescription {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.actions {
+  display: flex;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  appearance: none;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  flex: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+}
+
+.secondaryButton {
+  color: #6b7280;
+  background: rgba(243, 244, 246, 0.95);
+}
+
+.dangerButton {
+  color: #b91c1c;
+  background: rgba(254, 226, 226, 0.95);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.75rem;
+  background: rgba(254, 226, 226, 0.75);
+  color: #b91c1c;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.confirmText {
+  margin: 0;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.8125rem;
+  color: #4b5563;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strengthOption,
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton {
+    transition: none;
+  }
+}
