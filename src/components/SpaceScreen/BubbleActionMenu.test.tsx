@@ -66,4 +66,33 @@ describe('BubbleActionMenu', () => {
     const menu = screen.getByRole('button', { name: 'くわしく見る' }).closest('[data-bubble-action-menu]');
     expect(menu?.parentElement).toBe(document.body);
   });
+
+  it('renders pull handle when direct connections exist', () => {
+    const onPullHandlePointerDown = vi.fn();
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        showPullHandle
+        onPullHandlePointerDown={onPullHandlePointerDown}
+      />,
+    );
+
+    const handle = screen.getByRole('button', { name: 'つながりを引っ張る' });
+    expect(handle).toBeTruthy();
+    fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, pointerId: 1 });
+    expect(onPullHandlePointerDown).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides pull handle when showPullHandle is false', () => {
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        showPullHandle={false}
+        onPullHandlePointerDown={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'つながりを引っ張る' })).toBeNull();
+  });
 });

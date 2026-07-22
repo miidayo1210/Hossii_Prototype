@@ -64,6 +64,52 @@ export function buildDirectConnectionListItems(
   }));
 }
 
+/** 選択 root から 1-hop の peer Hossii ID 一覧 */
+export function getDirectPeerHossiiIds(filter: VisibleConnectionFilter): string[] {
+  return buildDirectConnectionListItems(filter).map((item) => item.peerHossiiId);
+}
+
+/** 選択 root から 2-hop で到達可能な visible Hossii 件数（1-hop peer 自身は除外） */
+export function countVisibleTwoHopPeers({
+  connections,
+  selectedBubbleId,
+  activePaneId,
+  visibleHossiiIds,
+}: VisibleConnectionFilter): number {
+  const directPeers = new Set(getDirectPeerHossiiIds({
+    connections,
+    selectedBubbleId,
+    activePaneId,
+    visibleHossiiIds,
+  }));
+  if (directPeers.size === 0) return 0;
+
+  const twoHopIds = new Set<string>();
+  for (const connection of connections) {
+    if (connection.paneId !== activePaneId) continue;
+    const { sourceHossiiId, targetHossiiId } = connection;
+
+    if (
+      directPeers.has(sourceHossiiId) &&
+      targetHossiiId !== selectedBubbleId &&
+      !directPeers.has(targetHossiiId) &&
+      visibleHossiiIds.has(targetHossiiId)
+    ) {
+      twoHopIds.add(targetHossiiId);
+    }
+    if (
+      directPeers.has(targetHossiiId) &&
+      sourceHossiiId !== selectedBubbleId &&
+      !directPeers.has(sourceHossiiId) &&
+      visibleHossiiIds.has(sourceHossiiId)
+    ) {
+      twoHopIds.add(sourceHossiiId);
+    }
+  }
+
+  return twoHopIds.size;
+}
+
 /** 通常時 ✦N: 表示中 Hossii ごとの 1 階層接続件数 */
 export function buildConnectionBadgeCounts(
   connections: HossiiConnection[],

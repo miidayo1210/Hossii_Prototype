@@ -37,6 +37,8 @@ export type ConnectionPullDisabledReason =
 export type UseConnectionPullInteractionOptions = {
   sourceRef: RefObject<HTMLElement | null>;
   connectedRef?: RefObject<HTMLElement | null>;
+  /** 複数接続先へ同一 shift を適用する統合向け ref */
+  connectedElementsRef?: RefObject<readonly HTMLElement[]>;
   /** false 時は pointerdown 無効。pull 中に false へ変わったら即 reset */
   enabled?: boolean;
   /** 統合側のデバッグ・ログ用（hook ロジックには不使用） */
@@ -56,9 +58,19 @@ export type UseConnectionPullInteractionResult = {
   starParticleCount: 1 | 2 | 3;
 };
 
+function getConnectedElements(
+  connectedRef: RefObject<HTMLElement | null> | undefined,
+  connectedElementsRef: RefObject<readonly HTMLElement[]> | undefined,
+): readonly HTMLElement[] {
+  if (connectedElementsRef?.current?.length) {
+    return connectedElementsRef.current;
+  }
+  return connectedRef?.current ? [connectedRef.current] : [];
+}
+
 function applyPullCssVars(
   source: HTMLElement,
-  connected: HTMLElement | null | undefined,
+  connectedElements: readonly HTMLElement[],
   pullVector: Point2D,
   progress: number,
   reducedMotion: boolean,
@@ -72,32 +84,40 @@ function applyPullCssVars(
   source.style.setProperty(CSS.pullProgress, String(progress));
   source.style.setProperty(CSS.glowProgress, String(glow));
   source.dataset.reducedMotion = reducedMotion ? 'true' : 'false';
+  source.dataset.connectionPullSource = 'true';
 
-  if (connected) {
+  for (const connected of connectedElements) {
     connected.style.setProperty(CSS.connectedShiftX, `${shift.x}px`);
     connected.style.setProperty(CSS.connectedShiftY, `${shift.y}px`);
+    connected.dataset.connectionPullPeer = 'true';
   }
 
   return starCount;
 }
 
-function clearPullCssVars(source: HTMLElement | null, connected: HTMLElement | null | undefined): void {
+function clearPullCssVars(
+  source: HTMLElement | null,
+  connectedElements: readonly HTMLElement[],
+): void {
   if (source) {
     source.style.setProperty(CSS.pullX, '0px');
     source.style.setProperty(CSS.pullY, '0px');
     source.style.setProperty(CSS.pullProgress, '0');
     source.style.setProperty(CSS.glowProgress, '0');
     delete source.dataset.reducedMotion;
+    delete source.dataset.connectionPullSource;
   }
-  if (connected) {
+  for (const connected of connectedElements) {
     connected.style.setProperty(CSS.connectedShiftX, '0px');
     connected.style.setProperty(CSS.connectedShiftY, '0px');
+    delete connected.dataset.connectionPullPeer;
   }
 }
 
 export function useConnectionPullInteraction({
   sourceRef,
   connectedRef,
+  connectedElementsRef,
   enabled = true,
   maxPullDistance = DEFAULT_MAX_PULL_DISTANCE_PX,
 }: UseConnectionPullInteractionOptions): UseConnectionPullInteractionResult {
@@ -132,13 +152,13 @@ export function useConnectionPullInteraction({
     const progress = computeNormalizedProgress(distance, maxPullDistance);
     const nextStars = applyPullCssVars(
       source,
-      connectedRef?.current,
+      getConnectedElements(connectedRef, connectedElementsRef),
       pullVectorRef.current,
       progress,
       prefersReducedMotion,
     );
     syncStarCountIfChanged(nextStars);
-  }, [connectedRef, maxPullDistance, prefersReducedMotion, sourceRef, syncStarCountIfChanged]);
+  }, [connectedElementsRef, connectedRef, maxPullDistance, prefersReducedMotion, sourceRef, syncStarCountIfChanged]);
 
   const scheduleFlush = useCallback(() => {
     if (rafRef.current != null) return;
@@ -160,11 +180,14 @@ export function useConnectionPullInteraction({
 
   const resetPull = useCallback(() => {
     pullVectorRef.current = { x: 0, y: 0 };
-    clearPullCssVars(sourceRef.current, connectedRef?.current);
+    clearPullCssVars(
+      sourceRef.current,
+      getConnectedElements(connectedRef, connectedElementsRef),
+    );
     syncStarCountIfChanged(1);
     setPhaseIfChanged('idle');
     releaseCapture();
-  }, [connectedRef, releaseCapture, setPhaseIfChanged, sourceRef, syncStarCountIfChanged]);
+  }, [connectedElementsRef, connectedRef, releaseCapture, setPhaseIfChanged, sourceRef, syncStarCountIfChanged]);
 
   const handlePointerMove = useCallback(
     (event: PointerEvent) => {
@@ -216,13 +239,13 @@ export function useConnectionPullInteraction({
 
   useLayoutEffect(() => {
     const source = sourceRef.current;
-    const connected = connectedRef?.current;
+    const connectedElements = getConnectedElements(connectedRef, connectedElementsRef);
     return () => {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       releaseCapture();
-      clearPullCssVars(source, connected);
+      clearPullCssVars(source, connectedElements);
     };
-  }, [connectedRef, releaseCapture, sourceRef]);
+  }, [connectedElementsRef, connectedRef, releaseCapture, sourceRef]);
 
   useEffect(() => {
     if (!enabled && phaseRef.current !== 'idle') {

@@ -4,7 +4,9 @@ import {
   buildConnectionBadgeCounts,
   buildDirectConnectionListItems,
   countDirectConnections,
+  countVisibleTwoHopPeers,
   filterVisibleConnections,
+  getDirectPeerHossiiIds,
   shouldShowConnectionOverlay,
 } from './connectionVisibility';
 
@@ -231,5 +233,31 @@ describe('buildConnectionBadgeCounts', () => {
     expect(counts.get('a')).toBe(1);
     expect(counts.get('b')).toBe(2);
     expect(counts.get('c')).toBe(1);
+  });
+});
+
+describe('getDirectPeerHossiiIds / countVisibleTwoHopPeers', () => {
+  it('lists direct peers and counts 2-hop visible nodes', () => {
+    const visible = new Set(['h1', 'h2', 'h3']);
+    const filter = {
+      connections: baseConnections,
+      selectedBubbleId: 'h1',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: visible,
+    };
+
+    expect(getDirectPeerHossiiIds(filter)).toEqual(['h2']);
+    expect(countVisibleTwoHopPeers(filter)).toBe(1);
+  });
+
+  it('returns zero 2-hop when no direct connections', () => {
+    expect(
+      countVisibleTwoHopPeers({
+        connections: baseConnections,
+        selectedBubbleId: 'h9',
+        activePaneId: 'pane-a',
+        visibleHossiiIds: new Set(['h1', 'h2', 'h3']),
+      }),
+    ).toBe(0);
   });
 });
