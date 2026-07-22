@@ -431,6 +431,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const showStarToggle = !isMobile && viewMode !== 'slideshow';
   const renderAsStar = isMobile || presentationMode === 'stars';
   const showPcStarHover = !isMobile && presentationMode === 'stars';
+  const bubbleActionMenuEnabled =
+    !isMobile &&
+    presentationMode === 'custom' &&
+    (layoutMode === 'random' || layoutMode === 'ordered');
   /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
   const useMobileBottomSheet = isMobile && isPortrait;
   const quickPostDefaultRect = useMemo(
@@ -580,6 +584,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     if (!isContentArchived) return;
     if (quickPostOpen) handleQuickPostClose();
     if (speechPanelOpen) setSpeechPanelOpen(false);
+    setSelectedBubbleId(null);
+    setActiveBubbleId(null);
+    setBubbleActionMenuOpen(false);
   }, [isContentArchived, quickPostOpen, speechPanelOpen, handleQuickPostClose]);
 
   const handleQuickLogClose = useCallback(() => {
@@ -778,10 +785,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     if (
       prev != null &&
       contextActivePaneId != null &&
-      prev !== contextActivePaneId &&
-      quickPostOpen
+      prev !== contextActivePaneId
     ) {
-      handleQuickPostClose();
+      setSelectedBubbleId(null);
+      setActiveBubbleId(null);
+      setBubbleActionMenuOpen(false);
+      if (quickPostOpen) {
+        handleQuickPostClose();
+      }
     }
     prevActivePaneIdRef.current = contextActivePaneId;
   }, [contextActivePaneId, quickPostOpen, handleQuickPostClose]);
@@ -896,6 +907,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
+  const [bubbleActionMenuOpen, setBubbleActionMenuOpen] = useState(false);
   const [personalShortcutBusy, setPersonalShortcutBusy] = useState(false);
 
   // A02: 選択中の装飾（ポップアップ表示用）
@@ -1269,12 +1281,36 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   // ===== F14: 選択ハンドラ =====
+  const resetBubbleInteraction = useCallback(() => {
+    setSelectedBubbleId(null);
+    setActiveBubbleId(null);
+    setBubbleActionMenuOpen(false);
+  }, []);
+
   const handleBubbleSelect = useCallback((id: string) => {
     setSelectedBubbleId(id);
+    setBubbleActionMenuOpen(false);
   }, []);
 
   const handleBubbleDeselect = useCallback(() => {
-    setSelectedBubbleId(null);
+    resetBubbleInteraction();
+  }, [resetBubbleInteraction]);
+
+  const handleBubbleActionMenuToggle = useCallback(() => {
+    setBubbleActionMenuOpen((open) => !open);
+  }, []);
+
+  const handleBubbleViewDetail = useCallback((id: string) => {
+    setSelectedPostId(id);
+    setBubbleActionMenuOpen(false);
+  }, []);
+
+  const handleBubbleConnectStub = useCallback(() => {
+    // connection overlay/API — stub until connection feature lands
+  }, []);
+
+  const handleBubbleConnectionsStub = useCallback(() => {
+    // connection list — stub until connection feature lands
   }, []);
 
   const handlePersonalShortcut = useCallback(async () => {
@@ -1358,11 +1394,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   // Escape キーでデセレクト
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedBubbleId(null);
+      if (e.key === 'Escape') resetBubbleInteraction();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [resetBubbleInteraction]);
 
   // 他タブからリアクションを受信
   const handleBroadcastReaction = useCallback((event: ReactionEvent) => {
@@ -1438,6 +1474,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const { filteredHossiis, tagCounts } = pipeline;
+
+  useEffect(() => {
+    if (!selectedBubbleId) return;
+    if (!filteredHossiis.some((h) => h.id === selectedBubbleId)) {
+      resetBubbleInteraction();
+    }
+  }, [filteredHossiis, resetBubbleInteraction, selectedBubbleId]);
 
   // 吹き出しごとに本人操作（編集/公開範囲/削除）を出せるか。
   // authorship を正本にし、ゲスト投稿・他人投稿・authorship 未確定では出さない。
@@ -1531,6 +1574,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       savePresentationMode(next);
       setHoveredHossiiId(null);
       setHoverAnchorRect(null);
+      setSelectedBubbleId(null);
+      setActiveBubbleId(null);
+      setBubbleActionMenuOpen(false);
     };
     if (prefersReducedMotion) {
       commit();
@@ -2208,7 +2254,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         onPointerDown={(e) => {
           const target = e.target as HTMLElement;
           if (!target.closest('[data-hossii-bubble]')) {
-            setSelectedBubbleId(null);
+            resetBubbleInteraction();
           }
         }}
       >
@@ -2356,6 +2402,15 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 animationLevel={animationLevel}
                 canManageOwn={canManageOwnHossii(hossii.id)}
                 onOwnerDeleted={handleBubbleDeselect}
+                actionMenuEnabled={bubbleActionMenuEnabled}
+                actionMenuOpen={bubbleActionMenuOpen && isThisSelected}
+                onActionMenuToggle={handleBubbleActionMenuToggle}
+                onViewDetail={() => handleBubbleViewDetail(hossii.id)}
+                onConnect={bubbleActionMenuEnabled ? handleBubbleConnectStub : undefined}
+                connectionCount={bubbleActionMenuEnabled ? 0 : undefined}
+                onConnectionsClick={
+                  bubbleActionMenuEnabled ? handleBubbleConnectionsStub : undefined
+                }
               />
               </div>
             );
