@@ -44,6 +44,26 @@ export function countDirectConnections(filter: VisibleConnectionFilter): number 
   return filterVisibleConnections(filter).length;
 }
 
+export type DirectConnectionListItem = {
+  connectionId: string;
+  peerHossiiId: string;
+  strength: HossiiConnection['strength'];
+};
+
+/** つながり N 一覧: 1-hop・方向非依存の peer 一覧 */
+export function buildDirectConnectionListItems(
+  filter: VisibleConnectionFilter,
+): DirectConnectionListItem[] {
+  return filterVisibleConnections(filter).map((connection) => ({
+    connectionId: connection.id,
+    peerHossiiId:
+      connection.sourceHossiiId === filter.selectedBubbleId
+        ? connection.targetHossiiId
+        : connection.sourceHossiiId,
+    strength: connection.strength,
+  }));
+}
+
 /** 通常時 ✦N: 表示中 Hossii ごとの 1 階層接続件数 */
 export function buildConnectionBadgeCounts(
   connections: HossiiConnection[],

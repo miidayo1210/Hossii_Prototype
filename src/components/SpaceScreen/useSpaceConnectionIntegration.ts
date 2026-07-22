@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { HossiiConnectionStrength } from '../../core/types/hossiiConnection';
+import type { Hossii } from '../../core/types';
 import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
 import { canManageSpace } from '../../core/utils/spaceAdminAccess';
@@ -15,9 +16,17 @@ import {
   mapDeleteConnectionResult,
   mapUpdateConnectionStrengthResult,
 } from '../../core/utils/connectionEditorApiAdapters';
+import { buildDirectConnectionListItems } from '../../core/utils/connectionVisibility';
+import { getHossiiConnectionStrengthLabel } from '../../core/utils/hossiiConnectionStrengthLabels';
+import {
+  getHossiiBubbleFullText,
+  truncateBubbleDisplayText,
+  MAX_BUBBLE_TEXT_LENGTH,
+} from '../../core/utils/bubbleTextTruncation';
 import { useConnectionEditor } from './useConnectionEditor';
 import type { ConnectionOverlayInputs } from './useConnectionOverlayInputs';
 import type { ConnectionOverlayProps } from './ConnectionOverlay';
+import type { ConnectionListPopoverItem } from './ConnectionListPopover';
 
 type BubbleActionMenuBubbleProps = {
   actionMenuEnabled: boolean;
@@ -45,6 +54,7 @@ type Options = {
     isThisSelected: boolean,
   ) => BubbleActionMenuBubbleProps;
   overlayInputs: ConnectionOverlayInputs;
+  filteredHossiis: Hossii[];
   layoutMode: LayoutMode;
   viewMode: ViewMode;
   presentationMode: PresentationMode;
@@ -64,6 +74,7 @@ export function useSpaceConnectionIntegration({
   closeBubbleActionMenu,
   getBubbleActionMenuProps,
   overlayInputs,
+  filteredHossiis,
   layoutMode,
   viewMode,
   presentationMode,
@@ -119,26 +130,97 @@ export function useSpaceConnectionIntegration({
   );
 
   const editor = useConnectionEditor(editorCallbacks);
+  const [connectionListOpen, setConnectionListOpen] = useState(false);
+
+  const closeConnectionList = useCallback(() => {
+    setConnectionListOpen(false);
+  }, []);
+
+  const visibleHossiiIds = useMemo(
+    () => new Set(filteredHossiis.map((h) => h.id)),
+    [filteredHossiis],
+  );
+
+  const hossiiById = useMemo(
+    () => new Map(filteredHossiis.map((h) => [h.id, h])),
+    [filteredHossiis],
+  );
+
+  const connectionListItems: ConnectionListPopoverItem[] = useMemo(() => {
+    if (!isConnectionsContextEnabled || !selectedBubbleId) return [];
+    return buildDirectConnectionListItems({
+      connections: overlayInputs.connections,
+      selectedBubbleId,
+      activePaneId: paneId,
+      visibleHossiiIds,
+    })
+      .map((item) => {
+        const peer = hossiiById.get(item.peerHossiiId);
+        const fullText = peer ? getHossiiBubbleFullText(peer) : '';
+        return {
+          connectionId: item.connectionId,
+          peerHossiiId: item.peerHossiiId,
+          messagePreview: truncateBubbleDisplayText(fullText, MAX_BUBBLE_TEXT_LENGTH) || '（本文なし）',
+          strengthLabel: getHossiiConnectionStrengthLabel(item.strength).title,
+        };
+      });
+  }, [
+    isConnectionsContextEnabled,
+    selectedBubbleId,
+    overlayInputs.connections,
+    paneId,
+    visibleHossiiIds,
+    hossiiById,
+  ]);
 
   const editorReset = editor.reset;
   const isEditorSaving = editor.isSaving || editor.phase === 'saving';
 
   const resetConnectionState = useCallback(() => {
     if (isEditorSaving) return;
+    closeConnectionList();
     editorReset();
     resetBubbleInteraction();
-  }, [isEditorSaving, editorReset, resetBubbleInteraction]);
+  }, [isEditorSaving, closeConnectionList, editorReset, resetBubbleInteraction]);
 
   const shouldAllowBubbleReset = useCallback(() => !isEditorSaving, [isEditorSaving]);
 
   const handleEscapeReset = useCallback(() => {
     if (isEditorSaving) return;
+    if (connectionListOpen) {
+      closeConnectionList();
+      return;
+    }
     if (editor.phase === 'error' || editor.phase !== 'idle') {
       editorReset();
       return;
     }
     resetBubbleInteraction();
-  }, [isEditorSaving, editor.phase, editorReset, resetBubbleInteraction]);
+  }, [
+    isEditorSaving,
+    connectionListOpen,
+    closeConnectionList,
+    editor.phase,
+    editorReset,
+    resetBubbleInteraction,
+  ]);
+
+  useEffect(() => {
+    if (!connectionListOpen) return;
+    if (!isConnectionsContextEnabled || !selectedBubbleId || connectionListItems.length === 0) {
+      queueMicrotask(() => closeConnectionList());
+    }
+  }, [
+    connectionListOpen,
+    isConnectionsContextEnabled,
+    selectedBubbleId,
+    connectionListItems.length,
+    closeConnectionList,
+  ]);
+
+  useEffect(() => {
+    queueMicrotask(() => closeConnectionList());
+  }, [contextActivePaneId, presentationMode, layoutMode, viewMode, closeConnectionList]);
 
   useEffect(() => {
     if (!selectedBubbleId && editor.phase !== 'idle' && editor.phase !== 'error') {
@@ -222,6 +304,36 @@ export function useSpaceConnectionIntegration({
     closeBubbleActionMenu,
   ]);
 
+  const openConnectionList = useCallback(() => {
+    if (!isConnectionsContextEnabled || selectedDirectConnectionCount <= 0) return;
+    closeBubbleActionMenu();
+    setConnectionListOpen(true);
+  }, [
+    isConnectionsContextEnabled,
+    selectedDirectConnectionCount,
+    closeBubbleActionMenu,
+  ]);
+
+  const handleConnectionListSelect = useCallback(
+    (peerHossiiId: string) => {
+      if (isEditorSaving) return;
+      closeConnectionList();
+      if (editor.phase === 'error' || editor.phase !== 'idle') {
+        editorReset();
+      }
+      setSelectedBubbleId(peerHossiiId);
+      setActiveBubbleId(null);
+    },
+    [
+      isEditorSaving,
+      closeConnectionList,
+      editor.phase,
+      editorReset,
+      setSelectedBubbleId,
+      setActiveBubbleId,
+    ],
+  );
+
   const getIntegratedBubbleActionMenuProps = useCallback(
     (hossiiId: string, isThisSelected: boolean): BubbleActionMenuBubbleProps => {
       const base = getBubbleActionMenuProps(hossiiId, isThisSelected);
@@ -241,7 +353,7 @@ export function useSpaceConnectionIntegration({
             : undefined,
         onConnectionsClick:
           showConnectionMenuItems && selectedDirectConnectionCount > 0
-            ? base.onConnectionsClick
+            ? openConnectionList
             : undefined,
       };
     },
@@ -251,6 +363,7 @@ export function useSpaceConnectionIntegration({
       canWriteConnections,
       handleConnectFromMenu,
       selectedDirectConnectionCount,
+      openConnectionList,
     ],
   );
 
@@ -290,5 +403,8 @@ export function useSpaceConnectionIntegration({
     getIntegratedBubbleActionMenuProps,
     getConnectionBadgeCount,
     isPickingTarget,
+    connectionListOpen,
+    connectionListItems,
+    handleConnectionListSelect,
   };
 }

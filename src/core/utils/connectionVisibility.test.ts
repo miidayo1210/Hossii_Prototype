@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { HossiiConnection } from '../types/hossiiConnection';
 import {
   buildConnectionBadgeCounts,
+  buildDirectConnectionListItems,
   countDirectConnections,
   filterVisibleConnections,
   shouldShowConnectionOverlay,
@@ -193,6 +194,20 @@ describe('countDirectConnections', () => {
     };
     expect(countDirectConnections(filter)).toBe(filterVisibleConnections(filter).length);
     expect(countDirectConnections(filter)).toBe(2);
+  });
+});
+
+describe('buildDirectConnectionListItems', () => {
+  it('returns peer ids for 1-hop connections regardless of direction', () => {
+    const items = buildDirectConnectionListItems({
+      connections: baseConnections,
+      selectedBubbleId: 'h2',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: new Set(['h1', 'h2', 'h3']),
+    });
+
+    expect(items.map((item) => item.peerHossiiId).sort()).toEqual(['h1', 'h3']);
+    expect(items.find((item) => item.peerHossiiId === 'h1')?.strength).toBe('soft');
   });
 });
 

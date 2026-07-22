@@ -76,6 +76,7 @@ import { ConnectionOverlay } from './ConnectionOverlay';
 import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
 import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
 import { ConnectionEditorPortals } from './ConnectionEditorPortals';
+import { ConnectionListPopover } from './ConnectionListPopover';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { StarView } from './StarView';
 import { StarHoverPreview } from './StarHoverPreview';
@@ -1663,6 +1664,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     canWriteConnections,
     isConnectionsContextEnabled,
     handleEscapeReset,
+    connectionListOpen,
+    connectionListItems,
+    handleConnectionListSelect,
   } = useSpaceConnectionIntegration({
     currentUser,
     activeSpace: contentSpace ?? activeSpace,
@@ -1676,6 +1680,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     closeBubbleActionMenu,
     getBubbleActionMenuProps,
     overlayInputs: connectionOverlayInputs,
+    filteredHossiis,
     layoutMode,
     viewMode,
     presentationMode,
@@ -2274,6 +2279,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           if (target.closest('[data-connection-overlay]')) return;
           if (target.closest('[data-connection-editor-popover]')) return;
           if (target.closest('[data-bubble-action-menu]')) return;
+          if (target.closest('[data-connection-list-popover]')) return;
           resetConnectionState();
         }}
       >
@@ -2309,6 +2315,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           canWriteConnections={canWriteConnections}
           isConnectionsContextEnabled={isConnectionsContextEnabled}
         />
+        {connectionListOpen && selectedBubbleId && (
+          <ConnectionListPopover
+            anchorHossiiId={selectedBubbleId}
+            items={connectionListItems}
+            onSelectPeer={handleConnectionListSelect}
+          />
+        )}
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
               const pos = authorClusterPositions[index] ?? { x: 8, y: 22 };

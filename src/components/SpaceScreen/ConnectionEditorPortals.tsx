@@ -4,6 +4,7 @@ import type { UseConnectionEditorReturn } from './useConnectionEditor';
 import { ConnectionStrengthPopover } from './ConnectionStrengthPopover';
 import { ConnectionDeleteConfirmPopover } from './ConnectionDeleteConfirmPopover';
 import styles from './ConnectionEditorPopover.module.css';
+import { escapeDataAttributeSelectorValue } from '../../core/utils/escapeDataAttributeSelectorValue';
 
 function PickTargetErrorNotice({
   anchorRect,
@@ -46,7 +47,9 @@ function useHossiiAnchorRect(hossiiId: string | null, active: boolean): DOMRect 
       return;
     }
 
-    const el = document.querySelector(`[data-hossii-id="${CSS.escape(hossiiId)}"]`);
+    const el = document.querySelector(
+      `[data-hossii-id="${escapeDataAttributeSelectorValue(hossiiId)}"]`,
+    );
     queueMicrotask(() => {
       setRect(el ? el.getBoundingClientRect() : null);
     });
