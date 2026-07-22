@@ -61,6 +61,7 @@ vi.mock('../../core/utils/likesApi', () => ({
   mutateLike: (...args: unknown[]) => mockState.mutateLike(...args),
 }));
 
+import { fetchLikedIds } from '../../core/utils/likesApi';
 import { LogListBody } from './LogListBody';
 
 function makeHossii(over: Partial<Hossii> & { id: string }): Hossii {
@@ -83,6 +84,8 @@ beforeEach(() => {
   mockState.mutateLike.mockReset();
   mockState.onLikeCountUpdated.mockReset();
   mockState.mutateLike.mockResolvedValue({ liked: true, likeCount: 1 });
+  vi.mocked(fetchLikedIds).mockReset();
+  vi.mocked(fetchLikedIds).mockResolvedValue(new Set<string>());
 });
 
 afterEach(() => cleanup());
@@ -186,6 +189,31 @@ describe('LogListBody like mutations', () => {
     fireEvent.click(screen.getByRole('button', { name: 'いいね' }));
     await waitFor(() => {
       expect(mockState.onLikeCountUpdated).toHaveBeenCalledWith('h1', 4);
+    });
+  });
+
+  it('refetches liked ids when hossiis load after auth', async () => {
+    vi.mocked(fetchLikedIds).mockResolvedValue(new Set(['h1']));
+    mockState.currentUser = { uid: 'user-1', isAdmin: false };
+    const { rerender } = render(
+      <LogListBody hossiis={[]} spaceId="s1" panelMode initialLogScope="all" />,
+    );
+    expect(fetchLikedIds).not.toHaveBeenCalled();
+
+    rerender(
+      <LogListBody
+        hossiis={[makeHossii({ id: 'h1', likeCount: 0 })]}
+        spaceId="s1"
+        panelMode
+        initialLogScope="all"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchLikedIds).toHaveBeenCalledWith('user-1', ['h1']);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'いいねを取り消す' })).toBeTruthy();
     });
   });
 

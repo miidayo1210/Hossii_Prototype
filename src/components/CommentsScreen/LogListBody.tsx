@@ -250,8 +250,7 @@ export function LogListBody({
     if (!currentUser || !likesEnabled || scopedHossiis.length === 0) return;
     const ids = scopedHossiis.map((h) => h.id);
     fetchLikedIds(currentUser.uid, ids).then(setLikedIds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid, likesEnabled, spaceId, logScope]);
+  }, [currentUser, likesEnabled, spaceId, logScope, scopedHossiis]);
 
   const handleHideFromLog = useCallback(
     (id: string) => {
