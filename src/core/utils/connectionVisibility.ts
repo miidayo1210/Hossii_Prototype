@@ -9,7 +9,9 @@ export type ConnectionOverlayGate = {
   selectedBubbleId: string | null;
 };
 
-/** custom Bubble 表示かつ選択中のみ overlay を描画 */
+/** custom Bubble 表示かつ選択中のみ overlay を描画。
+ *  archived スペースでも閲覧可（作成・変更・解除は後続 UI / API 担当）。
+ *  isContentArchived は gate に含めない。 */
 export function shouldShowConnectionOverlay(gate: ConnectionOverlayGate): boolean {
   return (
     gate.presentationMode === 'custom' &&

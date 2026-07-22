@@ -87,6 +87,17 @@ describe('shouldShowConnectionOverlay', () => {
       }),
     ).toBe(false);
   });
+
+  it('allows overlay in archived spaces (view-only; mutation is out of scope here)', () => {
+    expect(
+      shouldShowConnectionOverlay({
+        presentationMode: 'custom',
+        isMobile: false,
+        layoutMode: 'random',
+        selectedBubbleId: 'h1',
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('filterVisibleConnections', () => {
