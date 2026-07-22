@@ -72,7 +72,7 @@ const LikeButton = ({ hossii, likedByMe, isLoggedIn, onLike }: LikeButtonProps) 
           try {
             const result = await onLike(hossii.id);
             setLocalLiked(isLoggedIn ? result.liked : true);
-            setCountDelta(result.likeCount - (hossii.likeCount ?? 0));
+            setCountDelta(0);
           } catch {
             setLocalLiked(wasLiked);
             setCountDelta(prevDelta);
