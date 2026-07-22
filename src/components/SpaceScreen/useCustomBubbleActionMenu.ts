@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Hossii } from '../../core/types';
 import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
+import { isConnectionsContextEnabled } from '../../core/utils/connectionFetchGate';
 
 type BubbleActionMenuBubbleProps = {
   actionMenuEnabled: boolean;
@@ -14,7 +15,7 @@ type BubbleActionMenuBubbleProps = {
 };
 
 type Options = {
-  isMobile: boolean;
+  renderAsStar: boolean;
   presentationMode: PresentationMode;
   layoutMode: LayoutMode;
   viewMode: ViewMode;
@@ -25,10 +26,14 @@ type Options = {
   setSelectedPostId: (id: string | null) => void;
   filteredHossiis: Hossii[];
   contextActivePaneId: string | null | undefined;
+  /** saving 中など、バブル選択解除を抑止する */
+  shouldAllowReset?: () => boolean;
+  /** Esc 時の統合 reset（editor + bubble） */
+  onEscapeReset?: () => void;
 };
 
 export function useCustomBubbleActionMenu({
-  isMobile,
+  renderAsStar,
   presentationMode,
   layoutMode,
   viewMode,
@@ -39,6 +44,8 @@ export function useCustomBubbleActionMenu({
   setSelectedPostId,
   filteredHossiis,
   contextActivePaneId,
+  shouldAllowReset = () => true,
+  onEscapeReset,
 }: Options) {
   const [bubbleActionMenuOpen, setBubbleActionMenuOpen] = useState(false);
   const prevPaneIdRef = useRef(contextActivePaneId);
@@ -50,16 +57,19 @@ export function useCustomBubbleActionMenu({
     setBubbleActionMenuOpen(false);
   }, []);
 
-  const bubbleActionMenuEnabled =
-    !isMobile &&
-    presentationMode === 'custom' &&
-    (layoutMode === 'random' || layoutMode === 'ordered');
+  const bubbleActionMenuEnabled = isConnectionsContextEnabled({
+    renderAsStar,
+    viewMode,
+    presentationMode,
+    layoutMode,
+  });
 
   const resetBubbleInteraction = useCallback(() => {
+    if (!shouldAllowReset()) return;
     setSelectedBubbleId(null);
     setActiveBubbleId(null);
     setBubbleActionMenuOpen(false);
-  }, [setSelectedBubbleId, setActiveBubbleId]);
+  }, [setSelectedBubbleId, setActiveBubbleId, shouldAllowReset]);
 
   const handleBubbleSelect = useCallback(
     (id: string) => {
@@ -93,11 +103,16 @@ export function useCustomBubbleActionMenu({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') resetBubbleInteraction();
+      if (e.key !== 'Escape') return;
+      if (onEscapeReset) {
+        onEscapeReset();
+        return;
+      }
+      resetBubbleInteraction();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [resetBubbleInteraction]);
+  }, [onEscapeReset, resetBubbleInteraction]);
 
   useEffect(() => {
     if (!isContentArchived) return;

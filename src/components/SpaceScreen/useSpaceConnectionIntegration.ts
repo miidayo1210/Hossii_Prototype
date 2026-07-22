@@ -121,17 +121,31 @@ export function useSpaceConnectionIntegration({
   const editor = useConnectionEditor(editorCallbacks);
 
   const editorReset = editor.reset;
+  const isEditorSaving = editor.isSaving || editor.phase === 'saving';
 
   const resetConnectionState = useCallback(() => {
+    if (isEditorSaving) return;
     editorReset();
     resetBubbleInteraction();
-  }, [editorReset, resetBubbleInteraction]);
+  }, [isEditorSaving, editorReset, resetBubbleInteraction]);
+
+  const shouldAllowBubbleReset = useCallback(() => !isEditorSaving, [isEditorSaving]);
+
+  const handleEscapeReset = useCallback(() => {
+    if (isEditorSaving) return;
+    if (editor.phase === 'error' || editor.phase !== 'idle') {
+      editorReset();
+      return;
+    }
+    resetBubbleInteraction();
+  }, [isEditorSaving, editor.phase, editorReset, resetBubbleInteraction]);
 
   useEffect(() => {
     if (!selectedBubbleId && editor.phase !== 'idle' && editor.phase !== 'error') {
+      if (isEditorSaving) return;
       queueMicrotask(() => editorReset());
     }
-  }, [selectedBubbleId, editor.phase, editorReset]);
+  }, [selectedBubbleId, editor.phase, editorReset, isEditorSaving]);
 
   const prevPaneIdRef = useRef(contextActivePaneId);
   const prevPresentationModeRef = useRef(presentationMode);
@@ -141,65 +155,86 @@ export function useSpaceConnectionIntegration({
   useEffect(() => {
     const prev = prevPaneIdRef.current;
     if (prev != null && contextActivePaneId != null && prev !== contextActivePaneId) {
-      queueMicrotask(() => editorReset());
+      if (!isEditorSaving) queueMicrotask(() => editorReset());
     }
     prevPaneIdRef.current = contextActivePaneId;
-  }, [contextActivePaneId, editorReset]);
+  }, [contextActivePaneId, editorReset, isEditorSaving]);
 
   useEffect(() => {
     if (prevLayoutModeRef.current !== layoutMode && layoutMode === 'byAuthor') {
-      queueMicrotask(() => editorReset());
+      if (!isEditorSaving) queueMicrotask(() => editorReset());
     }
     prevLayoutModeRef.current = layoutMode;
-  }, [layoutMode, editorReset]);
+  }, [layoutMode, editorReset, isEditorSaving]);
 
   useEffect(() => {
     if (prevViewModeRef.current !== viewMode && viewMode === 'slideshow') {
-      queueMicrotask(() => editorReset());
+      if (!isEditorSaving) queueMicrotask(() => editorReset());
     }
     prevViewModeRef.current = viewMode;
-  }, [viewMode, editorReset]);
+  }, [viewMode, editorReset, isEditorSaving]);
 
   useEffect(() => {
     if (prevPresentationModeRef.current !== presentationMode) {
-      queueMicrotask(() => editorReset());
+      if (!isEditorSaving) queueMicrotask(() => editorReset());
     }
     prevPresentationModeRef.current = presentationMode;
-  }, [presentationMode, editorReset]);
+  }, [presentationMode, editorReset, isEditorSaving]);
 
   const handleBubbleSelect = useCallback(
     (id: string) => {
+      if (isEditorSaving) return;
+
       if (editor.phase === 'pickingTarget') {
         editor.chooseTarget(id);
         return;
       }
-      if (editor.phase !== 'idle' && editor.phase !== 'error') {
+
+      if (editor.phase === 'error') {
+        editorReset();
+      } else if (editor.phase !== 'idle') {
         return;
       }
+
       setSelectedBubbleId(id);
       setActiveBubbleId(null);
       closeBubbleActionMenu();
     },
-    [editor, setSelectedBubbleId, setActiveBubbleId, closeBubbleActionMenu],
+    [
+      isEditorSaving,
+      editor,
+      editorReset,
+      setSelectedBubbleId,
+      setActiveBubbleId,
+      closeBubbleActionMenu,
+    ],
   );
 
   const handleConnectFromMenu = useCallback(() => {
-    if (!canWriteConnections || !selectedBubbleId) return;
+    if (!isConnectionsContextEnabled || !canWriteConnections || !selectedBubbleId) return;
     closeBubbleActionMenu();
     editor.startCreate(selectedBubbleId);
-  }, [canWriteConnections, selectedBubbleId, editor, closeBubbleActionMenu]);
+  }, [
+    isConnectionsContextEnabled,
+    canWriteConnections,
+    selectedBubbleId,
+    editor,
+    closeBubbleActionMenu,
+  ]);
 
   const getIntegratedBubbleActionMenuProps = useCallback(
     (hossiiId: string, isThisSelected: boolean): BubbleActionMenuBubbleProps => {
       const base = getBubbleActionMenuProps(hossiiId, isThisSelected);
       if (!isThisSelected) return base;
 
-      const showConnectionMenuItems =
-        isConnectionsContextEnabled && !isContentArchived;
+      const showConnectionMenuItems = isConnectionsContextEnabled;
 
       return {
         ...base,
-        onConnect: canWriteConnections ? handleConnectFromMenu : undefined,
+        onConnect:
+          isConnectionsContextEnabled && canWriteConnections
+            ? handleConnectFromMenu
+            : undefined,
         connectionCount:
           showConnectionMenuItems && selectedDirectConnectionCount > 0
             ? selectedDirectConnectionCount
@@ -213,7 +248,6 @@ export function useSpaceConnectionIntegration({
     [
       getBubbleActionMenuProps,
       isConnectionsContextEnabled,
-      isContentArchived,
       canWriteConnections,
       handleConnectFromMenu,
       selectedDirectConnectionCount,
@@ -233,9 +267,12 @@ export function useSpaceConnectionIntegration({
   const overlayProps: ConnectionOverlayProps = useMemo(
     () => ({
       ...baseOverlayProps,
-      onConnectionClick: canWriteConnections ? editor.startEdit : undefined,
+      onConnectionClick:
+        isConnectionsContextEnabled && canWriteConnections
+          ? editor.startEdit
+          : undefined,
     }),
-    [baseOverlayProps, canWriteConnections, editor.startEdit],
+    [baseOverlayProps, isConnectionsContextEnabled, canWriteConnections, editor.startEdit],
   );
 
   const isPickingTarget = editor.phase === 'pickingTarget';
@@ -244,7 +281,10 @@ export function useSpaceConnectionIntegration({
     overlayProps,
     editor,
     canWriteConnections,
+    isConnectionsContextEnabled,
     resetConnectionState,
+    shouldAllowBubbleReset,
+    handleEscapeReset,
     handleBubbleSelect,
     handleBubbleDeselect: resetConnectionState,
     getIntegratedBubbleActionMenuProps,

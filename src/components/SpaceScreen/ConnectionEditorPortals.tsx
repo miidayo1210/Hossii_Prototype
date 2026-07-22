@@ -59,12 +59,14 @@ type Props = {
   editor: UseConnectionEditorReturn;
   selectedBubbleId: string | null;
   canWriteConnections: boolean;
+  isConnectionsContextEnabled: boolean;
 };
 
 export function ConnectionEditorPortals({
   editor,
   selectedBubbleId,
   canWriteConnections,
+  isConnectionsContextEnabled,
 }: Props) {
   const {
     phase,
@@ -82,26 +84,31 @@ export function ConnectionEditorPortals({
     cancel,
   } = editor;
 
+  const editorPortalEnabled = canWriteConnections && isConnectionsContextEnabled;
+
   const strengthPopoverActive =
-    phase === 'pickingStrength' || phase === 'editing' || phase === 'error';
+    phase === 'pickingStrength' ||
+    phase === 'editing' ||
+    phase === 'error' ||
+    phase === 'saving';
   const strengthAnchorId =
     phase === 'pickingStrength' ? targetId : selectedBubbleId;
   const strengthAnchorRect = useHossiiAnchorRect(
     strengthAnchorId,
-    canWriteConnections && strengthPopoverActive,
+    editorPortalEnabled && strengthPopoverActive,
   );
 
   const deleteAnchorRect = useHossiiAnchorRect(
     selectedBubbleId,
-    canWriteConnections && phase === 'deleting',
+    editorPortalEnabled && phase === 'deleting',
   );
 
   const pickTargetErrorRect = useHossiiAnchorRect(
     sourceId,
-    canWriteConnections && phase === 'pickingTarget' && !!errorMessage,
+    editorPortalEnabled && phase === 'pickingTarget' && !!errorMessage,
   );
 
-  if (!canWriteConnections) return null;
+  if (!editorPortalEnabled) return null;
 
   const strengthMode =
     phase === 'pickingStrength' || (phase === 'error' && !editingConnection)

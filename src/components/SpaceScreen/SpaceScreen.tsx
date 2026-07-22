@@ -904,6 +904,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
+  const shouldAllowBubbleResetRef = useRef<() => boolean>(() => true);
+  const handleEscapeResetRef = useRef<() => void>(() => {});
   const [personalShortcutBusy, setPersonalShortcutBusy] = useState(false);
 
   // A02: 選択中の装飾（ポップアップ表示用）
@@ -1431,7 +1433,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     closeBubbleActionMenu,
     getBubbleActionMenuProps,
   } = useCustomBubbleActionMenu({
-    isMobile,
+    renderAsStar,
     presentationMode,
     layoutMode,
     viewMode,
@@ -1442,6 +1444,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setSelectedPostId,
     filteredHossiis,
     contextActivePaneId,
+    shouldAllowReset: () => shouldAllowBubbleResetRef.current(),
+    onEscapeReset: () => handleEscapeResetRef.current(),
   });
 
   const handleHideBubble = useCallback(() => {
@@ -1657,6 +1661,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     isPickingTarget,
     editor: connectionEditor,
     canWriteConnections,
+    isConnectionsContextEnabled,
+    handleEscapeReset,
   } = useSpaceConnectionIntegration({
     currentUser,
     activeSpace: contentSpace ?? activeSpace,
@@ -1675,6 +1681,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     presentationMode,
     contextActivePaneId,
   });
+
+  shouldAllowBubbleResetRef.current = () =>
+    !connectionEditor.isSaving && connectionEditor.phase !== 'saving';
+  handleEscapeResetRef.current = handleEscapeReset;
 
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
@@ -2297,6 +2307,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           editor={connectionEditor}
           selectedBubbleId={selectedBubbleId}
           canWriteConnections={canWriteConnections}
+          isConnectionsContextEnabled={isConnectionsContextEnabled}
         />
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
