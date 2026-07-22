@@ -4,6 +4,10 @@ import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { X } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { fetchLikedIds, type LikeMutationResult } from '../../core/utils/likesApi';
+import {
+  LIKE_MUTATION_ERROR_MESSAGE,
+  previewOptimisticLikeState,
+} from '../../core/utils/likeMutationUi';
 import { useAuth } from '../../core/contexts/useAuth';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
@@ -16,7 +20,7 @@ type Props = {
   hossii: Hossii;
   onClose: () => void;
   likesEnabled?: boolean;
-  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
+  onLike?: (id: string) => Promise<LikeMutationResult>;
   readOnlyArchived?: boolean;
 };
 
@@ -49,6 +53,8 @@ export const PostDetailModal = ({
   const [isLiked, setIsLiked] = useState(false);
   const [isBouncing, setIsBouncing] = useState(false);
   const [likePending, setLikePending] = useState(false);
+  const [likeError, setLikeError] = useState<string | null>(null);
+  const isLoggedIn = !!currentUser;
 
   useEffect(() => {
     setLocalLikeCount(hossii.likeCount ?? 0);
@@ -75,16 +81,29 @@ export const PostDetailModal = ({
 
   const handleLikeClick = async () => {
     if (!onLike || likePending) return;
+    const prevCount = localLikeCount;
+    const prevLiked = isLiked;
+    const preview = previewOptimisticLikeState({
+      isLoggedIn,
+      wasLiked: isLiked,
+      baseCount: localLikeCount,
+    });
+    setLocalLikeCount(preview.count);
+    setIsLiked(preview.liked);
+    setLikeError(null);
     setLikePending(true);
     try {
       const result = await onLike(hossii.id);
-      if (!result) return;
       setLocalLikeCount(result.likeCount);
       setIsLiked(result.liked);
       if (result.liked) {
         setIsBouncing(true);
         setTimeout(() => setIsBouncing(false), 400);
       }
+    } catch {
+      setLocalLikeCount(prevCount);
+      setIsLiked(prevLiked);
+      setLikeError(LIKE_MUTATION_ERROR_MESSAGE);
     } finally {
       setLikePending(false);
     }
@@ -131,17 +150,24 @@ export const PostDetailModal = ({
           <div className={styles.meta}>
             <span className={styles.time}>{timestamp}</span>
             {likesEnabled && (
-              <button
-                className={`${styles.likeButton} ${isLiked ? styles.likeButtonActive : ''} ${isBouncing ? styles.likeButtonBounce : ''}`}
-                onClick={handleLikeClick}
-                disabled={likePending}
-                aria-label="いいね"
-              >
-                <span className={styles.likeHeart}>{isLiked ? '❤️' : '🤍'}</span>
-                {localLikeCount > 0 && (
-                  <span className={styles.likeCount}>{localLikeCount}</span>
+              <span className={styles.likeButtonWrap}>
+                <button
+                  className={`${styles.likeButton} ${isLiked ? styles.likeButtonActive : ''} ${isBouncing ? styles.likeButtonBounce : ''}`}
+                  onClick={handleLikeClick}
+                  disabled={likePending}
+                  aria-label="いいね"
+                >
+                  <span className={styles.likeHeart}>{isLiked ? '❤️' : '🤍'}</span>
+                  {localLikeCount > 0 && (
+                    <span className={styles.likeCount}>{localLikeCount}</span>
+                  )}
+                </button>
+                {likeError && (
+                  <span className={styles.likeError} role="alert">
+                    {likeError}
+                  </span>
                 )}
-              </button>
+              </span>
             )}
           </div>
         </div>

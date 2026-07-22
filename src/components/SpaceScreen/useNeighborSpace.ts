@@ -95,6 +95,13 @@ export function useNeighborSpace({
     setVisitingHossiis((prev) => prev.filter((h) => h.id !== id));
   }, []);
 
+  /** いいね成功後、ストア外の visitingHossiis の likeCount を同期する */
+  const patchVisitingHossiiLikeCount = useCallback((id: string, likeCount: number) => {
+    setVisitingHossiis((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, likeCount } : h)),
+    );
+  }, []);
+
   return {
     neighbors,
     visitingHossiis,
@@ -103,5 +110,6 @@ export function useNeighborSpace({
     setBottlePayload,
     handleIslandClick,
     removeVisitingHossii,
+    patchVisitingHossiiLikeCount,
   };
 }

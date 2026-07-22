@@ -932,6 +932,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setBottlePayload,
     handleIslandClick,
     removeVisitingHossii,
+    patchVisitingHossiiLikeCount,
   } = useNeighborSpace({
     activeSpaceId,
     visitingSpaceId,
@@ -1064,20 +1065,31 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const [likeReactionTrigger, setLikeReactionTrigger] = useState<{ id: string } | null>(null);
 
-  const handleLike = useCallback(async (hossiiId: string): Promise<LikeMutationResult | null> => {
-    if (isContentArchived) return null;
+  const handleLike = useCallback(async (hossiiId: string): Promise<LikeMutationResult> => {
+    if (isContentArchived) {
+      throw new Error('[SpaceScreen] likes disabled for archived content');
+    }
     try {
       const result = await mutateLike(hossiiId, currentUser?.uid);
       updateHossiiLikeCountAction(hossiiId, result.likeCount);
+      if (isVisiting) {
+        patchVisitingHossiiLikeCount(hossiiId, result.likeCount);
+      }
       if (result.liked) {
         setLikeReactionTrigger({ id: `like-${hossiiId}-${Date.now()}` });
       }
       return result;
     } catch (err) {
       console.error('[SpaceScreen] mutateLike error:', err);
-      return null;
+      throw err;
     }
-  }, [isContentArchived, currentUser?.uid, updateHossiiLikeCountAction]);
+  }, [
+    isContentArchived,
+    currentUser?.uid,
+    updateHossiiLikeCountAction,
+    isVisiting,
+    patchVisitingHossiiLikeCount,
+  ]);
 
   /** アプリ内「大画面」— 見た目の最大化（Fullscreen API は補助） */
   const [immersiveLayout, setImmersiveLayout] = useState(false);
@@ -3007,6 +3019,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                   }
             }
             readOnlyArchived={isContentArchived}
+            onLikeCountUpdated={isVisiting ? patchVisitingHossiiLikeCount : undefined}
           />
         </FloatingPanelShell>
       )}
