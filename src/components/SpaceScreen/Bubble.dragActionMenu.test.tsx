@@ -142,12 +142,12 @@ describe('Bubble drag threshold and action menu', () => {
       actionMenuOpen: true,
       onViewDetail: () => {},
       onConnect: () => {},
-      connectionCount: 0,
+      connectionCount: 2,
       onConnectionsClick: () => {},
     });
 
     expect(screen.getByRole('button', { name: 'くわしく見る' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'つないでみる' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'つながり 0' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'つながり 2' })).toBeTruthy();
   });
 });

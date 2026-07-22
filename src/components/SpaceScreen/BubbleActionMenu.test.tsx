@@ -5,10 +5,23 @@ import { BubbleActionMenu } from './BubbleActionMenu';
 
 afterEach(cleanup);
 
+const anchorRect = {
+  left: 100,
+  top: 200,
+  right: 260,
+  bottom: 320,
+  width: 160,
+  height: 120,
+  x: 100,
+  y: 200,
+  toJSON: () => ({}),
+} as DOMRect;
+
 describe('BubbleActionMenu', () => {
   it('renders only provided actions', () => {
     render(
       <BubbleActionMenu
+        anchorRect={anchorRect}
         onViewDetail={() => {}}
         onConnect={() => {}}
         connectionCount={2}
@@ -22,7 +35,7 @@ describe('BubbleActionMenu', () => {
   });
 
   it('hides connect actions when callbacks are omitted', () => {
-    render(<BubbleActionMenu onViewDetail={() => {}} />);
+    render(<BubbleActionMenu anchorRect={anchorRect} onViewDetail={() => {}} />);
 
     expect(screen.getByRole('button', { name: 'くわしく見る' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'つないでみる' })).toBeNull();
@@ -34,7 +47,11 @@ describe('BubbleActionMenu', () => {
     const onConnect = vi.fn();
 
     render(
-      <BubbleActionMenu onViewDetail={onViewDetail} onConnect={onConnect} />,
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={onViewDetail}
+        onConnect={onConnect}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'くわしく見る' }));
@@ -42,5 +59,11 @@ describe('BubbleActionMenu', () => {
 
     expect(onViewDetail).toHaveBeenCalledTimes(1);
     expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('portals to document.body', () => {
+    render(<BubbleActionMenu anchorRect={anchorRect} onViewDetail={() => {}} />);
+    const menu = screen.getByRole('button', { name: 'くわしく見る' }).closest('[data-bubble-action-menu]');
+    expect(menu?.parentElement).toBe(document.body);
   });
 });

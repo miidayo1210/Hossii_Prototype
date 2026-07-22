@@ -186,6 +186,7 @@ export function BubbleInner({
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const wasDraggingRef = useRef(false);
+  const [actionMenuAnchorRect, setActionMenuAnchorRect] = useState<DOMRect | null>(null);
 
   // hossii.likeCount が外部から変わった場合（初回フェッチ完了後など）に同期
   useEffect(() => {
@@ -239,6 +240,22 @@ export function BubbleInner({
 
   const displayPos = dragPos ?? position;
   const displayScale = dragScale ?? (hossii.scale ?? 1.0);
+
+  useLayoutEffect(() => {
+    if (!actionMenuEnabled || !actionMenuOpen || !containerRef.current) {
+      setActionMenuAnchorRect(null);
+      return;
+    }
+    setActionMenuAnchorRect(containerRef.current.getBoundingClientRect());
+  }, [
+    actionMenuEnabled,
+    actionMenuOpen,
+    displayPos.x,
+    displayPos.y,
+    displayScale,
+    isDragging,
+    contentExpanded,
+  ]);
 
   const { offset: landscapeClampOffset, isLandscape: isCustomLandscape } =
     useCustomBubbleLandscapeClamp(containerRef, [
@@ -809,8 +826,9 @@ export function BubbleInner({
 
       {/* 本人操作バー: 自分の吹き出しを選択したとき、吹き出し直下に編集/公開範囲/削除を出す。
           位置編集(canEdit)とは独立して常に到達可能にする。 */}
-      {isSelected && actionMenuEnabled && actionMenuOpen && (
+      {actionMenuAnchorRect && actionMenuEnabled && actionMenuOpen && (
         <BubbleActionMenu
+          anchorRect={actionMenuAnchorRect}
           onViewDetail={onViewDetail}
           onConnect={onConnect}
           connectionCount={connectionCount}
