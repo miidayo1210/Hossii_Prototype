@@ -8,6 +8,10 @@ import {
 } from '../../core/hooks/useHossiiActions';
 import type { Hossii } from '../../core/types';
 
+vi.mock('../../core/contexts/useAuth', () => ({
+  useAuth: () => ({ currentUser: null }),
+}));
+
 afterEach(cleanup);
 
 beforeEach(() => {

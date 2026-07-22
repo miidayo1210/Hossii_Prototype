@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { HossiiConnection } from '../types/hossiiConnection';
 import { isSupabaseConfigured } from '../supabase';
 import { fetchConnections } from '../utils/hossiiConnectionsApi';
@@ -11,6 +11,7 @@ export type UseHossiiConnectionsOptions = {
 
 export type UseHossiiConnectionsResult = {
   connections: HossiiConnection[];
+  refetch: () => void;
 };
 
 /**
@@ -22,7 +23,12 @@ export function useHossiiConnections({
   enabled,
 }: UseHossiiConnectionsOptions): UseHossiiConnectionsResult {
   const [connections, setConnections] = useState<HossiiConnection[]>([]);
+  const [fetchGeneration, setFetchGeneration] = useState(0);
   const requestIdRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    setFetchGeneration((generation) => generation + 1);
+  }, []);
 
   useEffect(() => {
     if (!enabled || !spaceId || !paneId || !isSupabaseConfigured) {
@@ -46,7 +52,7 @@ export function useHossiiConnections({
     return () => {
       cancelled = true;
     };
-  }, [enabled, spaceId, paneId]);
+  }, [enabled, spaceId, paneId, fetchGeneration]);
 
-  return { connections };
+  return { connections, refetch };
 }

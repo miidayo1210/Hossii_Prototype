@@ -71,8 +71,12 @@ import {
   SPACE_EXPORT_MAX_BUBBLES,
 } from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
+import { useCustomBubbleActionMenu } from './useCustomBubbleActionMenu';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
+import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
+import { ConnectionEditorPortals } from './ConnectionEditorPortals';
+import { ConnectionListPopover } from './ConnectionListPopover';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { StarView } from './StarView';
 import { StarHoverPreview } from './StarHoverPreview';
@@ -901,6 +905,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   // F14: 選択中バブル
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
+  const shouldAllowBubbleResetRef = useRef<() => boolean>(() => true);
+  const handleEscapeResetRef = useRef<() => void>(() => {});
   const [personalShortcutBusy, setPersonalShortcutBusy] = useState(false);
 
   // A02: 選択中の装飾（ポップアップ表示用）
@@ -1274,13 +1280,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   // ===== F14: 選択ハンドラ =====
-  const handleBubbleSelect = useCallback((id: string) => {
-    setSelectedBubbleId(id);
-  }, []);
-
-  const handleBubbleDeselect = useCallback(() => {
-    setSelectedBubbleId(null);
-  }, []);
+  // handleBubbleSelect / handleBubbleDeselect は useCustomBubbleActionMenu が提供
 
   const handlePersonalShortcut = useCallback(async () => {
     const communityId = activeSpace?.communityId;
@@ -1340,13 +1340,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     };
   }, [personalShortcutEligible, personalShortcutActive, handlePersonalShortcut, personalShortcutBusy]);
 
-  // F06: 非表示（管理者のみ）
-  const handleHideBubble = useCallback(() => {
-    if (isContentArchived) return;
-    if (!selectedBubbleId) return;
-    hideHossii(selectedBubbleId);
-    setSelectedBubbleId(null);
-  }, [isContentArchived, selectedBubbleId, hideHossii]);
+  // F06: 非表示（管理者のみ） — 実体は useCustomBubbleActionMenu 定義後
 
   // F05: PointerUp で即座にスケール保存
   const handleScaleSave = useCallback((id: string, scale: number) => {
@@ -1359,15 +1353,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     if (isContentArchived) return;
     updateHossiiColorAction(id, color);
   }, [isContentArchived, updateHossiiColorAction]);
-
-  // Escape キーでデセレクト
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedBubbleId(null);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // 他タブからリアクションを受信
   const handleBroadcastReaction = useCallback((event: ReactionEvent) => {
@@ -1443,6 +1428,33 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const { filteredHossiis, tagCounts } = pipeline;
+
+  const {
+    resetBubbleInteraction,
+    closeBubbleActionMenu,
+    getBubbleActionMenuProps,
+  } = useCustomBubbleActionMenu({
+    renderAsStar,
+    presentationMode,
+    layoutMode,
+    viewMode,
+    isContentArchived,
+    selectedBubbleId,
+    setSelectedBubbleId,
+    setActiveBubbleId,
+    setSelectedPostId,
+    filteredHossiis,
+    contextActivePaneId,
+    shouldAllowReset: () => shouldAllowBubbleResetRef.current(),
+    onEscapeReset: () => handleEscapeResetRef.current(),
+  });
+
+  const handleHideBubble = useCallback(() => {
+    if (isContentArchived) return;
+    if (!selectedBubbleId) return;
+    hideHossii(selectedBubbleId);
+    resetBubbleInteraction();
+  }, [isContentArchived, selectedBubbleId, hideHossii, resetBubbleInteraction]);
 
   // 吹き出しごとに本人操作（編集/公開範囲/削除）を出せるか。
   // authorship を正本にし、ゲスト投稿・他人投稿・authorship 未確定では出さない。
@@ -1628,7 +1640,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     [observeBubbleArea],
   );
 
-  const { overlayProps: connectionOverlayProps } = useConnectionOverlayInputs({
+  const connectionOverlayInputs = useConnectionOverlayInputs({
     bubbleAreaRef,
     spaceId: contentSpaceId ?? activeSpaceId ?? '',
     paneId: connectionActivePaneId,
@@ -1639,6 +1651,45 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     viewMode,
     layoutMode,
   });
+
+  const {
+    overlayProps: connectionOverlayProps,
+    resetConnectionState,
+    handleBubbleSelect,
+    handleBubbleDeselect,
+    getIntegratedBubbleActionMenuProps,
+    getConnectionBadgeCount,
+    isPickingTarget,
+    editor: connectionEditor,
+    canWriteConnections,
+    isConnectionsContextEnabled,
+    handleEscapeReset,
+    connectionListOpen,
+    connectionListItems,
+    handleConnectionListSelect,
+  } = useSpaceConnectionIntegration({
+    currentUser,
+    activeSpace: contentSpace ?? activeSpace,
+    isContentArchived,
+    spaceId: contentSpaceId ?? activeSpaceId ?? '',
+    paneId: connectionActivePaneId,
+    selectedBubbleId,
+    setSelectedBubbleId,
+    setActiveBubbleId,
+    resetBubbleInteraction,
+    closeBubbleActionMenu,
+    getBubbleActionMenuProps,
+    overlayInputs: connectionOverlayInputs,
+    filteredHossiis,
+    layoutMode,
+    viewMode,
+    presentationMode,
+    contextActivePaneId,
+  });
+
+  shouldAllowBubbleResetRef.current = () =>
+    !connectionEditor.isSaving && connectionEditor.phase !== 'saving';
+  handleEscapeResetRef.current = handleEscapeReset;
 
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
@@ -2224,9 +2275,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         onDoubleClick={handleDoubleClick}
         onPointerDown={(e) => {
           const target = e.target as HTMLElement;
-          if (!target.closest('[data-hossii-bubble]')) {
-            setSelectedBubbleId(null);
-          }
+          if (target.closest('[data-hossii-bubble]')) return;
+          if (target.closest('[data-connection-overlay]')) return;
+          if (target.closest('[data-connection-editor-popover]')) return;
+          if (target.closest('[data-bubble-action-menu]')) return;
+          if (target.closest('[data-connection-list-popover]')) return;
+          resetConnectionState();
         }}
       >
         <PinTray
@@ -2255,6 +2309,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           </div>
         )}
         <ConnectionOverlay {...connectionOverlayProps} />
+        <ConnectionEditorPortals
+          editor={connectionEditor}
+          selectedBubbleId={selectedBubbleId}
+          canWriteConnections={canWriteConnections}
+          isConnectionsContextEnabled={isConnectionsContextEnabled}
+        />
+        {connectionListOpen && selectedBubbleId && (
+          <ConnectionListPopover
+            anchorHossiiId={selectedBubbleId}
+            items={connectionListItems}
+            onSelectPeer={handleConnectionListSelect}
+          />
+        )}
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
               const pos = authorClusterPositions[index] ?? { x: 8, y: 22 };
@@ -2374,6 +2441,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 animationLevel={animationLevel}
                 canManageOwn={canManageOwnHossii(hossii.id)}
                 onOwnerDeleted={handleBubbleDeselect}
+                connectionBadgeCount={getConnectionBadgeCount(hossii.id)}
+                isConnectionPickTarget={
+                  isPickingTarget && !isThisSelected && connectionEditor.sourceId !== hossii.id
+                }
+                suppressActionMenuToggle={
+                  connectionEditor.phase !== 'idle' && connectionEditor.phase !== 'error'
+                }
+                {...getIntegratedBubbleActionMenuProps(hossii.id, isThisSelected)}
               />
               </div>
             );

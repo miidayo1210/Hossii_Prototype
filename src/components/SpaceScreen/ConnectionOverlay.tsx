@@ -25,6 +25,8 @@ export type ConnectionOverlayProps = {
   visibleHossiiIds: ReadonlySet<string>;
   /** QA / #55 メニュー連携用（overlay 描画件数と一致） */
   directConnectionCount?: number;
+  /** admin 向け: 糸クリックで編集開始 */
+  onConnectionClick?: (connection: HossiiConnection) => void;
 };
 
 type ConnectionPathPairProps = {
@@ -32,6 +34,7 @@ type ConnectionPathPairProps = {
   isHovered: boolean;
   onHoverChange: (connectionId: string | null) => void;
   onRegister: (connectionId: string, refs: ConnectionPathRefs | null) => void;
+  onConnectionClick?: (connection: HossiiConnection) => void;
 };
 
 function ConnectionPathPair({
@@ -39,6 +42,7 @@ function ConnectionPathPair({
   isHovered,
   onHoverChange,
   onRegister,
+  onConnectionClick,
 }: ConnectionPathPairProps) {
   const visualRef = useRef<SVGPathElement | null>(null);
   const hitRef = useRef<SVGPathElement | null>(null);
@@ -83,6 +87,12 @@ function ConnectionPathPair({
         style={{ strokeWidth: stroke.hitStrokeWidth }}
         onPointerEnter={() => onHoverChange(connection.id)}
         onPointerLeave={() => onHoverChange(null)}
+        onPointerDown={(e) => {
+          if (!onConnectionClick) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onConnectionClick(connection);
+        }}
       />
     </g>
   );
@@ -99,6 +109,7 @@ export function ConnectionOverlay({
   activePaneId,
   visibleHossiiIds,
   directConnectionCount,
+  onConnectionClick,
 }: ConnectionOverlayProps) {
   const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
   const pathRegistryRef = useRef<Map<string, ConnectionPathRefs>>(new Map());
@@ -162,6 +173,7 @@ export function ConnectionOverlay({
             isHovered={effectiveHoveredConnectionId === connection.id}
             onHoverChange={setHoveredConnectionId}
             onRegister={registerPathRefs}
+            onConnectionClick={onConnectionClick}
           />
         ))}
       </svg>

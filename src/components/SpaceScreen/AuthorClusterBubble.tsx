@@ -9,6 +9,7 @@ import { renderHossiiText } from '../../core/utils/render';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
 import { useCustomBubbleLandscapeClamp } from '../../core/hooks/useCustomBubbleLandscapeClamp';
+import { BUBBLE_DRAG_THRESHOLD_PX } from '../../core/utils/bubbleDragThreshold';
 import styles from './AuthorClusterBubble.module.css';
 
 const MAX_PREVIEW_POSTS = 20;
@@ -137,7 +138,7 @@ function AuthorClusterBubbleInner({
       const { startPX, startPY, startBX, startBY } = dragStateRef.current;
       const dx = e.clientX - startPX;
       const dy = e.clientY - startPY;
-      if (!dragStateRef.current.moved && Math.hypot(dx, dy) < 5) return;
+      if (!dragStateRef.current.moved && Math.hypot(dx, dy) < BUBBLE_DRAG_THRESHOLD_PX) return;
 
       if (!dragStateRef.current.moved) {
         dragStateRef.current.moved = true;

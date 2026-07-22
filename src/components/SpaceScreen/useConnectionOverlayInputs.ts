@@ -11,6 +11,7 @@ import {
 import {
   countDirectConnections,
   filterVisibleConnections,
+  buildConnectionBadgeCounts,
 } from '../../core/utils/connectionVisibility';
 import type { ConnectionOverlayProps } from './ConnectionOverlay';
 
@@ -30,6 +31,10 @@ export type ConnectionOverlayInputs = {
   overlayProps: ConnectionOverlayProps;
   /** 選択 root から 1 階層の糸件数（#55 メニュー ✦N 用） */
   selectedDirectConnectionCount: number;
+  connections: ReturnType<typeof useHossiiConnections>['connections'];
+  refetch: ReturnType<typeof useHossiiConnections>['refetch'];
+  isConnectionsContextEnabled: boolean;
+  connectionBadgeCountByHossiiId: ReadonlyMap<string, number>;
 };
 
 /** SpaceScreen から overlay 配線を切り出し、高衝突ファイルの diff を最小化する */
@@ -64,11 +69,16 @@ export function useConnectionOverlayInputs({
     paneId,
   });
 
-  const { connections } = useHossiiConnections({
+  const { connections, refetch } = useHossiiConnections({
     spaceId,
     paneId,
     enabled: fetchEnabled,
   });
+
+  const connectionBadgeCountByHossiiId = useMemo(() => {
+    if (!contextEnabled) return new Map<string, number>();
+    return buildConnectionBadgeCounts(connections, paneId, visibleHossiiIds);
+  }, [contextEnabled, connections, paneId, visibleHossiiIds]);
 
   const selectedDirectConnectionCount = useMemo(() => {
     if (!contextEnabled || !selectedBubbleId) return 0;
@@ -93,7 +103,14 @@ export function useConnectionOverlayInputs({
     directConnectionCount: selectedDirectConnectionCount,
   };
 
-  return { overlayProps, selectedDirectConnectionCount };
+  return {
+    overlayProps,
+    selectedDirectConnectionCount,
+    connections,
+    refetch,
+    isConnectionsContextEnabled: contextEnabled,
+    connectionBadgeCountByHossiiId,
+  };
 }
 
 export { filterVisibleConnections, countDirectConnections };

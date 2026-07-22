@@ -22,6 +22,8 @@ import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisp
 import { PostedNameLabel } from '../common/PostedNameLabel';
 import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
 import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
+import { BubbleActionMenu } from './BubbleActionMenu';
+import { exceedsBubbleDragThreshold } from '../../core/utils/bubbleDragThreshold';
 import { useAuth } from '../../core/contexts/useAuth';
 import {
   LIKE_MUTATION_ERROR_MESSAGE,
@@ -100,6 +102,20 @@ type BubbleProps = {
   canManageOwn?: boolean;
   /** 本人操作から削除が成功したときに選択解除するためのコールバック */
   onOwnerDeleted?: () => void;
+  /** PC custom random/ordered: compact action menu gate */
+  actionMenuEnabled?: boolean;
+  actionMenuOpen?: boolean;
+  onActionMenuToggle?: () => void;
+  onViewDetail?: () => void;
+  onConnect?: () => void;
+  connectionCount?: number;
+  onConnectionsClick?: () => void;
+  /** 通常時 ✦N（選択中は overlay が正本のため非表示） */
+  connectionBadgeCount?: number;
+  /** つなぎ先選択中の候補ハイライト */
+  isConnectionPickTarget?: boolean;
+  /** 糸編集中はメニュー toggle を抑止 */
+  suppressActionMenuToggle?: boolean;
 };
 
 export function BubbleInner({
@@ -128,6 +144,16 @@ export function BubbleInner({
   showPinUi = false,
   canManageOwn = false,
   onOwnerDeleted,
+  actionMenuEnabled = false,
+  actionMenuOpen = false,
+  onActionMenuToggle,
+  onViewDetail,
+  onConnect,
+  connectionCount,
+  onConnectionsClick,
+  connectionBadgeCount,
+  isConnectionPickTarget = false,
+  suppressActionMenuToggle = false,
 }: BubbleProps) {
   const { ref: visibilityRef, level: visibleAnimLevel } = useVisibleAnimationLevel(
     animationLevel,
@@ -168,6 +194,8 @@ export function BubbleInner({
   // I: 画像ライトボックス
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const wasDraggingRef = useRef(false);
+  const [actionMenuAnchorRect, setActionMenuAnchorRect] = useState<DOMRect | null>(null);
 
   // hossii.likeCount が外部から変わった場合（初回フェッチ完了後など）に同期
   useEffect(() => {
@@ -222,6 +250,22 @@ export function BubbleInner({
   const displayPos = dragPos ?? position;
   const displayScale = dragScale ?? (hossii.scale ?? 1.0);
 
+  useLayoutEffect(() => {
+    if (!actionMenuEnabled || !actionMenuOpen || !containerRef.current) {
+      setActionMenuAnchorRect(null);
+      return;
+    }
+    setActionMenuAnchorRect(containerRef.current.getBoundingClientRect());
+  }, [
+    actionMenuEnabled,
+    actionMenuOpen,
+    displayPos.x,
+    displayPos.y,
+    displayScale,
+    isDragging,
+    contentExpanded,
+  ]);
+
   const { offset: landscapeClampOffset, isLandscape: isCustomLandscape } =
     useCustomBubbleLandscapeClamp(containerRef, [
       displayPos.x,
@@ -246,6 +290,7 @@ export function BubbleInner({
       // 本人操作バー（編集/公開範囲/削除）上の操作はドラッグ・選択に干渉させない。
       // preventDefault で click が潰れないよう、ここで早期 return する。
       if ((e.target as HTMLElement).closest('[data-owner-actions]')) return;
+      if ((e.target as HTMLElement).closest('[data-bubble-action-menu]')) return;
 
       // 未選択 → 選択のみ（ドラッグは次のクリックから）
       if (!isSelectedRef.current) {
@@ -300,8 +345,13 @@ export function BubbleInner({
       const onPointerMove = (e: PointerEvent) => {
       if (!dragStateRef.current) return;
       const { mode, startPX, startPY, startBX, startBY, startScale } = dragStateRef.current;
+      const dx = e.clientX - startPX;
+      const dy = e.clientY - startPY;
+      if (!dragStateRef.current.moved && !exceedsBubbleDragThreshold(dx, dy)) return;
+
       if (!dragStateRef.current.moved) {
         dragStateRef.current.moved = true;
+        wasDraggingRef.current = true;
         setIsDragging(true);
       }
 
@@ -309,8 +359,8 @@ export function BubbleInner({
         const area = el.closest('[data-bubble-area]') as HTMLElement | null;
         const areaW = area?.clientWidth ?? window.innerWidth;
         const areaH = area?.clientHeight ?? window.innerHeight;
-        const dX = ((e.clientX - startPX) / areaW) * 100;
-        const dY = ((e.clientY - startPY) / areaH) * 100;
+        const dX = (dx / areaW) * 100;
+        const dY = (dy / areaH) * 100;
         const newPos = {
           x: Math.max(5, Math.min(95, startBX + dX)),
           y: Math.max(5, Math.min(90, startBY + dY)),
@@ -320,8 +370,8 @@ export function BubbleInner({
       } else {
         // リサイズ: 各コーナーから「外側」へ引くと拡大
         const { corner } = dragStateRef.current;
-        const dX = e.clientX - startPX; // 右が正
-        const dY = e.clientY - startPY; // 下が正
+        const dX = dx; // 右が正
+        const dY = dy; // 下が正
         const signX = (corner === 'TL' || corner === 'BL') ? -1 : 1;
         const signY = (corner === 'TL' || corner === 'TR') ? -1 : 1;
         const delta = (signX * dX + signY * dY) / 2;
@@ -354,6 +404,11 @@ export function BubbleInner({
       setDragScale(null);
       setIsDragging(false);
       setContentExpanded(false);
+      if (moved) {
+        window.setTimeout(() => {
+          wasDraggingRef.current = false;
+        }, 0);
+      }
     };
 
     document.addEventListener('pointermove', onPointerMove);
@@ -497,7 +552,9 @@ export function BubbleInner({
         : bubbleShapePng
           ? styles.bubbleSelectedShape
           : styles.bubbleSelected
-      : '',
+      : isConnectionPickTarget
+        ? styles.bubbleConnectionPickTarget
+        : '',
     dragPos ? styles.bubbleDragging : '',
     isRecentHighlight &&
       (isCanvasPost
@@ -519,10 +576,16 @@ export function BubbleInner({
       data-hossii-id={hossii.id}
       data-hossii-post-kind={isCanvasPost ? 'canvas' : 'bubble'}
       onClick={() => {
-        if (!dragStateRef.current?.moved) {
-          if (!isSelected) onSelect?.(hossii.id);
-          else onActivate();
+        if (wasDraggingRef.current || isDragging) return;
+        if (!isSelected) {
+          onSelect?.(hossii.id);
+          return;
         }
+        if (actionMenuEnabled && !suppressActionMenuToggle) {
+          onActionMenuToggle?.();
+          return;
+        }
+        onActivate();
       }}
       onMouseEnter={() => {
         if (!isSelected) onActivate();
@@ -530,6 +593,15 @@ export function BubbleInner({
       }}
       onMouseLeave={() => setIsBubbleHovered(false)}
     >
+      {connectionBadgeCount != null && connectionBadgeCount > 0 && (
+        <span
+          className={styles.connectionBadge}
+          data-connection-badge
+          aria-hidden
+        >
+          ✦{connectionBadgeCount}
+        </span>
+      )}
       {showPinUi && onPinToggle && (isBubbleHovered || isPinned) && (
         <PinButton
           className={styles.bubblePinButton}
@@ -776,6 +848,16 @@ export function BubbleInner({
 
       {/* 本人操作バー: 自分の吹き出しを選択したとき、吹き出し直下に編集/公開範囲/削除を出す。
           位置編集(canEdit)とは独立して常に到達可能にする。 */}
+      {actionMenuAnchorRect && actionMenuEnabled && actionMenuOpen && (
+        <BubbleActionMenu
+          anchorRect={actionMenuAnchorRect}
+          onViewDetail={onViewDetail}
+          onConnect={onConnect}
+          connectionCount={connectionCount}
+          onConnectionsClick={onConnectionsClick}
+        />
+      )}
+
       {isSelected && canManageOwn && (
         <div
           className={styles.bubbleOwnerBar}
@@ -884,7 +966,17 @@ function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
     prev.onOwnerDeleted === next.onOwnerDeleted &&
     prev.onPinToggle === next.onPinToggle &&
     prev.onActivate === next.onActivate &&
-    prev.onSelect === next.onSelect
+    prev.onSelect === next.onSelect &&
+    prev.actionMenuEnabled === next.actionMenuEnabled &&
+    prev.actionMenuOpen === next.actionMenuOpen &&
+    prev.onActionMenuToggle === next.onActionMenuToggle &&
+    prev.onViewDetail === next.onViewDetail &&
+    prev.onConnect === next.onConnect &&
+    prev.connectionCount === next.connectionCount &&
+    prev.onConnectionsClick === next.onConnectionsClick &&
+    prev.connectionBadgeCount === next.connectionBadgeCount &&
+    prev.isConnectionPickTarget === next.isConnectionPickTarget &&
+    prev.suppressActionMenuToggle === next.suppressActionMenuToggle
   );
 }
 

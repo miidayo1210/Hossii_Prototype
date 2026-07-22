@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { HossiiConnection } from '../types/hossiiConnection';
 import {
+  buildConnectionBadgeCounts,
+  buildDirectConnectionListItems,
   countDirectConnections,
   filterVisibleConnections,
   shouldShowConnectionOverlay,
@@ -48,6 +50,23 @@ const baseConnections: HossiiConnection[] = [
     ...connectionMeta,
   },
 ];
+
+function makeConnection(
+  overrides: Partial<HossiiConnection> = {},
+): HossiiConnection {
+  return {
+    id: 'conn-1',
+    spaceId: 'space-1',
+    paneId: 'pane-1',
+    sourceHossiiId: 'a',
+    targetHossiiId: 'b',
+    strength: 'medium',
+    createdBy: null,
+    createdAt: '2026-07-22T00:00:00.000Z',
+    updatedAt: '2026-07-22T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('shouldShowConnectionOverlay', () => {
   it('shows only in custom mode on desktop bubble with selection', () => {
@@ -175,5 +194,42 @@ describe('countDirectConnections', () => {
     };
     expect(countDirectConnections(filter)).toBe(filterVisibleConnections(filter).length);
     expect(countDirectConnections(filter)).toBe(2);
+  });
+});
+
+describe('buildDirectConnectionListItems', () => {
+  it('returns peer ids for 1-hop connections regardless of direction', () => {
+    const items = buildDirectConnectionListItems({
+      connections: baseConnections,
+      selectedBubbleId: 'h2',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: new Set(['h1', 'h2', 'h3']),
+    });
+
+    expect(items.map((item) => item.peerHossiiId).sort()).toEqual(['h1', 'h3']);
+    expect(items.find((item) => item.peerHossiiId === 'h1')?.strength).toBe('soft');
+  });
+});
+
+describe('buildConnectionBadgeCounts', () => {
+  it('counts direct connections for visible hossiis in active pane only', () => {
+    const counts = buildConnectionBadgeCounts(
+      [
+        makeConnection({ id: '1', sourceHossiiId: 'a', targetHossiiId: 'b' }),
+        makeConnection({
+          id: '2',
+          paneId: 'pane-2',
+          sourceHossiiId: 'a',
+          targetHossiiId: 'c',
+        }),
+        makeConnection({ id: '3', sourceHossiiId: 'b', targetHossiiId: 'c' }),
+      ],
+      'pane-1',
+      new Set(['a', 'b', 'c']),
+    );
+
+    expect(counts.get('a')).toBe(1);
+    expect(counts.get('b')).toBe(2);
+    expect(counts.get('c')).toBe(1);
   });
 });

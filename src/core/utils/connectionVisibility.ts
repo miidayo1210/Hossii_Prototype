@@ -43,3 +43,53 @@ export function filterVisibleConnections({
 export function countDirectConnections(filter: VisibleConnectionFilter): number {
   return filterVisibleConnections(filter).length;
 }
+
+export type DirectConnectionListItem = {
+  connectionId: string;
+  peerHossiiId: string;
+  strength: HossiiConnection['strength'];
+};
+
+/** つながり N 一覧: 1-hop・方向非依存の peer 一覧 */
+export function buildDirectConnectionListItems(
+  filter: VisibleConnectionFilter,
+): DirectConnectionListItem[] {
+  return filterVisibleConnections(filter).map((connection) => ({
+    connectionId: connection.id,
+    peerHossiiId:
+      connection.sourceHossiiId === filter.selectedBubbleId
+        ? connection.targetHossiiId
+        : connection.sourceHossiiId,
+    strength: connection.strength,
+  }));
+}
+
+/** 通常時 ✦N: 表示中 Hossii ごとの 1 階層接続件数 */
+export function buildConnectionBadgeCounts(
+  connections: HossiiConnection[],
+  activePaneId: string,
+  visibleHossiiIds: ReadonlySet<string>,
+): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const connection of connections) {
+    if (connection.paneId !== activePaneId) continue;
+    if (
+      !visibleHossiiIds.has(connection.sourceHossiiId) ||
+      !visibleHossiiIds.has(connection.targetHossiiId)
+    ) {
+      continue;
+    }
+
+    counts.set(
+      connection.sourceHossiiId,
+      (counts.get(connection.sourceHossiiId) ?? 0) + 1,
+    );
+    counts.set(
+      connection.targetHossiiId,
+      (counts.get(connection.targetHossiiId) ?? 0) + 1,
+    );
+  }
+
+  return counts;
+}
