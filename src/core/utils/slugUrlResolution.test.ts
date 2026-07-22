@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isSlugUrlStillResolving,
   parseSpaceSlugFromPathname,
+  shouldResetSlugHandlingOnAuthRestore,
 } from './slugUrlResolution';
 
 describe('parseSpaceSlugFromPathname', () => {
@@ -78,5 +79,19 @@ describe('isSlugUrlStillResolving', () => {
         isOnSlugPath: false,
       }),
     ).toBe(false);
+  });
+});
+
+describe('shouldResetSlugHandlingOnAuthRestore', () => {
+  it('is true when auth restores on slug path', () => {
+    expect(shouldResetSlugHandlingOnAuthRestore(null, { uid: 'user-1' }, true)).toBe(true);
+  });
+
+  it('is false when already logged in or not on slug path', () => {
+    expect(shouldResetSlugHandlingOnAuthRestore({ uid: 'user-1' }, { uid: 'user-1' }, true)).toBe(
+      false,
+    );
+    expect(shouldResetSlugHandlingOnAuthRestore(null, { uid: 'user-1' }, false)).toBe(false);
+    expect(shouldResetSlugHandlingOnAuthRestore(null, null, true)).toBe(false);
   });
 });
