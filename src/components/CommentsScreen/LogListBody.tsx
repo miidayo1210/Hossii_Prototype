@@ -9,7 +9,11 @@ import { FilterBar } from '../FilterBar/FilterBar';
 import { useSpaceSettings } from '../../core/hooks/useSpaceSettings';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useAuth } from '../../core/contexts/useAuth';
-import { fetchLikedIds, mutateLike } from '../../core/utils/likesApi';
+import { fetchLikedIds, mutateLike, type LikeMutationResult } from '../../core/utils/likesApi';
+import {
+  LIKE_MUTATION_ERROR_MESSAGE,
+  previewOptimisticLikeState,
+} from '../../core/utils/likeMutationUi';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { resolveLogScopeSelection } from '../../core/utils/resolveLogScopeSelection';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
@@ -27,30 +31,66 @@ import styles from './CommentsScreen.module.css';
 type LikeButtonProps = {
   hossii: Hossii;
   likedByMe: boolean;
-  onLike: (id: string) => Promise<void>;
+  isLoggedIn: boolean;
+  onLike: (id: string) => Promise<LikeMutationResult>;
 };
 
-const LikeButton = ({ hossii, likedByMe, onLike }: LikeButtonProps) => {
+const LikeButton = ({ hossii, likedByMe, isLoggedIn, onLike }: LikeButtonProps) => {
   const [pending, setPending] = useState(false);
-  const displayCount = Math.max(0, hossii.likeCount ?? 0);
+  const [localLiked, setLocalLiked] = useState(likedByMe);
+  const [countDelta, setCountDelta] = useState(0);
+  const [likeError, setLikeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalLiked(likedByMe);
+  }, [likedByMe]);
+
+  useEffect(() => {
+    setCountDelta(0);
+  }, [hossii.likeCount]);
+
+  const displayCount = Math.max(0, (hossii.likeCount ?? 0) + countDelta);
 
   return (
-    <button
-      className={`${styles.likeButton} ${likedByMe ? styles.likeButtonActive : ''}`}
-      disabled={pending}
-      onClick={async () => {
-        if (pending) return;
-        setPending(true);
-        try {
-          await onLike(hossii.id);
-        } finally {
-          setPending(false);
-        }
-      }}
-      aria-label={likedByMe ? 'いいねを取り消す' : 'いいね'}
-    >
-      {likedByMe ? '❤️' : '🤍'} {displayCount}
-    </button>
+    <span className={styles.likeButtonWrap}>
+      <button
+        className={`${styles.likeButton} ${localLiked ? styles.likeButtonActive : ''}`}
+        disabled={pending}
+        onClick={async () => {
+          if (pending) return;
+          const wasLiked = localLiked;
+          const prevDelta = countDelta;
+          const preview = previewOptimisticLikeState({
+            isLoggedIn,
+            wasLiked,
+            baseCount: hossii.likeCount ?? 0,
+          });
+          setLocalLiked(preview.liked);
+          setCountDelta((prev) => prev + (preview.count - (hossii.likeCount ?? 0)));
+          setLikeError(null);
+          setPending(true);
+          try {
+            const result = await onLike(hossii.id);
+            setLocalLiked(isLoggedIn ? result.liked : true);
+            setCountDelta(result.likeCount - (hossii.likeCount ?? 0));
+          } catch {
+            setLocalLiked(wasLiked);
+            setCountDelta(prevDelta);
+            setLikeError(LIKE_MUTATION_ERROR_MESSAGE);
+          } finally {
+            setPending(false);
+          }
+        }}
+        aria-label={isLoggedIn && localLiked ? 'いいねを取り消す' : 'いいね'}
+      >
+        {localLiked ? '❤️' : '🤍'} {displayCount}
+      </button>
+      {likeError && (
+        <span className={styles.likeError} role="alert">
+          {likeError}
+        </span>
+      )}
+    </span>
   );
 };
 
@@ -84,6 +124,8 @@ export type LogListBodyProps = {
   onOpenQuickPost?: () => void;
   /** 112: アーカイブ中は本人操作・クイック投稿導線を出さない */
   readOnlyArchived?: boolean;
+  /** いいね成功後、ストア外 hossiis（訪問モード等）の likeCount を同期する */
+  onLikeCountUpdated?: (id: string, likeCount: number) => void;
   /** Phase 9B: #comments の Pane フィルタ（panelMode では未使用） */
   paneFilter?: CommentsPaneFilter;
   visiblePanes?: SpacePane[];
@@ -119,6 +161,7 @@ export function LogListBody({
   onMoveHossiiToPane,
   movePaneBusyId = null,
   readOnlyArchived = false,
+  onLikeCountUpdated,
 }: LogListBodyProps) {
   const { currentUser } = useAuth();
   const { state, hideHossii, getActiveNickname, getAuthorId, myAuthorshipIds, myAuthorshipIdsStatus, postAuthorDisplayNames, updateHossiiLikeCountAction } =
@@ -207,8 +250,7 @@ export function LogListBody({
     if (!currentUser || !likesEnabled || scopedHossiis.length === 0) return;
     const ids = scopedHossiis.map((h) => h.id);
     fetchLikedIds(currentUser.uid, ids).then(setLikedIds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid, likesEnabled, spaceId, logScope]);
+  }, [currentUser, likesEnabled, spaceId, logScope, scopedHossiis]);
 
   const handleHideFromLog = useCallback(
     (id: string) => {
@@ -220,22 +262,26 @@ export function LogListBody({
   );
 
   const handleLike = useCallback(
-    async (hossiiId: string) => {
-      if (!currentUser) return;
+    async (hossiiId: string): Promise<LikeMutationResult> => {
       try {
-        const result = await mutateLike(hossiiId, currentUser.uid);
+        const result = await mutateLike(hossiiId, currentUser?.uid);
         updateHossiiLikeCountAction(hossiiId, result.likeCount);
-        setLikedIds((prev) => {
-          const next = new Set(prev);
-          if (result.liked) next.add(hossiiId);
-          else next.delete(hossiiId);
-          return next;
-        });
+        if (currentUser) {
+          setLikedIds((prev) => {
+            const next = new Set(prev);
+            if (result.liked) next.add(hossiiId);
+            else next.delete(hossiiId);
+            return next;
+          });
+        }
+        onLikeCountUpdated?.(hossiiId, result.likeCount);
+        return result;
       } catch (err) {
         console.error('[LogListBody] mutateLike error:', err);
+        throw err;
       }
     },
-    [currentUser, updateHossiiLikeCountAction]
+    [currentUser, updateHossiiLikeCountAction, onLikeCountUpdated]
   );
 
   const sortedHossiis = useMemo(() => {
@@ -515,6 +561,7 @@ export function LogListBody({
                           <LikeButton
                             hossii={hossii}
                             likedByMe={likedIds.has(hossii.id)}
+                            isLoggedIn={isAuthenticatedUser}
                             onLike={handleLike}
                           />
                         ) : (

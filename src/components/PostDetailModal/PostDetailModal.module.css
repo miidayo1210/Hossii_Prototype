@@ -142,6 +142,21 @@
   font-weight: 600;
 }
 
+.likeButtonWrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.likeError {
+  font-size: 0.65rem;
+  line-height: 1.2;
+  color: #b45309;
+  max-width: 8rem;
+  text-align: right;
+}
+
 /* Mobile: Full-height modal from bottom */
 @media (max-width: 768px) {
   .overlay {

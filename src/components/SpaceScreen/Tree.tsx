@@ -22,6 +22,11 @@ import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisp
 import { PostedNameLabel } from '../common/PostedNameLabel';
 import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
 import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
+import { useAuth } from '../../core/contexts/useAuth';
+import {
+  LIKE_MUTATION_ERROR_MESSAGE,
+  previewOptimisticLikeState,
+} from '../../core/utils/likeMutationUi';
 import styles from './SpaceScreen.module.css';
 
 const BUBBLE_COLORS = BUBBLE_INLINE_EDIT_COLORS;
@@ -74,7 +79,7 @@ type BubbleProps = {
   /** SpaceSettings.features.likesEnabled が ON の場合のみ true */
   likesEnabled?: boolean;
   /** いいねトグル時のコールバック（楽観的更新は Bubble 内で行い、Supabase 処理は親で行う） */
-  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
+  onLike?: (id: string) => Promise<LikeMutationResult>;
   /** カスタム吹き出し形状PNGのパス（指定するとmask-imageでPNG形状に切り抜かれる） */
   bubbleShapePng?: string;
   /** 投稿順レイアウト時: 左上基準でスケール・見た目を揃える */
@@ -141,10 +146,13 @@ export function BubbleInner({
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [dragScale, setDragScale] = useState<number | null>(null);
 
+  const { currentUser } = useAuth();
+  const isLoggedIn = !!currentUser;
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isBouncing, setIsBouncing] = useState(false);
   const [likePending, setLikePending] = useState(false);
+  const [likeError, setLikeError] = useState<string | null>(null);
   // 案A: 吹き出しホバー中フラグ（0件時はホバーでのみいいねバッジを表示）
   const [isBubbleHovered, setIsBubbleHovered] = useState(false);
   /** リサイズ Phase A: 切り詰め解除して全文を吹き出し内に表示 */
@@ -715,11 +723,20 @@ export function BubbleInner({
             onPointerDown={(e) => e.stopPropagation()}
             onClick={async (e) => {
               e.stopPropagation();
-              if (isBouncing || likePending) return;
+              if (isBouncing || likePending || !onLike) return;
+              const prevCount = localLikeCount;
+              const prevLiked = isLiked;
+              const preview = previewOptimisticLikeState({
+                isLoggedIn,
+                wasLiked: isLiked,
+                baseCount: localLikeCount,
+              });
+              setLocalLikeCount(preview.count);
+              setIsLiked(preview.liked);
+              setLikeError(null);
               setLikePending(true);
               try {
-                const result = await onLike?.(hossii.id);
-                if (!result) return;
+                const result = await onLike(hossii.id);
                 setLocalLikeCount(result.likeCount);
                 setIsLiked(result.liked);
                 if (result.liked) {
@@ -735,6 +752,10 @@ export function BubbleInner({
                   setLikeParticles(particles);
                   setTimeout(() => setLikeParticles([]), 750);
                 }
+              } catch {
+                setLocalLikeCount(prevCount);
+                setIsLiked(prevLiked);
+                setLikeError(LIKE_MUTATION_ERROR_MESSAGE);
               } finally {
                 setLikePending(false);
               }
@@ -743,6 +764,11 @@ export function BubbleInner({
           >
             {isLiked ? '❤️' : '🤍'}{localLikeCount > 0 && <span>{localLikeCount}</span>}
           </button>
+          {likeError && (
+            <span className={styles.likeFloatingError} role="alert">
+              {likeError}
+            </span>
+          )}
         </div>
       )}
 

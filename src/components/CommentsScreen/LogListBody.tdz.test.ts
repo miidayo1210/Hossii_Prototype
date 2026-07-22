@@ -31,6 +31,7 @@ vi.mock('../../core/hooks/useHossiiStore', () => ({
     myAuthorshipIds: mockState.myAuthorshipIds,
     myAuthorshipIdsStatus: mockState.myAuthorshipIdsStatus,
     postAuthorDisplayNames: mockState.postAuthorDisplayNames,
+    updateHossiiLikeCountAction: () => {},
   }),
 }));
 

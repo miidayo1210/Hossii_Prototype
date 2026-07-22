@@ -7,6 +7,10 @@ import { getEmotionColor } from '../../core/assets/emotionColors';
 import { renderHossiiText } from '../../core/utils/render';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { fetchLikedIds, type LikeMutationResult } from '../../core/utils/likesApi';
+import {
+  LIKE_MUTATION_ERROR_MESSAGE,
+  previewOptimisticLikeState,
+} from '../../core/utils/likeMutationUi';
 import { useAuth } from '../../core/contexts/useAuth';
 import styles from './AuthorTimelineModal.module.css';
 
@@ -25,15 +29,28 @@ type PostRowProps = {
   post: Hossii;
   likesEnabled?: boolean;
   likedByMe?: boolean;
-  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
+  isLoggedIn?: boolean;
+  onLike?: (id: string) => Promise<LikeMutationResult>;
   onSelect: (id: string) => void;
 };
 
-function TimelinePostRow({ post, likesEnabled, likedByMe = false, onLike, onSelect }: PostRowProps) {
+function TimelinePostRow({
+  post,
+  likesEnabled,
+  likedByMe = false,
+  isLoggedIn = false,
+  onLike,
+  onSelect,
+}: PostRowProps) {
   const [localLikeCount, setLocalLikeCount] = useState(post.likeCount ?? 0);
   const [isLiked, setIsLiked] = useState(likedByMe);
   const [likePending, setLikePending] = useState(false);
+  const [likeError, setLikeError] = useState<string | null>(null);
   const heartLiked = isLiked || likedByMe;
+
+  useEffect(() => {
+    setIsLiked(likedByMe);
+  }, [likedByMe]);
 
   useEffect(() => {
     queueMicrotask(() => setLocalLikeCount(post.likeCount ?? 0));
@@ -42,12 +59,25 @@ function TimelinePostRow({ post, likesEnabled, likedByMe = false, onLike, onSele
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onLike || likePending) return;
+    const prevCount = localLikeCount;
+    const prevLiked = isLiked;
+    const preview = previewOptimisticLikeState({
+      isLoggedIn,
+      wasLiked: heartLiked,
+      baseCount: localLikeCount,
+    });
+    setLocalLikeCount(preview.count);
+    setIsLiked(preview.liked);
+    setLikeError(null);
     setLikePending(true);
     try {
       const result = await onLike(post.id);
-      if (!result) return;
       setLocalLikeCount(result.likeCount);
       setIsLiked(result.liked);
+    } catch {
+      setLocalLikeCount(prevCount);
+      setIsLiked(prevLiked);
+      setLikeError(LIKE_MUTATION_ERROR_MESSAGE);
     } finally {
       setLikePending(false);
     }
@@ -76,16 +106,23 @@ function TimelinePostRow({ post, likesEnabled, likedByMe = false, onLike, onSele
       )}
       {likesEnabled && onLike && (
         <div className={styles.rowFooter}>
-          <button
-            type="button"
-            className={`${styles.likeButton} ${heartLiked ? styles.likeButtonActive : ''}`}
-            onClick={handleLike}
-            disabled={likePending}
-            aria-label="いいね"
-          >
-            {heartLiked ? '❤️' : '🤍'}
-            {localLikeCount > 0 && <span>{localLikeCount}</span>}
-          </button>
+          <span className={styles.likeButtonWrap}>
+            <button
+              type="button"
+              className={`${styles.likeButton} ${heartLiked ? styles.likeButtonActive : ''}`}
+              onClick={handleLike}
+              disabled={likePending}
+              aria-label="いいね"
+            >
+              {heartLiked ? '❤️' : '🤍'}
+              {localLikeCount > 0 && <span>{localLikeCount}</span>}
+            </button>
+            {likeError && (
+              <span className={styles.likeError} role="alert">
+                {likeError}
+              </span>
+            )}
+          </span>
         </div>
       )}
     </div>
@@ -99,7 +136,7 @@ type Props = {
   onClose: () => void;
   onSelectPost: (id: string) => void;
   likesEnabled?: boolean;
-  onLike?: (id: string) => Promise<LikeMutationResult | null | void>;
+  onLike?: (id: string) => Promise<LikeMutationResult>;
   isMobilePortrait?: boolean;
 };
 
@@ -186,6 +223,7 @@ export const AuthorTimelineModal = ({
                 post={post}
                 likesEnabled={likesEnabled}
                 likedByMe={likedIds.has(post.id)}
+                isLoggedIn={!!currentUser}
                 onLike={onLike}
                 onSelect={onSelectPost}
               />
