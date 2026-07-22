@@ -22,6 +22,8 @@ export type ConnectionOverlayProps = {
   layoutMode: LayoutMode;
   activePaneId: string;
   visibleHossiiIds: ReadonlySet<string>;
+  /** QA / #55 メニュー連携用（overlay 描画件数と一致） */
+  directConnectionCount?: number;
 };
 
 type ConnectionPathPairProps = {
@@ -94,6 +96,7 @@ export function ConnectionOverlay({
   layoutMode,
   activePaneId,
   visibleHossiiIds,
+  directConnectionCount,
 }: ConnectionOverlayProps) {
   const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
   const pathRegistryRef = useRef<Map<string, ConnectionPathRefs>>(new Map());
@@ -115,9 +118,11 @@ export function ConnectionOverlay({
     });
   }, [gateOpen, connections, selectedBubbleId, activePaneId, visibleHossiiIds]);
 
-  useEffect(() => {
-    setHoveredConnectionId(null);
-  }, [activePaneId, selectedBubbleId]);
+  const effectiveHoveredConnectionId =
+    hoveredConnectionId != null &&
+    visibleConnections.some((connection) => connection.id === hoveredConnectionId)
+      ? hoveredConnectionId
+      : null;
 
   const registerPathRefs = useCallback((connectionId: string, refs: ConnectionPathRefs | null) => {
     if (!refs) {
@@ -142,6 +147,7 @@ export function ConnectionOverlay({
     <div
       className={styles.overlay}
       data-connection-overlay
+      data-direct-connection-count={directConnectionCount ?? visibleConnections.length}
       data-space-export="exclude"
       aria-hidden
     >
@@ -150,7 +156,7 @@ export function ConnectionOverlay({
           <ConnectionPathPair
             key={connection.id}
             connection={connection}
-            isHovered={hoveredConnectionId === connection.id}
+            isHovered={effectiveHoveredConnectionId === connection.id}
             onHoverChange={setHoveredConnectionId}
             onRegister={registerPathRefs}
           />

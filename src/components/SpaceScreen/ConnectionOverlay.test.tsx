@@ -13,6 +13,9 @@ const connections: HossiiConnection[] = [
     sourceHossiiId: 'h1',
     targetHossiiId: 'h2',
     strength: 'medium',
+    createdBy: null,
+    createdAt: '2026-07-22T00:00:00Z',
+    updatedAt: '2026-07-22T00:00:00Z',
   },
 ];
 

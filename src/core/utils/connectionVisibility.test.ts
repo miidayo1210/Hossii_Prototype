@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { HossiiConnection } from '../types/hossiiConnection';
 import {
+  countDirectConnections,
   filterVisibleConnections,
   shouldShowConnectionOverlay,
 } from './connectionVisibility';
+
+const connectionMeta = {
+  createdBy: null,
+  createdAt: '2026-07-22T00:00:00Z',
+  updatedAt: '2026-07-22T00:00:00Z',
+};
 
 const baseConnections: HossiiConnection[] = [
   {
@@ -13,6 +20,7 @@ const baseConnections: HossiiConnection[] = [
     sourceHossiiId: 'h1',
     targetHossiiId: 'h2',
     strength: 'soft',
+    ...connectionMeta,
   },
   {
     id: 'c2',
@@ -21,6 +29,7 @@ const baseConnections: HossiiConnection[] = [
     sourceHossiiId: 'h2',
     targetHossiiId: 'h3',
     strength: 'medium',
+    ...connectionMeta,
   },
   {
     id: 'c3',
@@ -29,6 +38,7 @@ const baseConnections: HossiiConnection[] = [
     sourceHossiiId: 'h1',
     targetHossiiId: 'h2',
     strength: 'strong',
+    ...connectionMeta,
   },
 ];
 
@@ -141,5 +151,20 @@ describe('filterVisibleConnections', () => {
       visibleHossiiIds: new Set(['h2']),
     });
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('countDirectConnections', () => {
+  const visible = new Set(['h1', 'h2', 'h3']);
+
+  it('matches filterVisibleConnections length', () => {
+    const filter = {
+      connections: baseConnections,
+      selectedBubbleId: 'h2',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: visible,
+    };
+    expect(countDirectConnections(filter)).toBe(filterVisibleConnections(filter).length);
+    expect(countDirectConnections(filter)).toBe(2);
   });
 });

@@ -1628,7 +1628,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     [observeBubbleArea],
   );
 
-  const connectionOverlayProps = useConnectionOverlayInputs({
+  const { overlayProps: connectionOverlayProps } = useConnectionOverlayInputs({
     bubbleAreaRef,
     spaceId: contentSpaceId ?? activeSpaceId ?? '',
     paneId: connectionActivePaneId,

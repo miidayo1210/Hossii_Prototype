@@ -47,3 +47,8 @@ export function filterVisibleConnections({
     );
   });
 }
+
+/** 選択 root から 1 階層の糸件数（✦N 表示の正本） */
+export function countDirectConnections(filter: VisibleConnectionFilter): number {
+  return filterVisibleConnections(filter).length;
+}

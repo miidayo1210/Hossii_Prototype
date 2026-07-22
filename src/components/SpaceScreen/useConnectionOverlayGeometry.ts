@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { HossiiConnection } from '../../core/types/hossiiConnection';
 import {
   domRectToAxisRect,
@@ -80,7 +80,10 @@ export function useConnectionOverlayGeometry({
   pathRegistryRef,
 }: UseConnectionOverlayGeometryOptions): void {
   const connectionsRef = useRef(connections);
-  connectionsRef.current = connections;
+
+  useLayoutEffect(() => {
+    connectionsRef.current = connections;
+  }, [connections]);
 
   const syncPaths = useCallback(() => {
     const bubbleArea = bubbleAreaRef.current;
