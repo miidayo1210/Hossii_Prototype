@@ -1,0 +1,134 @@
+import { describe, expect, it } from 'vitest';
+import type { HossiiConnection } from '../types/hossiiConnection';
+import {
+  filterVisibleConnections,
+  shouldShowConnectionOverlay,
+} from './connectionVisibility';
+
+const baseConnections: HossiiConnection[] = [
+  {
+    id: 'c1',
+    spaceId: 's1',
+    paneId: 'pane-a',
+    sourceHossiiId: 'h1',
+    targetHossiiId: 'h2',
+    strength: 'soft',
+  },
+  {
+    id: 'c2',
+    spaceId: 's1',
+    paneId: 'pane-a',
+    sourceHossiiId: 'h2',
+    targetHossiiId: 'h3',
+    strength: 'medium',
+  },
+  {
+    id: 'c3',
+    spaceId: 's1',
+    paneId: 'pane-b',
+    sourceHossiiId: 'h1',
+    targetHossiiId: 'h2',
+    strength: 'strong',
+  },
+];
+
+describe('shouldShowConnectionOverlay', () => {
+  it('shows only in custom mode on desktop with selection', () => {
+    expect(
+      shouldShowConnectionOverlay({
+        presentationMode: 'custom',
+        isMobile: false,
+        layoutMode: 'random',
+        selectedBubbleId: 'h1',
+      }),
+    ).toBe(true);
+  });
+
+  it('hides in star mode', () => {
+    expect(
+      shouldShowConnectionOverlay({
+        presentationMode: 'stars',
+        isMobile: false,
+        layoutMode: 'random',
+        selectedBubbleId: 'h1',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides on mobile', () => {
+    expect(
+      shouldShowConnectionOverlay({
+        presentationMode: 'custom',
+        isMobile: true,
+        layoutMode: 'random',
+        selectedBubbleId: 'h1',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides in byAuthor layout', () => {
+    expect(
+      shouldShowConnectionOverlay({
+        presentationMode: 'custom',
+        isMobile: false,
+        layoutMode: 'byAuthor',
+        selectedBubbleId: 'h1',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides when nothing is selected', () => {
+    expect(
+      shouldShowConnectionOverlay({
+        presentationMode: 'custom',
+        isMobile: false,
+        layoutMode: 'ordered',
+        selectedBubbleId: null,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('filterVisibleConnections', () => {
+  const visible = new Set(['h1', 'h2', 'h3']);
+
+  it('returns only direct connections from selected root (1 hop)', () => {
+    const result = filterVisibleConnections({
+      connections: baseConnections,
+      selectedBubbleId: 'h1',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: visible,
+    });
+    expect(result.map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('hides unrelated connections (2 hops away)', () => {
+    const result = filterVisibleConnections({
+      connections: baseConnections,
+      selectedBubbleId: 'h1',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: visible,
+    });
+    expect(result.some((c) => c.id === 'c2')).toBe(false);
+  });
+
+  it('hides connections from other panes', () => {
+    const result = filterVisibleConnections({
+      connections: baseConnections,
+      selectedBubbleId: 'h1',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: visible,
+    });
+    expect(result.some((c) => c.id === 'c3')).toBe(false);
+  });
+
+  it('hides when endpoint hossii is not visible', () => {
+    const result = filterVisibleConnections({
+      connections: baseConnections,
+      selectedBubbleId: 'h2',
+      activePaneId: 'pane-a',
+      visibleHossiiIds: new Set(['h2']),
+    });
+    expect(result).toHaveLength(0);
+  });
+});

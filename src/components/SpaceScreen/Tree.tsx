@@ -516,6 +516,7 @@ export function BubbleInner({
       className={classNames}
       style={bubbleStyle}
       data-hossii-bubble
+      data-hossii-id={hossii.id}
       data-hossii-post-kind={isCanvasPost ? 'canvas' : 'bubble'}
       onClick={() => {
         if (!dragStateRef.current?.moved) {
@@ -702,6 +703,7 @@ export function BubbleInner({
           0件: ホバー時のみ表示（案A）、1件以上: 常時表示 */}
       {likesEnabled && (localLikeCount > 0 || isBubbleHovered) && (
         <div
+          data-like-badge
           className={[
             styles.likeFloatingBadge,
             isLiked ? styles.likeFloatingBadgeActive : '',

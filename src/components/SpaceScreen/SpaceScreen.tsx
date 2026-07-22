@@ -70,7 +70,9 @@ import {
   SpaceExportError,
   SPACE_EXPORT_MAX_BUBBLES,
 } from '../../core/utils/spaceCanvasExport';
+import { buildDevMockHossiiConnections } from '../../demo/mockHossiiConnections';
 import { Bubble } from './Tree';
+import { ConnectionOverlay } from './ConnectionOverlay';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { StarView } from './StarView';
 import { StarHoverPreview } from './StarHoverPreview';
@@ -292,6 +294,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     }
     return paneContext;
   }, [personalViewSpaceId, contentSpaceId, paneContext]);
+
+  const connectionActivePaneId =
+    contentPaneContext?.activePaneId ?? contextActivePaneId ?? defaultPane?.id ?? '';
 
   const screenQueryKey = useMemo(() => {
     if (!contentSpaceId || !contentPaneContext) return null;
@@ -1439,6 +1444,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const { filteredHossiis, tagCounts } = pipeline;
 
+  const visibleHossiiIds = useMemo(
+    () => new Set(filteredHossiis.map((h) => h.id)),
+    [filteredHossiis],
+  );
+
+  const devMockConnections = useMemo(() => {
+    const spaceId = contentSpaceId ?? activeSpaceId ?? '';
+    if (!spaceId || !connectionActivePaneId) return [];
+    return buildDevMockHossiiConnections(
+      spaceId,
+      connectionActivePaneId,
+      filteredHossiis.map((h) => h.id),
+    );
+  }, [contentSpaceId, activeSpaceId, connectionActivePaneId, filteredHossiis]);
+
   // 吹き出しごとに本人操作（編集/公開範囲/削除）を出せるか。
   // authorship を正本にし、ゲスト投稿・他人投稿・authorship 未確定では出さない。
   // presentationMode に依存せず、custom / ordered / random すべてで機能する。
@@ -2237,6 +2257,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             </button>
           </div>
         )}
+        <ConnectionOverlay
+          bubbleAreaRef={bubbleAreaRef}
+          connections={devMockConnections}
+          selectedBubbleId={selectedBubbleId}
+          presentationMode={presentationMode}
+          isMobile={isMobile}
+          layoutMode={layoutMode}
+          activePaneId={connectionActivePaneId}
+          visibleHossiiIds={visibleHossiiIds}
+        />
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
               const pos = authorClusterPositions[index] ?? { x: 8, y: 22 };
