@@ -110,6 +110,12 @@ type BubbleProps = {
   onConnect?: () => void;
   connectionCount?: number;
   onConnectionsClick?: () => void;
+  /** 通常時 ✦N（選択中は overlay が正本のため非表示） */
+  connectionBadgeCount?: number;
+  /** つなぎ先選択中の候補ハイライト */
+  isConnectionPickTarget?: boolean;
+  /** 糸編集中はメニュー toggle を抑止 */
+  suppressActionMenuToggle?: boolean;
 };
 
 export function BubbleInner({
@@ -145,6 +151,9 @@ export function BubbleInner({
   onConnect,
   connectionCount,
   onConnectionsClick,
+  connectionBadgeCount,
+  isConnectionPickTarget = false,
+  suppressActionMenuToggle = false,
 }: BubbleProps) {
   const { ref: visibilityRef, level: visibleAnimLevel } = useVisibleAnimationLevel(
     animationLevel,
@@ -543,7 +552,9 @@ export function BubbleInner({
         : bubbleShapePng
           ? styles.bubbleSelectedShape
           : styles.bubbleSelected
-      : '',
+      : isConnectionPickTarget
+        ? styles.bubbleConnectionPickTarget
+        : '',
     dragPos ? styles.bubbleDragging : '',
     isRecentHighlight &&
       (isCanvasPost
@@ -562,6 +573,7 @@ export function BubbleInner({
       className={classNames}
       style={bubbleStyle}
       data-hossii-bubble
+      data-hossii-id={hossii.id}
       data-hossii-post-kind={isCanvasPost ? 'canvas' : 'bubble'}
       onClick={() => {
         if (wasDraggingRef.current || isDragging) return;
@@ -569,7 +581,7 @@ export function BubbleInner({
           onSelect?.(hossii.id);
           return;
         }
-        if (actionMenuEnabled) {
+        if (actionMenuEnabled && !suppressActionMenuToggle) {
           onActionMenuToggle?.();
           return;
         }
@@ -581,6 +593,15 @@ export function BubbleInner({
       }}
       onMouseLeave={() => setIsBubbleHovered(false)}
     >
+      {connectionBadgeCount != null && connectionBadgeCount > 0 && (
+        <span
+          className={styles.connectionBadge}
+          data-connection-badge
+          aria-hidden
+        >
+          ✦{connectionBadgeCount}
+        </span>
+      )}
       {showPinUi && onPinToggle && (isBubbleHovered || isPinned) && (
         <PinButton
           className={styles.bubblePinButton}
@@ -754,6 +775,7 @@ export function BubbleInner({
           0件: ホバー時のみ表示（案A）、1件以上: 常時表示 */}
       {likesEnabled && (localLikeCount > 0 || isBubbleHovered) && (
         <div
+          data-like-badge
           className={[
             styles.likeFloatingBadge,
             isLiked ? styles.likeFloatingBadgeActive : '',
@@ -951,7 +973,10 @@ function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
     prev.onViewDetail === next.onViewDetail &&
     prev.onConnect === next.onConnect &&
     prev.connectionCount === next.connectionCount &&
-    prev.onConnectionsClick === next.onConnectionsClick
+    prev.onConnectionsClick === next.onConnectionsClick &&
+    prev.connectionBadgeCount === next.connectionBadgeCount &&
+    prev.isConnectionPickTarget === next.isConnectionPickTarget &&
+    prev.suppressActionMenuToggle === next.suppressActionMenuToggle
   );
 }
 

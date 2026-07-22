@@ -72,6 +72,10 @@ import {
 } from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
 import { useCustomBubbleActionMenu } from './useCustomBubbleActionMenu';
+import { ConnectionOverlay } from './ConnectionOverlay';
+import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
+import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
+import { ConnectionEditorPortals } from './ConnectionEditorPortals';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { StarView } from './StarView';
 import { StarHoverPreview } from './StarHoverPreview';
@@ -293,6 +297,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     }
     return paneContext;
   }, [personalViewSpaceId, contentSpaceId, paneContext]);
+
+  const connectionActivePaneId =
+    contentPaneContext?.activePaneId ?? contextActivePaneId ?? defaultPane?.id ?? '';
 
   const screenQueryKey = useMemo(() => {
     if (!contentSpaceId || !contentPaneContext) return null;
@@ -1421,13 +1428,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
 
   const {
     resetBubbleInteraction,
-    handleBubbleSelect,
-    handleBubbleDeselect,
+    closeBubbleActionMenu,
     getBubbleActionMenuProps,
   } = useCustomBubbleActionMenu({
     isMobile,
     presentationMode,
     layoutMode,
+    viewMode,
     isContentArchived,
     selectedBubbleId,
     setSelectedBubbleId,
@@ -1627,6 +1634,47 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     },
     [observeBubbleArea],
   );
+
+  const connectionOverlayInputs = useConnectionOverlayInputs({
+    bubbleAreaRef,
+    spaceId: contentSpaceId ?? activeSpaceId ?? '',
+    paneId: connectionActivePaneId,
+    filteredHossiis,
+    selectedBubbleId,
+    presentationMode,
+    renderAsStar,
+    viewMode,
+    layoutMode,
+  });
+
+  const {
+    overlayProps: connectionOverlayProps,
+    resetConnectionState,
+    handleBubbleSelect,
+    handleBubbleDeselect,
+    getIntegratedBubbleActionMenuProps,
+    getConnectionBadgeCount,
+    isPickingTarget,
+    editor: connectionEditor,
+    canWriteConnections,
+  } = useSpaceConnectionIntegration({
+    currentUser,
+    activeSpace: contentSpace ?? activeSpace,
+    isContentArchived,
+    spaceId: contentSpaceId ?? activeSpaceId ?? '',
+    paneId: connectionActivePaneId,
+    selectedBubbleId,
+    setSelectedBubbleId,
+    setActiveBubbleId,
+    resetBubbleInteraction,
+    closeBubbleActionMenu,
+    getBubbleActionMenuProps,
+    overlayInputs: connectionOverlayInputs,
+    layoutMode,
+    viewMode,
+    presentationMode,
+    contextActivePaneId,
+  });
 
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
@@ -2212,9 +2260,11 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         onDoubleClick={handleDoubleClick}
         onPointerDown={(e) => {
           const target = e.target as HTMLElement;
-          if (!target.closest('[data-hossii-bubble]')) {
-            resetBubbleInteraction();
-          }
+          if (target.closest('[data-hossii-bubble]')) return;
+          if (target.closest('[data-connection-overlay]')) return;
+          if (target.closest('[data-connection-editor-popover]')) return;
+          if (target.closest('[data-bubble-action-menu]')) return;
+          resetConnectionState();
         }}
       >
         <PinTray
@@ -2242,6 +2292,12 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             </button>
           </div>
         )}
+        <ConnectionOverlay {...connectionOverlayProps} />
+        <ConnectionEditorPortals
+          editor={connectionEditor}
+          selectedBubbleId={selectedBubbleId}
+          canWriteConnections={canWriteConnections}
+        />
         {layoutMode === 'byAuthor'
           ? authorGroups.map((group, index) => {
               const pos = authorClusterPositions[index] ?? { x: 8, y: 22 };
@@ -2361,7 +2417,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 animationLevel={animationLevel}
                 canManageOwn={canManageOwnHossii(hossii.id)}
                 onOwnerDeleted={handleBubbleDeselect}
-                {...getBubbleActionMenuProps(hossii.id, isThisSelected)}
+                connectionBadgeCount={getConnectionBadgeCount(hossii.id)}
+                isConnectionPickTarget={
+                  isPickingTarget && !isThisSelected && connectionEditor.sourceId !== hossii.id
+                }
+                suppressActionMenuToggle={
+                  connectionEditor.phase !== 'idle' && connectionEditor.phase !== 'error'
+                }
+                {...getIntegratedBubbleActionMenuProps(hossii.id, isThisSelected)}
               />
               </div>
             );

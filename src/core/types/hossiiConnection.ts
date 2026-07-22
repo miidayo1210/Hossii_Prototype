@@ -12,6 +12,18 @@ export type HossiiConnection = {
   updatedAt: string;
 };
 
+export type HossiiConnectionRow = {
+  id: string;
+  space_id: string;
+  pane_id: string;
+  source_hossii_id: string;
+  target_hossii_id: string;
+  strength: HossiiConnectionStrength;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export const HOSSII_CONNECTION_STRENGTHS: readonly HossiiConnectionStrength[] = [
   'soft',
   'medium',

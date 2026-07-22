@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Hossii } from '../../core/types';
-import type { LayoutMode } from '../../core/utils/displayPrefsStorage';
+import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
 
 type BubbleActionMenuBubbleProps = {
@@ -17,6 +17,7 @@ type Options = {
   isMobile: boolean;
   presentationMode: PresentationMode;
   layoutMode: LayoutMode;
+  viewMode: ViewMode;
   isContentArchived: boolean;
   selectedBubbleId: string | null;
   setSelectedBubbleId: (id: string | null) => void;
@@ -30,6 +31,7 @@ export function useCustomBubbleActionMenu({
   isMobile,
   presentationMode,
   layoutMode,
+  viewMode,
   isContentArchived,
   selectedBubbleId,
   setSelectedBubbleId,
@@ -41,6 +43,12 @@ export function useCustomBubbleActionMenu({
   const [bubbleActionMenuOpen, setBubbleActionMenuOpen] = useState(false);
   const prevPaneIdRef = useRef(contextActivePaneId);
   const prevPresentationModeRef = useRef(presentationMode);
+  const prevLayoutModeRef = useRef(layoutMode);
+  const prevViewModeRef = useRef(viewMode);
+
+  const closeBubbleActionMenu = useCallback(() => {
+    setBubbleActionMenuOpen(false);
+  }, []);
 
   const bubbleActionMenuEnabled =
     !isMobile &&
@@ -76,12 +84,12 @@ export function useCustomBubbleActionMenu({
   );
 
   const handleBubbleConnectStub = useCallback(() => {
-    // connection overlay/API — stub until SVG overlay branch lands
+    // wired by useSpaceConnectionIntegration
   }, []);
 
-  const handleBubbleConnectionsStub = useCallback(() => {
-    // connection list view — stub until SVG overlay branch lands
-  }, []);
+  const handleBubbleConnectionsClick = useCallback(() => {
+    closeBubbleActionMenu();
+  }, [closeBubbleActionMenu]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -111,6 +119,20 @@ export function useCustomBubbleActionMenu({
   }, [presentationMode, resetBubbleInteraction]);
 
   useEffect(() => {
+    if (prevLayoutModeRef.current !== layoutMode && layoutMode === 'byAuthor') {
+      queueMicrotask(() => resetBubbleInteraction());
+    }
+    prevLayoutModeRef.current = layoutMode;
+  }, [layoutMode, resetBubbleInteraction]);
+
+  useEffect(() => {
+    if (prevViewModeRef.current !== viewMode && viewMode === 'slideshow') {
+      queueMicrotask(() => resetBubbleInteraction());
+    }
+    prevViewModeRef.current = viewMode;
+  }, [viewMode, resetBubbleInteraction]);
+
+  useEffect(() => {
     if (!selectedBubbleId) return;
     if (!filteredHossiis.some((h) => h.id === selectedBubbleId)) {
       queueMicrotask(() => resetBubbleInteraction());
@@ -129,7 +151,7 @@ export function useCustomBubbleActionMenu({
           : undefined,
       connectionCount: undefined,
       onConnectionsClick: bubbleActionMenuEnabled
-        ? handleBubbleConnectionsStub
+        ? handleBubbleConnectionsClick
         : undefined,
     }),
     [
@@ -138,13 +160,14 @@ export function useCustomBubbleActionMenu({
       handleBubbleActionMenuToggle,
       handleBubbleViewDetail,
       handleBubbleConnectStub,
-      handleBubbleConnectionsStub,
+      handleBubbleConnectionsClick,
       isContentArchived,
     ],
   );
 
   return {
     resetBubbleInteraction,
+    closeBubbleActionMenu,
     handleBubbleSelect,
     handleBubbleDeselect,
     getBubbleActionMenuProps,
