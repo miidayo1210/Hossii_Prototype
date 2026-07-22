@@ -191,4 +191,29 @@ describe('deleteConnection', () => {
     const res = await deleteConnection('c1');
     expect(res).toEqual({ ok: true, id: 'c1' });
   });
+
+  /**
+   * Supabase delete は 0 件でも error を返さない。
+   * deleteConnection は deleted count を見ないため、存在しない id でも { ok: true, id } になる。
+   * UI 側で「削除済み」扱いにする場合は fetch 再同期か count チェックが別途必要。
+   */
+  it('returns ok when zero rows deleted (no Supabase error)', async () => {
+    const eqMock = vi.fn().mockResolvedValue({ error: null, count: 0 });
+    const deleteMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ delete: deleteMock });
+
+    const res = await deleteConnection('missing-id');
+    expect(res).toEqual({ ok: true, id: 'missing-id' });
+  });
+
+  it('surfaces delete errors', async () => {
+    const eqMock = vi.fn().mockResolvedValue({
+      error: { message: 'permission denied', code: '42501' },
+    });
+    const deleteMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ delete: deleteMock });
+
+    const res = await deleteConnection('c1');
+    expect(res).toEqual({ ok: false, message: 'permission denied', code: '42501' });
+  });
 });
