@@ -1,0 +1,78 @@
+.stage {
+  position: relative;
+  width: 320px;
+  height: 240px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.connectedBubble {
+  --connected-shift-x: 0px;
+  --connected-shift-y: 0px;
+  position: absolute;
+  left: 200px;
+  top: 80px;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(168, 85, 247, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: #6b21a8;
+  transform: translate(var(--connected-shift-x), var(--connected-shift-y));
+  transition: box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.pullSource {
+  --pull-x: 0px;
+  --pull-y: 0px;
+  --pull-progress: 0;
+  --glow-progress: 0;
+  position: absolute;
+  left: 48px;
+  top: 80px;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: rgba(255, 251, 235, 0.95);
+  border: 2px solid rgba(236, 72, 153, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  font-size: 0.65rem;
+  color: #831843;
+  touch-action: none;
+  cursor: grab;
+  transform: translate(var(--pull-x), var(--pull-y));
+  box-shadow: 0 0 calc(6px + 20px * var(--glow-progress))
+    rgba(236, 72, 153, calc(0.15 + 0.45 * var(--glow-progress)));
+  user-select: none;
+}
+
+.pullSource[data-pull-phase='pulling'] {
+  cursor: grabbing;
+}
+
+.starParticles {
+  display: flex;
+  gap: 0.1rem;
+  font-size: 0.55rem;
+  color: rgba(168, 85, 247, 0.85);
+  pointer-events: none;
+}
+
+.hint {
+  margin: 0.75rem auto 0;
+  max-width: 320px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
