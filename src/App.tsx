@@ -54,6 +54,7 @@ import {
   isSlugUrlStillResolving,
   parseSpaceSlugFromPathname,
   RE_IS_SLUG_URL_PATH,
+  shouldResetSlugHandlingOnAuthRestore,
   type SlugFetchOutcome,
 } from './core/utils/slugUrlResolution';
 import { canEnterSpaceAsGuest } from './core/utils/guestParticipation';
@@ -101,6 +102,7 @@ const AppContent = () => {
   const [slugAccessPending, setSlugAccessPending] = useState(false);
   // 初回 URL スラッグ解決済みフラグ（スペース設定変更後に再トリガーされるのを防ぐ）
   const initialSlugHandledRef = useRef(false);
+  const prevCurrentUserForSlugRef = useRef(currentUser);
 
   // スペース直リンクの pathname か。replaceState で / に戻ったあとに古い true のまま残さないよう毎レンダーで評価（下の effect と同じ判定）
   const p = window.location.pathname;
@@ -195,6 +197,20 @@ const AppContent = () => {
     }
   }, [currentUser]);
 
+  // auth 復元前に slug 処理が走った場合、ログイン確定後に再実行できるようにする
+  useEffect(() => {
+    if (
+      shouldResetSlugHandlingOnAuthRestore(
+        prevCurrentUserForSlugRef.current,
+        currentUser,
+        isOnSlugPath,
+      )
+    ) {
+      initialSlugHandledRef.current = false;
+    }
+    prevCurrentUserForSlugRef.current = currentUser;
+  }, [currentUser, isOnSlugPath]);
+
   // 参加者ログイン成功後: ログイン対象スペースへ必ず入室する
   useEffect(() => {
     if (!currentUser || !pendingParticipantSpaceId) return;
@@ -254,14 +270,18 @@ const AppContent = () => {
       setSlugFetchOutcome('hit');
     }
 
-    fetchSpaceByUrl(slug).then((space) => {
-      if (space) {
-        addSpaceLocal(space);
-        setSlugFetchOutcome('hit');
-      } else {
+    fetchSpaceByUrl(slug)
+      .then((space) => {
+        if (space) {
+          addSpaceLocal(space);
+          setSlugFetchOutcome('hit');
+        } else {
+          setSlugFetchOutcome(cached ? 'hit' : 'miss');
+        }
+      })
+      .catch(() => {
         setSlugFetchOutcome(cached ? 'hit' : 'miss');
-      }
-    });
+      });
   // マウント時に1回だけ実行。state.spaces はマウント時点で localStorage から同期済み。
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

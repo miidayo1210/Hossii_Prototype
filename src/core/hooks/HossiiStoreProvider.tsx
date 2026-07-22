@@ -1303,6 +1303,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       if (requestId !== spacesFetchRequestIdRef.current) return;
 
       if (supabaseSpaces !== null) {
+        for (const space of supabaseSpaces) {
+          pendingSpaceIds.current.delete(space.id);
+        }
         dispatch({ type: 'SET_SPACES', payload: supabaseSpaces, preserveIds });
         lastScopedCommunityFetchKeyRef.current = effectiveId;
         const st = stateRef.current;
@@ -1322,7 +1325,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       insertedHossiiIdsRef.current.clear();
       pendingOptimisticHossiiRef.current.clear();
       setSpacesLoadedFromSupabase(false);
-      dispatch({ type: 'SET_SPACES', payload: [], preserveIds: new Set() });
+      dispatch({ type: 'SET_SPACES', payload: [], preserveIds });
       dispatch({ type: 'SYNC_HOSSIIS', payload: [] });
       fetchSpaces(effectiveId).then(applySpaces);
     } else {
@@ -1747,6 +1750,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // Supabase から取得済みのスペースをローカル state に追加する（DB insert は行わない）
   // URL スラッグ直アクセス時のファストパス用
   const addSpaceLocal = useCallback((space: Space) => {
+    // slug 直リンクの MERGE_SPACE は fetchSpaces 前クリアで消えないよう preserve 対象にする
+    pendingSpaceIds.current.add(space.id);
     dispatch({ type: 'MERGE_SPACE', payload: space });
   }, []);
 

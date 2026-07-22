@@ -16,6 +16,15 @@ export function parseSpaceSlugFromPathname(pathname: string): string | null {
   return legacyMatch?.[1] ?? null;
 }
 
+/** auth が null → ログイン済みに復元されたとき、slug 初回処理を再実行できるようにする。 */
+export function shouldResetSlugHandlingOnAuthRestore(
+  previousUser: unknown,
+  currentUser: unknown,
+  isOnSlugPath: boolean,
+): boolean {
+  return isOnSlugPath && !previousUser && Boolean(currentUser);
+}
+
 /** slug 直リンクの解決中は not-found や SpaceScreen の unavailable を出さない。 */
 export function isSlugUrlStillResolving(input: {
   isOnSlugPath: boolean;
