@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useMemo } from 'react';
 import type { CSSProperties, ChangeEvent } from 'react';
 import type {
   HossiiConnectionReasonEmoji,
@@ -7,9 +8,9 @@ import type {
 import { HOSSII_CONNECTION_REASON_EMOJIS } from '../../core/types/hossiiConnection';
 import { MAX_CONNECTION_REASON_TEXT_LENGTH } from '../../core/utils/connectionReasonValidation';
 import {
-  clampPopoverHorizontal,
-  computePopoverBottomAboveAnchor,
+  computeStrengthPopoverTopLeft,
   CONNECTION_POPOVER_STRENGTH_ESTIMATED_MAX_HEIGHT,
+  type ConnectionPopoverViewport,
 } from '../../core/utils/connectionPopoverPosition';
 import { HOSSII_CONNECTION_STRENGTH_LABELS } from '../../core/utils/hossiiConnectionStrengthLabels';
 import styles from './ConnectionEditorPopover.module.css';
@@ -18,6 +19,7 @@ const GAP = 10;
 const WIDTH = 220;
 
 type Props = {
+  viewport: ConnectionPopoverViewport;
   anchorRect: DOMRect;
   mode: 'create' | 'edit';
   selectedStrength: HossiiConnectionStrength | null;
@@ -36,6 +38,7 @@ type Props = {
 };
 
 export function ConnectionStrengthPopover({
+  viewport,
   anchorRect,
   mode,
   selectedStrength,
@@ -52,16 +55,27 @@ export function ConnectionStrengthPopover({
   disabled = false,
   errorMessage = null,
 }: Props) {
-  const centerX = anchorRect.left + anchorRect.width / 2;
-  const left = clampPopoverHorizontal(centerX - WIDTH / 2, WIDTH);
   const estimatedHeight = reasonExpanded
     ? CONNECTION_POPOVER_STRENGTH_ESTIMATED_MAX_HEIGHT
     : CONNECTION_POPOVER_STRENGTH_ESTIMATED_MAX_HEIGHT - 120;
+
+  const layout = useMemo(
+    () =>
+      computeStrengthPopoverTopLeft({
+        anchorRect,
+        popoverWidth: WIDTH,
+        gap: GAP,
+        estimatedHeight,
+        viewport,
+      }),
+    [anchorRect, estimatedHeight, viewport],
+  );
+
   const style: CSSProperties = {
     position: 'fixed',
-    left,
+    top: layout.top,
+    left: layout.left,
     width: WIDTH,
-    bottom: computePopoverBottomAboveAnchor(anchorRect.top, GAP, estimatedHeight),
     zIndex: 330,
   };
 

@@ -1,10 +1,10 @@
-import { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { UseConnectionEditorReturn } from './useConnectionEditor';
 import { ConnectionStrengthPopover } from './ConnectionStrengthPopover';
 import { ConnectionDeleteConfirmPopover } from './ConnectionDeleteConfirmPopover';
 import styles from './ConnectionEditorPopover.module.css';
-import { escapeDataAttributeSelectorValue } from '../../core/utils/escapeDataAttributeSelectorValue';
+import { useConnectionPopoverViewport } from '../../core/hooks/useConnectionPopoverViewport';
+import { useHossiiAnchorRect } from '../../core/hooks/useHossiiAnchorRect';
 
 function PickTargetErrorNotice({
   anchorRect,
@@ -36,26 +36,6 @@ function PickTargetErrorNotice({
     </div>,
     document.body,
   );
-}
-
-function useHossiiAnchorRect(hossiiId: string | null, active: boolean): DOMRect | null {
-  const [rect, setRect] = useState<DOMRect | null>(null);
-
-  useLayoutEffect(() => {
-    if (!active || !hossiiId) {
-      queueMicrotask(() => setRect(null));
-      return;
-    }
-
-    const el = document.querySelector(
-      `[data-hossii-id="${escapeDataAttributeSelectorValue(hossiiId)}"]`,
-    );
-    queueMicrotask(() => {
-      setRect(el ? el.getBoundingClientRect() : null);
-    });
-  }, [active, hossiiId]);
-
-  return rect;
 }
 
 type Props = {
@@ -93,6 +73,7 @@ export function ConnectionEditorPortals({
   } = editor;
 
   const editorPortalEnabled = canUseConnectionEditor && isConnectionsContextEnabled;
+  const strengthPopoverViewport = useConnectionPopoverViewport();
 
   const strengthPopoverActive =
     phase === 'pickingStrength' ||
@@ -104,6 +85,7 @@ export function ConnectionEditorPortals({
   const strengthAnchorRect = useHossiiAnchorRect(
     strengthAnchorId,
     editorPortalEnabled && strengthPopoverActive,
+    strengthPopoverViewport,
   );
 
   const deleteAnchorRect = useHossiiAnchorRect(
@@ -130,6 +112,7 @@ export function ConnectionEditorPortals({
       )}
       {strengthPopoverActive && strengthAnchorRect && (
         <ConnectionStrengthPopover
+          viewport={strengthPopoverViewport}
           anchorRect={strengthAnchorRect}
           mode={strengthMode}
           selectedStrength={selectedStrength}
