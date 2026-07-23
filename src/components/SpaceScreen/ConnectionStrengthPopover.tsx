@@ -6,15 +6,16 @@ import type {
 } from '../../core/types/hossiiConnection';
 import { HOSSII_CONNECTION_REASON_EMOJIS } from '../../core/types/hossiiConnection';
 import { MAX_CONNECTION_REASON_TEXT_LENGTH } from '../../core/utils/connectionReasonValidation';
+import {
+  clampPopoverHorizontal,
+  computePopoverBottomAboveAnchor,
+  CONNECTION_POPOVER_STRENGTH_ESTIMATED_MAX_HEIGHT,
+} from '../../core/utils/connectionPopoverPosition';
 import { HOSSII_CONNECTION_STRENGTH_LABELS } from '../../core/utils/hossiiConnectionStrengthLabels';
 import styles from './ConnectionEditorPopover.module.css';
 
 const GAP = 10;
 const WIDTH = 220;
-
-function clampHorizontal(left: number, width: number): number {
-  return Math.max(8, Math.min(left, window.innerWidth - width - 8));
-}
 
 type Props = {
   anchorRect: DOMRect;
@@ -52,12 +53,15 @@ export function ConnectionStrengthPopover({
   errorMessage = null,
 }: Props) {
   const centerX = anchorRect.left + anchorRect.width / 2;
-  const left = clampHorizontal(centerX - WIDTH / 2, WIDTH);
+  const left = clampPopoverHorizontal(centerX - WIDTH / 2, WIDTH);
+  const estimatedHeight = reasonExpanded
+    ? CONNECTION_POPOVER_STRENGTH_ESTIMATED_MAX_HEIGHT
+    : CONNECTION_POPOVER_STRENGTH_ESTIMATED_MAX_HEIGHT - 120;
   const style: CSSProperties = {
     position: 'fixed',
     left,
     width: WIDTH,
-    bottom: window.innerHeight - anchorRect.top + GAP,
+    bottom: computePopoverBottomAboveAnchor(anchorRect.top, GAP, estimatedHeight),
     zIndex: 330,
   };
 

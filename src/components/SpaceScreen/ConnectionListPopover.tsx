@@ -3,13 +3,13 @@ import { useLayoutEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import styles from './ConnectionListPopover.module.css';
 import { escapeDataAttributeSelectorValue } from '../../core/utils/escapeDataAttributeSelectorValue';
+import {
+  clampPopoverHorizontal,
+  computePopoverBottomAboveAnchor,
+} from '../../core/utils/connectionPopoverPosition';
 
 const GAP = 10;
 const WIDTH = 260;
-
-function clampHorizontal(left: number, width: number): number {
-  return Math.max(8, Math.min(left, window.innerWidth - width - 8));
-}
 
 export type ConnectionListPopoverItem = {
   connectionId: string;
@@ -59,12 +59,12 @@ export function ConnectionListPopover({ anchorHossiiId, items, onSelectPeer }: P
   if (!anchorRect || items.length === 0) return null;
 
   const centerX = anchorRect.left + anchorRect.width / 2;
-  const left = clampHorizontal(centerX - WIDTH / 2, WIDTH);
+  const left = clampPopoverHorizontal(centerX - WIDTH / 2, WIDTH);
   const style: CSSProperties = {
     position: 'fixed',
     left,
     width: WIDTH,
-    bottom: window.innerHeight - anchorRect.top + GAP,
+    bottom: computePopoverBottomAboveAnchor(anchorRect.top, GAP),
     zIndex: 325,
   };
 

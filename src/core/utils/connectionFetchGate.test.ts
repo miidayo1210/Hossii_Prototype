@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   connectionsEnabled,
   isConnectionsContextEnabled,
+  resolveRenderAsStar,
   shouldFetchHossiiConnections,
   shouldShowSpaceHossiiConnectionHandle,
 } from './connectionFetchGate';
@@ -23,7 +24,7 @@ describe('isConnectionsContextEnabled / connectionsEnabled', () => {
     expect(isConnectionsContextEnabled({ ...base, viewMode: 'slideshow' })).toBe(false);
   });
 
-  it('disables when renderAsStar is true (mobile landscape included)', () => {
+  it('disables when renderAsStar is true (mobile portrait / star presentation)', () => {
     expect(
       isConnectionsContextEnabled({
         ...base,
@@ -41,6 +42,20 @@ describe('isConnectionsContextEnabled / connectionsEnabled', () => {
 
   it('disables byAuthor layout', () => {
     expect(isConnectionsContextEnabled({ ...base, layoutMode: 'byAuthor' })).toBe(false);
+  });
+});
+
+describe('resolveRenderAsStar', () => {
+  it('uses Star on mobile portrait and PC star presentation only', () => {
+    expect(
+      resolveRenderAsStar({ isMobilePortrait: true, presentationMode: 'custom' }),
+    ).toBe(true);
+    expect(
+      resolveRenderAsStar({ isMobilePortrait: false, presentationMode: 'stars' }),
+    ).toBe(true);
+    expect(
+      resolveRenderAsStar({ isMobilePortrait: false, presentationMode: 'custom' }),
+    ).toBe(false);
   });
 });
 
