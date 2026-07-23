@@ -77,6 +77,7 @@ import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
 import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
 import { useSpaceConnectionPull } from './useSpaceConnectionPull';
 import { ConnectionEditorPortals } from './ConnectionEditorPortals';
+import { ConnectionFetchErrorNotice } from './ConnectionFetchErrorNotice';
 import { ConnectionListPopover } from './ConnectionListPopover';
 import { DEFAULT_STAR_MARKER } from '../../core/types/settings';
 import { StarView } from './StarView';
@@ -1672,6 +1673,19 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   });
 
   const {
+    refetch: refetchConnections,
+    fetchError: connectionFetchError,
+    isConnectionsContextEnabled: connectionsContextEnabled,
+  } = connectionOverlayInputs;
+
+  const showConnectionFetchErrorNotice =
+    connectionsContextEnabled && connectionFetchError;
+
+  const handleConnectionFetchRetry = useCallback(() => {
+    refetchConnections();
+  }, [refetchConnections]);
+
+  const {
     overlayProps: connectionOverlayProps,
     resetConnectionState,
     handleBubbleSelect,
@@ -2788,6 +2802,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         showSpaceExportButton ||
         showStarToggle ||
         showTagControls ||
+        showConnectionFetchErrorNotice ||
         (isMobile && activeTagFilter)) && (
         <div className={styles.spaceTopRightCluster}>
           {showSpaceExportButton && (
@@ -2821,6 +2836,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             <div className={styles.fetchLoadingBadge} aria-live="polite">
               読み込み中… ({fetchProgress.loadedCount}件)
             </div>
+          )}
+          {showConnectionFetchErrorNotice && (
+            <ConnectionFetchErrorNotice onRetry={handleConnectionFetchRetry} />
           )}
           {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
             <div className={styles.orderedSortToolbar} role="group" aria-label="投稿順の整列方向">

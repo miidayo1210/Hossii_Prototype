@@ -12,6 +12,8 @@ export type UseHossiiConnectionsOptions = {
 export type UseHossiiConnectionsResult = {
   connections: HossiiConnection[];
   refetch: () => void;
+  /** 直近 fetch/refetch が失敗したとき true。成功または gate 無効で false */
+  fetchError: boolean;
 };
 
 /**
@@ -24,6 +26,7 @@ export function useHossiiConnections({
   enabled,
 }: UseHossiiConnectionsOptions): UseHossiiConnectionsResult {
   const [connections, setConnections] = useState<HossiiConnection[]>([]);
+  const [fetchError, setFetchError] = useState(false);
   const [fetchGeneration, setFetchGeneration] = useState(0);
   const requestIdRef = useRef(0);
   const scopeRef = useRef<{ spaceId: string; paneId: string; enabled: boolean } | null>(null);
@@ -37,6 +40,7 @@ export function useHossiiConnections({
       scopeRef.current = null;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fetch gate closes
       setConnections([]);
+      setFetchError(false);
       return undefined;
     }
 
@@ -53,6 +57,7 @@ export function useHossiiConnections({
     // Pane / space 変更時のみ即クリア。refetch 中は既存表示を維持する。
     if (isScopeChange) {
       setConnections([]);
+      setFetchError(false);
     }
 
     void (async () => {
@@ -60,8 +65,12 @@ export function useHossiiConnections({
       if (cancelled || reqId !== requestIdRef.current) return;
       if (result.ok) {
         setConnections(result.connections);
-      } else if (isScopeChange) {
-        setConnections([]);
+        setFetchError(false);
+      } else {
+        if (isScopeChange) {
+          setConnections([]);
+        }
+        setFetchError(true);
       }
     })();
 
@@ -70,5 +79,5 @@ export function useHossiiConnections({
     };
   }, [enabled, spaceId, paneId, fetchGeneration]);
 
-  return { connections, refetch };
+  return { connections, refetch, fetchError };
 }
