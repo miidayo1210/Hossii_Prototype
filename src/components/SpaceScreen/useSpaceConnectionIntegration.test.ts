@@ -400,6 +400,91 @@ describe('useSpaceConnectionIntegration', () => {
         expect(result.current.editor.phase).toBe('editing');
         expect(result.current.editor.editingConnection?.id).toBe('conn-b');
       });
+
+      it('ignores another connection click while deleting', () => {
+        const options = makeOptions({
+          overlayInputs: makeOverlayInputs({ connections: [connectionA, connectionB] }),
+        });
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+        act(() => {
+          result.current.editor.startEdit(connectionA);
+          result.current.editor.requestDelete();
+        });
+        expect(result.current.editor.phase).toBe('deleting');
+
+        act(() => {
+          result.current.overlayProps.onConnectionClick?.(connectionB);
+        });
+
+        expect(result.current.editor.phase).toBe('deleting');
+        expect(result.current.editor.editingConnection?.id).toBe('conn-a');
+      });
+
+      it('ignores another connection click while pickingTarget', () => {
+        const options = makeOptions({
+          overlayInputs: makeOverlayInputs({ connections: [connectionA, connectionB] }),
+        });
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+        act(() => {
+          result.current.editor.startCreate('h1');
+        });
+        expect(result.current.editor.phase).toBe('pickingTarget');
+
+        act(() => {
+          result.current.overlayProps.onConnectionClick?.(connectionB);
+        });
+
+        expect(result.current.editor.phase).toBe('pickingTarget');
+        expect(result.current.editor.sourceId).toBe('h1');
+        expect(result.current.editor.targetId).toBeNull();
+      });
+
+      it('ignores another connection click while pickingStrength', () => {
+        const options = makeOptions({
+          overlayInputs: makeOverlayInputs({ connections: [connectionA, connectionB] }),
+        });
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+        act(() => {
+          result.current.editor.startCreate('h1');
+          result.current.editor.chooseTarget('h2');
+          result.current.editor.chooseStrength('strong');
+        });
+        expect(result.current.editor.phase).toBe('pickingStrength');
+
+        act(() => {
+          result.current.overlayProps.onConnectionClick?.(connectionB);
+        });
+
+        expect(result.current.editor.phase).toBe('pickingStrength');
+        expect(result.current.editor.sourceId).toBe('h1');
+        expect(result.current.editor.targetId).toBe('h2');
+        expect(result.current.editor.selectedStrength).toBe('strong');
+      });
+
+      it('allows selecting another connection after cancel from deleting', () => {
+        const options = makeOptions({
+          overlayInputs: makeOverlayInputs({ connections: [connectionA, connectionB] }),
+        });
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+        act(() => {
+          result.current.editor.startEdit(connectionA);
+          result.current.editor.requestDelete();
+          result.current.editor.cancel();
+          result.current.editor.cancel();
+        });
+        expect(result.current.editor.phase).toBe('idle');
+
+        act(() => {
+          result.current.overlayProps.onConnectionClick?.(connectionB);
+        });
+
+        expect(result.current.editor.phase).toBe('editing');
+        expect(result.current.editor.editingConnection?.id).toBe('conn-b');
+      });
     });
 
     it('does not open editor for others connections as participant', () => {
