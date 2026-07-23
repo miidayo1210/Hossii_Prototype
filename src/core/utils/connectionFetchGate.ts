@@ -3,7 +3,7 @@ import type { PresentationMode } from './presentationModeStorage';
 
 /** SpaceScreen.renderAsStar / viewMode を含む糸機能の共通 gate */
 export type ConnectionContextGate = {
-  /** Bubble 描画判定の正本（isMobile landscape 含む） */
+  /** Bubble 描画判定の正本（mobile portrait / PC star presentation） */
   renderAsStar: boolean;
   viewMode: ViewMode;
   presentationMode: PresentationMode;
@@ -36,3 +36,11 @@ export function shouldFetchHossiiConnections(gate: ConnectionFetchGate): boolean
 
 /** @alias isConnectionsContextEnabled */
 export const connectionsEnabled = isConnectionsContextEnabled;
+
+/** mobile portrait または star presentation のとき Star 描画 */
+export function resolveRenderAsStar(params: {
+  isMobilePortrait: boolean;
+  presentationMode: PresentationMode;
+}): boolean {
+  return params.isMobilePortrait || params.presentationMode === 'stars';
+}

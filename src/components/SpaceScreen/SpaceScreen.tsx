@@ -71,6 +71,7 @@ import {
   SPACE_EXPORT_MAX_BUBBLES,
 } from '../../core/utils/spaceCanvasExport';
 import { Bubble } from './Tree';
+import { resolveRenderAsStar } from '../../core/utils/connectionFetchGate';
 import { useCustomBubbleActionMenu } from './useCustomBubbleActionMenu';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
@@ -446,7 +447,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     (isMobile && isPortrait) ||
     (!isMobile && presentationMode === 'stars');
   const showStarToggle = !isMobile && viewMode !== 'slideshow';
-  const renderAsStar = isMobile || presentationMode === 'stars';
+  const renderAsStar = resolveRenderAsStar({ isMobilePortrait, presentationMode });
   const showPcStarHover = !isMobile && presentationMode === 'stars';
   /** スマホ縦のみボトムシート。横持ち・PC は右サイドパネル */
   const useMobileBottomSheet = isMobile && isPortrait;
@@ -1795,6 +1796,15 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   shouldAllowBubbleResetRef.current = () =>
     !connectionEditor.isSaving && connectionEditor.phase !== 'saving';
   handleEscapeResetRef.current = handleEscapeReset;
+
+  const prevMobilePortraitRef = useRef(isMobilePortrait);
+  useEffect(() => {
+    const wasNotPortrait = !prevMobilePortraitRef.current;
+    prevMobilePortraitRef.current = isMobilePortrait;
+    if (wasNotPortrait && isMobilePortrait) {
+      resetConnectionState();
+    }
+  }, [isMobilePortrait, resetConnectionState]);
 
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
