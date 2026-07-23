@@ -264,6 +264,198 @@ describe('useConnectionEditor', () => {
     expect(result.current.errorMessage).toBe('保存に失敗しました');
   });
 
+  it('retries create after API failure and clears error on retry start', async () => {
+    callbacks.onCreate = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false as const, message: '保存に失敗しました' })
+      .mockResolvedValueOnce({ ok: true as const, data: makeConnection() });
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+      result.current.setDraftReasonText('再試行');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.draftReasonText).toBe('再試行');
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onCreate).toHaveBeenCalledTimes(2);
+    expect(callbacks.onCreate).toHaveBeenLastCalledWith({
+      sourceHossiiId: 'hossii-a',
+      targetHossiiId: 'hossii-b',
+      strength: 'medium',
+      reasonText: '再試行',
+    });
+    expect(result.current.phase).toBe('idle');
+    expect(result.current.errorMessage).toBeNull();
+  });
+
+  it('retries edit after API failure', async () => {
+    callbacks.onUpdateStrength = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false as const, message: '更新に失敗しました' })
+      .mockResolvedValueOnce({
+        ok: true as const,
+        data: makeConnection({ strength: 'strong' }),
+      });
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection();
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.chooseStrength('strong');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.selectedStrength).toBe('strong');
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).toHaveBeenCalledTimes(2);
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('retries reason-only update after API failure', async () => {
+    callbacks.onUpdateReason = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false as const, message: '理由を保存できませんでした' })
+      .mockResolvedValueOnce({
+        ok: true as const,
+        data: makeConnection({ reasonText: '再試行理由', reasonEmoji: '💡' }),
+      });
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection();
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('再試行理由');
+      result.current.toggleDraftReasonEmoji('💡');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(result.current.phase).toBe('error');
+    expect(callbacks.onUpdateStrength).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateReason).toHaveBeenCalledTimes(2);
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('does not call reason update when strength update fails', async () => {
+    callbacks.onUpdateStrength = vi.fn(async () => ({
+      ok: false as const,
+      message: 'strength failed',
+    }));
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection();
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.chooseStrength('strong');
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('理由');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).toHaveBeenCalledTimes(1);
+    expect(callbacks.onUpdateReason).not.toHaveBeenCalled();
+    expect(result.current.phase).toBe('error');
+    expect(result.current.errorMessage).toBe('strength failed');
+  });
+
+  it('prevents double submit while retrying after error', async () => {
+    const deferred = createDeferred<ReturnType<typeof makeConnection>>();
+    callbacks.onCreate = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false as const, message: '保存に失敗しました' })
+      .mockImplementationOnce(() => deferred.promise.then((data) => ({ ok: true as const, data })));
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+    expect(result.current.phase).toBe('error');
+
+    let firstRetry!: Promise<boolean>;
+    act(() => {
+      firstRetry = result.current.submitSave();
+    });
+    expect(result.current.phase).toBe('saving');
+
+    let secondRetryValue: boolean | undefined;
+    await act(async () => {
+      secondRetryValue = await result.current.submitSave();
+    });
+
+    deferred.resolve(makeConnection());
+    await act(async () => {
+      await firstRetry;
+    });
+
+    expect(callbacks.onCreate).toHaveBeenCalledTimes(2);
+    expect(secondRetryValue).toBe(false);
+  });
+
+  it('allows cancel after create error', async () => {
+    callbacks.onCreate = vi.fn(async () => ({
+      ok: false as const,
+      message: '保存に失敗しました',
+    }));
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    act(() => {
+      result.current.cancel();
+    });
+
+    expect(result.current.phase).toBe('idle');
+    expect(result.current.errorMessage).toBeNull();
+  });
+
   it('blocks cancel and reset while saving', async () => {
     const deferred = createDeferred<ReturnType<typeof makeConnection>>();
     callbacks.onCreate = vi.fn(() => deferred.promise.then((data) => ({ ok: true as const, data })));
