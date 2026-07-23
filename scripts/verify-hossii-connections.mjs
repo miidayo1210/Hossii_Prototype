@@ -82,7 +82,7 @@ async function cleanupTempHossiis() {
   tempHossiiIds.length = 0;
 }
 
-async function createTempHossiiPair(prefix) {
+async function createTempHossiiPair(prefix, spaceId = SPACE_ID, paneId = PANE_ID) {
   const ts = Date.now();
   const a = `${prefix}-a-${ts}`;
   const b = `${prefix}-b-${ts}`;
@@ -93,8 +93,8 @@ async function createTempHossiiPair(prefix) {
     const { error } = await admin.from('hossiis').insert({
       id,
       message: label,
-      space_id: SPACE_ID,
-      space_pane_id: PANE_ID,
+      space_id: spaceId,
+      space_pane_id: paneId,
       author_name: 'ReasonTest',
       origin: 'manual',
       created_at: new Date().toISOString(),
@@ -103,6 +103,299 @@ async function createTempHossiiPair(prefix) {
     tempHossiiIds.push(id);
   }
   return { a, b };
+}
+
+async function getDevUserIds() {
+  const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  const find = (email) => data.users.find((u) => u.email === email)?.id;
+  return {
+    userA: find('dev-user-a@example.test'),
+    userB: find('dev-user-b@example.test'),
+    userSameName: find('dev-user-same-name@example.test'),
+    communityAdmin: find('dev-community-admin@example.test'),
+    superAdmin: find('dev-super-admin@example.test'),
+  };
+}
+
+async function setupTypeAMembershipFixtures(userIds) {
+  const { data: space, error: spaceErr } = await admin
+    .from('spaces')
+    .select('community_id')
+    .eq('id', SPACE_ID)
+    .single();
+  if (spaceErr) throw new Error(`setupTypeAMembershipFixtures space: ${spaceErr.message}`);
+
+  if (userIds.userA) {
+    const { error } = await admin.from('space_memberships').upsert(
+      {
+        space_id: SPACE_ID,
+        auth_user_id: userIds.userA,
+        role: 'member',
+        status: 'active',
+      },
+      { onConflict: 'space_id,auth_user_id' },
+    );
+    if (error) throw new Error(`setup active member A: ${error.message}`);
+    await admin.from('community_memberships').upsert(
+      {
+        community_id: space.community_id,
+        auth_user_id: userIds.userA,
+        role: 'member',
+        status: 'active',
+      },
+      { onConflict: 'community_id,auth_user_id' },
+    );
+  }
+
+  if (userIds.userSameName) {
+    await admin
+      .from('space_memberships')
+      .delete()
+      .eq('space_id', SPACE_ID)
+      .eq('auth_user_id', userIds.userSameName);
+  }
+
+  if (userIds.userB) {
+    const { error } = await admin.from('space_memberships').upsert(
+      {
+        space_id: SPACE_ID,
+        auth_user_id: userIds.userB,
+        role: 'member',
+        status: 'suspended',
+      },
+      { onConflict: 'space_id,auth_user_id' },
+    );
+    if (error) throw new Error(`setup suspended member B: ${error.message}`);
+  }
+}
+
+async function runTypeAParticipantRlsChecks(userIds) {
+  const guestClient = createClient(DEV_URL, anon, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { a: rejectA, b: rejectB } = await createTempHossiiPair('type-a-reject');
+  const rejectPayload = {
+    space_id: SPACE_ID,
+    pane_id: PANE_ID,
+    source_hossii_id: rejectA,
+    target_hossii_id: rejectB,
+    strength: 'soft',
+  };
+
+  const { error: guestInsertErr } = await guestClient.from('hossii_connections').insert(rejectPayload);
+  record(
+    'type-a: guest INSERT rejected',
+    !!guestInsertErr,
+    guestInsertErr?.message ?? 'unexpected success',
+  );
+
+  await signIn('dev-user-same-name@example.test');
+  const { error: noMembershipErr } = await client.from('hossii_connections').insert({
+    ...rejectPayload,
+    strength: 'medium',
+  });
+  record(
+    'type-a: logged-in user without membership INSERT rejected',
+    !!noMembershipErr,
+    noMembershipErr?.message ?? 'unexpected success',
+  );
+  await signOut();
+
+  await signIn('dev-user-b@example.test');
+  const { error: inactiveMemberErr } = await client.from('hossii_connections').insert({
+    ...rejectPayload,
+    strength: 'strong',
+  });
+  record(
+    'type-a: inactive membership INSERT rejected',
+    !!inactiveMemberErr,
+    inactiveMemberErr?.message ?? 'unexpected success',
+  );
+  await signOut();
+
+  await signIn('dev-user-a@example.test');
+  const { a: memberA, b: memberB } = await createTempHossiiPair('type-a-member');
+  const { data: memberCreated, error: memberCreateErr } = await client
+    .from('hossii_connections')
+    .insert({
+      space_id: SPACE_ID,
+      pane_id: PANE_ID,
+      source_hossii_id: memberA,
+      target_hossii_id: memberB,
+      strength: 'soft',
+    })
+    .select('id, created_by')
+    .single();
+  record(
+    'type-a: active space member INSERT success',
+    !memberCreateErr && !!memberCreated?.id && memberCreated.created_by === userIds.userA,
+    memberCreateErr?.message ?? memberCreated?.id ?? '',
+  );
+  if (memberCreated?.id) createdConnectionIds.push(memberCreated.id);
+  await signOut();
+
+  const { data: spaceRow } = await admin
+    .from('spaces')
+    .select('community_id')
+    .eq('id', SPACE_ID)
+    .single();
+  await signIn('dev-user-a@example.test');
+  await client.rpc('ensure_my_personal_space', { p_community_id: spaceRow.community_id });
+  const { data: personalSpace } = await admin
+    .from('spaces')
+    .select('id')
+    .eq('space_type', 'personal')
+    .eq('community_id', spaceRow.community_id)
+    .eq('owner_user_id', userIds.userA)
+    .single();
+  const personalSpaceId = personalSpace?.id;
+  const personalPaneId = personalSpaceId ? `${personalSpaceId}-pane-default` : null;
+  let personalConnId = null;
+  if (personalSpaceId && personalPaneId) {
+    const { a: personalA, b: personalB } = await createTempHossiiPair(
+      'type-a-personal',
+      personalSpaceId,
+      personalPaneId,
+    );
+    const { data: personalConn, error: personalConnErr } = await client
+      .from('hossii_connections')
+      .insert({
+        space_id: personalSpaceId,
+        pane_id: personalPaneId,
+        source_hossii_id: personalA,
+        target_hossii_id: personalB,
+        strength: 'medium',
+      })
+      .select('id')
+      .single();
+    personalConnId = personalConn?.id ?? null;
+    record(
+      'type-a: personal owner INSERT success',
+      !personalConnErr && !!personalConnId,
+      personalConnErr?.message ?? personalConnId ?? '',
+    );
+    if (personalConnId) createdConnectionIds.push(personalConnId);
+  } else {
+    record('type-a: personal owner INSERT success', false, 'personal space missing');
+  }
+  await signOut();
+
+  if (memberCreated?.id) {
+    await signIn('dev-user-a@example.test');
+    const { data: ownUpdated, error: ownUpdateErr } = await client
+      .from('hossii_connections')
+      .update({ strength: 'strong' })
+      .eq('id', memberCreated.id)
+      .select('strength')
+      .single();
+    record(
+      'type-a: own connection UPDATE success',
+      !ownUpdateErr && ownUpdated?.strength === 'strong',
+      ownUpdateErr?.message ?? JSON.stringify(ownUpdated),
+    );
+    await signOut();
+
+    await signIn('dev-user-same-name@example.test');
+    const { data: otherUpdateRows, error: otherUpdateErr } = await client
+      .from('hossii_connections')
+      .update({ strength: 'soft' })
+      .eq('id', memberCreated.id)
+      .select('id');
+    record(
+      'type-a: others connection UPDATE rejected',
+      !otherUpdateErr && (otherUpdateRows ?? []).length === 0,
+      otherUpdateErr?.message ?? `rows=${otherUpdateRows?.length ?? 0}`,
+    );
+    await signOut();
+
+    await signIn('dev-community-admin@example.test');
+    const { data: adminUpdated, error: adminUpdateErr } = await client
+      .from('hossii_connections')
+      .update({ strength: 'medium' })
+      .eq('id', memberCreated.id)
+      .select('strength')
+      .single();
+    record(
+      'type-a: admin UPDATE others connection success',
+      !adminUpdateErr && adminUpdated?.strength === 'medium',
+      adminUpdateErr?.message ?? JSON.stringify(adminUpdated),
+    );
+    await signOut();
+
+    await signIn('dev-user-same-name@example.test');
+    const { error: otherDeleteErr } = await client
+      .from('hossii_connections')
+      .delete()
+      .eq('id', memberCreated.id);
+    const { count: stillExists } = await admin
+      .from('hossii_connections')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', memberCreated.id);
+    record(
+      'type-a: others connection DELETE rejected',
+      !otherDeleteErr && stillExists === 1,
+      otherDeleteErr?.message ?? `remaining=${stillExists}`,
+    );
+    await signOut();
+
+    await signIn('dev-user-a@example.test');
+    const { error: ownDeleteErr } = await client
+      .from('hossii_connections')
+      .delete()
+      .eq('id', memberCreated.id);
+    record(
+      'type-a: own connection DELETE success',
+      !ownDeleteErr,
+      ownDeleteErr?.message ?? '',
+    );
+    if (!ownDeleteErr) {
+      createdConnectionIds.splice(createdConnectionIds.indexOf(memberCreated.id), 1);
+    }
+    await signOut();
+  }
+
+  await signIn('dev-user-a@example.test');
+  const { a: reasonA, b: reasonB } = await createTempHossiiPair('type-a-reason');
+  const { data: reasonConn, error: reasonConnErr } = await client
+    .from('hossii_connections')
+    .insert({
+      space_id: SPACE_ID,
+      pane_id: PANE_ID,
+      source_hossii_id: reasonA,
+      target_hossii_id: reasonB,
+      strength: 'soft',
+      reason_text: '参加者',
+      reason_emoji: '💡',
+    })
+    .select('id, reason_text, reason_emoji, created_by')
+    .single();
+  record(
+    'type-a: member INSERT with reason success',
+    !reasonConnErr &&
+      reasonConn?.reason_text === '参加者' &&
+      reasonConn?.reason_emoji === '💡' &&
+      reasonConn?.created_by === userIds.userA,
+    reasonConnErr?.message ?? JSON.stringify(reasonConn),
+  );
+  if (reasonConn?.id) createdConnectionIds.push(reasonConn.id);
+  await signOut();
+
+  if (personalConnId) {
+    await signIn('dev-community-admin@example.test');
+    const { error: adminDeletePersonalErr } = await client
+      .from('hossii_connections')
+      .delete()
+      .eq('id', personalConnId);
+    record(
+      'type-a: admin DELETE others connection success',
+      !adminDeletePersonalErr,
+      adminDeletePersonalErr?.message ?? '',
+    );
+    if (!adminDeletePersonalErr) {
+      createdConnectionIds.splice(createdConnectionIds.indexOf(personalConnId), 1);
+    }
+    await signOut();
+  }
 }
 
 async function runReasonColumnChecks() {
@@ -341,6 +634,9 @@ async function main() {
   await cleanupConnections();
   await cleanupTempHossiis();
 
+  const userIds = await getDevUserIds();
+  await setupTypeAMembershipFixtures(userIds);
+
   const { count: hossiiCountBefore, error: countErr } = await admin
     .from('hossiis')
     .select('id', { count: 'exact', head: true })
@@ -360,6 +656,11 @@ async function main() {
     .select('*')
     .single();
   record('admin create connection', !createErr && !!created?.id, createErr?.message ?? created?.id ?? '');
+  record(
+    'type-a: community admin INSERT success',
+    !createErr && !!created?.id,
+    createErr?.message ?? created?.id ?? '',
+  );
   if (created?.id) createdConnectionIds.push(created.id);
   record(
     'create normalizes A-B order',
@@ -412,16 +713,7 @@ async function main() {
   record('different pane rejected', !!otherPaneErr, otherPaneErr?.message ?? '');
   await signOut();
 
-  await signIn('dev-user-a@example.test');
-  const { error: memberWriteErr } = await client.from('hossii_connections').insert({
-    space_id: SPACE_ID,
-    pane_id: PANE_ID,
-    source_hossii_id: HOSSII_A,
-    target_hossii_id: HOSSII_B,
-    strength: 'soft',
-  });
-  record('non-admin write rejected', !!memberWriteErr, memberWriteErr?.message ?? '');
-  await signOut();
+  await runTypeAParticipantRlsChecks(userIds);
 
   await signIn('dev-super-admin@example.test');
   const { data: superCreated, error: superCreateErr } = await client
@@ -436,6 +728,11 @@ async function main() {
     .select('id')
     .single();
   record('super_admin write success', !superCreateErr && !!superCreated?.id, superCreateErr?.message ?? '');
+  record(
+    'type-a: super admin INSERT success',
+    !superCreateErr && !!superCreated?.id,
+    superCreateErr?.message ?? '',
+  );
   if (superCreated?.id) createdConnectionIds.push(superCreated.id);
   await signOut();
 
