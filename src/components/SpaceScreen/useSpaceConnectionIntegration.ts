@@ -10,6 +10,7 @@ import {
   canEditTypeAConnection,
   evaluateTypeAConnectionWriteGate,
 } from '../../core/utils/typeAConnectionWriteGate';
+import { evaluateTypeBConnectionWriteGate } from '../../core/utils/typeBConnectionWriteGate';
 import {
   createConnection,
   deleteConnection,
@@ -42,6 +43,7 @@ type BubbleActionMenuBubbleProps = {
   onActionMenuToggle: () => void;
   onViewDetail?: () => void;
   onConnect?: () => void;
+  onCreateConnectedHossii?: () => void;
   connectionCreateBlockedReason?: string;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
@@ -72,6 +74,7 @@ type Options = {
   viewMode: ViewMode;
   presentationMode: PresentationMode;
   contextActivePaneId: string | null | undefined;
+  onCreateConnectedHossii?: (originId: string) => void;
 };
 
 export function useSpaceConnectionIntegration({
@@ -94,6 +97,7 @@ export function useSpaceConnectionIntegration({
   viewMode,
   presentationMode,
   contextActivePaneId,
+  onCreateConnectedHossii,
 }: Options) {
   const typeAWriteGate = useMemo(
     () =>
@@ -107,6 +111,19 @@ export function useSpaceConnectionIntegration({
   );
 
   const canCreateTypeAConnection = typeAWriteGate.canCreate;
+
+  const typeBWriteGate = useMemo(
+    () =>
+      evaluateTypeBConnectionWriteGate({
+        currentUser,
+        activeSpace,
+        isContentArchived,
+        activeSpaceMembershipStatus,
+      }),
+    [currentUser, activeSpace, isContentArchived, activeSpaceMembershipStatus],
+  );
+
+  const canCreateTypeBConnection = typeBWriteGate.canCreate;
 
   const canEditConnection = useCallback(
     (connection: HossiiConnection) =>
@@ -376,6 +393,25 @@ export function useSpaceConnectionIntegration({
     closeBubbleActionMenu,
   ]);
 
+  const handleCreateConnectedHossiiFromMenu = useCallback(() => {
+    if (
+      !onCreateConnectedHossii ||
+      !isConnectionsContextEnabled ||
+      !canCreateTypeBConnection ||
+      !selectedBubbleId
+    ) {
+      return;
+    }
+    closeBubbleActionMenu();
+    onCreateConnectedHossii(selectedBubbleId);
+  }, [
+    onCreateConnectedHossii,
+    isConnectionsContextEnabled,
+    canCreateTypeBConnection,
+    selectedBubbleId,
+    closeBubbleActionMenu,
+  ]);
+
   const handleConnectionOverlayClick = useCallback(
     (connection: HossiiConnection) => {
       if (!isConnectionsContextEnabled || !canEditConnection(connection)) return;
@@ -451,6 +487,12 @@ export function useSpaceConnectionIntegration({
           isConnectionsContextEnabled && canCreateTypeAConnection
             ? handleConnectFromMenu
             : undefined,
+        onCreateConnectedHossii:
+          onCreateConnectedHossii &&
+          isConnectionsContextEnabled &&
+          canCreateTypeBConnection
+            ? handleCreateConnectedHossiiFromMenu
+            : undefined,
         connectionCreateBlockedReason,
         membershipJoinStatus:
           isConnectionsContextEnabled && membershipJoinStatus ? membershipJoinStatus : undefined,
@@ -474,6 +516,9 @@ export function useSpaceConnectionIntegration({
       canCreateTypeAConnection,
       typeAWriteGate.blockReason,
       handleConnectFromMenu,
+      onCreateConnectedHossii,
+      canCreateTypeBConnection,
+      handleCreateConnectedHossiiFromMenu,
       retryActiveSpaceMembershipJoin,
       selectedDirectConnectionCount,
       openConnectionList,
@@ -518,9 +563,11 @@ export function useSpaceConnectionIntegration({
     overlayProps,
     editor,
     canCreateTypeAConnection,
+    canCreateTypeBConnection,
     canEditConnection,
     canUseConnectionEditor,
     typeAWriteGate,
+    typeBWriteGate,
     isConnectionsContextEnabled,
     resetConnectionState,
     shouldAllowBubbleReset,

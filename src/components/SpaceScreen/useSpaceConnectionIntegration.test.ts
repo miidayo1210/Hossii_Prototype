@@ -1007,4 +1007,204 @@ describe('useSpaceConnectionIntegration', () => {
     });
   });
 
+
+  describe('Type B write gate menu entry', () => {
+    const onCreateConnectedHossii = vi.fn();
+
+    function makeTypeBOptions(overrides: Partial<HookOptions> = {}): HookOptions {
+      return makeOptions({
+        onCreateConnectedHossii,
+        ...overrides,
+      });
+    }
+
+    beforeEach(() => {
+      onCreateConnectedHossii.mockClear();
+    });
+
+    it('shows create action for active member when callback is wired', () => {
+      const options = makeTypeBOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'active',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canCreateTypeBConnection).toBe(true);
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onCreateConnectedHossii).toBeTypeOf('function');
+      expect(menu.onConnect).toBeTypeOf('function');
+    });
+
+    it('shows create action for personal owner', () => {
+      const options = makeTypeBOptions({
+        currentUser: makeParticipantUser(),
+        activeSpace: makePersonalOwnerSpace(),
+        activeSpaceMembershipStatus: 'none',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canCreateTypeBConnection).toBe(true);
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h1', true).onCreateConnectedHossii,
+      ).toBeTypeOf('function');
+    });
+
+    it('shows create action for admin', () => {
+      const options = makeTypeBOptions({ activeSpaceMembershipStatus: 'none' });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canCreateTypeBConnection).toBe(true);
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h1', true).onCreateConnectedHossii,
+      ).toBeTypeOf('function');
+    });
+
+    it('hides create action for guest without blocked copy', () => {
+      const options = makeTypeBOptions({
+        currentUser: null,
+        activeSpaceMembershipStatus: 'active',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onCreateConnectedHossii).toBeUndefined();
+      expect(menu.connectionCreateBlockedReason).toBe('参加すると、つながりを作れます');
+    });
+
+    it('hides create action for none membership without Type B blocked copy', () => {
+      const options = makeTypeBOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'none',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onCreateConnectedHossii).toBeUndefined();
+      expect(menu.connectionCreateBlockedReason).toBe('このスペースに参加すると作れます');
+    });
+
+    it('hides create action when archived', () => {
+      const options = makeTypeBOptions({ isContentArchived: true });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onCreateConnectedHossii).toBeUndefined();
+      expect(menu.connectionCreateBlockedReason).toBe('アーカイブ中は編集できません');
+    });
+
+    it('keeps Type A joining/error UI and hides Type B create', () => {
+      const retry = vi.fn();
+      const joiningOptions = makeTypeBOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'joining',
+      });
+      const joining = renderHook(() => useSpaceConnectionIntegration(joiningOptions));
+      const joiningMenu = joining.result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(joiningMenu.onCreateConnectedHossii).toBeUndefined();
+      expect(joiningMenu.onConnect).toBeUndefined();
+      expect(joiningMenu.membershipJoinStatus).toBe('joining');
+
+      const errorOptions = makeTypeBOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'error',
+        retryActiveSpaceMembershipJoin: retry,
+      });
+      const error = renderHook(() => useSpaceConnectionIntegration(errorOptions));
+      const errorMenu = error.result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(errorMenu.onCreateConnectedHossii).toBeUndefined();
+      expect(errorMenu.onConnect).toBeUndefined();
+      expect(errorMenu.membershipJoinStatus).toBe('error');
+      expect(errorMenu.onMembershipRetry).toBe(retry);
+    });
+
+    it('shows create action on mobile landscape bubble context', () => {
+      const options = makeTypeBOptions({
+        overlayInputs: makeOverlayInputs({
+          isConnectionsContextEnabled: true,
+          overlayProps: {
+            renderAsStar: false,
+            viewMode: 'full',
+            presentationMode: 'custom',
+            layoutMode: 'random',
+          },
+        }),
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h1', true).onCreateConnectedHossii,
+      ).toBeTypeOf('function');
+    });
+
+    it('hides create action when connections context is disabled', () => {
+      const disabledCases: Partial<HookOptions>[] = [
+        {
+          overlayInputs: makeOverlayInputs({
+            isConnectionsContextEnabled: false,
+            overlayProps: { renderAsStar: true },
+          }),
+        },
+        {
+          overlayInputs: makeOverlayInputs({
+            isConnectionsContextEnabled: false,
+            overlayProps: { viewMode: 'slideshow' },
+          }),
+        },
+        {
+          overlayInputs: makeOverlayInputs({
+            isConnectionsContextEnabled: false,
+            overlayProps: { layoutMode: 'byAuthor' },
+          }),
+        },
+        {
+          overlayInputs: makeOverlayInputs({
+            isConnectionsContextEnabled: false,
+            overlayProps: { presentationMode: 'stars' },
+          }),
+        },
+      ];
+
+      for (const overrides of disabledCases) {
+        const options = makeTypeBOptions(overrides);
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+        const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+        expect(menu.onCreateConnectedHossii).toBeUndefined();
+        expect(menu.onConnect).toBeUndefined();
+      }
+    });
+
+    it('hides create action when callback is not wired', () => {
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'active',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h1', true).onCreateConnectedHossii,
+      ).toBeUndefined();
+    });
+
+    it('calls callback with selected bubble origin id', () => {
+      const options = makeTypeBOptions({ selectedBubbleId: 'origin-h1' });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      act(() => {
+        result.current.getIntegratedBubbleActionMenuProps('origin-h1', true).onCreateConnectedHossii?.();
+      });
+
+      expect(onCreateConnectedHossii).toHaveBeenCalledWith('origin-h1');
+      expect(options.closeBubbleActionMenu).toHaveBeenCalled();
+    });
+
+    it('does not expose create action on non-selected bubble', () => {
+      const options = makeTypeBOptions();
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h2', false).onCreateConnectedHossii,
+      ).toBeUndefined();
+    });
+  });
+
 });

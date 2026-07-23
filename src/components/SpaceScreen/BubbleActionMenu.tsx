@@ -13,6 +13,7 @@ type Props = {
   anchorRect: DOMRect;
   onViewDetail?: () => void;
   onConnect?: () => void;
+  onCreateConnectedHossii?: () => void;
   connectionCreateBlockedReason?: string;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
@@ -29,6 +30,7 @@ export function BubbleActionMenu({
   anchorRect,
   onViewDetail,
   onConnect,
+  onCreateConnectedHossii,
   connectionCreateBlockedReason,
   membershipJoinStatus,
   onMembershipRetry,
@@ -45,6 +47,7 @@ export function BubbleActionMenu({
   if (
     !onViewDetail &&
     !onConnect &&
+    !onCreateConnectedHossii &&
     !connectionCreateBlockedReason &&
     !membershipJoinStatus &&
     !showConnections &&
@@ -115,6 +118,15 @@ export function BubbleActionMenu({
           onClick={onConnect}
         >
           つないでみる
+        </button>
+      )}
+      {onCreateConnectedHossii && (
+        <button
+          type="button"
+          className={styles.menuItem}
+          onClick={onCreateConnectedHossii}
+        >
+          つなげて作る
         </button>
       )}
       {!onConnect && connectionCreateBlockedReason ? (
