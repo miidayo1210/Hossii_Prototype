@@ -109,7 +109,6 @@ export function createMembershipJoinController(
 
     if (forceRetry) {
       if (lastSuccessKey === key) lastSuccessKey = null;
-      if (inFlightKey === key) inFlightKey = null;
     }
 
     inFlightKey = key;
@@ -148,6 +147,14 @@ export function createMembershipJoinController(
     },
     retry: (input) => {
       if (!isEligible(input) || !input.configured || !input.authReady || !input.spaceId) {
+        return;
+      }
+      // retry は error 時のみ。joining 中の連打も in-flight dedupe で RPC 重複を防ぐ。
+      if (status !== 'error') {
+        return;
+      }
+      const key = keyOf(input.uid!, input.spaceId);
+      if (inFlightKey === key) {
         return;
       }
       syncInternal(input, true);
