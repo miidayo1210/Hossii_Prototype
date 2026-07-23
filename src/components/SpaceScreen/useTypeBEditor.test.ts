@@ -1,0 +1,164 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+
+const generateIdMock = vi.hoisted(() =>
+  vi.fn(() => `id-${Math.random().toString(36).slice(2, 8)}`),
+);
+
+vi.mock('../../core/utils', () => ({
+  generateId: generateIdMock,
+}));
+
+import { useTypeBEditor, isTypeAEditorBlockingTypeB, isTypeBEditorBlockingTypeA } from './useTypeBEditor';
+
+describe('useTypeBEditor', () => {
+  beforeEach(() => {
+    generateIdMock.mockReset();
+    generateIdMock
+      .mockReturnValueOnce('idem-1')
+      .mockReturnValueOnce('new-1')
+      .mockReturnValueOnce('idem-2')
+      .mockReturnValueOnce('new-2');
+  });
+
+  it('starts composing with generated ids and placement', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 42,
+        positionY: 55,
+      });
+    });
+
+    expect(result.current.phase).toBe('composing');
+    expect(result.current.originHossiiId).toBe('origin-1');
+    expect(result.current.positionX).toBe(42);
+    expect(result.current.positionY).toBe(55);
+    expect(result.current.idempotencyKey).toBe('idem-1');
+    expect(result.current.newHossiiId).toBe('new-1');
+    expect(result.current.showProvisionalThread).toBe(true);
+    expect(result.current.isBubbleSwitchBlocked).toBe(true);
+  });
+
+  it('keeps draft and error on submit failure', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+      result.current.setDraftMessage('draft text');
+    });
+
+    act(() => {
+      result.current.beginSubmit();
+      result.current.submitFailure('boom');
+    });
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.draftMessage).toBe('draft text');
+    expect(result.current.errorMessage).toBe('boom');
+    expect(result.current.showProvisionalThread).toBe(false);
+  });
+
+  it('reuses same ids on retry after error', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+    });
+
+    const { idempotencyKey, newHossiiId } = result.current;
+
+    act(() => {
+      result.current.beginSubmit();
+      result.current.submitFailure('fail');
+      result.current.beginSubmit();
+    });
+
+    expect(result.current.idempotencyKey).toBe(idempotencyKey);
+    expect(result.current.newHossiiId).toBe(newHossiiId);
+    expect(result.current.phase).toBe('submitting');
+  });
+
+  it('prevents double submit while submitting', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+    });
+
+    let first = false;
+    let second = false;
+    act(() => {
+      first = result.current.beginSubmit();
+      second = result.current.beginSubmit();
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+  });
+
+  it('clears all state on cancel', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+      result.current.setDraftMessage('draft');
+      result.current.cancel();
+    });
+
+    expect(result.current.phase).toBe('idle');
+    expect(result.current.originHossiiId).toBeNull();
+    expect(result.current.draftMessage).toBe('');
+  });
+
+  it('resets to idle on success', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+      result.current.beginSubmit();
+      result.current.submitSuccess();
+    });
+
+    expect(result.current.phase).toBe('idle');
+    expect(result.current.isActive).toBe(false);
+  });
+});
+
+describe('type editor mutual exclusion helpers', () => {
+  it('blocks Type B when Type A is active', () => {
+    expect(isTypeAEditorBlockingTypeB('pickingTarget')).toBe(true);
+    expect(isTypeAEditorBlockingTypeB('idle')).toBe(false);
+    expect(isTypeAEditorBlockingTypeB('error')).toBe(false);
+  });
+
+  it('blocks Type A when Type B is composing or submitting', () => {
+    expect(isTypeBEditorBlockingTypeA('composing')).toBe(true);
+    expect(isTypeBEditorBlockingTypeA('submitting')).toBe(true);
+    expect(isTypeBEditorBlockingTypeA('error')).toBe(false);
+    expect(isTypeBEditorBlockingTypeA('idle')).toBe(false);
+  });
+});

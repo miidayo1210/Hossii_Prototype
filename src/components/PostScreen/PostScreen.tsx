@@ -105,10 +105,22 @@ function parseHashtags(text: string): string[] {
   return [...new Set(matches.map((t) => t.slice(1)))];
 }
 
+type TypeBPostMode = {
+  prompt: string;
+  draftMessage: string;
+  onDraftChange: (message: string) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+  errorMessage: string | null;
+  onRetry: () => void;
+};
+
 type Props = {
   panelMode?: 'side' | 'bottom';
   initialPosition?: { x: number; y: number };
   onClose?: () => void;
+  /** Type B「つなげて作る」: PostScreen shell の簡略モード */
+  typeBMode?: TypeBPostMode | null;
   /** 音声候補から開いたときのメッセージ初期値 */
   initialMessage?: string;
   /** 音声パネル候補の編集モード（保存 / 気持ちを置く） */
@@ -136,7 +148,9 @@ export const PostScreen = ({
   speechToFreePosterRef,
   onSendingChange,
   postTargetOverride = null,
+  typeBMode = null,
 }: Props) => {
+  const isTypeBMode = typeBMode != null;
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -146,6 +160,16 @@ export const PostScreen = ({
   useEffect(() => {
     onSendingChange?.(sending);
   }, [sending, onSendingChange]);
+
+  useEffect(() => {
+    if (!isTypeBMode || typeBMode == null) return;
+    setMessage(typeBMode.draftMessage);
+  }, [isTypeBMode, typeBMode]);
+
+  useEffect(() => {
+    if (!isTypeBMode || !typeBMode) return;
+    onSendingChange?.(typeBMode.submitting);
+  }, [isTypeBMode, typeBMode, onSendingChange]);
 
   useEffect(() => {
     return () => {
@@ -846,6 +870,28 @@ export const PostScreen = ({
     setToast({ message: '候補テキストを更新したよ', type: 'success' });
   };
 
+  const handleTypeBSubmitClick = () => {
+    if (!typeBMode || typeBMode.submitting) return;
+    const trimmed = message.trim();
+    if (!trimmed) {
+      setToast({ message: 'メッセージを入力してください', type: 'error' });
+      return;
+    }
+    typeBMode.onSubmit();
+  };
+
+  const handleTypeBMessageChange = (value: string) => {
+    setMessage(value);
+    typeBMode?.onDraftChange(value);
+  };
+
+  const handleTypeBMessageKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (!typeBMode?.submitting && message.trim()) handleTypeBSubmitClick();
+    }
+  };
+
   return (
     <div className={`${styles.container}${panelMode ? ` ${styles.panelContainer}` : ''}`}>
       {/* パネルモード: 閉じるボタン */}
@@ -880,8 +926,48 @@ export const PostScreen = ({
         className={panelMode ? styles.panelMain : styles.main}
         data-panel-scroll={panelMode ? true : undefined}
       >
-        <h2 className={styles.title}>気持ちを置く 🌸</h2>
+        <h2 className={styles.title}>{isTypeBMode ? typeBMode!.prompt : '気持ちを置く 🌸'}</h2>
 
+        {isTypeBMode && typeBMode ? (
+          <div className={panelMode ? styles.panelSection : styles.section} data-type-b-post-form>
+            {typeBMode.errorMessage ? (
+              <div className={styles.typeBErrorBanner} data-type-b-error role="alert">
+                <p>{typeBMode.errorMessage}</p>
+                <button
+                  type="button"
+                  className={styles.typeBRetryButton}
+                  onClick={typeBMode.onRetry}
+                  disabled={typeBMode.submitting}
+                >
+                  もう一度試す
+                </button>
+              </div>
+            ) : null}
+            <PostFieldLabel label="メッセージ" required />
+            <textarea
+              ref={messageTextareaRef}
+              value={message}
+              onChange={(e) => handleTypeBMessageChange(e.target.value)}
+              onKeyDown={handleTypeBMessageKeyDown}
+              placeholder="なんでも書いてね…"
+              className={styles.textarea}
+              rows={4}
+              maxLength={200}
+              disabled={typeBMode.submitting}
+              data-type-b-message-input
+            />
+            <button
+              type="button"
+              onClick={handleTypeBSubmitClick}
+              disabled={typeBMode.submitting || !message.trim()}
+              className={styles.submitButton}
+              data-type-b-submit
+            >
+              {typeBMode.submitting ? '送信中...' : 'つなげて置く'}
+            </button>
+          </div>
+        ) : (
+          <>
         {isWebSerialSupported() && (
           <div className={styles.serialTestRow}>
             <span className={styles.serialTestLabel}>Arduino（テスト）</span>
@@ -1336,9 +1422,11 @@ export const PostScreen = ({
         )}
           </>
         )}
+          </>
+        )}
 
         {/* 連続投稿チェックボックス（音声候補編集時は非表示） */}
-        {!(speechEditMode && panelMode) && (
+        {!isTypeBMode && !(speechEditMode && panelMode) && (
           <label className={styles.continuousPostLabel}>
             <input
               type="checkbox"

@@ -296,6 +296,13 @@ describe('useSpaceConnectionIntegration', () => {
       );
     });
 
+    it('blocks Type A connect menu when Type B editor is composing', () => {
+      const options = makeOptions({ typeBEditorBlockingTypeA: true });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeUndefined();
+    });
+
     it('allows super admin even with none membership', () => {
       const options = makeOptions({
         currentUser: makeSuperAdminUser(),

@@ -45,6 +45,7 @@ type BubbleActionMenuBubbleProps = {
   onConnect?: () => void;
   onCreateConnectedHossii?: () => void;
   connectionCreateBlockedReason?: string;
+  typeBCreateBlockedReason?: string;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
   connectionCount?: number;
@@ -74,6 +75,8 @@ type Options = {
   viewMode: ViewMode;
   presentationMode: PresentationMode;
   contextActivePaneId: string | null | undefined;
+  /** Type B composing/submitting 中は Type A create をブロック */
+  typeBEditorBlockingTypeA?: boolean;
   onCreateConnectedHossii?: (originId: string) => void;
 };
 
@@ -97,6 +100,7 @@ export function useSpaceConnectionIntegration({
   viewMode,
   presentationMode,
   contextActivePaneId,
+  typeBEditorBlockingTypeA = false,
   onCreateConnectedHossii,
 }: Options) {
   const typeAWriteGate = useMemo(
@@ -382,13 +386,21 @@ export function useSpaceConnectionIntegration({
   );
 
   const handleConnectFromMenu = useCallback(() => {
-    if (!isConnectionsContextEnabled || !canCreateTypeAConnection || !selectedBubbleId) return;
+    if (
+      !isConnectionsContextEnabled ||
+      !canCreateTypeAConnection ||
+      !selectedBubbleId ||
+      typeBEditorBlockingTypeA
+    ) {
+      return;
+    }
     closeBubbleActionMenu();
     editor.startCreate(selectedBubbleId);
   }, [
     isConnectionsContextEnabled,
     canCreateTypeAConnection,
     selectedBubbleId,
+    typeBEditorBlockingTypeA,
     editor,
     closeBubbleActionMenu,
   ]);
@@ -398,7 +410,8 @@ export function useSpaceConnectionIntegration({
       !onCreateConnectedHossii ||
       !isConnectionsContextEnabled ||
       !canCreateTypeBConnection ||
-      !selectedBubbleId
+      !selectedBubbleId ||
+      typeBEditorBlockingTypeA
     ) {
       return;
     }
@@ -409,6 +422,7 @@ export function useSpaceConnectionIntegration({
     isConnectionsContextEnabled,
     canCreateTypeBConnection,
     selectedBubbleId,
+    typeBEditorBlockingTypeA,
     closeBubbleActionMenu,
   ]);
 
@@ -481,19 +495,32 @@ export function useSpaceConnectionIntegration({
           ? formatConnectionCreateBlockedReasonMessage(typeAWriteGate.blockReason) ?? undefined
           : undefined;
 
+      const typeBCreateBlockedReason =
+        isConnectionsContextEnabled &&
+        !canCreateTypeBConnection &&
+        !membershipJoinStatus
+          ? formatConnectionCreateBlockedReasonMessage(typeBWriteGate.blockReason) ?? undefined
+          : typeBEditorBlockingTypeA
+            ? 'いまは他のつながり操作の途中です'
+            : undefined;
+
       return {
         ...base,
         onConnect:
-          isConnectionsContextEnabled && canCreateTypeAConnection
+          isConnectionsContextEnabled &&
+          canCreateTypeAConnection &&
+          !typeBEditorBlockingTypeA
             ? handleConnectFromMenu
             : undefined,
         onCreateConnectedHossii:
           onCreateConnectedHossii &&
           isConnectionsContextEnabled &&
-          canCreateTypeBConnection
+          canCreateTypeBConnection &&
+          !typeBEditorBlockingTypeA
             ? handleCreateConnectedHossiiFromMenu
             : undefined,
         connectionCreateBlockedReason,
+        typeBCreateBlockedReason,
         membershipJoinStatus:
           isConnectionsContextEnabled && membershipJoinStatus ? membershipJoinStatus : undefined,
         onMembershipRetry:
@@ -514,7 +541,9 @@ export function useSpaceConnectionIntegration({
       getBubbleActionMenuProps,
       isConnectionsContextEnabled,
       canCreateTypeAConnection,
+      typeBEditorBlockingTypeA,
       typeAWriteGate.blockReason,
+      typeBWriteGate.blockReason,
       handleConnectFromMenu,
       onCreateConnectedHossii,
       canCreateTypeBConnection,
