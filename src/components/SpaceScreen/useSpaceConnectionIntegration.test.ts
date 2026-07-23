@@ -110,6 +110,7 @@ function makeOverlayInputs(
     selectedDirectConnectionCount: 0,
     connections: [],
     refetch: vi.fn(),
+    fetchError: false,
     isConnectionsContextEnabled: true,
     connectionBadgeCountByHossiiId: new Map(),
     ...overrides,

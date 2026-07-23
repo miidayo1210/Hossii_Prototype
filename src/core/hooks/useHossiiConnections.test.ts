@@ -66,6 +66,30 @@ describe('useHossiiConnections', () => {
 
     await waitFor(() => {
       expect(result.current.connections).toEqual([]);
+      expect(result.current.fetchError).toBe(true);
+    });
+  });
+
+  it('clears fetchError when disabled', async () => {
+    fetchConnectionsMock.mockResolvedValue({
+      ok: false,
+      message: 'network error',
+    });
+
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) =>
+        useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled }),
+      { initialProps: { enabled: true } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.fetchError).toBe(true);
+    });
+
+    rerender({ enabled: false });
+
+    await waitFor(() => {
+      expect(result.current.fetchError).toBe(false);
     });
   });
 
@@ -208,8 +232,66 @@ describe('useHossiiConnections', () => {
 
     await waitFor(() => {
       expect(fetchConnectionsMock).toHaveBeenCalledTimes(2);
+      expect(result.current.fetchError).toBe(true);
     });
 
+    expect(result.current.connections).toEqual([connectionP1]);
+  });
+
+  it('clears fetchError after refetch success', async () => {
+    fetchConnectionsMock
+      .mockResolvedValueOnce({ ok: false, message: 'network error' })
+      .mockResolvedValueOnce({ ok: true, connections: [connectionP1] });
+
+    const { result } = renderHook(() =>
+      useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled: true }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.fetchError).toBe(true);
+    });
+
+    act(() => {
+      result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(result.current.fetchError).toBe(false);
+      expect(result.current.connections).toEqual([connectionP1]);
+    });
+  });
+
+  it('does not spam fetchError when repeated refetch fails', async () => {
+    fetchConnectionsMock
+      .mockResolvedValueOnce({ ok: true, connections: [connectionP1] })
+      .mockResolvedValue({ ok: false, message: 'network error' });
+
+    const { result } = renderHook(() =>
+      useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled: true }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.connections).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(result.current.fetchError).toBe(true);
+    });
+
+    act(() => {
+      result.current.refetch();
+      result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(fetchConnectionsMock.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    expect(result.current.fetchError).toBe(true);
     expect(result.current.connections).toEqual([connectionP1]);
   });
 

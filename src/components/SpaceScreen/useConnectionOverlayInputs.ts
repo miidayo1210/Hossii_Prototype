@@ -33,6 +33,7 @@ export type ConnectionOverlayInputs = {
   selectedDirectConnectionCount: number;
   connections: ReturnType<typeof useHossiiConnections>['connections'];
   refetch: ReturnType<typeof useHossiiConnections>['refetch'];
+  fetchError: ReturnType<typeof useHossiiConnections>['fetchError'];
   isConnectionsContextEnabled: boolean;
   connectionBadgeCountByHossiiId: ReadonlyMap<string, number>;
 };
@@ -69,7 +70,7 @@ export function useConnectionOverlayInputs({
     paneId,
   });
 
-  const { connections, refetch } = useHossiiConnections({
+  const { connections, refetch, fetchError } = useHossiiConnections({
     spaceId,
     paneId,
     enabled: fetchEnabled,
@@ -108,6 +109,7 @@ export function useConnectionOverlayInputs({
     selectedDirectConnectionCount,
     connections,
     refetch,
+    fetchError,
     isConnectionsContextEnabled: contextEnabled,
     connectionBadgeCountByHossiiId,
   };
