@@ -390,6 +390,94 @@ describe('useConnectionEditor', () => {
     expect(callbacks.onUpdateReason).not.toHaveBeenCalled();
     expect(result.current.phase).toBe('error');
     expect(result.current.errorMessage).toBe('strength failed');
+    expect(result.current.editingConnection?.strength).toBe('medium');
+  });
+
+  it('retries strength update after strength-only failure without touching reason', async () => {
+    callbacks.onUpdateStrength = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false as const, message: 'strength failed' })
+      .mockResolvedValueOnce({
+        ok: true as const,
+        data: makeConnection({ strength: 'strong' }),
+      });
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection();
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.chooseStrength('strong');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(result.current.editingConnection?.strength).toBe('medium');
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).toHaveBeenCalledTimes(2);
+    expect(callbacks.onUpdateReason).not.toHaveBeenCalled();
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('syncs strength after partial success and retries reason only', async () => {
+    callbacks.onUpdateStrength = vi.fn(async () => ({
+      ok: true as const,
+      data: makeConnection({ strength: 'strong' }),
+    }));
+    callbacks.onUpdateReason = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false as const, message: 'reason failed' })
+      .mockResolvedValueOnce({
+        ok: true as const,
+        data: makeConnection({
+          strength: 'strong',
+          reasonText: '新しい理由',
+          reasonEmoji: '💡',
+        }),
+      });
+
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection();
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.chooseStrength('strong');
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('新しい理由');
+      result.current.toggleDraftReasonEmoji('💡');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.errorMessage).toBe('reason failed');
+    expect(result.current.selectedStrength).toBe('strong');
+    expect(result.current.editingConnection?.strength).toBe('strong');
+    expect(result.current.draftReasonText).toBe('新しい理由');
+    expect(result.current.draftReasonEmoji).toBe('💡');
+    expect(callbacks.onUpdateStrength).toHaveBeenCalledTimes(1);
+    expect(callbacks.onUpdateReason).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).toHaveBeenCalledTimes(1);
+    expect(callbacks.onUpdateReason).toHaveBeenCalledTimes(2);
+    expect(callbacks.onUpdateReason).toHaveBeenLastCalledWith({
+      connectionId: 'conn-1',
+      reasonText: '新しい理由',
+      reasonEmoji: '💡',
+    });
+    expect(result.current.phase).toBe('idle');
   });
 
   it('prevents double submit while retrying after error', async () => {
