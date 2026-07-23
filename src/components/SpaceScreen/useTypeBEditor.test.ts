@@ -1,9 +1,16 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const generateIdMock = vi.hoisted(() =>
   vi.fn(() => `id-${Math.random().toString(36).slice(2, 8)}`),
+);
+
+const randomUUIDMock = vi.hoisted(() =>
+  vi.fn(() => '11111111-1111-4111-8111-111111111111'),
 );
 
 vi.mock('../../core/utils', () => ({
@@ -15,14 +22,22 @@ import { useTypeBEditor, isTypeAEditorBlockingTypeB, isTypeBEditorBlockingTypeA 
 describe('useTypeBEditor', () => {
   beforeEach(() => {
     generateIdMock.mockReset();
-    generateIdMock
-      .mockReturnValueOnce('idem-1')
-      .mockReturnValueOnce('new-1')
-      .mockReturnValueOnce('idem-2')
-      .mockReturnValueOnce('new-2');
+    randomUUIDMock.mockReset();
+    vi.stubGlobal('crypto', {
+      ...globalThis.crypto,
+      randomUUID: randomUUIDMock,
+    });
+    randomUUIDMock
+      .mockReturnValueOnce('11111111-1111-4111-8111-111111111111')
+      .mockReturnValueOnce('22222222-2222-4222-8222-222222222222');
+    generateIdMock.mockReturnValueOnce('new-1').mockReturnValueOnce('new-2');
   });
 
-  it('starts composing with generated ids and placement', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('starts composing with UUID idempotency key and generateId new hossii id', () => {
     const { result } = renderHook(() => useTypeBEditor());
 
     act(() => {
@@ -37,8 +52,12 @@ describe('useTypeBEditor', () => {
     expect(result.current.originHossiiId).toBe('origin-1');
     expect(result.current.positionX).toBe(42);
     expect(result.current.positionY).toBe(55);
-    expect(result.current.idempotencyKey).toBe('idem-1');
+    expect(result.current.idempotencyKey).toBe('11111111-1111-4111-8111-111111111111');
+    expect(result.current.idempotencyKey).toMatch(UUID_V4_PATTERN);
     expect(result.current.newHossiiId).toBe('new-1');
+    expect(result.current.idempotencyKey).not.toBe(result.current.newHossiiId);
+    expect(randomUUIDMock).toHaveBeenCalledTimes(1);
+    expect(generateIdMock).toHaveBeenCalledTimes(1);
     expect(result.current.showProvisionalThread).toBe(true);
     expect(result.current.isBubbleSwitchBlocked).toBe(true);
   });
@@ -88,6 +107,36 @@ describe('useTypeBEditor', () => {
     expect(result.current.idempotencyKey).toBe(idempotencyKey);
     expect(result.current.newHossiiId).toBe(newHossiiId);
     expect(result.current.phase).toBe('submitting');
+    expect(randomUUIDMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('issues a new UUID after cancel and recompose', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+    });
+
+    expect(result.current.idempotencyKey).toBe('11111111-1111-4111-8111-111111111111');
+
+    act(() => {
+      result.current.cancel();
+    });
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 12,
+        positionY: 24,
+      });
+    });
+
+    expect(result.current.idempotencyKey).toBe('22222222-2222-4222-8222-222222222222');
+    expect(randomUUIDMock).toHaveBeenCalledTimes(2);
   });
 
   it('prevents double submit while submitting', () => {
