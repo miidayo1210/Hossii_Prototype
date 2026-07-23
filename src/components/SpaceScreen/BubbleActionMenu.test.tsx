@@ -45,20 +45,41 @@ describe('BubbleActionMenu', () => {
   it('invokes callbacks on click', () => {
     const onViewDetail = vi.fn();
     const onConnect = vi.fn();
+    const onCreateConnectedHossii = vi.fn();
 
     render(
       <BubbleActionMenu
         anchorRect={anchorRect}
         onViewDetail={onViewDetail}
         onConnect={onConnect}
+        onCreateConnectedHossii={onCreateConnectedHossii}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'くわしく見る' }));
     fireEvent.click(screen.getByRole('button', { name: 'つないでみる' }));
+    fireEvent.click(screen.getByRole('button', { name: 'つなげて作る' }));
 
     expect(onViewDetail).toHaveBeenCalledTimes(1);
     expect(onConnect).toHaveBeenCalledTimes(1);
+    expect(onCreateConnectedHossii).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Type B create button when handler provided', () => {
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onCreateConnectedHossii={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'つなげて作る' })).toBeTruthy();
+  });
+
+  it('hides Type B create button when handler omitted', () => {
+    render(<BubbleActionMenu anchorRect={anchorRect} onViewDetail={() => {}} />);
+
+    expect(screen.queryByRole('button', { name: 'つなげて作る' })).toBeNull();
   });
 
   it('portals to document.body', () => {

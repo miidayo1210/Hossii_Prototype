@@ -80,6 +80,9 @@ import {
   shouldShowSpaceHossiiConnectionHandle,
 } from '../../core/utils/connectionFetchGate';
 import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
+import { useSpaceTypeBIntegration } from './useSpaceTypeBIntegration';
+import { isTypeBEditorBlockingTypeA, useTypeBEditor } from './useTypeBEditor';
+import { TypeBProvisionalThread } from './TypeBProvisionalThread';
 import { useSpaceConnectionPull } from './useSpaceConnectionPull';
 import { ConnectionEditorPortals } from './ConnectionEditorPortals';
 import { ConnectionFetchErrorNotice } from './ConnectionFetchErrorNotice';
@@ -511,6 +514,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const [speechEditOriginal, setSpeechEditOriginal] = useState<string | undefined>();
   const [speechPostInitialMessage, setSpeechPostInitialMessage] = useState<string | undefined>();
   const [postScreenKey, setPostScreenKey] = useState(0);
+  const [typeBPostScreenKey, setTypeBPostScreenKey] = useState(0);
 
   // クイック投稿パネル（開閉とダブルタップ位置は別管理）
   const [quickPostOpen, setQuickPostOpen] = useState(false);
@@ -1692,11 +1696,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     refetchConnections();
   }, [refetchConnections]);
 
+  const typeBEditor = useTypeBEditor();
+  const typeBStartRef = useRef<(originId: string) => void>(() => {});
+
   const {
     overlayProps: connectionOverlayProps,
     resetConnectionState,
     handleBubbleSelect,
-    handleBubbleDeselect,
     getIntegratedBubbleActionMenuProps,
     getConnectionBadgeCount,
     isPickingTarget,
@@ -1729,7 +1735,56 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     viewMode,
     presentationMode,
     contextActivePaneId,
+    typeBEditorBlockingTypeA: isTypeBEditorBlockingTypeA(typeBEditor.phase),
+    onCreateConnectedHossii: (originId) => typeBStartRef.current(originId),
   });
+
+  const typeBIntegration = useSpaceTypeBIntegration({
+    editor: typeBEditor,
+    typeAEditorPhase: connectionEditor.phase,
+    currentUser,
+    activeSpace: contentSpace ?? activeSpace,
+    isContentArchived,
+    activeSpaceMembershipStatus,
+    spaceId: contentSpaceId ?? activeSpaceId ?? '',
+    paneId: connectionActivePaneId,
+    selectedBubbleId,
+    setSelectedBubbleId,
+    filteredHossiis,
+    isConnectionsContextEnabled,
+    refetchConnections,
+    syncFetchedHossiis,
+    screenQueryKey,
+    displayPeriod,
+    paneContext: contentPaneContext,
+    getExistingHossiis: () => hossiisRef.current,
+    bubbleAreaRef,
+    contextActivePaneId,
+    presentationMode,
+    viewMode,
+    layoutMode,
+    onPostPanelOpen: () => {
+      setTypeBPostScreenKey((k) => k + 1);
+      if (quickPostOpen) handleQuickPostClose();
+    },
+  });
+  typeBStartRef.current = typeBIntegration.startFromOrigin;
+
+  const resetConnectionStateWithTypeB = useCallback(() => {
+    if (connectionEditor.isSaving || connectionEditor.phase === 'saving') return;
+    if (!typeBIntegration.resetIfAllowed()) return;
+    resetConnectionState();
+  }, [connectionEditor.isSaving, connectionEditor.phase, typeBIntegration, resetConnectionState]);
+
+  const handleBubbleDeselectWithTypeB = resetConnectionStateWithTypeB;
+
+  const handleBubbleSelectWithTypeB = useCallback(
+    (id: string) => {
+      if (typeBIntegration.isBubbleSwitchBlocked) return;
+      handleBubbleSelect(id);
+    },
+    [typeBIntegration.isBubbleSwitchBlocked, handleBubbleSelect],
+  );
 
   const visibleHossiiIdsForPull = useMemo(
     () => new Set(filteredHossiis.map((h) => h.id)),
@@ -1744,6 +1799,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     visibleHossiiIds: visibleHossiiIdsForPull,
     isConnectionsContextEnabled,
     editorPhase: connectionEditor.phase,
+    typeBEditorActive: typeBIntegration.isTypeBEditorActive,
     bubbleInteractionLock,
   });
 
@@ -1805,27 +1861,38 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !isVisiting &&
     !isContentArchived;
 
-  const showSpaceHossiiConnectionHandle = shouldShowSpaceHossiiConnectionHandle({
-    isMobilePortrait,
-    isMobileLandscape,
-    isConnectionsContextEnabled: connectionsContextEnabled,
-    hossiiVisible: controlState.hossiiVisible,
-    selectedBubbleId,
-    directConnectionCount: selectedDirectConnectionCount,
-  });
+  const showSpaceHossiiConnectionHandle =
+    !typeBIntegration.isTypeBEditorActive &&
+    shouldShowSpaceHossiiConnectionHandle({
+      isMobilePortrait,
+      isMobileLandscape,
+      isConnectionsContextEnabled: connectionsContextEnabled,
+      hossiiVisible: controlState.hossiiVisible,
+      selectedBubbleId,
+      directConnectionCount: selectedDirectConnectionCount,
+    });
 
   shouldAllowBubbleResetRef.current = () =>
-    !connectionEditor.isSaving && connectionEditor.phase !== 'saving';
-  handleEscapeResetRef.current = handleEscapeReset;
+    !connectionEditor.isSaving &&
+    connectionEditor.phase !== 'saving' &&
+    !typeBEditor.isSubmitting &&
+    !typeBIntegration.isBubbleSwitchBlocked;
+  handleEscapeResetRef.current = () => {
+    if (typeBEditor.isActive) {
+      typeBIntegration.handleEscapeReset();
+      return;
+    }
+    handleEscapeReset();
+  };
 
   const prevMobilePortraitRef = useRef(isMobilePortrait);
   useEffect(() => {
     const wasNotPortrait = !prevMobilePortraitRef.current;
     prevMobilePortraitRef.current = isMobilePortrait;
     if (wasNotPortrait && isMobilePortrait) {
-      resetConnectionState();
+      resetConnectionStateWithTypeB();
     }
-  }, [isMobilePortrait, resetConnectionState]);
+  }, [isMobilePortrait, resetConnectionStateWithTypeB]);
 
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
@@ -2320,6 +2387,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   }, [mobilePostSplit]);
   /** スマホ横: 左スペース + 右固定投稿ドック */
   const mobilePostLandscapeSplit = isMobileLandscape && quickPostOpen;
+  const typeBPostOpen = typeBIntegration.typeBPostOpen;
+  const mobileTypeBPostSplit = useMobileBottomSheet && typeBPostOpen;
+  const mobileTypeBPostLandscapeSplit = isMobileLandscape && typeBPostOpen;
 
   const quickPostPanel = (
     <PostScreen
@@ -2334,6 +2404,16 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
       speechToFreePosterRef={speechToFreePosterRef}
       onSendingChange={setPostSending}
       postTargetOverride={postTargetOverride}
+    />
+  );
+
+  const typeBPostPanel = (
+    <PostScreen
+      key={typeBPostScreenKey}
+      panelMode={mobileTypeBPostSplit ? 'bottom' : 'side'}
+      onClose={typeBIntegration.handleCancel}
+      typeBMode={typeBIntegration.postScreenTypeBMode}
+      onSendingChange={setPostSending}
     />
   );
 
@@ -2416,7 +2496,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           if (target.closest('[data-connection-editor-popover]')) return;
           if (target.closest('[data-bubble-action-menu]')) return;
           if (target.closest('[data-connection-list-popover]')) return;
-          resetConnectionState();
+          resetConnectionStateWithTypeB();
         }}
       >
         <PinTray
@@ -2448,6 +2528,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           {...connectionOverlayProps}
           hitPathsDisabled={connectionPull.isPulling}
         />
+        {typeBIntegration.provisionalThread && (
+          <TypeBProvisionalThread
+            bubbleAreaRef={bubbleAreaRef}
+            originHossiiId={typeBIntegration.provisionalThread.originHossiiId}
+            positionX={typeBIntegration.provisionalThread.positionX}
+            positionY={typeBIntegration.provisionalThread.positionY}
+          />
+        )}
         <ConnectionEditorPortals
           editor={connectionEditor}
           selectedBubbleId={selectedBubbleId}
@@ -2563,7 +2651,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                   )
                 }
                 isSelected={isThisSelected}
-                onSelect={handleBubbleSelect}
+                onSelect={handleBubbleSelectWithTypeB}
                 onPositionSave={handlePositionSave}
                 onScaleSave={handleScaleSave}
                 onColorSave={handleColorSave}
@@ -2579,13 +2667,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 showPinUi={showPinUi}
                 animationLevel={animationLevel}
                 canManageOwn={canManageOwnHossii(hossii.id)}
-                onOwnerDeleted={handleBubbleDeselect}
+                onOwnerDeleted={handleBubbleDeselectWithTypeB}
                 connectionBadgeCount={getConnectionBadgeCount(hossii.id)}
                 isConnectionPickTarget={
                   isPickingTarget && !isThisSelected && connectionEditor.sourceId !== hossii.id
                 }
                 suppressActionMenuToggle={
-                  connectionEditor.phase !== 'idle' && connectionEditor.phase !== 'error'
+                  (connectionEditor.phase !== 'idle' && connectionEditor.phase !== 'error') ||
+                  typeBIntegration.isBubbleSwitchBlocked
                 }
                 showPullHandle={isThisSelected && connectionPull.pullHandleVisible && showConnectionPullHandles}
                 showBubblePullHandle={
@@ -2598,7 +2687,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onPullHandlePointerDown={connectionPull.handlers.onPointerDown}
                 pullStarParticleCount={connectionPull.starParticleCount}
                 isConnectionPulling={connectionPull.isPulling}
-                suppressBubbleDrag={connectionPull.isPulling}
+                suppressBubbleDrag={
+                  connectionPull.isPulling ||
+                  (typeBEditor.isActive && hossii.id === typeBEditor.originHossiiId)
+                }
                 suppressClickAfterPullRef={connectionPull.suppressClickAfterPullRef}
                 onBubbleDragStateChange={handleBubbleDragStateChange}
                 {...getIntegratedBubbleActionMenuProps(hossii.id, isThisSelected)}
@@ -3052,7 +3144,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           <button
             type="button"
             className={`${styles.editToolbarBtn} ${styles.editToolbarBtnCancel}`}
-            onClick={handleBubbleDeselect}
+            onClick={handleBubbleDeselectWithTypeB}
           >
             ✕ 選択解除
           </button>
@@ -3239,6 +3331,26 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             className={styles.quickPostSideChrome}
           >
             {quickPostPanel}
+          </FloatingPanelShell>
+        ))}
+
+      {typeBPostOpen && !isContentArchived &&
+        (mobileTypeBPostSplit ? (
+          <div className={styles.mobilePostSheet}>{typeBPostPanel}</div>
+        ) : mobileTypeBPostLandscapeSplit ? (
+          <div className={`${styles.mobilePostSideDock} ${styles.quickPostSideChrome}`}>
+            {typeBPostPanel}
+          </div>
+        ) : (
+          <FloatingPanelShell
+            storageKey="typeBPost.desktop"
+            defaultRect={quickPostDefaultRect}
+            minW={280}
+            minH={280}
+            zIndex={310}
+            className={styles.quickPostSideChrome}
+          >
+            {typeBPostPanel}
           </FloatingPanelShell>
         ))}
 

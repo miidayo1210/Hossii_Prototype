@@ -124,6 +124,7 @@ export function BubbleActionMenu({
         <button
           type="button"
           className={styles.menuItem}
+          data-type-b-create-connected
           onClick={onCreateConnectedHossii}
         >
           つなげて作る

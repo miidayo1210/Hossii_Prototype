@@ -74,6 +74,8 @@ type Options = {
   viewMode: ViewMode;
   presentationMode: PresentationMode;
   contextActivePaneId: string | null | undefined;
+  /** Type B composing/submitting 中は Type A create をブロック */
+  typeBEditorBlockingTypeA?: boolean;
   onCreateConnectedHossii?: (originId: string) => void;
 };
 
@@ -97,6 +99,7 @@ export function useSpaceConnectionIntegration({
   viewMode,
   presentationMode,
   contextActivePaneId,
+  typeBEditorBlockingTypeA = false,
   onCreateConnectedHossii,
 }: Options) {
   const typeAWriteGate = useMemo(
@@ -382,13 +385,21 @@ export function useSpaceConnectionIntegration({
   );
 
   const handleConnectFromMenu = useCallback(() => {
-    if (!isConnectionsContextEnabled || !canCreateTypeAConnection || !selectedBubbleId) return;
+    if (
+      !isConnectionsContextEnabled ||
+      !canCreateTypeAConnection ||
+      !selectedBubbleId ||
+      typeBEditorBlockingTypeA
+    ) {
+      return;
+    }
     closeBubbleActionMenu();
     editor.startCreate(selectedBubbleId);
   }, [
     isConnectionsContextEnabled,
     canCreateTypeAConnection,
     selectedBubbleId,
+    typeBEditorBlockingTypeA,
     editor,
     closeBubbleActionMenu,
   ]);
@@ -398,7 +409,8 @@ export function useSpaceConnectionIntegration({
       !onCreateConnectedHossii ||
       !isConnectionsContextEnabled ||
       !canCreateTypeBConnection ||
-      !selectedBubbleId
+      !selectedBubbleId ||
+      typeBEditorBlockingTypeA
     ) {
       return;
     }
@@ -409,13 +421,14 @@ export function useSpaceConnectionIntegration({
     isConnectionsContextEnabled,
     canCreateTypeBConnection,
     selectedBubbleId,
+    typeBEditorBlockingTypeA,
     closeBubbleActionMenu,
   ]);
 
   const handleConnectionOverlayClick = useCallback(
     (connection: HossiiConnection) => {
       if (!isConnectionsContextEnabled || !canEditConnection(connection)) return;
-      if (isEditorSaving) return;
+      if (isEditorSaving || typeBEditorBlockingTypeA) return;
       if (
         editor.phase === 'editing' ||
         editor.phase === 'error' ||
@@ -427,7 +440,7 @@ export function useSpaceConnectionIntegration({
       }
       editor.startEdit(connection);
     },
-    [isConnectionsContextEnabled, canEditConnection, isEditorSaving, editor],
+    [isConnectionsContextEnabled, canEditConnection, isEditorSaving, typeBEditorBlockingTypeA, editor],
   );
 
   const openConnectionList = useCallback(() => {
@@ -484,13 +497,16 @@ export function useSpaceConnectionIntegration({
       return {
         ...base,
         onConnect:
-          isConnectionsContextEnabled && canCreateTypeAConnection
+          isConnectionsContextEnabled &&
+          canCreateTypeAConnection &&
+          !typeBEditorBlockingTypeA
             ? handleConnectFromMenu
             : undefined,
         onCreateConnectedHossii:
           onCreateConnectedHossii &&
           isConnectionsContextEnabled &&
-          canCreateTypeBConnection
+          canCreateTypeBConnection &&
+          !typeBEditorBlockingTypeA
             ? handleCreateConnectedHossiiFromMenu
             : undefined,
         connectionCreateBlockedReason,
@@ -514,6 +530,7 @@ export function useSpaceConnectionIntegration({
       getBubbleActionMenuProps,
       isConnectionsContextEnabled,
       canCreateTypeAConnection,
+      typeBEditorBlockingTypeA,
       typeAWriteGate.blockReason,
       handleConnectFromMenu,
       onCreateConnectedHossii,
