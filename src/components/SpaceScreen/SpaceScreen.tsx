@@ -145,6 +145,10 @@ import { POST_FAILURE_EVENT, formatPostFailureForDisplay, type PostFailureDetail
 import { isActiveSpaceShellUnavailable } from '../../core/utils/spaceShellAvailability';
 import { SpaceShellUnavailableView } from './SpaceShellUnavailableView';
 import { hasSeenSpaceGuide, markSpaceGuideSeen } from '../../core/utils/spaceGuideStorage';
+import {
+  hasSeenConnectionPullHint,
+  markConnectionPullHintSeen,
+} from '../../core/utils/connectionPullHintStorage';
 import { SpaceWelcomeGuide } from './SpaceWelcomeGuide';
 import {
   getDefaultQuickLogBottomRect,
@@ -1720,6 +1724,59 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     bubbleInteractionLock,
   });
 
+  const pullHintSpaceId = contentSpaceId ?? activeSpaceId ?? '';
+  const [connectionPullHintSeen, setConnectionPullHintSeen] = useState(() =>
+    pullHintSpaceId ? hasSeenConnectionPullHint(pullHintSpaceId) : true,
+  );
+  const [connectionPullHintDismissedSession, setConnectionPullHintDismissedSession] =
+    useState(false);
+  const hadConnectionPullSessionRef = useRef(false);
+
+  useEffect(() => {
+    setConnectionPullHintSeen(
+      pullHintSpaceId ? hasSeenConnectionPullHint(pullHintSpaceId) : true,
+    );
+    setConnectionPullHintDismissedSession(false);
+    hadConnectionPullSessionRef.current = false;
+  }, [pullHintSpaceId]);
+
+  useEffect(() => {
+    if (connectionPull.isPulling) {
+      hadConnectionPullSessionRef.current = true;
+      return;
+    }
+    if (
+      hadConnectionPullSessionRef.current &&
+      pullHintSpaceId &&
+      !connectionPullHintSeen
+    ) {
+      hadConnectionPullSessionRef.current = false;
+      markConnectionPullHintSeen(pullHintSpaceId);
+      setConnectionPullHintSeen(true);
+    }
+  }, [connectionPull.isPulling, pullHintSpaceId, connectionPullHintSeen]);
+
+  const handleConnectionPullHintDismiss = useCallback(() => {
+    if (pullHintSpaceId) {
+      markConnectionPullHintSeen(pullHintSpaceId);
+      setConnectionPullHintSeen(true);
+    }
+    setConnectionPullHintDismissedSession(true);
+  }, [pullHintSpaceId]);
+
+  const showBubblePullHandle =
+    !isMobile &&
+    isConnectionsContextEnabled &&
+    selectedBubbleId != null &&
+    connectionPull.pullHandleVisible;
+
+  const showConnectionPullHint =
+    showBubblePullHandle &&
+    !connectionPullHintSeen &&
+    !connectionPullHintDismissedSession &&
+    !isVisiting &&
+    !isContentArchived;
+
   shouldAllowBubbleResetRef.current = () =>
     !connectionEditor.isSaving && connectionEditor.phase !== 'saving';
   handleEscapeResetRef.current = handleEscapeReset;
@@ -2485,6 +2542,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                   connectionEditor.phase !== 'idle' && connectionEditor.phase !== 'error'
                 }
                 showPullHandle={isThisSelected && connectionPull.pullHandleVisible}
+                showBubblePullHandle={
+                  isThisSelected &&
+                  showBubblePullHandle &&
+                  connectionPull.pullHandleVisible
+                }
+                showConnectionPullHint={isThisSelected && showConnectionPullHint}
+                onConnectionPullHintDismiss={handleConnectionPullHintDismiss}
                 onPullHandlePointerDown={connectionPull.handlers.onPointerDown}
                 pullStarParticleCount={connectionPull.starParticleCount}
                 isConnectionPulling={connectionPull.isPulling}
