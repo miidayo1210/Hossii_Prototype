@@ -162,6 +162,23 @@ function reducer(state: EditorState, action: Action): EditorState {
   }
 }
 
+function isCreateSavePhase(state: EditorState): boolean {
+  if (state.phase === 'pickingStrength') return true;
+  return (
+    state.phase === 'error' &&
+    !state.editingConnection &&
+    Boolean(state.sourceId && state.targetId && state.selectedStrength)
+  );
+}
+
+function isEditSavePhase(state: EditorState): boolean {
+  if (state.phase === 'editing') return true;
+  return (
+    state.phase === 'error' &&
+    Boolean(state.editingConnection && state.selectedStrength)
+  );
+}
+
 function toSnapshot(state: EditorState): ConnectionEditorSnapshot {
   return {
     phase: state.phase,
@@ -257,8 +274,8 @@ export function useConnectionEditor(callbacks: ConnectionEditorCallbacks) {
 
   const submitSave = useCallback(async () => {
     const current = stateRef.current;
-    const isCreate = current.phase === 'pickingStrength';
-    const isEdit = current.phase === 'editing';
+    const isCreate = isCreateSavePhase(current);
+    const isEdit = isEditSavePhase(current);
 
     if (!isCreate && !isEdit) return false;
     if (!guardNotSaving()) return false;
