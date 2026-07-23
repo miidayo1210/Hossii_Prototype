@@ -218,6 +218,9 @@ describe('useSpaceConnectionIntegration', () => {
       expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeTypeOf(
         'function',
       );
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h1', true).connectionCreateBlockedReason,
+      ).toBeUndefined();
       expect(result.current.canEditConnection(ownConnection)).toBe(true);
       expect(result.current.canEditConnection(othersConnection)).toBe(false);
     });
@@ -232,6 +235,7 @@ describe('useSpaceConnectionIntegration', () => {
       expect(result.current.canCreateTypeAConnection).toBe(false);
       const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
       expect(menu.onConnect).toBeUndefined();
+      expect(menu.connectionCreateBlockedReason).toBe('参加すると、つながりを作れます');
       expect(result.current.overlayProps.onConnectionClick).toBeTypeOf('function');
     });
 
@@ -244,6 +248,9 @@ describe('useSpaceConnectionIntegration', () => {
 
       expect(result.current.canCreateTypeAConnection).toBe(false);
       expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeUndefined();
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h1', true).connectionCreateBlockedReason,
+      ).toBe('このスペースに参加すると作れます');
     });
 
     it('blocks connect while joining and shows joining status', () => {
@@ -255,6 +262,7 @@ describe('useSpaceConnectionIntegration', () => {
 
       const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
       expect(menu.onConnect).toBeUndefined();
+      expect(menu.connectionCreateBlockedReason).toBeUndefined();
       expect(menu.membershipJoinStatus).toBe('joining');
     });
 
@@ -269,6 +277,7 @@ describe('useSpaceConnectionIntegration', () => {
 
       const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
       expect(menu.onConnect).toBeUndefined();
+      expect(menu.connectionCreateBlockedReason).toBeUndefined();
       expect(menu.membershipJoinStatus).toBe('error');
       expect(menu.onMembershipRetry).toBe(retry);
     });
@@ -304,6 +313,7 @@ describe('useSpaceConnectionIntegration', () => {
       expect(result.current.canCreateTypeAConnection).toBe(false);
       const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
       expect(menu.onConnect).toBeUndefined();
+      expect(menu.connectionCreateBlockedReason).toBe('アーカイブ中は編集できません');
       expect(result.current.canEditConnection(makeConnection())).toBe(false);
     });
 
