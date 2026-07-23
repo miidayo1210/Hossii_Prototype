@@ -6,6 +6,7 @@ import {
   filterVisibleConnections,
   shouldShowConnectionOverlay,
 } from '../../core/utils/connectionVisibility';
+import { formatConnectionReasonDisplay } from '../../core/utils/formatConnectionReasonDisplay';
 import { getConnectionStrokeStyle } from '../../core/utils/connectionPath';
 import {
   useConnectionOverlayGeometry,
@@ -31,11 +32,21 @@ export type ConnectionOverlayProps = {
   onConnectionClick?: (connection: HossiiConnection) => void;
 };
 
+type ConnectionHoverPoint = {
+  x: number;
+  y: number;
+};
+
+type ConnectionHoverState = {
+  connectionId: string;
+  point: ConnectionHoverPoint;
+};
+
 type ConnectionPathPairProps = {
   connection: HossiiConnection;
   isHovered: boolean;
   hitPathsDisabled: boolean;
-  onHoverChange: (connectionId: string | null) => void;
+  onHoverChange: (connectionId: string | null, point?: ConnectionHoverPoint) => void;
   onRegister: (connectionId: string, refs: ConnectionPathRefs | null) => void;
   onConnectionClick?: (connection: HossiiConnection) => void;
 };
@@ -69,6 +80,14 @@ function ConnectionPathPair({
 
   const stroke = getConnectionStrokeStyle(connection.strength);
 
+  const reportHover = useCallback(
+    (clientX: number, clientY: number) => {
+      if (hitPathsDisabled) return;
+      onHoverChange(connection.id, { x: clientX, y: clientY });
+    },
+    [connection.id, hitPathsDisabled, onHoverChange],
+  );
+
   return (
     <g data-connection-id={connection.id}>
       <path
@@ -92,9 +111,11 @@ function ConnectionPathPair({
           strokeWidth: stroke.hitStrokeWidth,
           pointerEvents: hitPathsDisabled ? 'none' : 'stroke',
         }}
-        onPointerEnter={() => {
-          if (hitPathsDisabled) return;
-          onHoverChange(connection.id);
+        onPointerEnter={(event) => {
+          reportHover(event.clientX, event.clientY);
+        }}
+        onPointerMove={(event) => {
+          reportHover(event.clientX, event.clientY);
         }}
         onPointerLeave={() => {
           if (hitPathsDisabled) return;
@@ -125,7 +146,8 @@ export function ConnectionOverlay({
   hitPathsDisabled = false,
   onConnectionClick,
 }: ConnectionOverlayProps) {
-  const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const [hoverState, setHoverState] = useState<ConnectionHoverState | null>(null);
   const pathRegistryRef = useRef<Map<string, ConnectionPathRefs>>(new Map());
 
   const gateOpen = shouldShowConnectionOverlay({
@@ -146,12 +168,50 @@ export function ConnectionOverlay({
     });
   }, [gateOpen, connections, selectedBubbleId, activePaneId, visibleHossiiIds]);
 
-  const effectiveHoveredConnectionId =
-    hoveredConnectionId != null &&
+const effectiveHoverState =
+    hoverState != null &&
     !hitPathsDisabled &&
-    visibleConnections.some((connection) => connection.id === hoveredConnectionId)
-      ? hoveredConnectionId
+    visibleConnections.some((connection) => connection.id === hoverState.connectionId)
+      ? hoverState
       : null;
+
+  const hoveredConnection = useMemo(() => {
+    if (!effectiveHoverState) return null;
+    return (
+      visibleConnections.find((connection) => connection.id === effectiveHoverState.connectionId) ??
+      null
+    );
+  }, [effectiveHoverState, visibleConnections]);
+
+  const reasonTooltipText = useMemo(() => {
+    if (!hoveredConnection) return null;
+    return formatConnectionReasonDisplay(
+      hoveredConnection.reasonText,
+      hoveredConnection.reasonEmoji,
+    );
+  }, [hoveredConnection]);
+
+  const handleHoverChange = useCallback(
+    (connectionId: string | null, point?: ConnectionHoverPoint) => {
+      if (!connectionId || !point) {
+        setHoverState(null);
+        return;
+      }
+      const overlayRect = overlayRef.current?.getBoundingClientRect();
+      if (!overlayRect) {
+        setHoverState(null);
+        return;
+      }
+      setHoverState({
+        connectionId,
+        point: {
+          x: point.x - overlayRect.left + 12,
+          y: point.y - overlayRect.top + 12,
+        },
+      });
+    },
+    [],
+  );
 
   const registerPathRefs = useCallback((connectionId: string, refs: ConnectionPathRefs | null) => {
     if (!refs) {
@@ -174,6 +234,7 @@ export function ConnectionOverlay({
 
   return (
     <div
+      ref={overlayRef}
       className={styles.overlay}
       data-connection-overlay
       data-direct-connection-count={directConnectionCount ?? visibleConnections.length}
@@ -186,14 +247,26 @@ export function ConnectionOverlay({
           <ConnectionPathPair
             key={connection.id}
             connection={connection}
-            isHovered={effectiveHoveredConnectionId === connection.id}
+            isHovered={effectiveHoverState?.connectionId === connection.id}
             hitPathsDisabled={hitPathsDisabled}
-            onHoverChange={setHoveredConnectionId}
+            onHoverChange={handleHoverChange}
             onRegister={registerPathRefs}
             onConnectionClick={onConnectionClick}
           />
         ))}
       </svg>
+      {reasonTooltipText && effectiveHoverState ? (
+        <div
+          className={styles.reasonTooltip}
+          data-connection-reason-tooltip
+          style={{
+            left: effectiveHoverState.point.x,
+            top: effectiveHoverState.point.y,
+          }}
+        >
+          {reasonTooltipText}
+        </div>
+      ) : null}
     </div>
   );
 }
