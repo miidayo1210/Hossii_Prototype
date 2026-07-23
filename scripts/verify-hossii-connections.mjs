@@ -526,10 +526,16 @@ async function main() {
     .select('id', { count: 'exact', head: true })
     .eq('space_id', SPACE_ID);
   if (countAfterErr) throw countAfterErr;
+  await cleanupTempHossiis();
+  const { count: hossiiCountFinal, error: countFinalErr } = await admin
+    .from('hossiis')
+    .select('id', { count: 'exact', head: true })
+    .eq('space_id', SPACE_ID);
+  if (countFinalErr) throw countFinalErr;
   record(
     'existing hossii count unchanged',
-    hossiiCountBefore === hossiiCountAfter,
-    `${hossiiCountBefore} -> ${hossiiCountAfter}`,
+    hossiiCountBefore === hossiiCountFinal,
+    `${hossiiCountBefore} -> ${hossiiCountFinal} (before temp cleanup: ${hossiiCountAfter})`,
   );
 
   await cleanupConnections();
