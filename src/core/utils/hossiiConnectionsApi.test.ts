@@ -5,6 +5,7 @@ import {
   fetchConnections,
   normalizeConnectionPair,
   rowToHossiiConnection,
+  updateConnectionReason,
   updateConnectionStrength,
 } from './hossiiConnectionsApi';
 
@@ -17,6 +18,18 @@ vi.mock('../supabase', () => ({
   supabase: supabaseMock,
 }));
 
+const baseRow = {
+  id: 'c1',
+  space_id: 's1',
+  pane_id: 'p1',
+  source_hossii_id: 'a',
+  target_hossii_id: 'b',
+  strength: 'soft' as const,
+  created_by: 'u1',
+  created_at: '2026-07-22T00:00:00Z',
+  updated_at: '2026-07-22T00:00:00Z',
+};
+
 describe('normalizeConnectionPair', () => {
   it('sorts ids lexicographically', () => {
     expect(normalizeConnectionPair('z-id', 'a-id')).toEqual({
@@ -28,29 +41,37 @@ describe('normalizeConnectionPair', () => {
 
 describe('rowToHossiiConnection', () => {
   it('maps snake_case row to camelCase', () => {
-    expect(
-      rowToHossiiConnection({
-        id: 'c1',
-        space_id: 's1',
-        pane_id: 'p1',
-        source_hossii_id: 'a',
-        target_hossii_id: 'b',
-        strength: 'soft',
-        created_by: 'u1',
-        created_at: '2026-07-22T00:00:00Z',
-        updated_at: '2026-07-22T00:00:00Z',
-      }),
-    ).toEqual({
+    expect(rowToHossiiConnection(baseRow)).toEqual({
       id: 'c1',
       spaceId: 's1',
       paneId: 'p1',
       sourceHossiiId: 'a',
       targetHossiiId: 'b',
       strength: 'soft',
+      reasonText: null,
+      reasonEmoji: null,
       createdBy: 'u1',
       createdAt: '2026-07-22T00:00:00Z',
       updatedAt: '2026-07-22T00:00:00Z',
     });
+  });
+
+  it('maps reason fields when present', () => {
+    expect(
+      rowToHossiiConnection({
+        ...baseRow,
+        reason_text: 'つながり',
+        reason_emoji: '💡',
+      }),
+    ).toMatchObject({
+      reasonText: 'つながり',
+      reasonEmoji: '💡',
+    });
+  });
+
+  it('maps missing reason columns to null (Production 列未適用互換)', () => {
+    expect(rowToHossiiConnection(baseRow).reasonText).toBeNull();
+    expect(rowToHossiiConnection(baseRow).reasonEmoji).toBeNull();
   });
 });
 
@@ -63,15 +84,10 @@ describe('fetchConnections', () => {
     const orderMock = vi.fn().mockResolvedValue({
       data: [
         {
-          id: 'c1',
-          space_id: 's1',
-          pane_id: 'p1',
-          source_hossii_id: 'a',
-          target_hossii_id: 'b',
+          ...baseRow,
           strength: 'medium',
-          created_by: null,
-          created_at: 't1',
-          updated_at: 't1',
+          reason_text: '理由',
+          reason_emoji: '🔗',
         },
       ],
       error: null,
@@ -86,6 +102,26 @@ describe('fetchConnections', () => {
     if (res.ok) {
       expect(res.connections).toHaveLength(1);
       expect(res.connections[0]?.strength).toBe('medium');
+      expect(res.connections[0]?.reasonText).toBe('理由');
+      expect(res.connections[0]?.reasonEmoji).toBe('🔗');
+    }
+  });
+
+  it('maps rows without reason columns', async () => {
+    const orderMock = vi.fn().mockResolvedValue({
+      data: [{ ...baseRow, strength: 'medium' }],
+      error: null,
+    });
+    const eqPane = vi.fn(() => ({ order: orderMock }));
+    const eqSpace = vi.fn(() => ({ eq: eqPane }));
+    const select = vi.fn(() => ({ eq: eqSpace }));
+    supabaseMock.from.mockReturnValue({ select });
+
+    const res = await fetchConnections('s1', 'p1');
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.connections[0]?.reasonText).toBeNull();
+      expect(res.connections[0]?.reasonEmoji).toBeNull();
     }
   });
 
@@ -109,24 +145,19 @@ describe('createConnection', () => {
     supabaseMock.from.mockReset();
   });
 
-  it('normalizes pair before insert', async () => {
+  function mockInsertChain() {
     const singleMock = vi.fn().mockResolvedValue({
-      data: {
-        id: 'c1',
-        space_id: 's1',
-        pane_id: 'p1',
-        source_hossii_id: 'a',
-        target_hossii_id: 'b',
-        strength: 'strong',
-        created_by: 'u1',
-        created_at: 't1',
-        updated_at: 't1',
-      },
+      data: baseRow,
       error: null,
     });
     const selectMock = vi.fn(() => ({ single: singleMock }));
     const insertMock = vi.fn(() => ({ select: selectMock }));
     supabaseMock.from.mockReturnValue({ insert: insertMock });
+    return insertMock;
+  }
+
+  it('normalizes pair before insert', async () => {
+    const insertMock = mockInsertChain();
 
     const res = await createConnection({
       spaceId: 's1',
@@ -145,6 +176,101 @@ describe('createConnection', () => {
     });
     expect(res.ok).toBe(true);
   });
+
+  it('reasonなし create では reason 列を送らない', async () => {
+    const insertMock = mockInsertChain();
+
+    await createConnection({
+      spaceId: 's1',
+      paneId: 'p1',
+      sourceHossiiId: 'a',
+      targetHossiiId: 'b',
+      strength: 'soft',
+    });
+
+    expect(insertMock.mock.calls[0]?.[0]).not.toHaveProperty('reason_text');
+    expect(insertMock.mock.calls[0]?.[0]).not.toHaveProperty('reason_emoji');
+  });
+
+  it('reasonあり create で正規化して insert する', async () => {
+    const insertMock = mockInsertChain();
+
+    const res = await createConnection({
+      spaceId: 's1',
+      paneId: 'p1',
+      sourceHossiiId: 'a',
+      targetHossiiId: 'b',
+      strength: 'soft',
+      reasonText: '  つながり  ',
+      reasonEmoji: '💡',
+    });
+
+    expect(insertMock).toHaveBeenCalledWith({
+      space_id: 's1',
+      pane_id: 'p1',
+      source_hossii_id: 'a',
+      target_hossii_id: 'b',
+      strength: 'soft',
+      reason_text: 'つながり',
+      reason_emoji: '💡',
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('空白 reasonText は NULL として insert する', async () => {
+    const insertMock = mockInsertChain();
+
+    await createConnection({
+      spaceId: 's1',
+      paneId: 'p1',
+      sourceHossiiId: 'a',
+      targetHossiiId: 'b',
+      strength: 'soft',
+      reasonText: '   ',
+    });
+
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason_text: null,
+        reason_emoji: null,
+      }),
+    );
+  });
+
+  it('51文字 reasonText を拒否', async () => {
+    const res = await createConnection({
+      spaceId: 's1',
+      paneId: 'p1',
+      sourceHossiiId: 'a',
+      targetHossiiId: 'b',
+      strength: 'soft',
+      reasonText: 'あ'.repeat(51),
+    });
+    expect(res).toEqual({
+      ok: false,
+      message: 'reason text must be at most 50 characters',
+    });
+  });
+
+  it('surfaces Supabase insert errors', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'check violation', code: '23514' },
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const insertMock = vi.fn(() => ({ select: selectMock }));
+    supabaseMock.from.mockReturnValue({ insert: insertMock });
+
+    const res = await createConnection({
+      spaceId: 's1',
+      paneId: 'p1',
+      sourceHossiiId: 'a',
+      targetHossiiId: 'b',
+      strength: 'soft',
+      reasonText: 'ok',
+    });
+    expect(res).toEqual({ ok: false, message: 'check violation', code: '23514' });
+  });
 });
 
 describe('updateConnectionStrength', () => {
@@ -155,14 +281,8 @@ describe('updateConnectionStrength', () => {
   it('returns updated row from server', async () => {
     const singleMock = vi.fn().mockResolvedValue({
       data: {
-        id: 'c1',
-        space_id: 's1',
-        pane_id: 'p1',
-        source_hossii_id: 'a',
-        target_hossii_id: 'b',
+        ...baseRow,
         strength: 'soft',
-        created_by: 'u1',
-        created_at: 't1',
         updated_at: 't2',
       },
       error: null,
@@ -175,6 +295,90 @@ describe('updateConnectionStrength', () => {
     const res = await updateConnectionStrength('c1', 'soft');
     expect(updateMock).toHaveBeenCalledWith({ strength: 'soft' });
     expect(res.ok).toBe(true);
+  });
+
+  it('does not touch reason fields (regression)', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: baseRow,
+      error: null,
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await updateConnectionStrength('c1', 'medium');
+    expect(updateMock).toHaveBeenCalledWith({ strength: 'medium' });
+    expect(updateMock.mock.calls[0]?.[0]).not.toHaveProperty('reason_text');
+  });
+});
+
+describe('updateConnectionReason', () => {
+  beforeEach(() => {
+    supabaseMock.from.mockReset();
+  });
+
+  it('updates reason fields', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: {
+        ...baseRow,
+        reason_text: '更新',
+        reason_emoji: '🌱',
+      },
+      error: null,
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    const res = await updateConnectionReason({
+      connectionId: 'c1',
+      reasonText: '更新',
+      reasonEmoji: '🌱',
+    });
+
+    expect(updateMock).toHaveBeenCalledWith({
+      reason_text: '更新',
+      reason_emoji: '🌱',
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.connection.reasonText).toBe('更新');
+      expect(res.connection.reasonEmoji).toBe('🌱');
+    }
+  });
+
+  it('rejects invalid reason before Supabase call', async () => {
+    const updateMock = vi.fn();
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    const res = await updateConnectionReason({
+      connectionId: 'c1',
+      reasonText: 'a'.repeat(51),
+    });
+    expect(res).toEqual({
+      ok: false,
+      message: 'reason text must be at most 50 characters',
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('surfaces Supabase update errors', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'permission denied', code: '42501' },
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    const res = await updateConnectionReason({
+      connectionId: 'c1',
+      reasonEmoji: '❤️',
+    });
+    expect(res).toEqual({ ok: false, message: 'permission denied', code: '42501' });
   });
 });
 
