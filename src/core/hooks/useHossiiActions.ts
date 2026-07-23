@@ -2,7 +2,17 @@ import { createContext, useContext } from 'react';
 import type { HossiiContextValue } from './HossiiStoreProvider';
 
 /** 安定参照のアクションのみ（87 §9.1 Context 分割） */
-export type HossiiActionsContextValue = Omit<HossiiContextValue, 'state' | 'spacesLoadedFromSupabase' | 'hossiiLoadedFromSupabase' | 'communitySlug' | 'myAuthorshipIds' | 'myAuthorshipIdsStatus' | 'postAuthorDisplayNames'>;
+export type HossiiActionsContextValue = Omit<
+  HossiiContextValue,
+  | 'state'
+  | 'spacesLoadedFromSupabase'
+  | 'hossiiLoadedFromSupabase'
+  | 'communitySlug'
+  | 'myAuthorshipIds'
+  | 'myAuthorshipIdsStatus'
+  | 'postAuthorDisplayNames'
+  | 'activeSpaceMembershipStatus'
+>;
 
 export const HossiiActionsContext = createContext<HossiiActionsContextValue | null>(null);
 
