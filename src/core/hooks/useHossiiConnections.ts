@@ -15,7 +15,8 @@ export type UseHossiiConnectionsResult = {
 };
 
 /**
- * Pane 単位の糸一覧。fetch 失敗時は空配列のまま（SpaceScreen を止めない）。
+ * Pane 単位の糸一覧。
+ * 初回 fetch 失敗時は空配列。refetch 失敗時は既存表示を維持（SpaceScreen を止めない）。
  */
 export function useHossiiConnections({
   spaceId,
@@ -25,6 +26,7 @@ export function useHossiiConnections({
   const [connections, setConnections] = useState<HossiiConnection[]>([]);
   const [fetchGeneration, setFetchGeneration] = useState(0);
   const requestIdRef = useRef(0);
+  const scopeRef = useRef<{ spaceId: string; paneId: string; enabled: boolean } | null>(null);
 
   const refetch = useCallback(() => {
     setFetchGeneration((generation) => generation + 1);
@@ -32,6 +34,7 @@ export function useHossiiConnections({
 
   useEffect(() => {
     if (!enabled || !spaceId || !paneId || !isSupabaseConfigured) {
+      scopeRef.current = null;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fetch gate closes
       setConnections([]);
       return undefined;
@@ -40,13 +43,26 @@ export function useHossiiConnections({
     const reqId = ++requestIdRef.current;
     let cancelled = false;
 
-    // Pane / space 変更直後に旧件数を残さない（race guard は reqId で維持）
-    setConnections([]);
+    const isScopeChange =
+      scopeRef.current === null ||
+      scopeRef.current.spaceId !== spaceId ||
+      scopeRef.current.paneId !== paneId ||
+      scopeRef.current.enabled !== enabled;
+    scopeRef.current = { spaceId, paneId, enabled };
+
+    // Pane / space 変更時のみ即クリア。refetch 中は既存表示を維持する。
+    if (isScopeChange) {
+      setConnections([]);
+    }
 
     void (async () => {
       const result = await fetchConnections(spaceId, paneId);
       if (cancelled || reqId !== requestIdRef.current) return;
-      setConnections(result.ok ? result.connections : []);
+      if (result.ok) {
+        setConnections(result.connections);
+      } else if (isScopeChange) {
+        setConnections([]);
+      }
     })();
 
     return () => {
