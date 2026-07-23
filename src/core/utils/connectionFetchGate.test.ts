@@ -4,6 +4,7 @@ import {
   isConnectionsContextEnabled,
   resolveRenderAsStar,
   shouldFetchHossiiConnections,
+  shouldShowConnectionPullHandles,
   shouldShowSpaceHossiiConnectionHandle,
 } from './connectionFetchGate';
 
@@ -99,9 +100,30 @@ describe('shouldFetchHossiiConnections', () => {
 });
 
 
+describe('shouldShowConnectionPullHandles', () => {
+  it('allows pull handles on PC custom viewport', () => {
+    expect(
+      shouldShowConnectionPullHandles({ isMobilePortrait: false, isMobileLandscape: false }),
+    ).toBe(true);
+  });
+
+  it('hides pull handles on mobile portrait', () => {
+    expect(
+      shouldShowConnectionPullHandles({ isMobilePortrait: true, isMobileLandscape: false }),
+    ).toBe(false);
+  });
+
+  it('hides pull handles on mobile landscape', () => {
+    expect(
+      shouldShowConnectionPullHandles({ isMobilePortrait: false, isMobileLandscape: true }),
+    ).toBe(false);
+  });
+});
+
 describe('shouldShowSpaceHossiiConnectionHandle', () => {
   const base = {
-    isMobile: false,
+    isMobilePortrait: false,
+    isMobileLandscape: false,
     isConnectionsContextEnabled: true,
     hossiiVisible: true,
     selectedBubbleId: 'h1',
@@ -133,7 +155,15 @@ describe('shouldShowSpaceHossiiConnectionHandle', () => {
     ).toBe(false);
   });
 
-  it('hides on mobile', () => {
-    expect(shouldShowSpaceHossiiConnectionHandle({ ...base, isMobile: true })).toBe(false);
+  it('hides on mobile portrait', () => {
+    expect(
+      shouldShowSpaceHossiiConnectionHandle({ ...base, isMobilePortrait: true }),
+    ).toBe(false);
+  });
+
+  it('hides on mobile landscape', () => {
+    expect(
+      shouldShowSpaceHossiiConnectionHandle({ ...base, isMobileLandscape: true }),
+    ).toBe(false);
   });
 });

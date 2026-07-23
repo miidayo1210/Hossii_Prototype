@@ -45,8 +45,22 @@ export function resolveRenderAsStar(params: {
   return params.isMobilePortrait || params.presentationMode === 'stars';
 }
 
-export type SpaceHossiiConnectionHandleGate = {
-  isMobile: boolean;
+export type MobileConnectionViewportGate = {
+  isMobilePortrait: boolean;
+  isMobileLandscape: boolean;
+};
+
+/** mobile portrait / landscape いずれか */
+export function isMobileConnectionViewport(gate: MobileConnectionViewportGate): boolean {
+  return gate.isMobilePortrait || gate.isMobileLandscape;
+}
+
+/** pull 入口（Bubble 常設 / ActionMenu / Space Hossii）を出してよい viewport */
+export function shouldShowConnectionPullHandles(gate: MobileConnectionViewportGate): boolean {
+  return !isMobileConnectionViewport(gate);
+}
+
+export type SpaceHossiiConnectionHandleGate = MobileConnectionViewportGate & {
   isConnectionsContextEnabled: boolean;
   hossiiVisible: boolean;
   selectedBubbleId: string | null;
@@ -58,7 +72,7 @@ export function shouldShowSpaceHossiiConnectionHandle(
   gate: SpaceHossiiConnectionHandleGate,
 ): boolean {
   return (
-    !gate.isMobile &&
+    shouldShowConnectionPullHandles(gate) &&
     gate.isConnectionsContextEnabled &&
     gate.hossiiVisible &&
     gate.selectedBubbleId != null &&

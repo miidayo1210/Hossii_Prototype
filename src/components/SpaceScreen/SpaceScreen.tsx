@@ -75,7 +75,10 @@ import { resolveRenderAsStar } from '../../core/utils/connectionFetchGate';
 import { useCustomBubbleActionMenu } from './useCustomBubbleActionMenu';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
-import { shouldShowSpaceHossiiConnectionHandle } from '../../core/utils/connectionFetchGate';
+import {
+  shouldShowConnectionPullHandles,
+  shouldShowSpaceHossiiConnectionHandle,
+} from '../../core/utils/connectionFetchGate';
 import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
 import { useSpaceConnectionPull } from './useSpaceConnectionPull';
 import { ConnectionEditorPortals } from './ConnectionEditorPortals';
@@ -1784,8 +1787,13 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     setConnectionPullHintDismissedSession(true);
   }, [pullHintSpaceId]);
 
+  const showConnectionPullHandles = shouldShowConnectionPullHandles({
+    isMobilePortrait,
+    isMobileLandscape,
+  });
+
   const showBubblePullHandle =
-    !isMobile &&
+    showConnectionPullHandles &&
     isConnectionsContextEnabled &&
     selectedBubbleId != null &&
     connectionPull.pullHandleVisible;
@@ -1798,7 +1806,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !isContentArchived;
 
   const showSpaceHossiiConnectionHandle = shouldShowSpaceHossiiConnectionHandle({
-    isMobile,
+    isMobilePortrait,
+    isMobileLandscape,
     isConnectionsContextEnabled: connectionsContextEnabled,
     hossiiVisible: controlState.hossiiVisible,
     selectedBubbleId,
@@ -2578,7 +2587,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 suppressActionMenuToggle={
                   connectionEditor.phase !== 'idle' && connectionEditor.phase !== 'error'
                 }
-                showPullHandle={isThisSelected && connectionPull.pullHandleVisible}
+                showPullHandle={isThisSelected && connectionPull.pullHandleVisible && showConnectionPullHandles}
                 showBubblePullHandle={
                   isThisSelected &&
                   showBubblePullHandle &&
