@@ -1,11 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useRouter } from '../../core/hooks/useRouter';
 import { useAdminNavigation } from '../../core/contexts/useAdminNavigation';
-import { fetchAllCommunities } from '../../core/utils/communitiesApi';
+import {
+  fetchAllCommunities,
+  superAdminCreateCommunity,
+} from '../../core/utils/communitiesApi';
 import type { Community, CommunityStatus } from '../../core/utils/communitiesApi';
 import { fetchCommunityStats } from '../../core/utils/spacesApi';
 import type { CommunityStats } from '../../core/utils/spacesApi';
+import { CreateCommunityModal } from './CreateCommunityModal';
 import styles from './CommunitiesScreen.module.css';
 
 const statusBadge = (status: CommunityStatus) => {
@@ -20,6 +24,7 @@ export const CommunitiesScreen = () => {
   const { currentUser, logout } = useAuth();
   const { navigate } = useRouter();
   const { setOverrideCommunity } = useAdminNavigation();
+  const isSuperAdmin = currentUser?.isSuperAdmin === true;
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,12 +33,24 @@ export const CommunitiesScreen = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statsCache, setStatsCache] = useState<Map<string, CommunityStats>>(new Map());
   const [loadingStatsId, setLoadingStatsId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [createError, setCreateError] = useState(false);
+
+  const loadCommunities = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await fetchAllCommunities();
+      setCommunities(rows);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchAllCommunities()
-      .then(setCommunities)
-      .finally(() => setLoading(false));
-  }, []);
+    void loadCommunities();
+  }, [loadCommunities]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -47,9 +64,44 @@ export const CommunitiesScreen = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAccountMenu]);
 
-  const handleManageSpaces = (community: Community) => {
+  const handleManageSpaces = useCallback((community: Community) => {
     setOverrideCommunity(community.id, community.name, community.slug);
     navigate('spaces', community.slug ?? undefined);
+  }, [navigate, setOverrideCommunity]);
+
+  const openCreateModal = () => {
+    setCreateName('');
+    setCreateError(false);
+    setCreateSubmitting(false);
+    setShowCreateModal(true);
+  };
+
+  const closeCreateModal = () => {
+    if (createSubmitting) return;
+    setShowCreateModal(false);
+    setCreateName('');
+    setCreateError(false);
+  };
+
+  const handleCreateCommunity = async () => {
+    const trimmed = createName.trim();
+    if (!trimmed || createSubmitting) return;
+
+    setCreateSubmitting(true);
+    setCreateError(false);
+
+    const result = await superAdminCreateCommunity(trimmed);
+    if (!result.ok) {
+      setCreateError(true);
+      setCreateSubmitting(false);
+      return;
+    }
+
+    setShowCreateModal(false);
+    setCreateName('');
+    setCreateSubmitting(false);
+    await loadCommunities();
+    handleManageSpaces(result.community);
   };
 
   const handleToggleDetail = async (community: Community) => {
@@ -117,6 +169,18 @@ export const CommunitiesScreen = () => {
       </header>
 
       <main className={styles.main}>
+        {isSuperAdmin && (
+          <div className={styles.toolbar}>
+            <button
+              type="button"
+              className={styles.createCommunityButton}
+              onClick={openCreateModal}
+            >
+              ＋ 新しいコミュニティを作成
+            </button>
+          </div>
+        )}
+
         {loading && (
           <div className={styles.loadingState}>
             <p>読み込み中...</p>
@@ -212,6 +276,16 @@ export const CommunitiesScreen = () => {
           </div>
         )}
       </main>
+
+      <CreateCommunityModal
+        open={showCreateModal}
+        name={createName}
+        submitting={createSubmitting}
+        error={createError}
+        onNameChange={setCreateName}
+        onCancel={closeCreateModal}
+        onSubmit={() => { void handleCreateCommunity(); }}
+      />
     </div>
   );
 };

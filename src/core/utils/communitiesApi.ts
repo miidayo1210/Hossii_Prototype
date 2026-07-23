@@ -151,3 +151,35 @@ export async function createCommunity(adminId: string, name: string): Promise<Co
 
   return rowToCommunity(data as CommunityRow);
 }
+
+export type SuperAdminCreateCommunityResult =
+  | { ok: true; community: Community }
+  | { ok: false };
+
+/**
+ * スーパー管理者がコミュニティを即時作成する（PR-A RPC 経由）。
+ * 認可は RPC 内部が正本。失敗時は汎用結果のみ返す（DB メッセージは UI に出さない）。
+ */
+export async function superAdminCreateCommunity(
+  name: string,
+): Promise<SuperAdminCreateCommunityResult> {
+  if (!isSupabaseConfigured) {
+    return { ok: false };
+  }
+
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return { ok: false };
+  }
+
+  const { data, error } = await supabase.rpc('super_admin_create_community', {
+    p_name: trimmed,
+  });
+
+  if (error || !data) {
+    console.error('[communitiesApi] superAdminCreateCommunity error:', error?.message);
+    return { ok: false };
+  }
+
+  return { ok: true, community: rowToCommunity(data as CommunityRow) };
+}
