@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useHossiiConnections } from './useHossiiConnections';
 
 const fetchConnectionsMock = vi.hoisted(() => vi.fn());
@@ -145,5 +145,96 @@ describe('useHossiiConnections', () => {
     rerender({ paneId: 'p2' });
 
     expect(result.current.connections).toEqual([]);
+  });
+
+  const connectionP1 = {
+    id: 'c1',
+    spaceId: 's1',
+    paneId: 'p1',
+    sourceHossiiId: 'a',
+    targetHossiiId: 'b',
+    strength: 'soft' as const,
+    reasonText: null,
+    reasonEmoji: null,
+    createdBy: null,
+    createdAt: 't1',
+    updatedAt: 't1',
+  };
+
+  const connectionP1b = {
+    ...connectionP1,
+    id: 'c2',
+    targetHossiiId: 'c',
+  };
+
+  it('refetch success updates connections', async () => {
+    fetchConnectionsMock
+      .mockResolvedValueOnce({ ok: true, connections: [connectionP1] })
+      .mockResolvedValueOnce({ ok: true, connections: [connectionP1, connectionP1b] });
+
+    const { result } = renderHook(() =>
+      useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled: true }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.connections).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(result.current.connections).toHaveLength(2);
+    });
+  });
+
+  it('keeps existing connections when refetch fails', async () => {
+    fetchConnectionsMock
+      .mockResolvedValueOnce({ ok: true, connections: [connectionP1] })
+      .mockResolvedValueOnce({ ok: false, message: 'network error' });
+
+    const { result } = renderHook(() =>
+      useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled: true }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.connections).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(fetchConnectionsMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(result.current.connections).toEqual([connectionP1]);
+  });
+
+  it('does not clear connections during refetch before fetch resolves', async () => {
+    fetchConnectionsMock.mockResolvedValueOnce({ ok: true, connections: [connectionP1] });
+
+    const { result } = renderHook(() =>
+      useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled: true }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.connections).toHaveLength(1);
+    });
+
+    fetchConnectionsMock.mockImplementation(
+      () =>
+        new Promise(() => {
+          /* never resolves */
+        }),
+    );
+
+    act(() => {
+      result.current.refetch();
+    });
+
+    expect(result.current.connections).toEqual([connectionP1]);
   });
 });
