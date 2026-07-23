@@ -71,3 +71,13 @@
     transition: none;
   }
 }
+
+.reasonPreview {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

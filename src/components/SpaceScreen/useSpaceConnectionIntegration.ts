@@ -33,6 +33,7 @@ import { useConnectionEditor } from './useConnectionEditor';
 import type { ConnectionOverlayInputs } from './useConnectionOverlayInputs';
 import type { ConnectionOverlayProps } from './ConnectionOverlay';
 import type { ConnectionListPopoverItem } from './ConnectionListPopover';
+import { formatConnectionReasonDisplay } from '../../core/utils/formatConnectionReasonDisplay';
 
 type BubbleActionMenuBubbleProps = {
   actionMenuEnabled: boolean;
@@ -198,6 +199,8 @@ export function useSpaceConnectionIntegration({
 
   const connectionListItems: ConnectionListPopoverItem[] = useMemo(() => {
     if (!isConnectionsContextEnabled || !selectedBubbleId) return [];
+    const connById = new Map(overlayInputs.connections.map((c) => [c.id, c]));
+
     return buildDirectConnectionListItems({
       connections: overlayInputs.connections,
       selectedBubbleId,
@@ -207,11 +210,16 @@ export function useSpaceConnectionIntegration({
       .map((item) => {
         const peer = hossiiById.get(item.peerHossiiId);
         const fullText = peer ? getHossiiBubbleFullText(peer) : '';
+        const conn = connById.get(item.connectionId);
+        const reasonPreview = conn
+          ? formatConnectionReasonDisplay(conn.reasonText, conn.reasonEmoji)
+          : null;
         return {
           connectionId: item.connectionId,
           peerHossiiId: item.peerHossiiId,
           messagePreview: truncateBubbleDisplayText(fullText, MAX_BUBBLE_TEXT_LENGTH) || '（本文なし）',
           strengthLabel: getHossiiConnectionStrengthLabel(item.strength).title,
+          ...(reasonPreview ? { reasonPreview } : {}),
         };
       });
   }, [

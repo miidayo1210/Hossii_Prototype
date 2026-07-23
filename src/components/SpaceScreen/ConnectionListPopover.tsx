@@ -16,6 +16,7 @@ export type ConnectionListPopoverItem = {
   peerHossiiId: string;
   messagePreview: string;
   strengthLabel: string;
+  reasonPreview?: string;
 };
 
 type Props = {
@@ -42,6 +43,14 @@ function useHossiiAnchorRect(hossiiId: string | null, active: boolean): DOMRect 
   }, [active, hossiiId]);
 
   return rect;
+}
+
+function buildListItemAriaLabel(item: ConnectionListPopoverItem): string {
+  const parts = [item.messagePreview, item.strengthLabel];
+  if (item.reasonPreview) {
+    parts.push(item.reasonPreview);
+  }
+  return parts.join('、');
 }
 
 export function ConnectionListPopover({ anchorHossiiId, items, onSelectPeer }: Props) {
@@ -75,10 +84,14 @@ export function ConnectionListPopover({ anchorHossiiId, items, onSelectPeer }: P
             <button
               type="button"
               className={styles.listItem}
+              aria-label={buildListItemAriaLabel(item)}
               onClick={() => onSelectPeer(item.peerHossiiId)}
             >
               <span className={styles.messagePreview}>{item.messagePreview}</span>
               <span className={styles.strengthLabel}>{item.strengthLabel}</span>
+              {item.reasonPreview ? (
+                <span className={styles.reasonPreview}>{item.reasonPreview}</span>
+              ) : null}
             </button>
           </li>
         ))}
