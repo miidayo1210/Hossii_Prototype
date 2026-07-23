@@ -1675,6 +1675,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   const {
     refetch: refetchConnections,
     fetchError: connectionFetchError,
+    isFetching: connectionFetchInFlight,
     isConnectionsContextEnabled: connectionsContextEnabled,
   } = connectionOverlayInputs;
 
@@ -2838,7 +2839,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
             </div>
           )}
           {showConnectionFetchErrorNotice && (
-            <ConnectionFetchErrorNotice onRetry={handleConnectionFetchRetry} />
+            <ConnectionFetchErrorNotice
+              onRetry={handleConnectionFetchRetry}
+              retryDisabled={connectionFetchInFlight}
+            />
           )}
           {layoutMode === 'ordered' && viewMode !== 'slideshow' && (
             <div className={styles.orderedSortToolbar} role="group" aria-label="投稿順の整列方向">

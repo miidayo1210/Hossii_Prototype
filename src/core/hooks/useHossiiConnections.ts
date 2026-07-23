@@ -14,6 +14,8 @@ export type UseHossiiConnectionsResult = {
   refetch: () => void;
   /** 直近 fetch/refetch が失敗したとき true。成功または gate 無効で false */
   fetchError: boolean;
+  /** fetch / refetch 実行中 */
+  isFetching: boolean;
 };
 
 /**
@@ -27,20 +29,24 @@ export function useHossiiConnections({
 }: UseHossiiConnectionsOptions): UseHossiiConnectionsResult {
   const [connections, setConnections] = useState<HossiiConnection[]>([]);
   const [fetchError, setFetchError] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [fetchGeneration, setFetchGeneration] = useState(0);
   const requestIdRef = useRef(0);
+  const fetchInFlightRef = useRef(false);
   const scopeRef = useRef<{ spaceId: string; paneId: string; enabled: boolean } | null>(null);
 
   const refetch = useCallback(() => {
+    if (fetchInFlightRef.current) return;
     setFetchGeneration((generation) => generation + 1);
   }, []);
 
   useEffect(() => {
     if (!enabled || !spaceId || !paneId || !isSupabaseConfigured) {
       scopeRef.current = null;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fetch gate closes
+      fetchInFlightRef.current = false;
       setConnections([]);
       setFetchError(false);
+      setIsFetching(false);
       return undefined;
     }
 
@@ -60,17 +66,27 @@ export function useHossiiConnections({
       setFetchError(false);
     }
 
+    fetchInFlightRef.current = true;
+    setIsFetching(true);
+
     void (async () => {
-      const result = await fetchConnections(spaceId, paneId);
-      if (cancelled || reqId !== requestIdRef.current) return;
-      if (result.ok) {
-        setConnections(result.connections);
-        setFetchError(false);
-      } else {
-        if (isScopeChange) {
-          setConnections([]);
+      try {
+        const result = await fetchConnections(spaceId, paneId);
+        if (cancelled || reqId !== requestIdRef.current) return;
+        if (result.ok) {
+          setConnections(result.connections);
+          setFetchError(false);
+        } else {
+          if (isScopeChange) {
+            setConnections([]);
+          }
+          setFetchError(true);
         }
-        setFetchError(true);
+      } finally {
+        if (reqId === requestIdRef.current) {
+          fetchInFlightRef.current = false;
+          setIsFetching(false);
+        }
       }
     })();
 
@@ -79,5 +95,5 @@ export function useHossiiConnections({
     };
   }, [enabled, spaceId, paneId, fetchGeneration]);
 
-  return { connections, refetch, fetchError };
+  return { connections, refetch, fetchError, isFetching };
 }
