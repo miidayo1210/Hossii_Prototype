@@ -33,8 +33,11 @@ const admin = createClient(DEV_URL, service, {
 });
 const client = createClient(DEV_URL, anon);
 
+const REASON_EMOJI_PRESETS = ['💡', '🔗', '🌱', '💬', '↔️', '🎯', '❤️', '❓'];
+
 const results = [];
 const createdConnectionIds = [];
+const tempHossiiIds = [];
 let extraPaneId = null;
 
 function record(name, ok, detail = '') {
@@ -65,6 +68,218 @@ async function cleanupConnections() {
   if (createdConnectionIds.length === 0) return;
   await admin.from('hossii_connections').delete().in('id', createdConnectionIds);
   createdConnectionIds.length = 0;
+}
+
+async function cleanupTempHossiis() {
+  if (tempHossiiIds.length === 0) return;
+  for (const id of tempHossiiIds) {
+    await admin
+      .from('hossii_connections')
+      .delete()
+      .or(`source_hossii_id.eq.${id},target_hossii_id.eq.${id}`);
+  }
+  await admin.from('hossiis').delete().in('id', tempHossiiIds);
+  tempHossiiIds.length = 0;
+}
+
+async function createTempHossiiPair(prefix) {
+  const ts = Date.now();
+  const a = `${prefix}-a-${ts}`;
+  const b = `${prefix}-b-${ts}`;
+  for (const [id, label] of [
+    [a, 'Reason A'],
+    [b, 'Reason B'],
+  ]) {
+    const { error } = await admin.from('hossiis').insert({
+      id,
+      message: label,
+      space_id: SPACE_ID,
+      space_pane_id: PANE_ID,
+      author_name: 'ReasonTest',
+      origin: 'manual',
+      created_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(`createTempHossiiPair ${id}: ${error.message}`);
+    tempHossiiIds.push(id);
+  }
+  return { a, b };
+}
+
+async function runReasonColumnChecks() {
+  await signIn('dev-community-admin@example.test');
+
+  const { a: pairA, b: pairB } = await createTempHossiiPair('reason-null');
+  const { data: nullReasonConn, error: nullReasonErr } = await client
+    .from('hossii_connections')
+    .insert({
+      space_id: SPACE_ID,
+      pane_id: PANE_ID,
+      source_hossii_id: pairA,
+      target_hossii_id: pairB,
+      strength: 'medium',
+      reason_text: null,
+      reason_emoji: null,
+    })
+    .select('id, reason_text, reason_emoji')
+    .single();
+  record(
+    'reason: both NULL create',
+    !nullReasonErr &&
+      nullReasonConn?.reason_text == null &&
+      nullReasonConn?.reason_emoji == null,
+    nullReasonErr?.message ?? JSON.stringify(nullReasonConn),
+  );
+  if (nullReasonConn?.id) createdConnectionIds.push(nullReasonConn.id);
+
+  const { a: text50A, b: text50B } = await createTempHossiiPair('reason-50');
+  const text50 = 'あ'.repeat(50);
+  const { data: text50Conn, error: text50Err } = await client
+    .from('hossii_connections')
+    .insert({
+      space_id: SPACE_ID,
+      pane_id: PANE_ID,
+      source_hossii_id: text50A,
+      target_hossii_id: text50B,
+      strength: 'soft',
+      reason_text: text50,
+    })
+    .select('id, reason_text')
+    .single();
+  record(
+    'reason: reason_text 50 chars allowed',
+    !text50Err && text50Conn?.reason_text === text50,
+    text50Err?.message ?? text50Conn?.reason_text?.length,
+  );
+  if (text50Conn?.id) createdConnectionIds.push(text50Conn.id);
+
+  const { a: text51A, b: text51B } = await createTempHossiiPair('reason-51');
+  const { error: text51Err } = await client.from('hossii_connections').insert({
+    space_id: SPACE_ID,
+    pane_id: PANE_ID,
+    source_hossii_id: text51A,
+    target_hossii_id: text51B,
+    strength: 'soft',
+    reason_text: 'a'.repeat(51),
+  });
+  record(
+    'reason: reason_text 51 chars rejected',
+    !!text51Err,
+    text51Err?.message ?? 'unexpected success',
+  );
+
+  const { a: nlA, b: nlB } = await createTempHossiiPair('reason-nl');
+  const { error: newlineErr } = await client.from('hossii_connections').insert({
+    space_id: SPACE_ID,
+    pane_id: PANE_ID,
+    source_hossii_id: nlA,
+    target_hossii_id: nlB,
+    strength: 'soft',
+    reason_text: 'line1\nline2',
+  });
+  record(
+    'reason: reason_text newline rejected',
+    !!newlineErr,
+    newlineErr?.message ?? 'unexpected success',
+  );
+
+  const { a: blankA, b: blankB } = await createTempHossiiPair('reason-blank');
+  const { data: blankConn, error: blankErr } = await client
+    .from('hossii_connections')
+    .insert({
+      space_id: SPACE_ID,
+      pane_id: PANE_ID,
+      source_hossii_id: blankA,
+      target_hossii_id: blankB,
+      strength: 'soft',
+      reason_text: '   ',
+    })
+    .select('id, reason_text')
+    .single();
+  record(
+    'reason: blank reason_text stored as NULL',
+    !blankErr && blankConn?.reason_text == null,
+    blankErr?.message ?? JSON.stringify(blankConn),
+  );
+  if (blankConn?.id) createdConnectionIds.push(blankConn.id);
+
+  for (const emoji of REASON_EMOJI_PRESETS) {
+    const { a, b } = await createTempHossiiPair(`reason-emoji-${emoji.codePointAt(0)}`);
+    const { data: emojiConn, error: emojiErr } = await client
+      .from('hossii_connections')
+      .insert({
+        space_id: SPACE_ID,
+        pane_id: PANE_ID,
+        source_hossii_id: a,
+        target_hossii_id: b,
+        strength: 'soft',
+        reason_emoji: emoji,
+      })
+      .select('id, reason_emoji')
+      .single();
+    record(
+      `reason: preset emoji ${emoji} allowed`,
+      !emojiErr && emojiConn?.reason_emoji === emoji,
+      emojiErr?.message ?? emojiConn?.reason_emoji ?? '',
+    );
+    if (emojiConn?.id) createdConnectionIds.push(emojiConn.id);
+  }
+
+  const { a: badEmojiA, b: badEmojiB } = await createTempHossiiPair('reason-bad-emoji');
+  const { error: badEmojiErr } = await client.from('hossii_connections').insert({
+    space_id: SPACE_ID,
+    pane_id: PANE_ID,
+    source_hossii_id: badEmojiA,
+    target_hossii_id: badEmojiB,
+    strength: 'soft',
+    reason_emoji: '🔥',
+  });
+  record(
+    'reason: non-preset emoji rejected',
+    !!badEmojiErr,
+    badEmojiErr?.message ?? 'unexpected success',
+  );
+
+  if (nullReasonConn?.id) {
+    const { data: updatedWithReason, error: updateWithReasonErr } = await client
+      .from('hossii_connections')
+      .update({ strength: 'strong', reason_text: '更新後' })
+      .eq('id', nullReasonConn.id)
+      .select('strength, reason_text, created_by')
+      .single();
+    record(
+      'reason: existing CRUD update with reason_text',
+      !updateWithReasonErr &&
+        updatedWithReason?.strength === 'strong' &&
+        updatedWithReason?.reason_text === '更新後',
+      updateWithReasonErr?.message ?? JSON.stringify(updatedWithReason),
+    );
+  }
+
+  const { data: adminUser } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  const communityAdminId = adminUser.users.find(
+    (u) => u.email === 'dev-community-admin@example.test',
+  )?.id;
+  const userBId = adminUser.users.find((u) => u.email === 'dev-user-b@example.test')?.id;
+  if (nullReasonConn?.id && communityAdminId && userBId) {
+    const { error: createdByUpdateErr } = await client
+      .from('hossii_connections')
+      .update({ created_by: userBId, reason_text: 'still mine' })
+      .eq('id', nullReasonConn.id);
+    const { data: afterCreatedBy } = await client
+      .from('hossii_connections')
+      .select('created_by, reason_text')
+      .eq('id', nullReasonConn.id)
+      .single();
+    record(
+      'reason: created_by immutability preserved',
+      !createdByUpdateErr &&
+        afterCreatedBy?.created_by === communityAdminId &&
+        afterCreatedBy?.reason_text === 'still mine',
+      `created_by=${afterCreatedBy?.created_by}`,
+    );
+  }
+
+  await signOut();
 }
 
 async function ensureHossiiPaneAssignments() {
@@ -104,6 +319,7 @@ async function main() {
   await ensureHossiiPaneAssignments();
   await ensureExtraPane();
   await cleanupConnections();
+  await cleanupTempHossiis();
 
   const { count: hossiiCountBefore, error: countErr } = await admin
     .from('hossiis')
@@ -261,6 +477,8 @@ async function main() {
     .eq('id', cascadeConn?.id ?? 'missing');
   record('cascade delete on hossii removal', cascadeLeft === 0, `remaining=${cascadeLeft}`);
 
+  await runReasonColumnChecks();
+
   await signIn('dev-community-admin@example.test');
   await client.rpc('set_space_archived', { p_space_id: SPACE_ID, p_archived: true });
   const { error: archivedErr } = await client
@@ -295,6 +513,7 @@ async function main() {
   );
 
   await cleanupConnections();
+  await cleanupTempHossiis();
 
   const failed = results.filter((r) => !r.ok);
   if (failed.length > 0) {
@@ -308,6 +527,7 @@ main().catch(async (err) => {
   console.error(err);
   try {
     await cleanupConnections();
+    await cleanupTempHossiis();
   } catch {
     // ignore cleanup errors on crash
   }
