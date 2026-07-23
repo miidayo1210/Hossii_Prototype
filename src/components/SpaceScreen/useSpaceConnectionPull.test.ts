@@ -7,6 +7,7 @@ import {
   DEFAULT_MAX_PULL_DISTANCE_PX,
   MAX_CONNECTED_SHIFT_PX,
 } from '../../core/utils/connectionPullMath';
+import { CONNECTION_TWO_HOP_STARS_ATTR } from '../../core/utils/connectionTwoHopStars';
 
 const connectionMeta = {
   createdBy: null,
@@ -313,5 +314,205 @@ describe('useSpaceConnectionPull', () => {
     });
 
     expect(result.current.isPulling).toBe(false);
+  });
+});
+
+const multiPeerConnections: HossiiConnection[] = [
+  {
+    id: 'c1',
+    spaceId: 's1',
+    paneId: 'pane-a',
+    sourceHossiiId: 'h1',
+    targetHossiiId: 'h2',
+    strength: 'soft',
+    ...connectionMeta,
+  },
+  {
+    id: 'c2',
+    spaceId: 's1',
+    paneId: 'pane-a',
+    sourceHossiiId: 'h1',
+    targetHossiiId: 'h8',
+    strength: 'soft',
+    ...connectionMeta,
+  },
+  {
+    id: 'c3',
+    spaceId: 's1',
+    paneId: 'pane-a',
+    sourceHossiiId: 'h2',
+    targetHossiiId: 'h3',
+    strength: 'medium',
+    ...connectionMeta,
+  },
+  {
+    id: 'c4',
+    spaceId: 's1',
+    paneId: 'pane-a',
+    sourceHossiiId: 'h2',
+    targetHossiiId: 'h4',
+    strength: 'medium',
+    ...connectionMeta,
+  },
+];
+
+function setupMultiPeerBubbleArea() {
+  const area = document.createElement('div');
+  const source = document.createElement('div');
+  source.dataset.hossiiId = 'h1';
+  source.dataset.hossiiBubble = 'true';
+  const peerA = document.createElement('div');
+  peerA.dataset.hossiiId = 'h2';
+  peerA.dataset.hossiiBubble = 'true';
+  const peerB = document.createElement('div');
+  peerB.dataset.hossiiId = 'h8';
+  peerB.dataset.hossiiBubble = 'true';
+  area.append(source, peerA, peerB);
+  document.body.appendChild(area);
+
+  source.setPointerCapture = vi.fn();
+  source.releasePointerCapture = vi.fn();
+  source.hasPointerCapture = vi.fn(() => true);
+
+  return { area, source, peerA, peerB };
+}
+
+describe('two-hop stars during pull', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  });
+
+  it('shows peer-specific stars while pulling and clears on release', async () => {
+    const { area, source, peerA, peerB } = setupMultiPeerBubbleArea();
+    const bubbleAreaRef = { current: area };
+
+    const { result } = renderHook(() =>
+      useSpaceConnectionPull({
+        bubbleAreaRef,
+        connections: multiPeerConnections,
+        selectedBubbleId: 'h1',
+        activePaneId: 'pane-a',
+        visibleHossiiIds: new Set(['h1', 'h2', 'h3', 'h4', 'h8']),
+        isConnectionsContextEnabled: true,
+        editorPhase: 'idle',
+        bubbleInteractionLock: { isDragging: false, isResizing: false },
+      }),
+    );
+
+    act(() => {
+      result.current.handlers.onPointerDown({
+        button: 0,
+        pointerId: 10,
+        pointerType: 'mouse',
+        clientX: 0,
+        clientY: 0,
+        currentTarget: source,
+        preventDefault: vi.fn(),
+      } as unknown as React.PointerEvent<HTMLElement>);
+    });
+
+    expect(peerA.getAttribute(CONNECTION_TWO_HOP_STARS_ATTR)).toBe('2');
+    expect(peerB.hasAttribute(CONNECTION_TWO_HOP_STARS_ATTR)).toBe(false);
+
+    act(() => {
+      fireEvent.pointerUp(document, { pointerId: 10 });
+    });
+
+    expect(peerA.hasAttribute(CONNECTION_TWO_HOP_STARS_ATTR)).toBe(false);
+    expect(peerB.hasAttribute(CONNECTION_TWO_HOP_STARS_ATTR)).toBe(false);
+  });
+
+  it('clears stars when connections gate turns off during pull', () => {
+    const { area, source, peerA } = setupMultiPeerBubbleArea();
+    const bubbleAreaRef = { current: area };
+
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) =>
+        useSpaceConnectionPull({
+          bubbleAreaRef,
+          connections: multiPeerConnections,
+          selectedBubbleId: 'h1',
+          activePaneId: 'pane-a',
+          visibleHossiiIds: new Set(['h1', 'h2', 'h3', 'h4', 'h8']),
+          isConnectionsContextEnabled: enabled,
+          editorPhase: 'idle',
+          bubbleInteractionLock: { isDragging: false, isResizing: false },
+        }),
+      { initialProps: { enabled: true } },
+    );
+
+    act(() => {
+      result.current.handlers.onPointerDown({
+        button: 0,
+        pointerId: 11,
+        pointerType: 'mouse',
+        clientX: 0,
+        clientY: 0,
+        currentTarget: source,
+        preventDefault: vi.fn(),
+      } as unknown as React.PointerEvent<HTMLElement>);
+    });
+    expect(peerA.getAttribute(CONNECTION_TWO_HOP_STARS_ATTR)).toBe('2');
+
+    rerender({ enabled: false });
+    expect(peerA.hasAttribute(CONNECTION_TWO_HOP_STARS_ATTR)).toBe(false);
+  });
+
+  it('shows one star under reduced motion even when peer has more 2-hop nodes', () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }));
+
+    const { area, source, peerA } = setupMultiPeerBubbleArea();
+    const bubbleAreaRef = { current: area };
+
+    const { result } = renderHook(() =>
+      useSpaceConnectionPull({
+        bubbleAreaRef,
+        connections: multiPeerConnections,
+        selectedBubbleId: 'h1',
+        activePaneId: 'pane-a',
+        visibleHossiiIds: new Set(['h1', 'h2', 'h3', 'h4', 'h8']),
+        isConnectionsContextEnabled: true,
+        editorPhase: 'idle',
+        bubbleInteractionLock: { isDragging: false, isResizing: false },
+      }),
+    );
+
+    act(() => {
+      result.current.handlers.onPointerDown({
+        button: 0,
+        pointerId: 12,
+        pointerType: 'mouse',
+        clientX: 0,
+        clientY: 0,
+        currentTarget: source,
+        preventDefault: vi.fn(),
+      } as unknown as React.PointerEvent<HTMLElement>);
+    });
+
+    expect(peerA.getAttribute(CONNECTION_TWO_HOP_STARS_ATTR)).toBe('1');
   });
 });

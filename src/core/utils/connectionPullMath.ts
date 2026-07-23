@@ -73,6 +73,13 @@ export function computeConnectedBubbleShift(
   return clampVectorMagnitude(raw, maxShift);
 }
 
+/** visible 2-hop 件数を pull 中 peer 星粒数（1〜3）へ clamp。0 は非表示 */
+export function clampTwoHopStarDisplayCount(count: number): 0 | 1 | 2 | 3 {
+  if (count <= 0) return 0;
+  if (count >= 3) return 3;
+  return count as 1 | 2 | 3;
+}
+
 /** 2-hop 星粒の表示数（progress に応じて 1〜3） */
 export function computeTwoHopStarParticleCount(
   progress: number,
