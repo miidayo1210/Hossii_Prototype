@@ -4,7 +4,9 @@ import {
   buildConnectionBadgeCounts,
   buildDirectConnectionListItems,
   countDirectConnections,
+  buildDirectPeerTwoHopStarCounts,
   countVisibleTwoHopPeers,
+  countVisibleTwoHopPeersForDirectPeer,
   filterVisibleConnections,
   getDirectPeerHossiiIds,
   shouldShowConnectionOverlay,
@@ -259,5 +261,69 @@ describe('getDirectPeerHossiiIds / countVisibleTwoHopPeers', () => {
         visibleHossiiIds: new Set(['h1', 'h2', 'h3']),
       }),
     ).toBe(0);
+  });
+});
+
+
+describe('buildDirectPeerTwoHopStarCounts', () => {
+  const filter = {
+    connections: [
+      ...baseConnections,
+      {
+        id: 'c4',
+        spaceId: 's1',
+        paneId: 'pane-a',
+        sourceHossiiId: 'h2',
+        targetHossiiId: 'h4',
+        strength: 'soft',
+        ...connectionMeta,
+      },
+      {
+        id: 'c5',
+        spaceId: 's1',
+        paneId: 'pane-a',
+        sourceHossiiId: 'h2',
+        targetHossiiId: 'h5',
+        strength: 'soft',
+        ...connectionMeta,
+      },
+      {
+        id: 'c6',
+        spaceId: 's1',
+        paneId: 'pane-a',
+        sourceHossiiId: 'h2',
+        targetHossiiId: 'h6',
+        strength: 'soft',
+        ...connectionMeta,
+      },
+      {
+        id: 'c7',
+        spaceId: 's1',
+        paneId: 'pane-a',
+        sourceHossiiId: 'h2',
+        targetHossiiId: 'h7',
+        strength: 'soft',
+        ...connectionMeta,
+      },
+    ],
+    selectedBubbleId: 'h1',
+    activePaneId: 'pane-a',
+    visibleHossiiIds: new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7']),
+  };
+
+  it('returns peer-specific counts and excludes selected/direct peers', () => {
+    expect(countVisibleTwoHopPeersForDirectPeer(filter, 'h2')).toBe(5);
+    expect(buildDirectPeerTwoHopStarCounts(filter, ['h2']).get('h2')).toBe(3);
+    expect(buildDirectPeerTwoHopStarCounts(filter, ['h3']).get('h3')).toBeUndefined();
+  });
+
+  it('excludes hidden and cross-pane 2-hop nodes', () => {
+    const hiddenFilter = {
+      ...filter,
+      visibleHossiiIds: new Set(['h1', 'h2', 'h3']),
+    };
+    expect(countVisibleTwoHopPeersForDirectPeer(hiddenFilter, 'h2')).toBe(1);
+    expect(buildDirectPeerTwoHopStarCounts(hiddenFilter, ['h2', 'h3']).get('h2')).toBe(1);
+    expect(buildDirectPeerTwoHopStarCounts(hiddenFilter, ['h2', 'h3']).get('h3')).toBeUndefined();
   });
 });

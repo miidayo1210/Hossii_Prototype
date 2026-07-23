@@ -7,6 +7,7 @@ import {
   computeDragVector,
   computeNormalizedProgress,
   computePullGlowProgress,
+  clampTwoHopStarDisplayCount,
   computeTwoHopStarParticleCount,
   DEFAULT_CONNECTED_FOLLOW_RATIO,
   DEFAULT_MAX_PULL_DISTANCE_PX,
@@ -90,5 +91,16 @@ describe('connectionPullMath', () => {
   it('clamps arbitrary vector magnitude', () => {
     const clamped = clampVectorMagnitude({ x: 100, y: 100 }, 50);
     expect(computeDistance(clamped)).toBeCloseTo(50, 5);
+  });
+});
+
+
+describe('clampTwoHopStarDisplayCount', () => {
+  it('clamps visible 2-hop counts to 0-3 stars', () => {
+    expect(clampTwoHopStarDisplayCount(0)).toBe(0);
+    expect(clampTwoHopStarDisplayCount(1)).toBe(1);
+    expect(clampTwoHopStarDisplayCount(2)).toBe(2);
+    expect(clampTwoHopStarDisplayCount(3)).toBe(3);
+    expect(clampTwoHopStarDisplayCount(99)).toBe(3);
   });
 });

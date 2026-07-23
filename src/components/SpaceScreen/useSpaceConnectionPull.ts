@@ -2,11 +2,18 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { RefObject } from 'react';
 import type { HossiiConnection } from '../../core/types/hossiiConnection';
 import {
+  buildDirectPeerTwoHopStarCounts,
   getDirectPeerHossiiIds,
   countVisibleTwoHopPeers,
 } from '../../core/utils/connectionVisibility';
 import { useConnectionPullInteraction } from '../../core/hooks/useConnectionPullInteraction';
+import { usePrefersReducedMotion } from '../../core/hooks/usePrefersReducedMotion';
+import {
+  applyConnectionTwoHopStars,
+  clearConnectionTwoHopStarsFromElements,
+} from '../../core/utils/connectionTwoHopStars';
 import type { ConnectionEditorPhase } from './connectionEditorTypes';
+
 
 type BubbleInteractionLock = {
   isDragging: boolean;
@@ -99,8 +106,56 @@ export function useSpaceConnectionPull({
     !bubbleInteractionLock.isDragging &&
     !bubbleInteractionLock.isResizing;
 
+
+  const visibleConnectionFilter = useMemo(() => {
+    if (!selectedBubbleId) return null;
+    return {
+      connections,
+      selectedBubbleId,
+      activePaneId,
+      visibleHossiiIds,
+    };
+  }, [connections, selectedBubbleId, activePaneId, visibleHossiiIds]);
+
+  const peerTwoHopStarCounts = useMemo(() => {
+    if (!visibleConnectionFilter) return new Map<string, 1 | 2 | 3>();
+    return buildDirectPeerTwoHopStarCounts(visibleConnectionFilter, directPeerIds);
+  }, [visibleConnectionFilter, directPeerIds]);
+
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const markedPeerElementsRef = useRef<HTMLElement[]>([]);
+
   const pullHandleVisible =
     isConnectionsContextEnabled && directPeerIds.length > 0;
+
+
+  const clearPeerTwoHopStars = useCallback(() => {
+    clearConnectionTwoHopStarsFromElements(markedPeerElementsRef.current);
+    markedPeerElementsRef.current = [];
+  }, []);
+
+  const applyPeerTwoHopStars = useCallback(() => {
+    const area = bubbleAreaRef.current;
+    if (!area) return;
+
+    clearPeerTwoHopStars();
+    const marked: HTMLElement[] = [];
+    for (const peerId of directPeerIds) {
+      const count = peerTwoHopStarCounts.get(peerId);
+      if (!count) continue;
+      const element = findBubbleElement(area, peerId);
+      if (!element) continue;
+      applyConnectionTwoHopStars(element, count, prefersReducedMotion);
+      marked.push(element);
+    }
+    markedPeerElementsRef.current = marked;
+  }, [
+    bubbleAreaRef,
+    clearPeerTwoHopStars,
+    directPeerIds,
+    peerTwoHopStarCounts,
+    prefersReducedMotion,
+  ]);
 
   const syncBubbleRefs = useCallback(() => {
     const area = bubbleAreaRef.current;
@@ -125,6 +180,30 @@ export function useSpaceConnectionPull({
     connectedElementsRef,
     enabled: pullEnabled,
   });
+
+
+  useLayoutEffect(() => {
+    if (isPulling) {
+      applyPeerTwoHopStars();
+      return () => {
+        clearPeerTwoHopStars();
+      };
+    }
+    clearPeerTwoHopStars();
+    return undefined;
+  }, [isPulling, applyPeerTwoHopStars, clearPeerTwoHopStars]);
+
+  useEffect(() => {
+    if (!isConnectionsContextEnabled) {
+      clearPeerTwoHopStars();
+    }
+  }, [isConnectionsContextEnabled, clearPeerTwoHopStars]);
+
+  useEffect(() => {
+    if (isPulling) {
+      applyPeerTwoHopStars();
+    }
+  }, [connections, directPeerIds, peerTwoHopStarCounts, prefersReducedMotion, isPulling, applyPeerTwoHopStars]);
 
   useEffect(() => {
     if (wasPullingRef.current && !isPulling) {

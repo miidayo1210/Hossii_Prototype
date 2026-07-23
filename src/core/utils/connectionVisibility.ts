@@ -1,5 +1,6 @@
 import type { HossiiConnection } from '../types/hossiiConnection';
 import { isConnectionsContextEnabled, type ConnectionContextGate } from './connectionFetchGate';
+import { clampTwoHopStarDisplayCount } from './connectionPullMath';
 
 export type ConnectionOverlayGate = ConnectionContextGate & {
   selectedBubbleId: string | null;
@@ -108,6 +109,51 @@ export function countVisibleTwoHopPeers({
   }
 
   return twoHopIds.size;
+}
+
+
+/** direct peer 1 件あたりの visible 2-hop 件数（selected / direct peer は除外） */
+export function countVisibleTwoHopPeersForDirectPeer(
+  filter: VisibleConnectionFilter,
+  directPeerId: string,
+): number {
+  const directPeers = new Set(getDirectPeerHossiiIds(filter));
+  if (!directPeers.has(directPeerId)) return 0;
+
+  const twoHopIds = new Set<string>();
+  for (const connection of filter.connections) {
+    if (connection.paneId !== filter.activePaneId) continue;
+    const { sourceHossiiId, targetHossiiId } = connection;
+
+    let otherId: string | null = null;
+    if (sourceHossiiId === directPeerId) otherId = targetHossiiId;
+    else if (targetHossiiId === directPeerId) otherId = sourceHossiiId;
+    else continue;
+
+    if (otherId === filter.selectedBubbleId) continue;
+    if (directPeers.has(otherId)) continue;
+    if (!filter.visibleHossiiIds.has(otherId)) continue;
+    twoHopIds.add(otherId);
+  }
+
+  return twoHopIds.size;
+}
+
+/** pull 中: direct peer ごとの 2-hop 星粒数（1〜3。0 は map に含めない） */
+export function buildDirectPeerTwoHopStarCounts(
+  filter: VisibleConnectionFilter,
+  directPeerIds: readonly string[],
+): ReadonlyMap<string, 1 | 2 | 3> {
+  const counts = new Map<string, 1 | 2 | 3>();
+  for (const peerId of directPeerIds) {
+    const displayCount = clampTwoHopStarDisplayCount(
+      countVisibleTwoHopPeersForDirectPeer(filter, peerId),
+    );
+    if (displayCount !== 0) {
+      counts.set(peerId, displayCount);
+    }
+  }
+  return counts;
 }
 
 /** 通常時 ✦N: 表示中 Hossii ごとの 1 階層接続件数 */
