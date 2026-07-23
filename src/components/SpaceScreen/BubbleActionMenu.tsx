@@ -13,6 +13,8 @@ type Props = {
   anchorRect: DOMRect;
   onViewDetail?: () => void;
   onConnect?: () => void;
+  membershipJoinStatus?: 'joining' | 'error';
+  onMembershipRetry?: () => void;
   connectionCount?: number;
   onConnectionsClick?: () => void;
   /** 直接 connection が 1 件以上のとき表示 */
@@ -26,6 +28,8 @@ export function BubbleActionMenu({
   anchorRect,
   onViewDetail,
   onConnect,
+  membershipJoinStatus,
+  onMembershipRetry,
   connectionCount,
   onConnectionsClick,
   showPullHandle = false,
@@ -36,7 +40,13 @@ export function BubbleActionMenu({
   const showConnections =
     onConnectionsClick != null && connectionCount != null;
 
-  if (!onViewDetail && !onConnect && !showConnections && !showPullHandle) {
+  if (
+    !onViewDetail &&
+    !onConnect &&
+    !membershipJoinStatus &&
+    !showConnections &&
+    !showPullHandle
+  ) {
     return null;
   }
 
@@ -102,6 +112,20 @@ export function BubbleActionMenu({
           onClick={onConnect}
         >
           つないでみる
+        </button>
+      )}
+      {membershipJoinStatus === 'joining' && (
+        <p className={styles.membershipStatus} aria-live="polite">
+          参加確認中…
+        </p>
+      )}
+      {membershipJoinStatus === 'error' && onMembershipRetry && (
+        <button
+          type="button"
+          className={styles.membershipRetry}
+          onClick={onMembershipRetry}
+        >
+          もう一度試す
         </button>
       )}
       {showConnections && (

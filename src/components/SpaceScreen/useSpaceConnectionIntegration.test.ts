@@ -129,6 +129,8 @@ function makeOptions(overrides: Partial<HookOptions> = {}): HookOptions {
     currentUser: makeAdminUser(),
     activeSpace: makeSpace(),
     isContentArchived: false,
+    activeSpaceMembershipStatus: 'active' as const,
+    retryActiveSpaceMembershipJoin: vi.fn(),
     spaceId: 'space-1',
     paneId: 'pane-1',
     selectedBubbleId: 'h1',
@@ -147,6 +149,24 @@ function makeOptions(overrides: Partial<HookOptions> = {}): HookOptions {
   };
 }
 
+function makeSuperAdminUser(): AppUser {
+  return {
+    uid: 'super-1',
+    email: 'super@test',
+    displayName: 'Super',
+    isAdmin: false,
+    isSuperAdmin: true,
+    communityId: 'other',
+  };
+}
+
+function makePersonalOwnerSpace(): Space {
+  return makeSpace({
+    spaceType: 'personal',
+    ownerUserId: 'user-1',
+  });
+}
+
 describe('useSpaceConnectionIntegration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -161,34 +181,182 @@ describe('useSpaceConnectionIntegration', () => {
     mockedDelete.mockResolvedValue({ ok: true, id: 'conn-1' });
   });
 
-  describe('write gate (admin / participant / archived)', () => {
+  describe('Type A write gate', () => {
     it('allows connect and overlay edit for community admin', () => {
-      const options = makeOptions();
+      const options = makeOptions({
+        activeSpaceMembershipStatus: 'none',
+      });
       const { result } = renderHook(() => useSpaceConnectionIntegration(options));
 
-      expect(result.current.canWriteConnections).toBe(true);
+      expect(result.current.canCreateTypeAConnection).toBe(true);
       const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
       expect(menu.onConnect).toBeTypeOf('function');
       expect(result.current.overlayProps.onConnectionClick).toBeTypeOf('function');
     });
 
-    it('blocks write actions for participants', () => {
-      const options = makeOptions({ currentUser: makeParticipantUser() });
+    it('allows active member connect and own-connection edit only', () => {
+      const ownConnection = makeConnection({ createdBy: 'user-1' });
+      const othersConnection = makeConnection({ id: 'conn-2', createdBy: 'user-2' });
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'active',
+        overlayInputs: makeOverlayInputs({ connections: [ownConnection, othersConnection] }),
+      });
       const { result } = renderHook(() => useSpaceConnectionIntegration(options));
 
-      expect(result.current.canWriteConnections).toBe(false);
-      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
-      expect(menu.onConnect).toBeUndefined();
-      expect(result.current.overlayProps.onConnectionClick).toBeUndefined();
+      expect(result.current.canCreateTypeAConnection).toBe(true);
+      expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeTypeOf(
+        'function',
+      );
+      expect(result.current.canEditConnection(ownConnection)).toBe(true);
+      expect(result.current.canEditConnection(othersConnection)).toBe(false);
     });
 
-    it('blocks write actions when space content is archived', () => {
+    it('blocks write actions for guest', () => {
+      const options = makeOptions({
+        currentUser: null,
+        activeSpaceMembershipStatus: 'active',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canCreateTypeAConnection).toBe(false);
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onConnect).toBeUndefined();
+      expect(result.current.overlayProps.onConnectionClick).toBeTypeOf('function');
+    });
+
+    it('blocks write actions for none membership', () => {
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'none',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canCreateTypeAConnection).toBe(false);
+      expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeUndefined();
+    });
+
+    it('blocks connect while joining and shows joining status', () => {
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'joining',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onConnect).toBeUndefined();
+      expect(menu.membershipJoinStatus).toBe('joining');
+    });
+
+    it('blocks connect on error and exposes retry', () => {
+      const retry = vi.fn();
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'error',
+        retryActiveSpaceMembershipJoin: retry,
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onConnect).toBeUndefined();
+      expect(menu.membershipJoinStatus).toBe('error');
+      expect(menu.onMembershipRetry).toBe(retry);
+    });
+
+    it('allows personal owner even with none membership', () => {
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpace: makePersonalOwnerSpace(),
+        activeSpaceMembershipStatus: 'none',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canCreateTypeAConnection).toBe(true);
+      expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeTypeOf(
+        'function',
+      );
+    });
+
+    it('allows super admin even with none membership', () => {
+      const options = makeOptions({
+        currentUser: makeSuperAdminUser(),
+        activeSpaceMembershipStatus: 'none',
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canCreateTypeAConnection).toBe(true);
+    });
+
+    it('blocks all write actions when space content is archived', () => {
       const options = makeOptions({ isContentArchived: true });
       const { result } = renderHook(() => useSpaceConnectionIntegration(options));
 
-      expect(result.current.canWriteConnections).toBe(false);
+      expect(result.current.canCreateTypeAConnection).toBe(false);
       const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
       expect(menu.onConnect).toBeUndefined();
+      expect(result.current.canEditConnection(makeConnection())).toBe(false);
+    });
+
+    it('allows admin to edit others connections via overlay handler', () => {
+      const othersConnection = makeConnection({ createdBy: 'user-2' });
+      const options = makeOptions({
+        overlayInputs: makeOverlayInputs({ connections: [othersConnection] }),
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(result.current.canEditConnection(othersConnection)).toBe(true);
+      act(() => {
+        result.current.overlayProps.onConnectionClick?.(othersConnection);
+      });
+      expect(result.current.editor.phase).toBe('editing');
+    });
+
+    it('does not open editor for others connections as participant', () => {
+      const othersConnection = makeConnection({ createdBy: 'user-2' });
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'active',
+        overlayInputs: makeOverlayInputs({ connections: [othersConnection] }),
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      act(() => {
+        result.current.overlayProps.onConnectionClick?.(othersConnection);
+      });
+      expect(result.current.editor.phase).toBe('idle');
+    });
+
+    it('becomes creatable after membership transitions to active', () => {
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'joining',
+      });
+      const { result, rerender } = renderHook(
+        (props: HookOptions) => useSpaceConnectionIntegration(props),
+        { initialProps: options },
+      );
+
+      expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeUndefined();
+
+      rerender({ ...options, activeSpaceMembershipStatus: 'active' });
+      expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeTypeOf(
+        'function',
+      );
+    });
+
+    it('preserves read-only connection menu items regardless of write gate', () => {
+      const options = makeOptions({
+        currentUser: makeParticipantUser(),
+        activeSpaceMembershipStatus: 'none',
+        overlayInputs: makeOverlayInputs({ selectedDirectConnectionCount: 2 }),
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      const menu = result.current.getIntegratedBubbleActionMenuProps('h1', true);
+      expect(menu.onConnect).toBeUndefined();
+      expect(menu.connectionCount).toBe(2);
+      expect(menu.onConnectionsClick).toBeTypeOf('function');
+      expect(result.current.getConnectionBadgeCount('h2')).toBeUndefined();
     });
   });
 

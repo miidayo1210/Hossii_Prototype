@@ -95,4 +95,47 @@ describe('BubbleActionMenu', () => {
     );
     expect(screen.queryByRole('button', { name: 'つながりを引っ張る' })).toBeNull();
   });
+
+  it('shows joining status without connect action', () => {
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        membershipJoinStatus="joining"
+      />,
+    );
+
+    expect(screen.getByText('参加確認中…')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'つないでみる' })).toBeNull();
+  });
+
+  it('shows retry action on membership error', () => {
+    const onMembershipRetry = vi.fn();
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        membershipJoinStatus="error"
+        onMembershipRetry={onMembershipRetry}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }));
+    expect(onMembershipRetry).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'つないでみる' })).toBeNull();
+  });
+
+  it('shows connect action when membership is active', () => {
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        onConnect={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'つないでみる' })).toBeTruthy();
+    expect(screen.queryByText('参加確認中…')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'もう一度試す' })).toBeNull();
+  });
 });

@@ -89,6 +89,32 @@
   transform: scale(0.97);
 }
 
+.membershipStatus {
+  margin: 0;
+  padding: 0.35rem 0.75rem 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.membershipRetry {
+  appearance: none;
+  border: none;
+  background: transparent;
+  border-radius: 9999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #7c3aed;
+  text-align: center;
+  cursor: pointer;
+}
+
+.membershipRetry:hover {
+  background: #f3e8ff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menuItem {
     transition: none;
