@@ -34,6 +34,7 @@ import type { ConnectionOverlayInputs } from './useConnectionOverlayInputs';
 import type { ConnectionOverlayProps } from './ConnectionOverlay';
 import type { ConnectionListPopoverItem } from './ConnectionListPopover';
 import { formatConnectionReasonDisplay } from '../../core/utils/formatConnectionReasonDisplay';
+import { formatConnectionCreateBlockedReasonMessage } from '../../core/utils/formatConnectionCreateBlockedReasonMessage';
 
 type BubbleActionMenuBubbleProps = {
   actionMenuEnabled: boolean;
@@ -41,6 +42,7 @@ type BubbleActionMenuBubbleProps = {
   onActionMenuToggle: () => void;
   onViewDetail?: () => void;
   onConnect?: () => void;
+  connectionCreateBlockedReason?: string;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
   connectionCount?: number;
@@ -424,12 +426,20 @@ export function useSpaceConnectionIntegration({
             ? ('error' as const)
             : undefined;
 
+      const connectionCreateBlockedReason =
+        isConnectionsContextEnabled &&
+        !canCreateTypeAConnection &&
+        !membershipJoinStatus
+          ? formatConnectionCreateBlockedReasonMessage(typeAWriteGate.blockReason) ?? undefined
+          : undefined;
+
       return {
         ...base,
         onConnect:
           isConnectionsContextEnabled && canCreateTypeAConnection
             ? handleConnectFromMenu
             : undefined,
+        connectionCreateBlockedReason,
         membershipJoinStatus:
           isConnectionsContextEnabled && membershipJoinStatus ? membershipJoinStatus : undefined,
         onMembershipRetry:

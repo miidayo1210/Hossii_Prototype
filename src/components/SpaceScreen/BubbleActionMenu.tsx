@@ -13,6 +13,7 @@ type Props = {
   anchorRect: DOMRect;
   onViewDetail?: () => void;
   onConnect?: () => void;
+  connectionCreateBlockedReason?: string;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
   connectionCount?: number;
@@ -28,6 +29,7 @@ export function BubbleActionMenu({
   anchorRect,
   onViewDetail,
   onConnect,
+  connectionCreateBlockedReason,
   membershipJoinStatus,
   onMembershipRetry,
   connectionCount,
@@ -43,6 +45,7 @@ export function BubbleActionMenu({
   if (
     !onViewDetail &&
     !onConnect &&
+    !connectionCreateBlockedReason &&
     !membershipJoinStatus &&
     !showConnections &&
     !showPullHandle
@@ -114,6 +117,11 @@ export function BubbleActionMenu({
           つないでみる
         </button>
       )}
+      {!onConnect && connectionCreateBlockedReason ? (
+        <p className={styles.createBlockedReason} data-connection-create-blocked-reason>
+          {connectionCreateBlockedReason}
+        </p>
+      ) : null}
       {membershipJoinStatus === 'joining' && (
         <p className={styles.membershipStatus} aria-live="polite">
           参加確認中…

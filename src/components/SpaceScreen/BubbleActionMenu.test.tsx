@@ -96,6 +96,34 @@ describe('BubbleActionMenu', () => {
     expect(screen.queryByRole('button', { name: 'つながりを引っ張る' })).toBeNull();
   });
 
+
+  it('shows create blocked reason when connect is unavailable', () => {
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        connectionCreateBlockedReason="参加すると、つながりを作れます"
+      />,
+    );
+
+    expect(screen.getByText('参加すると、つながりを作れます')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'つないでみる' })).toBeNull();
+  });
+
+  it('does not show create blocked reason when connect is available', () => {
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        onConnect={() => {}}
+        connectionCreateBlockedReason="参加すると、つながりを作れます"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'つないでみる' })).toBeTruthy();
+    expect(screen.queryByText('参加すると、つながりを作れます')).toBeNull();
+  });
+
   it('shows joining status without connect action', () => {
     render(
       <BubbleActionMenu
