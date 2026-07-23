@@ -154,6 +154,11 @@ async function getDevUserIds() {
 }
 
 async function main() {
+  if (DEV_REF !== 'uodaubhlcvvqlgsdxcdf') {
+    throw new Error(`Ref mismatch: expected Development ${'uodaubhlcvvqlgsdxcdf'}, got ${DEV_REF}`);
+  }
+  record('target project ref is Development', true, DEV_REF);
+
   const { data: rpcProbe, error: rpcProbeErr } = await admin.rpc('create_type_b_connected_hossii', {
     p_idempotency_key: randomUUID(),
     p_space_id: SPACE_ID,
@@ -198,15 +203,14 @@ async function main() {
     // personal owner success
     await signIn('dev-user-a@example.test');
     const { data: spaceRow } = await admin.from('spaces').select('community_id').eq('id', SPACE_ID).single();
-    await client.rpc('ensure_my_personal_space', { p_community_id: spaceRow.community_id });
-    const { data: personalSpace } = await admin
-      .from('spaces')
-      .select('id')
-      .eq('space_type', 'personal')
-      .eq('owner_user_id', userIds.userA)
-      .maybeSingle();
-    if (personalSpace?.id) {
-      const personalPane = `${personalSpace.id}-pane-default`;
+    const { data: ensuredPersonal, error: ensurePersonalErr } = await client.rpc('ensure_my_personal_space', {
+      p_community_id: spaceRow.community_id,
+    });
+    const personalSpaceId = Array.isArray(ensuredPersonal)
+      ? ensuredPersonal[0]?.space_id
+      : ensuredPersonal?.space_id;
+    if (personalSpaceId && !ensurePersonalErr) {
+      const personalPane = `${personalSpaceId}-pane-default`;
       const { a, b } = await (async () => {
         const ts = Date.now();
         const aId = `tb2-personal-a-${ts}`;
@@ -218,7 +222,7 @@ async function main() {
           await admin.from('hossiis').insert({
             id,
             message: msg,
-            space_id: personalSpace.id,
+            space_id: personalSpaceId,
             space_pane_id: personalPane,
             author_name: 'personal',
             origin: 'manual',
@@ -229,7 +233,7 @@ async function main() {
         return { a: aId, b: bId };
       })();
       const personalPayload = basePayload({
-        p_space_id: personalSpace.id,
+        p_space_id: personalSpaceId,
         p_pane_id: personalPane,
         p_origin_hossii_id: a,
         p_new_hossii_id: `tb2-personal-new-${Date.now()}`,
@@ -238,7 +242,7 @@ async function main() {
       await trackSuccess(personalPayload, personalData);
       record('personal owner success', !personalErr && !!personalData?.connection_id, personalErr?.message ?? '');
     } else {
-      record('personal owner success', false, 'personal space missing');
+      record('personal owner success', false, ensurePersonalErr?.message ?? 'personal space missing');
     }
     await signOut();
 
@@ -367,14 +371,72 @@ async function main() {
     record('empty message reject', !!emptyErr && !emptyRow, emptyErr?.message ?? '');
     await signOut();
 
+    // message at max length (200) success
+    await signIn('dev-user-a@example.test');
+    const maxMsgId = `tb2-maxmsg-${Date.now()}`;
+    const maxMsgPayload = basePayload({ p_message: 'm'.repeat(200), p_new_hossii_id: maxMsgId });
+    const { data: maxMsgData, error: maxMsgErr } = await callTypeB(maxMsgPayload);
+    await trackSuccess(maxMsgPayload, maxMsgData);
+    record('message 200 chars success', !maxMsgErr && !!maxMsgData?.connection_id, maxMsgErr?.message ?? '');
+    await signOut();
+
     // message too long (>200)
     await signIn('dev-user-a@example.test');
     const longMsgId = `tb2-long-${Date.now()}`;
     const longPayload = basePayload({ p_message: 'x'.repeat(201), p_new_hossii_id: longMsgId });
     const { error: longErr } = await callTypeB(longPayload);
     const { data: longRow } = await admin.from('hossiis').select('id').eq('id', longMsgId).maybeSingle();
-    record('message max length reject', !!longErr && !longRow, longErr?.message ?? '');
+    record('message 201 chars reject', !!longErr && !longRow, longErr?.message ?? '');
     await signOut();
+
+    // dev_test RPC: service_role only
+    await signIn('dev-user-a@example.test');
+    const { error: devTestAuthErr } = await client.rpc('dev_test_type_b_transaction_rollback');
+    record(
+      'dev_test blocked for authenticated',
+      !!devTestAuthErr && /permission denied|not found|42501/i.test(devTestAuthErr.message),
+      devTestAuthErr?.message ?? 'unexpected success',
+    );
+    await signOut();
+    const { error: devTestAnonErr } = await client.rpc('dev_test_type_b_transaction_rollback');
+    record(
+      'dev_test blocked for anon',
+      !!devTestAnonErr && /permission denied|not found|42501/i.test(devTestAnonErr.message),
+      devTestAnonErr?.message ?? 'unexpected success',
+    );
+
+    // idempotency table not readable from client
+    await signIn('dev-user-a@example.test');
+    const { data: idemRows, error: idemReadErr } = await client
+      .from('type_b_create_idempotency')
+      .select('idempotency_key')
+      .limit(1);
+    record(
+      'idempotency table not client-readable',
+      !!idemReadErr || (Array.isArray(idemRows) && idemRows.length === 0),
+      idemReadErr?.message ?? `rows=${idemRows?.length ?? 0}`,
+    );
+    await signOut();
+
+    // RPC not granted to anon (PostgREST layer)
+    const anonOnly = createClient(DEV_URL, anon, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { error: rpcGrantErr } = await anonOnly.rpc('create_type_b_connected_hossii', {
+      p_idempotency_key: randomUUID(),
+      p_space_id: SPACE_ID,
+      p_pane_id: PANE_ID,
+      p_origin_hossii_id: ORIGIN_ID,
+      p_new_hossii_id: `tb2-grant-${Date.now()}`,
+      p_message: 'grant probe',
+      p_position_x: 10,
+      p_position_y: 10,
+    });
+    record(
+      'RPC not granted to anon',
+      !!rpcGrantErr && /permission denied|42501|not authorized/i.test(rpcGrantErr.message),
+      rpcGrantErr?.message ?? 'unexpected success',
+    );
 
     // connection failure rollback (dev probe RPC)
     const { error: rollbackErr } = await admin.rpc('dev_test_type_b_transaction_rollback');
