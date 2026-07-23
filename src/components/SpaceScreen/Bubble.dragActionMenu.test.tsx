@@ -151,3 +151,84 @@ describe('Bubble drag threshold and action menu', () => {
     expect(screen.getByRole('button', { name: 'つながり 2' })).toBeTruthy();
   });
 });
+
+describe('Bubble persistent pull handle', () => {
+  const onPullHandlePointerDown = vi.fn();
+
+  beforeEach(() => {
+    onPullHandlePointerDown.mockClear();
+  });
+
+  it('shows bubble pull handle when selected with connections', () => {
+    renderBubble({
+      isSelected: true,
+      showBubblePullHandle: true,
+      onPullHandlePointerDown,
+    });
+
+    expect(screen.getByLabelText('つながりを引っ張る')).toBeTruthy();
+    expect(document.querySelector('[data-bubble-pull-handle]')).toBeTruthy();
+  });
+
+  it('hides bubble pull handle when not selected', () => {
+    renderBubble({
+      isSelected: false,
+      showBubblePullHandle: true,
+      onPullHandlePointerDown,
+    });
+
+    expect(screen.queryByLabelText('つながりを引っ張る')).toBeNull();
+  });
+
+  it('hides bubble pull handle when showBubblePullHandle is false', () => {
+    renderBubble({
+      isSelected: true,
+      showBubblePullHandle: false,
+      onPullHandlePointerDown,
+    });
+
+    expect(screen.queryByLabelText('つながりを引っ張る')).toBeNull();
+  });
+
+  it('does not start bubble drag from pull handle pointerdown', () => {
+    const { onPositionSave } = renderBubble({
+      isSelected: true,
+      canEdit: true,
+      showBubblePullHandle: true,
+      onPullHandlePointerDown,
+    });
+
+    const handle = screen.getByLabelText('つながりを引っ張る') as HTMLElement;
+    handle.setPointerCapture = vi.fn();
+    handle.hasPointerCapture = vi.fn(() => true);
+    handle.releasePointerCapture = vi.fn();
+
+    fireEvent.pointerDown(handle, {
+      clientX: 100,
+      clientY: 100,
+      pointerId: 1,
+      buttons: 1,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(document, { clientX: 140, clientY: 140, pointerId: 1, buttons: 1 });
+    fireEvent.pointerUp(document, { clientX: 140, clientY: 140, pointerId: 1 });
+
+    expect(onPositionSave).not.toHaveBeenCalled();
+    expect(onPullHandlePointerDown).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows pull hint with dismiss control', () => {
+    const onConnectionPullHintDismiss = vi.fn();
+    renderBubble({
+      isSelected: true,
+      showBubblePullHandle: true,
+      showConnectionPullHint: true,
+      onConnectionPullHintDismiss,
+      onPullHandlePointerDown,
+    });
+
+    expect(screen.getByRole('status').textContent).toContain('✦を引っ張ると、つながりが見えるよ');
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    expect(onConnectionPullHintDismiss).toHaveBeenCalledTimes(1);
+  });
+});

@@ -120,6 +120,11 @@ type BubbleProps = {
   suppressActionMenuToggle?: boolean;
   /** compact menu 内 pull ハンドル */
   showPullHandle?: boolean;
+  /** 選択 Bubble 右上の常設 pull ハンドル（PC custom のみ） */
+  showBubblePullHandle?: boolean;
+  /** 初回 pull ガイド */
+  showConnectionPullHint?: boolean;
+  onConnectionPullHintDismiss?: () => void;
   onPullHandlePointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
   pullStarParticleCount?: number;
   isConnectionPulling?: boolean;
@@ -168,6 +173,9 @@ export function BubbleInner({
   isConnectionPickTarget = false,
   suppressActionMenuToggle = false,
   showPullHandle = false,
+  showBubblePullHandle = false,
+  showConnectionPullHint = false,
+  onConnectionPullHintDismiss,
   onPullHandlePointerDown,
   pullStarParticleCount = 1,
   isConnectionPulling = false,
@@ -633,6 +641,50 @@ export function BubbleInner({
           ✦{connectionBadgeCount}
         </span>
       )}
+      {isSelected && showBubblePullHandle && onPullHandlePointerDown && (
+        <button
+          type="button"
+          className={`${styles.bubblePullHandle} ${isConnectionPulling ? styles.bubblePullHandleActive : ''}`}
+          data-connection-pull-handle
+          data-bubble-pull-handle
+          data-space-export="exclude"
+          aria-label="つながりを引っ張る"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onPullHandlePointerDown(e);
+          }}
+        >
+          <span className={styles.bubblePullHandleIcon} aria-hidden>
+            ✦
+          </span>
+        </button>
+      )}
+      {isSelected && showConnectionPullHint && (
+        <div
+          className={styles.connectionPullHint}
+          role="status"
+          data-space-export="exclude"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className={styles.connectionPullHintText}>
+            ✦を引っ張ると、つながりが見えるよ
+          </span>
+          {onConnectionPullHintDismiss && (
+            <button
+              type="button"
+              className={styles.connectionPullHintDismiss}
+              aria-label="閉じる"
+              onClick={(e) => {
+                e.stopPropagation();
+                onConnectionPullHintDismiss();
+              }}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
       {showPinUi && onPinToggle && (isBubbleHovered || isPinned) && (
         <PinButton
           className={styles.bubblePinButton}
@@ -1017,6 +1069,9 @@ function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
     prev.isConnectionPickTarget === next.isConnectionPickTarget &&
     prev.suppressActionMenuToggle === next.suppressActionMenuToggle &&
     prev.showPullHandle === next.showPullHandle &&
+    prev.showBubblePullHandle === next.showBubblePullHandle &&
+    prev.showConnectionPullHint === next.showConnectionPullHint &&
+    prev.onConnectionPullHintDismiss === next.onConnectionPullHintDismiss &&
     prev.onPullHandlePointerDown === next.onPullHandlePointerDown &&
     prev.pullStarParticleCount === next.pullStarParticleCount &&
     prev.isConnectionPulling === next.isConnectionPulling &&
