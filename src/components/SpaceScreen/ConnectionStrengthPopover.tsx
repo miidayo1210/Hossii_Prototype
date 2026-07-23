@@ -1,6 +1,11 @@
 import { createPortal } from 'react-dom';
-import type { CSSProperties } from 'react';
-import type { HossiiConnectionStrength } from '../../core/types/hossiiConnection';
+import type { CSSProperties, ChangeEvent } from 'react';
+import type {
+  HossiiConnectionReasonEmoji,
+  HossiiConnectionStrength,
+} from '../../core/types/hossiiConnection';
+import { HOSSII_CONNECTION_REASON_EMOJIS } from '../../core/types/hossiiConnection';
+import { MAX_CONNECTION_REASON_TEXT_LENGTH } from '../../core/utils/connectionReasonValidation';
 import { HOSSII_CONNECTION_STRENGTH_LABELS } from '../../core/utils/hossiiConnectionStrengthLabels';
 import styles from './ConnectionEditorPopover.module.css';
 
@@ -15,7 +20,13 @@ type Props = {
   anchorRect: DOMRect;
   mode: 'create' | 'edit';
   selectedStrength: HossiiConnectionStrength | null;
+  reasonExpanded: boolean;
+  draftReasonText: string;
+  draftReasonEmoji: HossiiConnectionReasonEmoji | null;
   onSelectStrength: (strength: HossiiConnectionStrength) => void;
+  onToggleReasonExpanded: () => void;
+  onDraftReasonTextChange: (text: string) => void;
+  onToggleDraftReasonEmoji: (emoji: HossiiConnectionReasonEmoji) => void;
   onPrimaryAction: () => void;
   onRequestDelete?: () => void;
   onCancel: () => void;
@@ -27,7 +38,13 @@ export function ConnectionStrengthPopover({
   anchorRect,
   mode,
   selectedStrength,
+  reasonExpanded,
+  draftReasonText,
+  draftReasonEmoji,
   onSelectStrength,
+  onToggleReasonExpanded,
+  onDraftReasonTextChange,
+  onToggleDraftReasonEmoji,
   onPrimaryAction,
   onRequestDelete,
   onCancel,
@@ -44,7 +61,12 @@ export function ConnectionStrengthPopover({
     zIndex: 330,
   };
 
-  const primaryLabel = mode === 'create' ? 'つなぐ' : '強さ変更';
+  const primaryLabel = mode === 'create' ? 'つなぐ' : '保存する';
+  const reasonCharCount = draftReasonText.length;
+
+  const handleReasonTextChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onDraftReasonTextChange(event.target.value);
+  };
 
   return createPortal(
     <div
@@ -56,7 +78,7 @@ export function ConnectionStrengthPopover({
       onClick={(e) => e.stopPropagation()}
     >
       <p className={styles.title}>
-        {mode === 'create' ? 'つなぐ強さを選ぶ' : '強さを変える'}
+        {mode === 'create' ? 'つなぐ強さを選ぶ' : 'つながりを編集'}
       </p>
       <div className={styles.strengthList}>
         {HOSSII_CONNECTION_STRENGTH_LABELS.map((entry) => {
@@ -75,6 +97,52 @@ export function ConnectionStrengthPopover({
             </button>
           );
         })}
+      </div>
+      <div className={styles.reasonSection}>
+        {!reasonExpanded ? (
+          <button
+            type="button"
+            className={styles.reasonToggle}
+            onClick={onToggleReasonExpanded}
+            disabled={disabled}
+          >
+            ＋ 理由も添える
+          </button>
+        ) : (
+          <div className={styles.reasonPanel}>
+            <div className={styles.reasonEmojiRow}>
+              {HOSSII_CONNECTION_REASON_EMOJIS.map((emoji) => {
+                const active = draftReasonEmoji === emoji;
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className={`${styles.reasonEmojiButton} ${active ? styles.reasonEmojiButtonActive : ''}`}
+                    onClick={() => onToggleDraftReasonEmoji(emoji)}
+                    disabled={disabled}
+                    aria-pressed={active}
+                    aria-label={`理由の絵文字 ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
+            </div>
+            <input
+              type="text"
+              className={styles.reasonInput}
+              value={draftReasonText}
+              onChange={handleReasonTextChange}
+              disabled={disabled}
+              placeholder="理由（任意）"
+              maxLength={MAX_CONNECTION_REASON_TEXT_LENGTH}
+              aria-label="つながりの理由"
+            />
+            <p className={styles.reasonCounter} aria-live="polite">
+              {reasonCharCount}/{MAX_CONNECTION_REASON_TEXT_LENGTH}
+            </p>
+          </div>
+        )}
       </div>
       {errorMessage && (
         <p className={styles.error} role="alert">

@@ -1,5 +1,13 @@
 import { useCallback, useMemo, useReducer, useRef } from 'react';
-import type { HossiiConnection, HossiiConnectionStrength } from '../../core/types/hossiiConnection';
+import type {
+  HossiiConnection,
+  HossiiConnectionReasonEmoji,
+  HossiiConnectionStrength,
+} from '../../core/types/hossiiConnection';
+import {
+  buildCreateReasonFields,
+  buildReasonUpdateDelta,
+} from '../../core/utils/connectionReasonEditor';
 import {
   CONNECTION_SELF_TARGET_ERROR,
   type ConnectionEditorCallbacks,
@@ -14,7 +22,16 @@ type EditorState = {
   targetId: string | null;
   selectedStrength: HossiiConnectionStrength | null;
   editingConnection: HossiiConnection | null;
+  reasonExpanded: boolean;
+  draftReasonText: string;
+  draftReasonEmoji: HossiiConnectionReasonEmoji | null;
   errorMessage: string | null;
+};
+
+const INITIAL_REASON = {
+  reasonExpanded: false,
+  draftReasonText: '',
+  draftReasonEmoji: null as HossiiConnectionReasonEmoji | null,
 };
 
 const INITIAL_STATE: EditorState = {
@@ -23,6 +40,7 @@ const INITIAL_STATE: EditorState = {
   targetId: null,
   selectedStrength: null,
   editingConnection: null,
+  ...INITIAL_REASON,
   errorMessage: null,
 };
 
@@ -37,7 +55,11 @@ type Action =
   | { type: 'requestDelete' }
   | { type: 'cancelFromDeleting' }
   | { type: 'mutationSuccess' }
-  | { type: 'mutationFailure'; message: string };
+  | { type: 'mutationFailure'; message: string }
+  | { type: 'setValidationError'; message: string }
+  | { type: 'toggleReasonExpanded' }
+  | { type: 'setDraftReasonText'; text: string }
+  | { type: 'toggleDraftReasonEmoji'; emoji: HossiiConnectionReasonEmoji };
 
 function reducer(state: EditorState, action: Action): EditorState {
   switch (action.type) {
@@ -60,6 +82,7 @@ function reducer(state: EditorState, action: Action): EditorState {
         phase: 'pickingStrength',
         targetId: action.targetId,
         selectedStrength: 'medium',
+        ...INITIAL_REASON,
         errorMessage: null,
       };
     case 'chooseStrength':
@@ -74,13 +97,20 @@ function reducer(state: EditorState, action: Action): EditorState {
         phase: 'saving',
         errorMessage: null,
       };
-    case 'startEdit':
+    case 'startEdit': {
+      const hasReason = Boolean(
+        action.connection.reasonText?.trim() || action.connection.reasonEmoji,
+      );
       return {
         ...INITIAL_STATE,
         phase: 'editing',
         editingConnection: action.connection,
         selectedStrength: action.connection.strength,
+        draftReasonText: action.connection.reasonText ?? '',
+        draftReasonEmoji: action.connection.reasonEmoji,
+        reasonExpanded: hasReason,
       };
+    }
     case 'requestDelete':
       if (state.phase !== 'editing' || !state.editingConnection) return state;
       return {
@@ -103,6 +133,30 @@ function reducer(state: EditorState, action: Action): EditorState {
         phase: 'error',
         errorMessage: action.message,
       };
+    case 'setValidationError':
+      return {
+        ...state,
+        errorMessage: action.message,
+      };
+    case 'toggleReasonExpanded':
+      return {
+        ...state,
+        reasonExpanded: !state.reasonExpanded,
+        errorMessage: null,
+      };
+    case 'setDraftReasonText':
+      return {
+        ...state,
+        draftReasonText: action.text,
+        errorMessage: null,
+      };
+    case 'toggleDraftReasonEmoji':
+      return {
+        ...state,
+        draftReasonEmoji:
+          state.draftReasonEmoji === action.emoji ? null : action.emoji,
+        errorMessage: null,
+      };
     default:
       return state;
   }
@@ -115,6 +169,9 @@ function toSnapshot(state: EditorState): ConnectionEditorSnapshot {
     targetId: state.targetId,
     selectedStrength: state.selectedStrength,
     editingConnection: state.editingConnection,
+    reasonExpanded: state.reasonExpanded,
+    draftReasonText: state.draftReasonText,
+    draftReasonEmoji: state.draftReasonEmoji,
     errorMessage: state.errorMessage,
     isSaving: state.phase === 'saving',
     canCancel: state.phase !== 'saving',
@@ -141,7 +198,7 @@ export function useConnectionEditor(callbacks: ConnectionEditorCallbacks) {
   const startCreate = useCallback((sourceId: string) => {
     if (!guardNotSaving()) return;
     dispatch({ type: 'startCreate', sourceId });
-  }, [guardNotSaving]);
+  }, [guardNotSaving, dispatch]);
 
   const chooseTarget = useCallback((targetId: string) => {
     const current = stateRef.current;
@@ -152,14 +209,29 @@ export function useConnectionEditor(callbacks: ConnectionEditorCallbacks) {
       return;
     }
     dispatch({ type: 'chooseTarget', targetId });
-  }, [guardNotSaving]);
+  }, [guardNotSaving, dispatch]);
 
   const chooseStrength = useCallback((strength: HossiiConnectionStrength) => {
     const phase = stateRef.current.phase;
     if (phase !== 'pickingStrength' && phase !== 'editing') return;
     if (!guardNotSaving()) return;
     dispatch({ type: 'chooseStrength', strength });
-  }, [guardNotSaving]);
+  }, [guardNotSaving, dispatch]);
+
+  const toggleReasonExpanded = useCallback(() => {
+    if (!guardNotSaving()) return;
+    dispatch({ type: 'toggleReasonExpanded' });
+  }, [guardNotSaving, dispatch]);
+
+  const setDraftReasonText = useCallback((text: string) => {
+    if (!guardNotSaving()) return;
+    dispatch({ type: 'setDraftReasonText', text });
+  }, [guardNotSaving, dispatch]);
+
+  const toggleDraftReasonEmoji = useCallback((emoji: HossiiConnectionReasonEmoji) => {
+    if (!guardNotSaving()) return;
+    dispatch({ type: 'toggleDraftReasonEmoji', emoji });
+  }, [guardNotSaving, dispatch]);
 
   const runMutation = useCallback(
     async <T,>(
@@ -180,55 +252,101 @@ export function useConnectionEditor(callbacks: ConnectionEditorCallbacks) {
         inFlightRef.current = false;
       }
     },
-    [],
+    [dispatch],
   );
 
-  const submitCreate = useCallback(async () => {
+  const submitSave = useCallback(async () => {
     const current = stateRef.current;
-    if (current.phase !== 'pickingStrength') return false;
-    if (!current.sourceId || !current.targetId || !current.selectedStrength) return false;
+    const isCreate = current.phase === 'pickingStrength';
+    const isEdit = current.phase === 'editing';
+
+    if (!isCreate && !isEdit) return false;
     if (!guardNotSaving()) return false;
 
-    const { sourceId, targetId, selectedStrength } = current;
-    return runMutation(() =>
-      callbacksRef.current.onCreate({
-        sourceHossiiId: sourceId,
-        targetHossiiId: targetId,
-        strength: selectedStrength,
-      }),
+    if (isCreate) {
+      if (!current.sourceId || !current.targetId || !current.selectedStrength) return false;
+
+      const reasonResult = buildCreateReasonFields(
+        current.draftReasonText,
+        current.draftReasonEmoji,
+      );
+      if (!reasonResult.ok) {
+        dispatch({ type: 'setValidationError', message: reasonResult.message });
+        return false;
+      }
+
+      const { sourceId, targetId, selectedStrength } = current;
+      return runMutation(() =>
+        callbacksRef.current.onCreate({
+          sourceHossiiId: sourceId,
+          targetHossiiId: targetId,
+          strength: selectedStrength,
+          ...reasonResult.fields,
+        }),
+      );
+    }
+
+    const connection = current.editingConnection;
+    if (!connection || !current.selectedStrength) return false;
+
+    const reasonDeltaResult = buildReasonUpdateDelta(
+      {
+        reasonText: connection.reasonText,
+        reasonEmoji: connection.reasonEmoji,
+      },
+      current.draftReasonText,
+      current.draftReasonEmoji,
     );
-  }, [guardNotSaving, runMutation]);
-
-  const startEdit = useCallback((connection: HossiiConnection) => {
-    if (!guardNotSaving()) return;
-    dispatch({ type: 'startEdit', connection });
-  }, [guardNotSaving]);
-
-  const submitStrengthUpdate = useCallback(async () => {
-    const current = stateRef.current;
-    if (current.phase !== 'editing' || !current.editingConnection || !current.selectedStrength) {
+    if (!reasonDeltaResult.ok) {
+      dispatch({ type: 'setValidationError', message: reasonDeltaResult.message });
       return false;
     }
-    if (!guardNotSaving()) return false;
 
-    const { editingConnection, selectedStrength } = current;
-    if (selectedStrength === editingConnection.strength) {
+    const strengthChanged = current.selectedStrength !== connection.strength;
+    const reasonChanged = reasonDeltaResult.delta !== null;
+
+    if (!strengthChanged && !reasonChanged) {
       dispatch({ type: 'reset' });
       return true;
     }
 
-    return runMutation(() =>
-      callbacksRef.current.onUpdateStrength({
-        connectionId: editingConnection.id,
-        strength: selectedStrength,
-      }),
-    );
-  }, [guardNotSaving, runMutation]);
+    return runMutation(async () => {
+      let lastData: HossiiConnection = connection;
+
+      if (strengthChanged) {
+        const strengthResult = await callbacksRef.current.onUpdateStrength({
+          connectionId: connection.id,
+          strength: current.selectedStrength!,
+        });
+        if (!strengthResult.ok) return strengthResult;
+        lastData = strengthResult.data;
+      }
+
+      if (reasonChanged && reasonDeltaResult.delta) {
+        const reasonResult = await callbacksRef.current.onUpdateReason({
+          connectionId: connection.id,
+          ...reasonDeltaResult.delta,
+        });
+        if (!reasonResult.ok) return reasonResult;
+        lastData = reasonResult.data;
+      }
+
+      return { ok: true as const, data: lastData };
+    });
+  }, [guardNotSaving, runMutation, dispatch]);
+
+  const submitCreate = submitSave;
+  const submitStrengthUpdate = submitSave;
+
+  const startEdit = useCallback((connection: HossiiConnection) => {
+    if (!guardNotSaving()) return;
+    dispatch({ type: 'startEdit', connection });
+  }, [guardNotSaving, dispatch]);
 
   const requestDelete = useCallback(() => {
     if (!guardNotSaving()) return;
     dispatch({ type: 'requestDelete' });
-  }, [guardNotSaving]);
+  }, [guardNotSaving, dispatch]);
 
   const confirmDelete = useCallback(async () => {
     const current = stateRef.current;
@@ -246,12 +364,12 @@ export function useConnectionEditor(callbacks: ConnectionEditorCallbacks) {
       return;
     }
     dispatch({ type: 'reset' });
-  }, [guardNotSaving]);
+  }, [guardNotSaving, dispatch]);
 
   const reset = useCallback(() => {
     if (!guardNotSaving()) return;
     dispatch({ type: 'reset' });
-  }, [guardNotSaving]);
+  }, [guardNotSaving, dispatch]);
 
   const snapshot = useMemo(() => toSnapshot(state), [state]);
 
@@ -260,9 +378,13 @@ export function useConnectionEditor(callbacks: ConnectionEditorCallbacks) {
     startCreate,
     chooseTarget,
     chooseStrength,
+    toggleReasonExpanded,
+    setDraftReasonText,
+    toggleDraftReasonEmoji,
+    submitSave,
     submitCreate,
-    startEdit,
     submitStrengthUpdate,
+    startEdit,
     requestDelete,
     confirmDelete,
     cancel,

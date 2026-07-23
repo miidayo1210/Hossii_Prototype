@@ -10,17 +10,20 @@ import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
 import {
   createConnection,
   deleteConnection,
+  updateConnectionReason,
   updateConnectionStrength,
 } from '../../core/utils/hossiiConnectionsApi';
 
 vi.mock('../../core/utils/hossiiConnectionsApi', () => ({
   createConnection: vi.fn(),
   updateConnectionStrength: vi.fn(),
+  updateConnectionReason: vi.fn(),
   deleteConnection: vi.fn(),
 }));
 
 const mockedCreate = vi.mocked(createConnection);
 const mockedUpdate = vi.mocked(updateConnectionStrength);
+const mockedUpdateReason = vi.mocked(updateConnectionReason);
 const mockedDelete = vi.mocked(deleteConnection);
 
 function makeHossii(id: string, message = 'msg'): Hossii {
@@ -41,6 +44,8 @@ function makeConnection(overrides: Partial<HossiiConnection> = {}): HossiiConnec
     sourceHossiiId: 'h1',
     targetHossiiId: 'h2',
     strength: 'medium',
+    reasonText: null,
+    reasonEmoji: null,
     createdBy: null,
     createdAt: '2026-07-22T00:00:00.000Z',
     updatedAt: '2026-07-22T00:00:00.000Z',
@@ -177,6 +182,10 @@ describe('useSpaceConnectionIntegration', () => {
     mockedUpdate.mockResolvedValue({
       ok: true,
       connection: makeConnection({ strength: 'strong' }),
+    });
+    mockedUpdateReason.mockResolvedValue({
+      ok: true,
+      connection: makeConnection({ reasonText: '更新', reasonEmoji: '💡' }),
     });
     mockedDelete.mockResolvedValue({ ok: true, id: 'conn-1' });
   });
@@ -374,7 +383,7 @@ describe('useSpaceConnectionIntegration', () => {
       });
 
       await act(async () => {
-        await result.current.editor.submitCreate();
+        await result.current.editor.submitSave();
       });
 
       expect(mockedCreate).toHaveBeenCalledWith({
@@ -383,6 +392,37 @@ describe('useSpaceConnectionIntegration', () => {
         sourceHossiiId: 'h1',
         targetHossiiId: 'h2',
         strength: 'medium',
+      });
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('create API へ reason を配線する', async () => {
+      const refetch = vi.fn();
+      const options = makeOptions({
+        overlayInputs: makeOverlayInputs({ refetch }),
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      act(() => {
+        result.current.editor.startCreate('h1');
+        result.current.editor.chooseTarget('h2');
+        result.current.editor.toggleReasonExpanded();
+        result.current.editor.setDraftReasonText('つながり');
+        result.current.editor.toggleDraftReasonEmoji('💡');
+      });
+
+      await act(async () => {
+        await result.current.editor.submitSave();
+      });
+
+      expect(mockedCreate).toHaveBeenCalledWith({
+        spaceId: 'space-1',
+        paneId: 'pane-1',
+        sourceHossiiId: 'h1',
+        targetHossiiId: 'h2',
+        strength: 'medium',
+        reasonText: 'つながり',
+        reasonEmoji: '💡',
       });
       expect(refetch).toHaveBeenCalledTimes(1);
     });
@@ -400,14 +440,55 @@ describe('useSpaceConnectionIntegration', () => {
       });
 
       await act(async () => {
-        await result.current.editor.submitStrengthUpdate();
+        await result.current.editor.submitSave();
       });
 
       expect(mockedUpdate).toHaveBeenCalledWith('conn-1', 'strong');
       expect(refetch).toHaveBeenCalledTimes(1);
     });
 
-    it('refetches after delete success even when zero rows deleted at API layer', async () => {
+    it('updateConnectionReason へ partial payload を配線する', async () => {
+      const refetch = vi.fn();
+      const options = makeOptions({
+        overlayInputs: makeOverlayInputs({ refetch }),
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      act(() => {
+        result.current.editor.startEdit(makeConnection({ reasonText: '既存', reasonEmoji: '💡' }));
+        result.current.editor.setDraftReasonText('更新');
+      });
+
+      await act(async () => {
+        await result.current.editor.submitSave();
+      });
+
+      expect(mockedUpdate).not.toHaveBeenCalled();
+      expect(mockedUpdateReason).toHaveBeenCalledWith({
+        connectionId: 'conn-1',
+        reasonText: '更新',
+      });
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('strength更新回帰: reason に触れない', async () => {
+      const options = makeOptions();
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      act(() => {
+        result.current.editor.startEdit(makeConnection());
+        result.current.editor.chooseStrength('strong');
+      });
+
+      await act(async () => {
+        await result.current.editor.submitSave();
+      });
+
+      expect(mockedUpdate).toHaveBeenCalledWith('conn-1', 'strong');
+      expect(mockedUpdateReason).not.toHaveBeenCalled();
+    });
+
+    it('delete回帰', async () => {
       const refetch = vi.fn();
       mockedDelete.mockResolvedValue({ ok: true, id: 'missing-id' });
       const options = makeOptions({

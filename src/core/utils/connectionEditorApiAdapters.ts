@@ -3,6 +3,7 @@ import type {
   CreateConnectionResult,
   DeleteConnectionResult,
   HossiiConnectionsApiError,
+  UpdateConnectionReasonResult,
   UpdateConnectionStrengthResult,
 } from './hossiiConnectionsApi';
 import type { ConnectionMutationResult } from '../../components/SpaceScreen/connectionEditorTypes';
@@ -31,6 +32,13 @@ export function mapCreateConnectionResult(
 
 export function mapUpdateConnectionStrengthResult(
   result: UpdateConnectionStrengthResult,
+): ConnectionMutationResult<HossiiConnection> {
+  if (result.ok) return { ok: true, data: result.connection };
+  return { ok: false, message: formatConnectionApiError(result) };
+}
+
+export function mapUpdateConnectionReasonResult(
+  result: UpdateConnectionReasonResult,
 ): ConnectionMutationResult<HossiiConnection> {
   if (result.ok) return { ok: true, data: result.connection };
   return { ok: false, message: formatConnectionApiError(result) };
