@@ -15,7 +15,6 @@ type Props = {
   onConnect?: () => void;
   onCreateConnectedHossii?: () => void;
   connectionCreateBlockedReason?: string;
-  typeBCreateBlockedReason?: string;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
   connectionCount?: number;
@@ -33,7 +32,6 @@ export function BubbleActionMenu({
   onConnect,
   onCreateConnectedHossii,
   connectionCreateBlockedReason,
-  typeBCreateBlockedReason,
   membershipJoinStatus,
   onMembershipRetry,
   connectionCount,
@@ -51,7 +49,6 @@ export function BubbleActionMenu({
     !onConnect &&
     !onCreateConnectedHossii &&
     !connectionCreateBlockedReason &&
-    !typeBCreateBlockedReason &&
     !membershipJoinStatus &&
     !showConnections &&
     !showPullHandle
@@ -136,11 +133,6 @@ export function BubbleActionMenu({
       {!onConnect && connectionCreateBlockedReason ? (
         <p className={styles.createBlockedReason} data-connection-create-blocked-reason>
           {connectionCreateBlockedReason}
-        </p>
-      ) : null}
-      {!onCreateConnectedHossii && typeBCreateBlockedReason ? (
-        <p className={styles.createBlockedReason} data-type-b-create-blocked-reason>
-          {typeBCreateBlockedReason}
         </p>
       ) : null}
       {membershipJoinStatus === 'joining' && (

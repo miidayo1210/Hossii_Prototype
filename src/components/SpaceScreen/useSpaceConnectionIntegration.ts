@@ -45,7 +45,6 @@ type BubbleActionMenuBubbleProps = {
   onConnect?: () => void;
   onCreateConnectedHossii?: () => void;
   connectionCreateBlockedReason?: string;
-  typeBCreateBlockedReason?: string;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
   connectionCount?: number;
@@ -429,7 +428,7 @@ export function useSpaceConnectionIntegration({
   const handleConnectionOverlayClick = useCallback(
     (connection: HossiiConnection) => {
       if (!isConnectionsContextEnabled || !canEditConnection(connection)) return;
-      if (isEditorSaving) return;
+      if (isEditorSaving || typeBEditorBlockingTypeA) return;
       if (
         editor.phase === 'editing' ||
         editor.phase === 'error' ||
@@ -441,7 +440,7 @@ export function useSpaceConnectionIntegration({
       }
       editor.startEdit(connection);
     },
-    [isConnectionsContextEnabled, canEditConnection, isEditorSaving, editor],
+    [isConnectionsContextEnabled, canEditConnection, isEditorSaving, typeBEditorBlockingTypeA, editor],
   );
 
   const openConnectionList = useCallback(() => {
@@ -495,15 +494,6 @@ export function useSpaceConnectionIntegration({
           ? formatConnectionCreateBlockedReasonMessage(typeAWriteGate.blockReason) ?? undefined
           : undefined;
 
-      const typeBCreateBlockedReason =
-        isConnectionsContextEnabled &&
-        !canCreateTypeBConnection &&
-        !membershipJoinStatus
-          ? formatConnectionCreateBlockedReasonMessage(typeBWriteGate.blockReason) ?? undefined
-          : typeBEditorBlockingTypeA
-            ? 'いまは他のつながり操作の途中です'
-            : undefined;
-
       return {
         ...base,
         onConnect:
@@ -520,7 +510,6 @@ export function useSpaceConnectionIntegration({
             ? handleCreateConnectedHossiiFromMenu
             : undefined,
         connectionCreateBlockedReason,
-        typeBCreateBlockedReason,
         membershipJoinStatus:
           isConnectionsContextEnabled && membershipJoinStatus ? membershipJoinStatus : undefined,
         onMembershipRetry:
@@ -543,7 +532,6 @@ export function useSpaceConnectionIntegration({
       canCreateTypeAConnection,
       typeBEditorBlockingTypeA,
       typeAWriteGate.blockReason,
-      typeBWriteGate.blockReason,
       handleConnectFromMenu,
       onCreateConnectedHossii,
       canCreateTypeBConnection,

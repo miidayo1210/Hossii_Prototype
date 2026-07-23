@@ -28,6 +28,7 @@ type Options = {
   visibleHossiiIds: ReadonlySet<string>;
   isConnectionsContextEnabled: boolean;
   editorPhase: ConnectionEditorPhase;
+  typeBEditorActive?: boolean;
   bubbleInteractionLock: BubbleInteractionLock;
 };
 
@@ -59,6 +60,7 @@ export function useSpaceConnectionPull({
   visibleHossiiIds,
   isConnectionsContextEnabled,
   editorPhase,
+  typeBEditorActive = false,
   bubbleInteractionLock,
 }: Options) {
   const sourceRef = useRef<HTMLElement | null>(null);
@@ -102,6 +104,7 @@ export function useSpaceConnectionPull({
     isConnectionsContextEnabled &&
     selectedBubbleId != null &&
     directPeerIds.length > 0 &&
+    !typeBEditorActive &&
     !EDITOR_PHASES_BLOCKING_PULL.has(editorPhase) &&
     !bubbleInteractionLock.isDragging &&
     !bubbleInteractionLock.isResizing;
@@ -126,7 +129,7 @@ export function useSpaceConnectionPull({
   const markedPeerElementsRef = useRef<HTMLElement[]>([]);
 
   const pullHandleVisible =
-    isConnectionsContextEnabled && directPeerIds.length > 0;
+    isConnectionsContextEnabled && directPeerIds.length > 0 && !typeBEditorActive;
 
 
   const clearPeerTwoHopStars = useCallback(() => {

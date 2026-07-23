@@ -130,6 +130,45 @@ describe('useTypeBEditor', () => {
     expect(result.current.draftMessage).toBe('');
   });
 
+  it('ignores cancel while submitting', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+    });
+
+    act(() => {
+      result.current.beginSubmit();
+    });
+
+    act(() => {
+      result.current.cancel();
+    });
+
+    expect(result.current.phase).toBe('submitting');
+    expect(result.current.originHossiiId).toBe('origin-1');
+  });
+
+  it('blocks bubble switch during error', () => {
+    const { result } = renderHook(() => useTypeBEditor());
+
+    act(() => {
+      result.current.startCreate({
+        originHossiiId: 'origin-1',
+        positionX: 10,
+        positionY: 20,
+      });
+      result.current.beginSubmit();
+      result.current.submitFailure('fail');
+    });
+
+    expect(result.current.isBubbleSwitchBlocked).toBe(true);
+  });
+
   it('resets to idle on success', () => {
     const { result } = renderHook(() => useTypeBEditor());
 
@@ -155,10 +194,10 @@ describe('type editor mutual exclusion helpers', () => {
     expect(isTypeAEditorBlockingTypeB('error')).toBe(false);
   });
 
-  it('blocks Type A when Type B is composing or submitting', () => {
+  it('blocks Type A when Type B is active', () => {
     expect(isTypeBEditorBlockingTypeA('composing')).toBe(true);
     expect(isTypeBEditorBlockingTypeA('submitting')).toBe(true);
-    expect(isTypeBEditorBlockingTypeA('error')).toBe(false);
+    expect(isTypeBEditorBlockingTypeA('error')).toBe(true);
     expect(isTypeBEditorBlockingTypeA('idle')).toBe(false);
   });
 });

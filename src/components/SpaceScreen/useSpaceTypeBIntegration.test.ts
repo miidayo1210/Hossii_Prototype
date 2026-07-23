@@ -3,8 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { AppUser } from '../../core/contexts/AuthContext';
 import type { Hossii } from '../../core/types';
+import type { Space } from '../../core/types/space';
 import { useTypeBEditor } from './useTypeBEditor';
 import {
+  evaluateTypeBSubmitGate,
   formatTypeBSubmitErrorMessage,
   useSpaceTypeBIntegration,
 } from './useSpaceTypeBIntegration';
@@ -53,44 +55,78 @@ function makeAdminUser(): AppUser {
   };
 }
 
-function renderIntegration(
-  overrides: Partial<Omit<Parameters<typeof useSpaceTypeBIntegration>[0], 'editor'>> = {},
-) {
+function makeSpace(): Space {
+  return {
+    id: 'space-1',
+    name: 'Test Space',
+    communityId: 'comm-1',
+  } as Space;
+}
+
+type IntegrationOptions = Omit<Parameters<typeof useSpaceTypeBIntegration>[0], 'editor'>;
+
+function makeIntegrationOptions(
+  overrides: Partial<IntegrationOptions> = {},
+): IntegrationOptions {
   const setSelectedBubbleId = vi.fn();
   const refetchConnections = vi.fn();
   const syncFetchedHossiis = vi.fn();
   const onPostPanelOpen = vi.fn();
+  const onPostPanelClose = vi.fn();
 
-  const baseOptions = {
-    typeAEditorPhase: 'idle' as const,
+  return {
+    typeAEditorPhase: 'idle',
     currentUser: makeAdminUser(),
+    activeSpace: makeSpace(),
+    isContentArchived: false,
+    activeSpaceMembershipStatus: 'active',
     spaceId: 'space-1',
     paneId: 'pane-1',
+    selectedBubbleId: 'origin-1',
     setSelectedBubbleId,
     filteredHossiis: [makeHossii('origin-1'), makeHossii('other-1', { positionX: 60, positionY: 70 })],
+    isConnectionsContextEnabled: true,
     refetchConnections,
     syncFetchedHossiis,
     screenQueryKey: 'query-1',
-    displayPeriod: 'all' as const,
+    displayPeriod: 'all',
     paneContext: null,
     getExistingHossiis: () => [],
     bubbleAreaRef: { current: null },
+    contextActivePaneId: 'pane-1',
+    presentationMode: 'custom',
+    viewMode: 'full',
+    layoutMode: 'random',
     onPostPanelOpen,
+    onPostPanelClose,
     ...overrides,
   };
+}
 
-  const hook = renderHook(() => {
-    const editor = useTypeBEditor();
-    const integration = useSpaceTypeBIntegration({ editor, ...baseOptions });
-    return { editor, integration };
-  });
+function renderIntegration(overrides: Partial<IntegrationOptions> = {}) {
+  let currentOptions = makeIntegrationOptions(overrides);
+
+  const hook = renderHook(
+    (props: IntegrationOptions) => {
+      const editor = useTypeBEditor();
+      const integration = useSpaceTypeBIntegration({ editor, ...props });
+      return { editor, integration };
+    },
+    { initialProps: currentOptions },
+  );
 
   return {
     hook,
-    setSelectedBubbleId,
-    refetchConnections,
-    syncFetchedHossiis,
-    onPostPanelOpen,
+    options: currentOptions,
+    setSelectedBubbleId: currentOptions.setSelectedBubbleId,
+    refetchConnections: currentOptions.refetchConnections,
+    syncFetchedHossiis: currentOptions.syncFetchedHossiis,
+    onPostPanelOpen: currentOptions.onPostPanelOpen,
+    onPostPanelClose: currentOptions.onPostPanelClose,
+    rerender: (nextOverrides: Partial<IntegrationOptions>) => {
+      currentOptions = { ...currentOptions, ...nextOverrides };
+      hook.rerender(currentOptions);
+    },
   };
 }
 
@@ -310,6 +346,187 @@ describe('useSpaceTypeBIntegration', () => {
     });
 
     expect(hook.result.current.integration.provisionalThread).toBeNull();
+  });
+
+  it('ignores cancel while submitting', () => {
+    const { hook } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    act(() => {
+      hook.result.current.editor.beginSubmit();
+    });
+
+    act(() => {
+      hook.result.current.integration.handleCancel();
+    });
+
+    expect(hook.result.current.editor.phase).toBe('submitting');
+  });
+
+  it('blocks reset while submitting', () => {
+    const { hook } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    act(() => {
+      hook.result.current.editor.beginSubmit();
+    });
+
+    expect(hook.result.current.integration.resetIfAllowed()).toBe(false);
+    expect(hook.result.current.editor.phase).toBe('submitting');
+  });
+
+  it('disables close while submitting', () => {
+    const { hook } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    act(() => {
+      hook.result.current.editor.beginSubmit();
+    });
+
+    expect(hook.result.current.integration.postScreenTypeBMode?.closeDisabled).toBe(true);
+  });
+
+  it('skips RPC when submit gate fails and keeps retry ids', async () => {
+    const { hook, rerender } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+      hook.result.current.editor.setDraftMessage('retry me');
+    });
+
+    const { idempotencyKey, newHossiiId } = hook.result.current.editor;
+
+    rerender({ isConnectionsContextEnabled: false });
+
+    await act(async () => {
+      await hook.result.current.integration.handleSubmit();
+    });
+
+    expect(mockedCreate).not.toHaveBeenCalled();
+    expect(hook.result.current.editor.phase).toBe('error');
+    expect(hook.result.current.editor.idempotencyKey).toBe(idempotencyKey);
+    expect(hook.result.current.editor.newHossiiId).toBe(newHossiiId);
+    expect(hook.result.current.editor.draftMessage).toBe('retry me');
+  });
+
+  it('cleans up on pane change', () => {
+    const { hook, rerender } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+    expect(hook.result.current.editor.phase).toBe('composing');
+
+    rerender({ contextActivePaneId: 'pane-2' });
+
+    expect(hook.result.current.editor.phase).toBe('idle');
+    expect(hook.result.current.integration.provisionalThread).toBeNull();
+  });
+
+  it('cleans up on presentation mode change', () => {
+    const { hook, rerender } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    rerender({ presentationMode: 'stars' });
+
+    expect(hook.result.current.editor.phase).toBe('idle');
+  });
+
+  it('cleans up on viewMode slideshow change', () => {
+    const { hook, rerender } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    rerender({ viewMode: 'slideshow' });
+
+    expect(hook.result.current.editor.phase).toBe('idle');
+  });
+
+  it('cleans up on layout byAuthor change', () => {
+    const { hook, rerender } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    rerender({ layoutMode: 'byAuthor' });
+
+    expect(hook.result.current.editor.phase).toBe('idle');
+  });
+
+  it('cleans up when origin bubble is filtered out', () => {
+    const { hook, rerender } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    rerender({
+      filteredHossiis: [makeHossii('other-1', { positionX: 60, positionY: 70 })],
+    });
+
+    expect(hook.result.current.editor.phase).toBe('idle');
+  });
+
+  it('cleans up on bubble deselect', () => {
+    const { hook, rerender } = renderIntegration();
+
+    act(() => {
+      hook.result.current.integration.startFromOrigin('origin-1');
+    });
+
+    rerender({ selectedBubbleId: null });
+
+    expect(hook.result.current.editor.phase).toBe('idle');
+  });
+});
+
+describe('evaluateTypeBSubmitGate', () => {
+  it('returns null when all checks pass', () => {
+    expect(
+      evaluateTypeBSubmitGate({
+        isConnectionsContextEnabled: true,
+        writeGate: { canCreate: true, blockReason: null, bypassesMembership: true },
+        originHossiiId: 'origin-1',
+        originExists: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('blocks when connections context is disabled', () => {
+    expect(
+      evaluateTypeBSubmitGate({
+        isConnectionsContextEnabled: false,
+        writeGate: { canCreate: true, blockReason: null, bypassesMembership: true },
+        originHossiiId: 'origin-1',
+        originExists: true,
+      }),
+    ).toContain('つなげて作れません');
+  });
+
+  it('blocks when origin is missing', () => {
+    expect(
+      evaluateTypeBSubmitGate({
+        isConnectionsContextEnabled: true,
+        writeGate: { canCreate: true, blockReason: null, bypassesMembership: true },
+        originHossiiId: 'origin-1',
+        originExists: false,
+      }),
+    ).toContain('起点');
   });
 });
 

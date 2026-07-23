@@ -14,7 +14,11 @@ export type TypeBEditorSnapshot = {
 };
 
 export function isTypeBEditorBubbleSwitchBlocked(phase: TypeBEditorPhase): boolean {
-  return phase === 'composing' || phase === 'submitting';
+  return phase !== 'idle';
+}
+
+export function canResetTypeBEditor(phase: TypeBEditorPhase): boolean {
+  return phase === 'composing' || phase === 'error';
 }
 
 export function isTypeBEditorActive(phase: TypeBEditorPhase): boolean {

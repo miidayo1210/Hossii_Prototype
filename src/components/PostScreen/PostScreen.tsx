@@ -113,6 +113,7 @@ type TypeBPostMode = {
   submitting: boolean;
   errorMessage: string | null;
   onRetry: () => void;
+  closeDisabled?: boolean;
 };
 
 type Props = {
@@ -504,9 +505,10 @@ export const PostScreen = ({
   }, [pf.message.enabled]);
 
   const requestClosePanel = useCallback(() => {
+    if (isTypeBMode && typeBMode?.closeDisabled) return;
     if (!onClose) return;
     onClose();
-  }, [onClose]);
+  }, [isTypeBMode, typeBMode, onClose]);
 
   // パネル: Esc で閉じる（お絵描きモーダル優先）
   useEffect(() => {
@@ -901,6 +903,7 @@ export const PostScreen = ({
             type="button"
             onClick={requestClosePanel}
             className={styles.panelCloseButton}
+            disabled={isTypeBMode && !!typeBMode?.closeDisabled}
             onPointerDown={(e) => e.stopPropagation()}
           >
             ✕ 閉じる

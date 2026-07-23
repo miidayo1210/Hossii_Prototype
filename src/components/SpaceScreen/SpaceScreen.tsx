@@ -1703,7 +1703,6 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     overlayProps: connectionOverlayProps,
     resetConnectionState,
     handleBubbleSelect,
-    handleBubbleDeselect,
     getIntegratedBubbleActionMenuProps,
     getConnectionBadgeCount,
     isPickingTarget,
@@ -1744,10 +1743,15 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     editor: typeBEditor,
     typeAEditorPhase: connectionEditor.phase,
     currentUser,
+    activeSpace: contentSpace ?? activeSpace,
+    isContentArchived,
+    activeSpaceMembershipStatus,
     spaceId: contentSpaceId ?? activeSpaceId ?? '',
     paneId: connectionActivePaneId,
+    selectedBubbleId,
     setSelectedBubbleId,
     filteredHossiis,
+    isConnectionsContextEnabled,
     refetchConnections,
     syncFetchedHossiis,
     screenQueryKey,
@@ -1755,12 +1759,24 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     paneContext: contentPaneContext,
     getExistingHossiis: () => hossiisRef.current,
     bubbleAreaRef,
+    contextActivePaneId,
+    presentationMode,
+    viewMode,
+    layoutMode,
     onPostPanelOpen: () => {
       setTypeBPostScreenKey((k) => k + 1);
       if (quickPostOpen) handleQuickPostClose();
     },
   });
   typeBStartRef.current = typeBIntegration.startFromOrigin;
+
+  const resetConnectionStateWithTypeB = useCallback(() => {
+    if (connectionEditor.isSaving || connectionEditor.phase === 'saving') return;
+    if (!typeBIntegration.resetIfAllowed()) return;
+    resetConnectionState();
+  }, [connectionEditor.isSaving, connectionEditor.phase, typeBIntegration, resetConnectionState]);
+
+  const handleBubbleDeselectWithTypeB = resetConnectionStateWithTypeB;
 
   const handleBubbleSelectWithTypeB = useCallback(
     (id: string) => {
@@ -1783,6 +1799,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     visibleHossiiIds: visibleHossiiIdsForPull,
     isConnectionsContextEnabled,
     editorPhase: connectionEditor.phase,
+    typeBEditorActive: typeBIntegration.isTypeBEditorActive,
     bubbleInteractionLock,
   });
 
@@ -1844,18 +1861,21 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !isVisiting &&
     !isContentArchived;
 
-  const showSpaceHossiiConnectionHandle = shouldShowSpaceHossiiConnectionHandle({
-    isMobilePortrait,
-    isMobileLandscape,
-    isConnectionsContextEnabled: connectionsContextEnabled,
-    hossiiVisible: controlState.hossiiVisible,
-    selectedBubbleId,
-    directConnectionCount: selectedDirectConnectionCount,
-  });
+  const showSpaceHossiiConnectionHandle =
+    !typeBIntegration.isTypeBEditorActive &&
+    shouldShowSpaceHossiiConnectionHandle({
+      isMobilePortrait,
+      isMobileLandscape,
+      isConnectionsContextEnabled: connectionsContextEnabled,
+      hossiiVisible: controlState.hossiiVisible,
+      selectedBubbleId,
+      directConnectionCount: selectedDirectConnectionCount,
+    });
 
   shouldAllowBubbleResetRef.current = () =>
     !connectionEditor.isSaving &&
     connectionEditor.phase !== 'saving' &&
+    !typeBEditor.isSubmitting &&
     !typeBIntegration.isBubbleSwitchBlocked;
   handleEscapeResetRef.current = () => {
     if (typeBEditor.isActive) {
@@ -1870,10 +1890,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     const wasNotPortrait = !prevMobilePortraitRef.current;
     prevMobilePortraitRef.current = isMobilePortrait;
     if (wasNotPortrait && isMobilePortrait) {
-      resetConnectionState();
-      if (typeBEditor.isActive) typeBIntegration.handleCancel();
+      resetConnectionStateWithTypeB();
     }
-  }, [isMobilePortrait, resetConnectionState, typeBEditor.isActive, typeBIntegration]);
+  }, [isMobilePortrait, resetConnectionStateWithTypeB]);
 
   const mapDisplayPos = useCallback(
     (pos: { x: number; y: number }) => {
@@ -2477,7 +2496,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           if (target.closest('[data-connection-editor-popover]')) return;
           if (target.closest('[data-bubble-action-menu]')) return;
           if (target.closest('[data-connection-list-popover]')) return;
-          resetConnectionState();
+          resetConnectionStateWithTypeB();
         }}
       >
         <PinTray
@@ -2648,7 +2667,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 showPinUi={showPinUi}
                 animationLevel={animationLevel}
                 canManageOwn={canManageOwnHossii(hossii.id)}
-                onOwnerDeleted={handleBubbleDeselect}
+                onOwnerDeleted={handleBubbleDeselectWithTypeB}
                 connectionBadgeCount={getConnectionBadgeCount(hossii.id)}
                 isConnectionPickTarget={
                   isPickingTarget && !isThisSelected && connectionEditor.sourceId !== hossii.id
@@ -2668,7 +2687,10 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onPullHandlePointerDown={connectionPull.handlers.onPointerDown}
                 pullStarParticleCount={connectionPull.starParticleCount}
                 isConnectionPulling={connectionPull.isPulling}
-                suppressBubbleDrag={connectionPull.isPulling}
+                suppressBubbleDrag={
+                  connectionPull.isPulling ||
+                  (typeBEditor.isActive && hossii.id === typeBEditor.originHossiiId)
+                }
                 suppressClickAfterPullRef={connectionPull.suppressClickAfterPullRef}
                 onBubbleDragStateChange={handleBubbleDragStateChange}
                 {...getIntegratedBubbleActionMenuProps(hossii.id, isThisSelected)}
@@ -3122,7 +3144,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           <button
             type="button"
             className={`${styles.editToolbarBtn} ${styles.editToolbarBtnCancel}`}
-            onClick={handleBubbleDeselect}
+            onClick={handleBubbleDeselectWithTypeB}
           >
             ✕ 選択解除
           </button>

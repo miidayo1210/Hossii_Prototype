@@ -155,6 +155,28 @@ describe('useSpaceConnectionPull', () => {
     expect(result.current.pullEnabled).toBe(false);
   });
 
+  it('disables pull while Type B editor is active', () => {
+    const { area } = setupBubbleArea();
+    const bubbleAreaRef = { current: area };
+
+    const { result } = renderHook(() =>
+      useSpaceConnectionPull({
+        bubbleAreaRef,
+        connections,
+        selectedBubbleId: 'h1',
+        activePaneId: 'pane-a',
+        visibleHossiiIds: new Set(['h1', 'h2', 'h3']),
+        isConnectionsContextEnabled: true,
+        editorPhase: 'idle',
+        typeBEditorActive: true,
+        bubbleInteractionLock: { isDragging: false, isResizing: false },
+      }),
+    );
+
+    expect(result.current.pullEnabled).toBe(false);
+    expect(result.current.pullHandleVisible).toBe(false);
+  });
+
   it('disables pull during bubble drag or resize', () => {
     const { area } = setupBubbleArea();
     const bubbleAreaRef = { current: area };

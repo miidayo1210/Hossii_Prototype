@@ -303,6 +303,34 @@ describe('useSpaceConnectionIntegration', () => {
       expect(result.current.getIntegratedBubbleActionMenuProps('h1', true).onConnect).toBeUndefined();
     });
 
+    it('hides Type B create menu when Type B editor is active', () => {
+      const onCreateConnectedHossii = vi.fn();
+      const options = makeOptions({
+        typeBEditorBlockingTypeA: true,
+        onCreateConnectedHossii,
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      expect(
+        result.current.getIntegratedBubbleActionMenuProps('h1', true).onCreateConnectedHossii,
+      ).toBeUndefined();
+    });
+
+    it('blocks overlay edit when Type B editor is active', () => {
+      const connection = makeConnection({ createdBy: 'admin-1' });
+      const options = makeOptions({
+        typeBEditorBlockingTypeA: true,
+        overlayInputs: makeOverlayInputs({ connections: [connection] }),
+      });
+      const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+      act(() => {
+        result.current.overlayProps.onConnectionClick?.(connection);
+      });
+
+      expect(result.current.editor.phase).toBe('idle');
+    });
+
     it('allows super admin even with none membership', () => {
       const options = makeOptions({
         currentUser: makeSuperAdminUser(),

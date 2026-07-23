@@ -76,15 +76,10 @@ describe('BubbleActionMenu', () => {
     expect(screen.getByRole('button', { name: 'つなげて作る' })).toBeTruthy();
   });
 
-  it('shows Type B blocked reason when create handler omitted', () => {
-    render(
-      <BubbleActionMenu
-        anchorRect={anchorRect}
-        typeBCreateBlockedReason="参加すると、つながりを作れます"
-      />,
-    );
+  it('hides Type B create button when handler omitted', () => {
+    render(<BubbleActionMenu anchorRect={anchorRect} onViewDetail={() => {}} />);
 
-    expect(screen.getByText('参加すると、つながりを作れます')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'つなげて作る' })).toBeNull();
   });
 
   it('portals to document.body', () => {

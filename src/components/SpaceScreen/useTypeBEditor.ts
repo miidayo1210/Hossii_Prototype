@@ -1,6 +1,10 @@
 import { useCallback, useMemo, useReducer, useRef } from 'react';
 import { generateId } from '../../core/utils';
 import type { TypeBEditorPhase, TypeBEditorSnapshot } from './typeBEditorTypes';
+import {
+  canResetTypeBEditor,
+  isTypeBEditorBubbleSwitchBlocked,
+} from './typeBEditorTypes';
 
 type EditorState = TypeBEditorSnapshot;
 
@@ -97,8 +101,9 @@ export function useTypeBEditor() {
   }, []);
 
   const cancel = useCallback(() => {
+    if (state.phase === 'submitting') return;
     reset();
-  }, [reset]);
+  }, [state.phase, reset]);
 
   const snapshot = useMemo(
     (): TypeBEditorSnapshot & {
@@ -106,13 +111,14 @@ export function useTypeBEditor() {
       isActive: boolean;
       showProvisionalThread: boolean;
       isSubmitting: boolean;
+      canReset: boolean;
     } => ({
       ...state,
-      isBubbleSwitchBlocked:
-        state.phase === 'composing' || state.phase === 'submitting',
+      isBubbleSwitchBlocked: isTypeBEditorBubbleSwitchBlocked(state.phase),
       isActive: state.phase !== 'idle',
       showProvisionalThread: state.phase === 'composing',
       isSubmitting: state.phase === 'submitting',
+      canReset: canResetTypeBEditor(state.phase),
     }),
     [state],
   );
@@ -138,5 +144,5 @@ export function isTypeAEditorBlockingTypeB(typeAPhase: string): boolean {
 
 /** Type B editor phase から Type A 起動をブロックする */
 export function isTypeBEditorBlockingTypeA(typeBPhase: TypeBEditorPhase): boolean {
-  return typeBPhase === 'composing' || typeBPhase === 'submitting';
+  return typeBPhase !== 'idle';
 }
