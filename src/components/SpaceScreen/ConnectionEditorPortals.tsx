@@ -77,11 +77,16 @@ export function ConnectionEditorPortals({
     sourceId,
     editingConnection,
     selectedStrength,
+    reasonExpanded,
+    draftReasonText,
+    draftReasonEmoji,
     errorMessage,
     isSaving,
     chooseStrength,
-    submitCreate,
-    submitStrengthUpdate,
+    toggleReasonExpanded,
+    setDraftReasonText,
+    toggleDraftReasonEmoji,
+    submitSave,
     requestDelete,
     confirmDelete,
     cancel,
@@ -128,10 +133,14 @@ export function ConnectionEditorPortals({
           anchorRect={strengthAnchorRect}
           mode={strengthMode}
           selectedStrength={selectedStrength}
+          reasonExpanded={reasonExpanded}
+          draftReasonText={draftReasonText}
+          draftReasonEmoji={draftReasonEmoji}
           onSelectStrength={chooseStrength}
-          onPrimaryAction={
-            strengthMode === 'create' ? submitCreate : submitStrengthUpdate
-          }
+          onToggleReasonExpanded={toggleReasonExpanded}
+          onDraftReasonTextChange={setDraftReasonText}
+          onToggleDraftReasonEmoji={toggleDraftReasonEmoji}
+          onPrimaryAction={submitSave}
           onRequestDelete={strengthMode === 'edit' ? requestDelete : undefined}
           onCancel={cancel}
           disabled={isSaving}

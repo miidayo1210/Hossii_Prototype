@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { HossiiConnectionStrength, HossiiConnection } from '../../core/types/hossiiConnection';
+import type { HossiiConnectionStrength, HossiiConnection, HossiiConnectionReasonEmoji } from '../../core/types/hossiiConnection';
 import type { Hossii } from '../../core/types';
 import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
@@ -13,11 +13,13 @@ import {
 import {
   createConnection,
   deleteConnection,
+  updateConnectionReason,
   updateConnectionStrength,
 } from '../../core/utils/hossiiConnectionsApi';
 import {
   mapCreateConnectionResult,
   mapDeleteConnectionResult,
+  mapUpdateConnectionReasonResult,
   mapUpdateConnectionStrengthResult,
 } from '../../core/utils/connectionEditorApiAdapters';
 import { buildDirectConnectionListItems } from '../../core/utils/connectionVisibility';
@@ -128,6 +130,8 @@ export function useSpaceConnectionIntegration({
         sourceHossiiId: string;
         targetHossiiId: string;
         strength: HossiiConnectionStrength;
+        reasonText?: string | null;
+        reasonEmoji?: HossiiConnectionReasonEmoji | null;
       }) => {
         const result = mapCreateConnectionResult(
           await createConnection({
@@ -145,6 +149,21 @@ export function useSpaceConnectionIntegration({
       }) => {
         const result = mapUpdateConnectionStrengthResult(
           await updateConnectionStrength(input.connectionId, input.strength),
+        );
+        if (result.ok) refetch();
+        return result;
+      },
+      onUpdateReason: async (input: {
+        connectionId: string;
+        reasonText?: string | null;
+        reasonEmoji?: HossiiConnectionReasonEmoji | null;
+      }) => {
+        const result = mapUpdateConnectionReasonResult(
+          await updateConnectionReason({
+            connectionId: input.connectionId,
+            reasonText: input.reasonText,
+            reasonEmoji: input.reasonEmoji,
+          }),
         );
         if (result.ok) refetch();
         return result;

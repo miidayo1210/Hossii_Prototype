@@ -18,6 +18,8 @@ function makeConnection(
     sourceHossiiId: 'hossii-a',
     targetHossiiId: 'hossii-b',
     strength: 'medium',
+    reasonText: null,
+    reasonEmoji: null,
     createdBy: 'user-1',
     createdAt: '2026-07-22T00:00:00.000Z',
     updatedAt: '2026-07-22T00:00:00.000Z',
@@ -46,6 +48,10 @@ describe('useConnectionEditor', () => {
         ok: true as const,
         data: makeConnection({ strength: 'strong' }),
       })),
+      onUpdateReason: vi.fn(async () => ({
+        ok: true as const,
+        data: makeConnection({ reasonText: '更新', reasonEmoji: '💡' }),
+      })),
       onDelete: vi.fn(async () => ({
         ok: true as const,
         data: { id: 'conn-1' },
@@ -66,9 +72,10 @@ describe('useConnectionEditor', () => {
     });
     expect(result.current.phase).toBe('pickingStrength');
     expect(result.current.selectedStrength).toBe('medium');
+    expect(result.current.reasonExpanded).toBe(false);
 
     await act(async () => {
-      await result.current.submitCreate();
+      await result.current.submitSave();
     });
 
     expect(callbacks.onCreate).toHaveBeenCalledWith({
@@ -77,6 +84,93 @@ describe('useConnectionEditor', () => {
       strength: 'medium',
     });
     expect(result.current.phase).toBe('idle');
+  });
+
+  it('create reasonなしでは reason キーを送らない', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onCreate).toHaveBeenCalledWith({
+      sourceHossiiId: 'hossii-a',
+      targetHossiiId: 'hossii-b',
+      strength: 'medium',
+    });
+  });
+
+  it('create emoji のみ', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+      result.current.toggleReasonExpanded();
+      result.current.toggleDraftReasonEmoji('💡');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onCreate).toHaveBeenCalledWith({
+      sourceHossiiId: 'hossii-a',
+      targetHossiiId: 'hossii-b',
+      strength: 'medium',
+      reasonEmoji: '💡',
+    });
+  });
+
+  it('create text のみ', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('つながり');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onCreate).toHaveBeenCalledWith({
+      sourceHossiiId: 'hossii-a',
+      targetHossiiId: 'hossii-b',
+      strength: 'medium',
+      reasonText: 'つながり',
+    });
+  });
+
+  it('create emoji＋text', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('理由');
+      result.current.toggleDraftReasonEmoji('🔗');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onCreate).toHaveBeenCalledWith({
+      sourceHossiiId: 'hossii-a',
+      targetHossiiId: 'hossii-b',
+      strength: 'medium',
+      reasonText: '理由',
+      reasonEmoji: '🔗',
+    });
   });
 
   it('rejects self target', () => {
@@ -105,7 +199,7 @@ describe('useConnectionEditor', () => {
 
     let submitPromise!: Promise<boolean>;
     act(() => {
-      submitPromise = result.current.submitCreate();
+      submitPromise = result.current.submitSave();
     });
 
     expect(result.current.phase).toBe('saving');
@@ -132,12 +226,12 @@ describe('useConnectionEditor', () => {
 
     let first!: Promise<boolean>;
     act(() => {
-      first = result.current.submitCreate();
+      first = result.current.submitSave();
     });
 
     let secondValue: boolean | undefined;
     await act(async () => {
-      secondValue = await result.current.submitCreate();
+      secondValue = await result.current.submitSave();
     });
 
     deferred.resolve(makeConnection());
@@ -163,7 +257,7 @@ describe('useConnectionEditor', () => {
     });
 
     await act(async () => {
-      await result.current.submitCreate();
+      await result.current.submitSave();
     });
 
     expect(result.current.phase).toBe('error');
@@ -182,7 +276,7 @@ describe('useConnectionEditor', () => {
     });
 
     act(() => {
-      void result.current.submitCreate();
+      void result.current.submitSave();
     });
 
     act(() => {
@@ -198,6 +292,158 @@ describe('useConnectionEditor', () => {
     });
   });
 
+  it('seeds existing reason on edit and expands when present', () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection({ reasonText: '既存', reasonEmoji: '💡' });
+
+    act(() => {
+      result.current.startEdit(connection);
+    });
+
+    expect(result.current.draftReasonText).toBe('既存');
+    expect(result.current.draftReasonEmoji).toBe('💡');
+    expect(result.current.reasonExpanded).toBe(true);
+  });
+
+  it('reason-only更新', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection({ reasonText: null, reasonEmoji: null });
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('新しい理由');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).not.toHaveBeenCalled();
+    expect(callbacks.onUpdateReason).toHaveBeenCalledWith({
+      connectionId: 'conn-1',
+      reasonText: '新しい理由',
+    });
+  });
+
+  it('strength-only更新', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection();
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.chooseStrength('strong');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).toHaveBeenCalledWith({
+      connectionId: 'conn-1',
+      strength: 'strong',
+    });
+    expect(callbacks.onUpdateReason).not.toHaveBeenCalled();
+  });
+
+  it('strength＋reason更新', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection();
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.chooseStrength('strong');
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('理由');
+      result.current.toggleDraftReasonEmoji('❤️');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).toHaveBeenCalled();
+    expect(callbacks.onUpdateReason).toHaveBeenCalledWith({
+      connectionId: 'conn-1',
+      reasonText: '理由',
+      reasonEmoji: '❤️',
+    });
+  });
+
+  it('text clear sends null only for text', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection({ reasonText: '既存', reasonEmoji: '💡' });
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.setDraftReasonText('');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateReason).toHaveBeenCalledWith({
+      connectionId: 'conn-1',
+      reasonText: null,
+    });
+  });
+
+  it('emoji clear sends null only for emoji', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection({ reasonText: '既存', reasonEmoji: '💡' });
+
+    act(() => {
+      result.current.startEdit(connection);
+      result.current.toggleDraftReasonEmoji('💡');
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateReason).toHaveBeenCalledWith({
+      connectionId: 'conn-1',
+      reasonEmoji: null,
+    });
+  });
+
+  it('変更なしでは API を呼ばず idle に戻る', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+    const connection = makeConnection({ reasonText: '既存', reasonEmoji: '💡' });
+
+    act(() => {
+      result.current.startEdit(connection);
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onUpdateStrength).not.toHaveBeenCalled();
+    expect(callbacks.onUpdateReason).not.toHaveBeenCalled();
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('validation失敗で API を呼ばない', async () => {
+    const { result } = renderHook(() => useConnectionEditor(callbacks));
+
+    act(() => {
+      result.current.startCreate('hossii-a');
+      result.current.chooseTarget('hossii-b');
+      result.current.toggleReasonExpanded();
+      result.current.setDraftReasonText('あ'.repeat(51));
+    });
+
+    await act(async () => {
+      await result.current.submitSave();
+    });
+
+    expect(callbacks.onCreate).not.toHaveBeenCalled();
+    expect(result.current.errorMessage).toContain('50文字');
+    expect(result.current.phase).toBe('pickingStrength');
+  });
+
   it('supports edit, delete confirm, and external reset', async () => {
     const { result } = renderHook(() => useConnectionEditor(callbacks));
     const connection = makeConnection();
@@ -209,7 +455,7 @@ describe('useConnectionEditor', () => {
     expect(result.current.phase).toBe('editing');
 
     await act(async () => {
-      await result.current.submitStrengthUpdate();
+      await result.current.submitSave();
     });
     expect(callbacks.onUpdateStrength).toHaveBeenCalledWith({
       connectionId: 'conn-1',
