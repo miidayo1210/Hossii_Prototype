@@ -202,6 +202,26 @@ async function runReasonColumnChecks() {
   );
   if (blankConn?.id) createdConnectionIds.push(blankConn.id);
 
+  const { a: emptyA, b: emptyB } = await createTempHossiiPair('reason-empty');
+  const { data: emptyConn, error: emptyErr } = await client
+    .from('hossii_connections')
+    .insert({
+      space_id: SPACE_ID,
+      pane_id: PANE_ID,
+      source_hossii_id: emptyA,
+      target_hossii_id: emptyB,
+      strength: 'soft',
+      reason_text: '',
+    })
+    .select('id, reason_text')
+    .single();
+  record(
+    'reason: empty string reason_text stored as NULL',
+    !emptyErr && emptyConn?.reason_text == null,
+    emptyErr?.message ?? JSON.stringify(emptyConn),
+  );
+  if (emptyConn?.id) createdConnectionIds.push(emptyConn.id);
+
   for (const emoji of REASON_EMOJI_PRESETS) {
     const { a, b } = await createTempHossiiPair(`reason-emoji-${emoji.codePointAt(0)}`);
     const { data: emojiConn, error: emojiErr } = await client
