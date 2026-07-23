@@ -97,6 +97,40 @@ describe('BubbleActionMenu', () => {
   });
 
 
+
+  it('renders create connected hossii action when callback is provided', () => {
+    const onCreateConnectedHossii = vi.fn();
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        onCreateConnectedHossii={onCreateConnectedHossii}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'つなげて作る' }));
+    expect(onCreateConnectedHossii).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides create connected hossii action when callback is omitted', () => {
+    render(<BubbleActionMenu anchorRect={anchorRect} onViewDetail={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'つなげて作る' })).toBeNull();
+  });
+
+  it('shows both Type A connect and Type B create actions', () => {
+    render(
+      <BubbleActionMenu
+        anchorRect={anchorRect}
+        onViewDetail={() => {}}
+        onConnect={() => {}}
+        onCreateConnectedHossii={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'つないでみる' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'つなげて作る' })).toBeTruthy();
+  });
+
   it('shows create blocked reason when connect is unavailable', () => {
     render(
       <BubbleActionMenu

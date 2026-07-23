@@ -108,6 +108,7 @@ type BubbleProps = {
   onActionMenuToggle?: () => void;
   onViewDetail?: () => void;
   onConnect?: () => void;
+  onCreateConnectedHossii?: () => void;
   membershipJoinStatus?: 'joining' | 'error';
   onMembershipRetry?: () => void;
   connectionCount?: number;
@@ -165,6 +166,7 @@ export function BubbleInner({
   onActionMenuToggle,
   onViewDetail,
   onConnect,
+  onCreateConnectedHossii,
   membershipJoinStatus,
   onMembershipRetry,
   connectionCount,
@@ -936,6 +938,7 @@ export function BubbleInner({
           anchorRect={actionMenuAnchorRect}
           onViewDetail={onViewDetail}
           onConnect={onConnect}
+          onCreateConnectedHossii={onCreateConnectedHossii}
           membershipJoinStatus={membershipJoinStatus}
           onMembershipRetry={onMembershipRetry}
           connectionCount={connectionCount}
@@ -1061,6 +1064,7 @@ function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
     prev.onActionMenuToggle === next.onActionMenuToggle &&
     prev.onViewDetail === next.onViewDetail &&
     prev.onConnect === next.onConnect &&
+    prev.onCreateConnectedHossii === next.onCreateConnectedHossii &&
     prev.membershipJoinStatus === next.membershipJoinStatus &&
     prev.onMembershipRetry === next.onMembershipRetry &&
     prev.connectionCount === next.connectionCount &&
