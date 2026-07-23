@@ -56,6 +56,7 @@ type Action =
   | { type: 'cancelFromDeleting' }
   | { type: 'mutationSuccess' }
   | { type: 'mutationFailure'; message: string }
+  | { type: 'syncEditingConnection'; connection: HossiiConnection }
   | { type: 'setValidationError'; message: string }
   | { type: 'toggleReasonExpanded' }
   | { type: 'setDraftReasonText'; text: string }
@@ -132,6 +133,13 @@ function reducer(state: EditorState, action: Action): EditorState {
         ...state,
         phase: 'error',
         errorMessage: action.message,
+      };
+    case 'syncEditingConnection':
+      if (!state.editingConnection) return state;
+      return {
+        ...state,
+        editingConnection: action.connection,
+        selectedStrength: action.connection.strength,
       };
     case 'setValidationError':
       return {
@@ -337,6 +345,7 @@ export function useConnectionEditor(callbacks: ConnectionEditorCallbacks) {
         });
         if (!strengthResult.ok) return strengthResult;
         lastData = strengthResult.data;
+        dispatch({ type: 'syncEditingConnection', connection: lastData });
       }
 
       if (reasonChanged && reasonDeltaResult.delta) {
