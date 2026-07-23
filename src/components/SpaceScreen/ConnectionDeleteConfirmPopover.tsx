@@ -1,13 +1,13 @@
 import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
+import {
+  clampPopoverHorizontal,
+  computePopoverBottomAboveAnchor,
+} from '../../core/utils/connectionPopoverPosition';
 import styles from './ConnectionEditorPopover.module.css';
 
 const GAP = 10;
 const WIDTH = 220;
-
-function clampHorizontal(left: number, width: number): number {
-  return Math.max(8, Math.min(left, window.innerWidth - width - 8));
-}
 
 type Props = {
   anchorRect: DOMRect;
@@ -25,12 +25,12 @@ export function ConnectionDeleteConfirmPopover({
   errorMessage = null,
 }: Props) {
   const centerX = anchorRect.left + anchorRect.width / 2;
-  const left = clampHorizontal(centerX - WIDTH / 2, WIDTH);
+  const left = clampPopoverHorizontal(centerX - WIDTH / 2, WIDTH);
   const style: CSSProperties = {
     position: 'fixed',
     left,
     width: WIDTH,
-    bottom: window.innerHeight - anchorRect.top + GAP,
+    bottom: computePopoverBottomAboveAnchor(anchorRect.top, GAP),
     zIndex: 330,
   };
 

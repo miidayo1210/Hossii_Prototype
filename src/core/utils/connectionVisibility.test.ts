@@ -92,7 +92,7 @@ describe('shouldShowConnectionOverlay', () => {
     ).toBe(false);
   });
 
-  it('hides when renderAsStar is true (mobile landscape)', () => {
+  it('hides when renderAsStar is true (mobile portrait)', () => {
     expect(
       shouldShowConnectionOverlay({
         ...baseGate,
