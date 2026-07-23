@@ -2,17 +2,29 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createMembershipJoinController,
   resolveMembershipNickname,
+  type ActiveSpaceMembershipStatus,
   type MembershipJoinInput,
 } from './membershipJoinController';
 
 // resolve/flush microtasks
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
-function makeController(joinImpl?: (spaceId: string, nickname: string | null) => Promise<unknown>) {
+function makeController(
+  joinImpl?: (spaceId: string, nickname: string | null) => Promise<unknown>,
+  onStatusChange?: (status: ActiveSpaceMembershipStatus) => void,
+) {
   const join = vi.fn(joinImpl ?? (async () => ({ id: 'm1' })));
   const onError = vi.fn();
-  const controller = createMembershipJoinController({ join, onError });
-  return { controller, join, onError };
+  const statuses: ActiveSpaceMembershipStatus[] = [];
+  const controller = createMembershipJoinController({
+    join,
+    onError,
+    onStatusChange: (status) => {
+      statuses.push(status);
+      onStatusChange?.(status);
+    },
+  });
+  return { controller, join, onError, statuses };
 }
 
 function input(over: Partial<MembershipJoinInput> = {}): MembershipJoinInput {
@@ -159,6 +171,106 @@ describe('createMembershipJoinController', () => {
     controller.sync(input({ resolveNickname: () => { throw new Error('nick'); } }));
     await flush();
     expect(join).toHaveBeenCalledWith('space-1', null);
+  });
+
+  describe('activeSpaceMembershipStatus', () => {
+    it('public shared + logged-in: joining → active', async () => {
+      const { controller, statuses } = makeController();
+      controller.sync(input());
+      expect(statuses).toContain('joining');
+      await flush();
+      expect(controller.getStatus()).toBe('active');
+      expect(statuses).toContain('active');
+    });
+
+    it('join 失敗: joining → error', async () => {
+      const { controller, statuses } = makeController(async () => {
+        throw new Error('boom');
+      });
+      controller.sync(input());
+      expect(statuses).toContain('joining');
+      await flush();
+      expect(controller.getStatus()).toBe('error');
+      expect(statuses).toContain('error');
+    });
+
+    it('retry で join を再実行できる', async () => {
+      let calls = 0;
+      const { controller, join, statuses } = makeController(async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('boom');
+        return { id: 'm1' };
+      });
+      controller.sync(input());
+      await flush();
+      expect(controller.getStatus()).toBe('error');
+      statuses.length = 0;
+      controller.retry(input());
+      expect(statuses).toContain('joining');
+      await flush();
+      expect(join).toHaveBeenCalledTimes(2);
+      expect(controller.getStatus()).toBe('active');
+    });
+
+    it('guest: none', () => {
+      const { controller, join, statuses } = makeController();
+      controller.sync(input({ isGuest: true }));
+      expect(join).not.toHaveBeenCalled();
+      expect(controller.getStatus()).toBe('none');
+      expect(statuses).toContain('none');
+    });
+
+    it('invite_only: none', () => {
+      const { controller, join, statuses } = makeController();
+      controller.sync(input({ allowAutoJoin: false }));
+      expect(join).not.toHaveBeenCalled();
+      expect(controller.getStatus()).toBe('none');
+      expect(statuses).toContain('none');
+    });
+
+    it('personal space (allowAutoJoin=false): none、RPC を呼ばない', () => {
+      const { controller, join, statuses } = makeController();
+      controller.sync(input({ allowAutoJoin: false }));
+      expect(join).not.toHaveBeenCalled();
+      expect(controller.getStatus()).toBe('none');
+      expect(statuses).toContain('none');
+    });
+
+    it('space 切替で状態を reset する', async () => {
+      const { controller, statuses } = makeController();
+      controller.sync(input({ spaceId: 'space-1' }));
+      await flush();
+      expect(controller.getStatus()).toBe('active');
+      statuses.length = 0;
+      controller.sync(input({ spaceId: 'space-2' }));
+      expect(statuses).toContain('joining');
+      await flush();
+      expect(controller.getStatus()).toBe('active');
+    });
+
+    it('logout で none に reset する', async () => {
+      const { controller, statuses } = makeController();
+      controller.sync(input());
+      await flush();
+      expect(controller.getStatus()).toBe('active');
+      statuses.length = 0;
+      controller.sync(input({ uid: null }));
+      expect(controller.getStatus()).toBe('none');
+      expect(statuses).toContain('none');
+    });
+
+    it('同一 space で二重 join しない（active を維持）', async () => {
+      const { controller, join, statuses } = makeController();
+      controller.sync(input());
+      await flush();
+      statuses.length = 0;
+      controller.sync(input());
+      controller.sync(input());
+      await flush();
+      expect(join).toHaveBeenCalledTimes(1);
+      expect(controller.getStatus()).toBe('active');
+      expect(statuses).not.toContain('joining');
+    });
   });
 });
 

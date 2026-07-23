@@ -10,7 +10,14 @@
 //     自動連打しない）。
 //   - join 失敗は握りつぶして呼び出し側（画面・ログイン）へ影響させない。
 //
-// React／Supabase へは一切依存しない（join / onError を注入）。
+// React／Supabase へは一切依存しない（join / onError / onStatusChange を注入）。
+
+export type ActiveSpaceMembershipStatus =
+  | 'idle'
+  | 'joining'
+  | 'active'
+  | 'none'
+  | 'error';
 
 export type MembershipJoinInput = {
   configured: boolean;
@@ -18,7 +25,7 @@ export type MembershipJoinInput = {
   uid: string | null;
   spaceId: string | null;
   isGuest: boolean;
-  /** public shared のみ true。invite_only では自己 join しない。 */
+  /** public shared のみ true。invite_only / personal では自己 join しない。 */
   allowAutoJoin: boolean;
   /** join 実行時に space_nickname を解決する。取得失敗時は null を返す（join は止めない）。 */
   resolveNickname: () => string | null;
@@ -28,10 +35,15 @@ export type MembershipJoinDeps = {
   /** role は渡さない。role は RPC 側で 'member' 固定。 */
   join: (spaceId: string, nickname: string | null) => Promise<unknown>;
   onError: (error: unknown) => void;
+  /** join 状態が変化したときだけ呼ばれる */
+  onStatusChange?: (status: ActiveSpaceMembershipStatus) => void;
 };
 
 export interface MembershipJoinController {
   sync: (input: MembershipJoinInput) => void;
+  /** join 失敗後、同一 active space で join を再実行する */
+  retry: (input: MembershipJoinInput) => void;
+  getStatus: () => ActiveSpaceMembershipStatus;
 }
 
 const keyOf = (uid: string, spaceId: string) => `${uid}\u0000${spaceId}`;
@@ -43,55 +55,104 @@ export function createMembershipJoinController(
   let lastSuccessKey: string | null = null;
   // 実行中の (uid+spaceId)。StrictMode の二重 setup 連打を防ぐ。
   let inFlightKey: string | null = null;
+  let status: ActiveSpaceMembershipStatus = 'idle';
+
+  const setStatus = (next: ActiveSpaceMembershipStatus) => {
+    if (next === status) return;
+    status = next;
+    deps.onStatusChange?.(next);
+  };
+
+  const isEligible = (input: MembershipJoinInput) =>
+    Boolean(input.uid && !input.isGuest && input.allowAutoJoin);
+
+  const syncInternal = (input: MembershipJoinInput, forceRetry: boolean) => {
+    const { configured, authReady, uid, spaceId, isGuest, allowAutoJoin, resolveNickname } = input;
+
+    // ログアウト / ゲスト / invite_only / personal = 対象外。
+    if (!uid || isGuest || !allowAutoJoin) {
+      lastSuccessKey = null;
+      inFlightKey = null;
+      setStatus('none');
+      return;
+    }
+
+    // 一時的に未確定（auth 解決中・未設定・space 未確定）なら join しない。
+    // dedupe 状態は保持する（transient なフリップで無駄な再 join をしない）。
+    if (!configured || !authReady || !spaceId) {
+      if (spaceId) {
+        const key = keyOf(uid, spaceId);
+        if (key === lastSuccessKey) {
+          setStatus('active');
+          return;
+        }
+        if (key === inFlightKey) {
+          setStatus('joining');
+          return;
+        }
+      }
+      setStatus('idle');
+      return;
+    }
+
+    const key = keyOf(uid, spaceId);
+
+    if (!forceRetry && key === lastSuccessKey) {
+      setStatus('active');
+      return;
+    }
+
+    if (!forceRetry && key === inFlightKey) {
+      setStatus('joining');
+      return;
+    }
+
+    if (forceRetry) {
+      if (lastSuccessKey === key) lastSuccessKey = null;
+      if (inFlightKey === key) inFlightKey = null;
+    }
+
+    inFlightKey = key;
+    setStatus('joining');
+
+    let nickname: string | null = null;
+    try {
+      nickname = resolveNickname();
+    } catch {
+      // nickname 取得失敗で join は止めない。
+      nickname = null;
+    }
+
+    Promise.resolve(deps.join(spaceId, nickname))
+      .then(() => {
+        // 実行中に user/space が切り替わっていなければ成功として記録する。
+        if (inFlightKey === key) {
+          lastSuccessKey = key;
+          inFlightKey = null;
+          setStatus('active');
+        }
+      })
+      .catch((error) => {
+        // 失敗時は lastSuccessKey を立てない → retry / 次の sync で再試行可能。
+        if (inFlightKey === key) {
+          inFlightKey = null;
+          setStatus('error');
+        }
+        deps.onError(error);
+      });
+  };
 
   return {
     sync: (input) => {
-      const { configured, authReady, uid, spaceId, isGuest, allowAutoJoin, resolveNickname } = input;
-
-      // ログアウト / ゲスト / invite_only = 対象外。
-      if (!uid || isGuest || !allowAutoJoin) {
-        lastSuccessKey = null;
-        inFlightKey = null;
-        return;
-      }
-
-      // 一時的に未確定（auth 解決中・未設定・space 未確定）なら何もしない。
-      // dedupe 状態は保持する（transient なフリップで無駄な再 join をしない）。
-      if (!configured || !authReady || !spaceId) {
-        return;
-      }
-
-      const key = keyOf(uid, spaceId);
-      if (key === lastSuccessKey || key === inFlightKey) {
-        return; // 既に join 済み / 実行中
-      }
-
-      inFlightKey = key;
-
-      let nickname: string | null = null;
-      try {
-        nickname = resolveNickname();
-      } catch {
-        // nickname 取得失敗で join は止めない。
-        nickname = null;
-      }
-
-      Promise.resolve(deps.join(spaceId, nickname))
-        .then(() => {
-          // 実行中に user/space が切り替わっていなければ成功として記録する。
-          if (inFlightKey === key) {
-            lastSuccessKey = key;
-            inFlightKey = null;
-          }
-        })
-        .catch((error) => {
-          // 失敗時は lastSuccessKey を立てない → 次の sync（再訪問・切替等）で再試行可能。
-          if (inFlightKey === key) {
-            inFlightKey = null;
-          }
-          deps.onError(error);
-        });
+      syncInternal(input, false);
     },
+    retry: (input) => {
+      if (!isEligible(input) || !input.configured || !input.authReady || !input.spaceId) {
+        return;
+      }
+      syncInternal(input, true);
+    },
+    getStatus: () => status,
   };
 }
 

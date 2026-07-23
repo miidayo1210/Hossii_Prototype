@@ -113,7 +113,9 @@ import { checkCanAccessSpace } from '../utils/spaceAccessApi';
 import {
   createMembershipJoinController,
   resolveMembershipNickname,
+  type ActiveSpaceMembershipStatus,
   type MembershipJoinController,
+  type MembershipJoinInput,
 } from '../utils/membershipJoinController';
 import { fetchSpacePostAuthorDisplayNames } from '../utils/spacePostAuthorNamesApi';
 import {
@@ -890,6 +892,8 @@ export type OwnPostMutationResult =
   | { ok: true }
   | { ok: false; message?: string };
 
+export type { ActiveSpaceMembershipStatus } from '../utils/membershipJoinController';
+
 export type HossiiContextValue = {
   state: ExtendedHossiiState;
   spacesLoadedFromSupabase: boolean;
@@ -905,6 +909,10 @@ export type HossiiContextValue = {
    * ゲスト投稿・membership 無し・nickname 未設定は含まれない。書き換え不可。
    */
   postAuthorDisplayNames: ReadonlyMap<string, string>;
+  /** public shared space への membership auto-join 状態（Phase 2B / T1.2） */
+  activeSpaceMembershipStatus: ActiveSpaceMembershipStatus;
+  /** join 失敗時に同一 active space で join を再実行する */
+  retryActiveSpaceMembershipJoin: () => void;
   addHossii: (input: AddHossiiInput) => Promise<boolean>;
   selectHossii: (id: string | null) => void;
   clearAll: () => void;
@@ -1154,21 +1162,27 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // 影響させず、PII を出さずに console.error へ記録するだけにとどめる。
   // controller は React state を持たず購読もしないため、authorship のような dispose は不要
   // （StrictMode の二重 setup は controller 内の in-flight / lastSuccessKey で吸収する）。
+  const [activeSpaceMembershipStatus, setActiveSpaceMembershipStatus] =
+    useState<ActiveSpaceMembershipStatus>('idle');
   const membershipJoinRef = useRef<MembershipJoinController | null>(null);
+  const membershipJoinInputRef = useRef<MembershipJoinInput | null>(null);
   if (membershipJoinRef.current === null) {
     membershipJoinRef.current = createMembershipJoinController({
       join: (spaceId, nickname) => joinSpaceAsMember(spaceId, nickname),
       onError: () => {
         console.error('[HossiiStore] failed to register space membership');
       },
+      onStatusChange: setActiveSpaceMembershipStatus,
     });
   }
 
   useEffect(() => {
     const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
-    const allowAutoJoin = activeSpace?.accessMode !== 'invite_only';
+    const isPersonalSpace = activeSpace?.spaceType === 'personal';
+    const allowAutoJoin =
+      activeSpace?.accessMode !== 'invite_only' && !isPersonalSpace;
 
-    membershipJoinRef.current?.sync({
+    const membershipInput: MembershipJoinInput = {
       configured: isSupabaseConfigured,
       authReady: !isResolvingAuth,
       uid: currentUser?.uid ?? null,
@@ -1187,8 +1201,16 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           },
           stateRef.current.activeSpaceId,
         ),
-    });
+    };
+    membershipJoinInputRef.current = membershipInput;
+    membershipJoinRef.current?.sync(membershipInput);
   }, [currentUser?.uid, state.activeSpaceId, state.spaces, isResolvingAuth]);
+
+  const retryActiveSpaceMembershipJoin = useCallback(() => {
+    const input = membershipJoinInputRef.current;
+    if (!input) return;
+    membershipJoinRef.current?.retry(input);
+  }, []);
 
   // ===== 投稿者の現在表示名マップ（Phase 2C）=====
   // 過去投稿に「現在のスペースニックネーム」を表示するため、space 単位で
@@ -2022,6 +2044,8 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         myAuthorshipIds: authorshipSnapshot.ids,
         myAuthorshipIdsStatus: authorshipSnapshot.status,
         postAuthorDisplayNames: postAuthorNamesSnapshot.names,
+        activeSpaceMembershipStatus,
+        retryActiveSpaceMembershipJoin,
         addHossii,
         selectHossii,
         clearAll,
@@ -2088,6 +2112,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           refreshPostAuthorDisplayNames,
           syncFetchedHossiis,
           setHossiiFetchLoading,
+          retryActiveSpaceMembershipJoin,
         }}
       >
         {children}
