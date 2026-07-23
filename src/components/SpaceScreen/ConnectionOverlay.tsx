@@ -31,7 +31,7 @@ export type ConnectionOverlayProps = {
   hitPathsDisabled?: boolean;
   /** admin 向け: 糸クリックで編集開始 */
   onConnectionClick?: (connection: HossiiConnection) => void;
-  /** false のとき 1-hop 糸を描画しない（入口操作後に true） */
+  /** true のとき 1-hop 糸を視覚強調（描画自体は常に行う） */
   emphasized?: boolean;
 };
 
@@ -52,7 +52,7 @@ type ConnectionPathPairProps = {
   onHoverChange: (connectionId: string | null, point?: ConnectionHoverPoint) => void;
   onRegister: (connectionId: string, refs: ConnectionPathRefs | null) => void;
   onConnectionClick?: (connection: HossiiConnection) => void;
-  /** false のとき 1-hop 糸を描画しない（入口操作後に true） */
+  /** true のとき 1-hop 糸を視覚強調（描画自体は常に行う） */
   emphasized?: boolean;
 };
 
@@ -150,7 +150,7 @@ export function ConnectionOverlay({
   directConnectionCount,
   hitPathsDisabled = false,
   onConnectionClick,
-  emphasized = true,
+  emphasized = false,
 }: ConnectionOverlayProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -253,16 +253,16 @@ export function ConnectionOverlay({
     pathRegistryRef,
   });
 
-  if (!gateOpen || visibleConnections.length === 0 || !emphasized) {
+  if (!gateOpen || visibleConnections.length === 0) {
     return null;
   }
 
   return (
     <div
       ref={overlayRef}
-      className={`${styles.overlay} ${styles.overlayEmphasized}`}
+      className={`${styles.overlay}${emphasized ? ` ${styles.overlayEmphasized}` : ''}`}
       data-connection-overlay
-      data-connection-emphasized="true"
+      data-connection-emphasized={emphasized ? 'true' : 'false'}
       data-direct-connection-count={directConnectionCount ?? visibleConnections.length}
       data-hit-paths-disabled={hitPathsDisabled ? 'true' : 'false'}
       data-space-export="exclude"

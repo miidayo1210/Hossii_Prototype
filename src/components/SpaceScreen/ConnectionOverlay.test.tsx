@@ -181,26 +181,19 @@ describe('ConnectionOverlay', () => {
     const hitPath = getHitPath();
     expect(hitPath?.style.pointerEvents).toBe('none');
   });
-  it('does not render when emphasized is false', () => {
-    const bubbleArea = document.createElement('div');
-    const ref = { current: bubbleArea } as const;
+  it('still renders threads when emphasized is false', () => {
+    renderOverlay({ emphasized: false });
+    const overlay = queryOverlay();
+    expect(overlay).toBeTruthy();
+    expect(overlay?.getAttribute('data-connection-emphasized')).toBe('false');
+    expect(overlay?.className.includes('overlayEmphasized')).toBe(false);
+  });
 
-    const { container } = render(
-      <ConnectionOverlay
-        bubbleAreaRef={ref}
-        connections={connections}
-        selectedBubbleId="h1"
-        presentationMode="custom"
-        renderAsStar={false}
-        viewMode="default"
-        layoutMode="default"
-        activePaneId="pane-a"
-        visibleHossiiIds={new Set(['h1', 'h2'])}
-        emphasized={false}
-      />,
-    );
-
-    expect(container.querySelector('[data-connection-overlay]')).toBeNull();
+  it('applies emphasis styling when emphasized is true', () => {
+    renderOverlay({ emphasized: true });
+    const overlay = queryOverlay();
+    expect(overlay?.getAttribute('data-connection-emphasized')).toBe('true');
+    expect(overlay?.className.includes('overlayEmphasized')).toBe(true);
   });
 
 });

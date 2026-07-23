@@ -1704,7 +1704,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     connectionListItems,
     handleConnectionListSelect,
     connectionThreadsEmphasized,
-    emphasizeConnectionThreads,
+    toggleConnectionThreadsEmphasis,
   } = useSpaceConnectionIntegration({
     currentUser,
     activeSpace: contentSpace ?? activeSpace,
@@ -2665,7 +2665,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           guideMessage={guideMessage}
           onGuideDismiss={dismissGuide}
           showConnectionViewHandle={showSpaceHossiiConnectionHandle}
-          onConnectionViewClick={emphasizeConnectionThreads}
+          onConnectionViewClick={toggleConnectionThreadsEmphasis}
           connectionViewHandleActive={connectionThreadsEmphasized}
         />
       )}

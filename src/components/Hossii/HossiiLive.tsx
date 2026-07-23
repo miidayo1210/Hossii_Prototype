@@ -636,11 +636,15 @@ export function HossiiLive({
   const idleAnimDuration = ([6, 4, 3, 2] as const)[energyLevel];
 
   // コンテナのクラス名
-  const containerClasses = [
-    decorative ? styles.containerDecorative : styles.container,
+  const motionShellClasses = [
+    decorative ? styles.motionShellDecorative : styles.motionShell,
     !decorative && isSwimming ? styles.swimming : '',
     isReacting ? styles.reacting : '',
     tapTransform ? styles.tapped : '',
+  ].filter(Boolean).join(' ');
+
+  const containerClasses = [
+    decorative ? styles.containerDecorative : styles.container,
   ].filter(Boolean).join(' ');
 
   // BaseMotion の transform + TapMotion の追加transform
@@ -664,12 +668,15 @@ export function HossiiLive({
     <>
       {/* Hossii本体 */}
       <div
-        className={containerClasses}
+        className={motionShellClasses}
         style={{
           transform: finalTransform,
           transitionDuration:
             !decorative && isSwimming && !tapTransform ? `${transitionDuration}ms` : undefined,
         }}
+      >
+      <div
+        className={containerClasses}
         onClick={decorative ? undefined : handleTap}
         role={decorative ? undefined : 'button'}
         tabIndex={decorative ? undefined : 0}
@@ -753,6 +760,7 @@ export function HossiiLive({
             <span className={styles.idleBubbleText}>{idleBubble}</span>
           </div>
         )}
+      </div>
         {showConnectionViewHandle && onConnectionViewClick && (
           <SpaceHossiiConnectionHandle
             onClick={onConnectionViewClick}

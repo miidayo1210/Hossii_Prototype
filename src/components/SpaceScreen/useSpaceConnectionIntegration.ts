@@ -249,6 +249,10 @@ export function useSpaceConnectionIntegration({
 
   const handleEscapeReset = useCallback(() => {
     if (isEditorSaving) return;
+    if (connectionThreadsEmphasized && editor.phase === 'idle' && !connectionListOpen) {
+      setConnectionThreadsEmphasized(false);
+      return;
+    }
     if (connectionListOpen) {
       closeConnectionList();
       return;
@@ -260,6 +264,7 @@ export function useSpaceConnectionIntegration({
     resetBubbleInteraction();
   }, [
     isEditorSaving,
+    connectionThreadsEmphasized,
     connectionListOpen,
     closeConnectionList,
     editor.phase,
@@ -489,8 +494,8 @@ export function useSpaceConnectionIntegration({
     canCreateTypeAConnection ||
     (editor.editingConnection != null && canEditConnection(editor.editingConnection));
 
-  const emphasizeConnectionThreads = useCallback(() => {
-    setConnectionThreadsEmphasized(true);
+  const toggleConnectionThreadsEmphasis = useCallback(() => {
+    setConnectionThreadsEmphasized((current) => !current);
   }, []);
 
   const overlayProps: ConnectionOverlayProps = useMemo(
@@ -529,7 +534,7 @@ export function useSpaceConnectionIntegration({
     connectionListItems,
     handleConnectionListSelect,
     connectionThreadsEmphasized,
-    emphasizeConnectionThreads,
+    toggleConnectionThreadsEmphasis,
     selectedDirectConnectionCount,
   };
 }
