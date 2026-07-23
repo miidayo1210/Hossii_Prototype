@@ -935,4 +935,76 @@ describe('useSpaceConnectionIntegration', () => {
       expect(options.setSelectedBubbleId).not.toHaveBeenCalled();
     });
   });
+  describe('Space Hossii connection entry emphasis', () => {
+    it('starts with overlay threads not emphasized', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      expect(result.current.connectionThreadsEmphasized).toBe(false);
+      expect(result.current.overlayProps.emphasized).toBe(false);
+    });
+
+    it('toggles overlay emphasis when entry handle is clicked repeatedly', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      act(() => {
+        result.current.toggleConnectionThreadsEmphasis();
+      });
+
+      expect(result.current.connectionThreadsEmphasized).toBe(true);
+      expect(result.current.overlayProps.emphasized).toBe(true);
+
+      act(() => {
+        result.current.toggleConnectionThreadsEmphasis();
+      });
+
+      expect(result.current.connectionThreadsEmphasized).toBe(false);
+      expect(result.current.overlayProps.emphasized).toBe(false);
+    });
+
+    it('keeps overlay click edit available while not emphasized', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      expect(result.current.connectionThreadsEmphasized).toBe(false);
+      expect(result.current.overlayProps.onConnectionClick).toBeTypeOf('function');
+    });
+
+    it('clears emphasis on Escape while editor is idle', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      act(() => {
+        result.current.toggleConnectionThreadsEmphasis();
+      });
+
+      act(() => {
+        result.current.handleEscapeReset();
+      });
+
+      expect(result.current.connectionThreadsEmphasized).toBe(false);
+    });
+
+    it('clears emphasis when connection state resets', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      act(() => {
+        result.current.toggleConnectionThreadsEmphasis();
+      });
+
+      act(() => {
+        result.current.resetConnectionState();
+      });
+
+      expect(result.current.connectionThreadsEmphasized).toBe(false);
+    });
+  });
+
 });

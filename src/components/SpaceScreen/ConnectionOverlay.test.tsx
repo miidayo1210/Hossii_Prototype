@@ -181,6 +181,21 @@ describe('ConnectionOverlay', () => {
     const hitPath = getHitPath();
     expect(hitPath?.style.pointerEvents).toBe('none');
   });
+  it('still renders threads when emphasized is false', () => {
+    renderOverlay({ emphasized: false });
+    const overlay = queryOverlay();
+    expect(overlay).toBeTruthy();
+    expect(overlay?.getAttribute('data-connection-emphasized')).toBe('false');
+    expect(overlay?.className.includes('overlayEmphasized')).toBe(false);
+  });
+
+  it('applies emphasis styling when emphasized is true', () => {
+    renderOverlay({ emphasized: true });
+    const overlay = queryOverlay();
+    expect(overlay?.getAttribute('data-connection-emphasized')).toBe('true');
+    expect(overlay?.className.includes('overlayEmphasized')).toBe(true);
+  });
+
 });
 
 describe('ConnectionOverlay reason tooltip', () => {

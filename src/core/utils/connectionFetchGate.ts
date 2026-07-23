@@ -44,3 +44,24 @@ export function resolveRenderAsStar(params: {
 }): boolean {
   return params.isMobilePortrait || params.presentationMode === 'stars';
 }
+
+export type SpaceHossiiConnectionHandleGate = {
+  isMobile: boolean;
+  isConnectionsContextEnabled: boolean;
+  hossiiVisible: boolean;
+  selectedBubbleId: string | null;
+  directConnectionCount: number;
+};
+
+/** Space Hossii 横のつながり入口 ✦（Phase 1: PC custom のみ） */
+export function shouldShowSpaceHossiiConnectionHandle(
+  gate: SpaceHossiiConnectionHandleGate,
+): boolean {
+  return (
+    !gate.isMobile &&
+    gate.isConnectionsContextEnabled &&
+    gate.hossiiVisible &&
+    gate.selectedBubbleId != null &&
+    gate.directConnectionCount > 0
+  );
+}

@@ -15,6 +15,7 @@ import { HOSSII_IDLE, getDefaultIdle, getRandomInteractionFace, getListeningFace
 import { MOBILE_BOTTOM_NAV_RESERVE_PX } from '../../core/utils/floatingPanelStorage';
 import { stripEmojisForSpeech } from '../../core/utils/stripEmojisForSpeech';
 import styles from './HossiiLive.module.css';
+import { SpaceHossiiConnectionHandle } from './SpaceHossiiConnectionHandle';
 
 type Props = {
   lastTriggerId?: string;
@@ -38,6 +39,10 @@ type Props = {
   guideMessage?: string | null;
   /** 117: ガイド吹き出しを閉じたとき */
   onGuideDismiss?: () => void;
+  /** つながり入口 ✦（Space Hossii のみ。My Hossii には付けない） */
+  showConnectionViewHandle?: boolean;
+  onConnectionViewClick?: () => void;
+  connectionViewHandleActive?: boolean;
 };
 
 /** Hossii のサイズ (CSS の width/height と一致させる) */
@@ -175,6 +180,9 @@ export function HossiiLive({
   idleImageOverride,
   guideMessage,
   onGuideDismiss,
+  showConnectionViewHandle = false,
+  onConnectionViewClick,
+  connectionViewHandleActive = false,
 }: Props) {
   // === State ===
   const [position, setPosition] = useState(getInitialPosition);
@@ -628,11 +636,15 @@ export function HossiiLive({
   const idleAnimDuration = ([6, 4, 3, 2] as const)[energyLevel];
 
   // コンテナのクラス名
-  const containerClasses = [
-    decorative ? styles.containerDecorative : styles.container,
+  const motionShellClasses = [
+    decorative ? styles.motionShellDecorative : styles.motionShell,
     !decorative && isSwimming ? styles.swimming : '',
     isReacting ? styles.reacting : '',
     tapTransform ? styles.tapped : '',
+  ].filter(Boolean).join(' ');
+
+  const containerClasses = [
+    decorative ? styles.containerDecorative : styles.container,
   ].filter(Boolean).join(' ');
 
   // BaseMotion の transform + TapMotion の追加transform
@@ -656,12 +668,15 @@ export function HossiiLive({
     <>
       {/* Hossii本体 */}
       <div
-        className={containerClasses}
+        className={motionShellClasses}
         style={{
           transform: finalTransform,
           transitionDuration:
             !decorative && isSwimming && !tapTransform ? `${transitionDuration}ms` : undefined,
         }}
+      >
+      <div
+        className={containerClasses}
         onClick={decorative ? undefined : handleTap}
         role={decorative ? undefined : 'button'}
         tabIndex={decorative ? undefined : 0}
@@ -744,6 +759,13 @@ export function HossiiLive({
           <div className={styles.idleBubble}>
             <span className={styles.idleBubbleText}>{idleBubble}</span>
           </div>
+        )}
+      </div>
+        {showConnectionViewHandle && onConnectionViewClick && (
+          <SpaceHossiiConnectionHandle
+            onClick={onConnectionViewClick}
+            active={connectionViewHandleActive}
+          />
         )}
       </div>
 
