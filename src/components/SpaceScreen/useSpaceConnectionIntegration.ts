@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { HossiiConnectionStrength } from '../../core/types/hossiiConnection';
+import type { HossiiConnectionStrength, HossiiConnection } from '../../core/types/hossiiConnection';
 import type { Hossii } from '../../core/types';
 import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
-import { canManageSpace } from '../../core/utils/spaceAdminAccess';
 import type { AppUser } from '../../core/contexts/AuthContext';
 import type { Space } from '../../core/types/space';
+import type { ActiveSpaceMembershipStatus } from '../../core/utils/membershipJoinController';
+import {
+  canEditTypeAConnection,
+  evaluateTypeAConnectionWriteGate,
+} from '../../core/utils/typeAConnectionWriteGate';
 import {
   createConnection,
   deleteConnection,
@@ -34,6 +38,8 @@ type BubbleActionMenuBubbleProps = {
   onActionMenuToggle: () => void;
   onViewDetail?: () => void;
   onConnect?: () => void;
+  membershipJoinStatus?: 'joining' | 'error';
+  onMembershipRetry?: () => void;
   connectionCount?: number;
   onConnectionsClick?: () => void;
 };
@@ -42,6 +48,8 @@ type Options = {
   currentUser: AppUser | null | undefined;
   activeSpace: Space | null | undefined;
   isContentArchived: boolean;
+  activeSpaceMembershipStatus: ActiveSpaceMembershipStatus;
+  retryActiveSpaceMembershipJoin: () => void;
   spaceId: string;
   paneId: string;
   selectedBubbleId: string | null;
@@ -65,6 +73,8 @@ export function useSpaceConnectionIntegration({
   currentUser,
   activeSpace,
   isContentArchived,
+  activeSpaceMembershipStatus,
+  retryActiveSpaceMembershipJoin,
   spaceId,
   paneId,
   selectedBubbleId,
@@ -80,8 +90,29 @@ export function useSpaceConnectionIntegration({
   presentationMode,
   contextActivePaneId,
 }: Options) {
-  const canWriteConnections =
-    !isContentArchived && canManageSpace(currentUser, activeSpace);
+  const typeAWriteGate = useMemo(
+    () =>
+      evaluateTypeAConnectionWriteGate({
+        currentUser,
+        activeSpace,
+        isContentArchived,
+        activeSpaceMembershipStatus,
+      }),
+    [currentUser, activeSpace, isContentArchived, activeSpaceMembershipStatus],
+  );
+
+  const canCreateTypeAConnection = typeAWriteGate.canCreate;
+
+  const canEditConnection = useCallback(
+    (connection: HossiiConnection) =>
+      canEditTypeAConnection({
+        currentUser,
+        activeSpace,
+        isContentArchived,
+        connection,
+      }),
+    [currentUser, activeSpace, isContentArchived],
+  );
 
   const {
     overlayProps: baseOverlayProps,
@@ -293,16 +324,24 @@ export function useSpaceConnectionIntegration({
   );
 
   const handleConnectFromMenu = useCallback(() => {
-    if (!isConnectionsContextEnabled || !canWriteConnections || !selectedBubbleId) return;
+    if (!isConnectionsContextEnabled || !canCreateTypeAConnection || !selectedBubbleId) return;
     closeBubbleActionMenu();
     editor.startCreate(selectedBubbleId);
   }, [
     isConnectionsContextEnabled,
-    canWriteConnections,
+    canCreateTypeAConnection,
     selectedBubbleId,
     editor,
     closeBubbleActionMenu,
   ]);
+
+  const handleConnectionOverlayClick = useCallback(
+    (connection: HossiiConnection) => {
+      if (!isConnectionsContextEnabled || !canEditConnection(connection)) return;
+      editor.startEdit(connection);
+    },
+    [isConnectionsContextEnabled, canEditConnection, editor],
+  );
 
   const openConnectionList = useCallback(() => {
     if (!isConnectionsContextEnabled || selectedDirectConnectionCount <= 0) return;
@@ -341,11 +380,24 @@ export function useSpaceConnectionIntegration({
 
       const showConnectionMenuItems = isConnectionsContextEnabled;
 
+      const membershipJoinStatus =
+        typeAWriteGate.blockReason === 'membership_joining'
+          ? ('joining' as const)
+          : typeAWriteGate.blockReason === 'membership_error'
+            ? ('error' as const)
+            : undefined;
+
       return {
         ...base,
         onConnect:
-          isConnectionsContextEnabled && canWriteConnections
+          isConnectionsContextEnabled && canCreateTypeAConnection
             ? handleConnectFromMenu
+            : undefined,
+        membershipJoinStatus:
+          isConnectionsContextEnabled && membershipJoinStatus ? membershipJoinStatus : undefined,
+        onMembershipRetry:
+          isConnectionsContextEnabled && membershipJoinStatus === 'error'
+            ? retryActiveSpaceMembershipJoin
             : undefined,
         connectionCount:
           showConnectionMenuItems && selectedDirectConnectionCount > 0
@@ -360,8 +412,10 @@ export function useSpaceConnectionIntegration({
     [
       getBubbleActionMenuProps,
       isConnectionsContextEnabled,
-      canWriteConnections,
+      canCreateTypeAConnection,
+      typeAWriteGate.blockReason,
       handleConnectFromMenu,
+      retryActiveSpaceMembershipJoin,
       selectedDirectConnectionCount,
       openConnectionList,
     ],
@@ -377,15 +431,16 @@ export function useSpaceConnectionIntegration({
     [isConnectionsContextEnabled, selectedBubbleId, connectionBadgeCountByHossiiId],
   );
 
+  const canUseConnectionEditor =
+    canCreateTypeAConnection ||
+    (editor.editingConnection != null && canEditConnection(editor.editingConnection));
+
   const overlayProps: ConnectionOverlayProps = useMemo(
     () => ({
       ...baseOverlayProps,
-      onConnectionClick:
-        isConnectionsContextEnabled && canWriteConnections
-          ? editor.startEdit
-          : undefined,
+      onConnectionClick: isConnectionsContextEnabled ? handleConnectionOverlayClick : undefined,
     }),
-    [baseOverlayProps, isConnectionsContextEnabled, canWriteConnections, editor.startEdit],
+    [baseOverlayProps, isConnectionsContextEnabled, handleConnectionOverlayClick],
   );
 
   const isPickingTarget = editor.phase === 'pickingTarget';
@@ -393,7 +448,10 @@ export function useSpaceConnectionIntegration({
   return {
     overlayProps,
     editor,
-    canWriteConnections,
+    canCreateTypeAConnection,
+    canEditConnection,
+    canUseConnectionEditor,
+    typeAWriteGate,
     isConnectionsContextEnabled,
     resetConnectionState,
     shouldAllowBubbleReset,

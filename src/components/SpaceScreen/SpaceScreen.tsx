@@ -222,6 +222,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     myAuthorshipIdsStatus,
     postAuthorDisplayNames,
     getActiveNickname,
+    activeSpaceMembershipStatus,
+    retryActiveSpaceMembershipJoin,
   } = useHossiiStore();
   const { activeSpaceId, visitingSpaceId } = state;
   const hossiisRef = useRef(state.hossiis);
@@ -1674,7 +1676,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     getConnectionBadgeCount,
     isPickingTarget,
     editor: connectionEditor,
-    canWriteConnections,
+    canUseConnectionEditor,
     isConnectionsContextEnabled,
     handleEscapeReset,
     connectionListOpen,
@@ -1684,6 +1686,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     currentUser,
     activeSpace: contentSpace ?? activeSpace,
     isContentArchived,
+    activeSpaceMembershipStatus,
+    retryActiveSpaceMembershipJoin,
     spaceId: contentSpaceId ?? activeSpaceId ?? '',
     paneId: connectionActivePaneId,
     selectedBubbleId,
@@ -2344,7 +2348,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
         <ConnectionEditorPortals
           editor={connectionEditor}
           selectedBubbleId={selectedBubbleId}
-          canWriteConnections={canWriteConnections}
+          canUseConnectionEditor={canUseConnectionEditor}
           isConnectionsContextEnabled={isConnectionsContextEnabled}
         />
         {connectionListOpen && selectedBubbleId && (

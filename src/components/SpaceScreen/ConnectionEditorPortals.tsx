@@ -61,14 +61,14 @@ function useHossiiAnchorRect(hossiiId: string | null, active: boolean): DOMRect 
 type Props = {
   editor: UseConnectionEditorReturn;
   selectedBubbleId: string | null;
-  canWriteConnections: boolean;
+  canUseConnectionEditor: boolean;
   isConnectionsContextEnabled: boolean;
 };
 
 export function ConnectionEditorPortals({
   editor,
   selectedBubbleId,
-  canWriteConnections,
+  canUseConnectionEditor,
   isConnectionsContextEnabled,
 }: Props) {
   const {
@@ -87,7 +87,7 @@ export function ConnectionEditorPortals({
     cancel,
   } = editor;
 
-  const editorPortalEnabled = canWriteConnections && isConnectionsContextEnabled;
+  const editorPortalEnabled = canUseConnectionEditor && isConnectionsContextEnabled;
 
   const strengthPopoverActive =
     phase === 'pickingStrength' ||
