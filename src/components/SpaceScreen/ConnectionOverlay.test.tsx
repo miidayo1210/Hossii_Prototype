@@ -181,6 +181,28 @@ describe('ConnectionOverlay', () => {
     const hitPath = getHitPath();
     expect(hitPath?.style.pointerEvents).toBe('none');
   });
+  it('does not render when emphasized is false', () => {
+    const bubbleArea = document.createElement('div');
+    const ref = { current: bubbleArea } as const;
+
+    const { container } = render(
+      <ConnectionOverlay
+        bubbleAreaRef={ref}
+        connections={connections}
+        selectedBubbleId="h1"
+        presentationMode="custom"
+        renderAsStar={false}
+        viewMode="default"
+        layoutMode="default"
+        activePaneId="pane-a"
+        visibleHossiiIds={new Set(['h1', 'h2'])}
+        emphasized={false}
+      />,
+    );
+
+    expect(container.querySelector('[data-connection-overlay]')).toBeNull();
+  });
+
 });
 
 describe('ConnectionOverlay reason tooltip', () => {

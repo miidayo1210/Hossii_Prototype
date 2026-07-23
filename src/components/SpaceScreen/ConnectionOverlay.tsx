@@ -31,6 +31,8 @@ export type ConnectionOverlayProps = {
   hitPathsDisabled?: boolean;
   /** admin 向け: 糸クリックで編集開始 */
   onConnectionClick?: (connection: HossiiConnection) => void;
+  /** false のとき 1-hop 糸を描画しない（入口操作後に true） */
+  emphasized?: boolean;
 };
 
 type ConnectionHoverPoint = {
@@ -50,6 +52,8 @@ type ConnectionPathPairProps = {
   onHoverChange: (connectionId: string | null, point?: ConnectionHoverPoint) => void;
   onRegister: (connectionId: string, refs: ConnectionPathRefs | null) => void;
   onConnectionClick?: (connection: HossiiConnection) => void;
+  /** false のとき 1-hop 糸を描画しない（入口操作後に true） */
+  emphasized?: boolean;
 };
 
 function ConnectionPathPair({
@@ -146,6 +150,7 @@ export function ConnectionOverlay({
   directConnectionCount,
   hitPathsDisabled = false,
   onConnectionClick,
+  emphasized = true,
 }: ConnectionOverlayProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -212,7 +217,7 @@ export function ConnectionOverlay({
 
   useLayoutEffect(() => {
     if (!reasonTooltipText || !effectiveHoverState || !overlayRef.current || !tooltipRef.current) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- measure tooltip size before clamping
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear tooltip when hover ends
       setTooltipPosition(null);
       return;
     }
@@ -248,15 +253,16 @@ export function ConnectionOverlay({
     pathRegistryRef,
   });
 
-  if (!gateOpen || visibleConnections.length === 0) {
+  if (!gateOpen || visibleConnections.length === 0 || !emphasized) {
     return null;
   }
 
   return (
     <div
       ref={overlayRef}
-      className={styles.overlay}
+      className={`${styles.overlay} ${styles.overlayEmphasized}`}
       data-connection-overlay
+      data-connection-emphasized="true"
       data-direct-connection-count={directConnectionCount ?? visibleConnections.length}
       data-hit-paths-disabled={hitPathsDisabled ? 'true' : 'false'}
       data-space-export="exclude"

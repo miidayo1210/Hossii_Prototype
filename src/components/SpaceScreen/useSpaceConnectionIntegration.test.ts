@@ -935,4 +935,44 @@ describe('useSpaceConnectionIntegration', () => {
       expect(options.setSelectedBubbleId).not.toHaveBeenCalled();
     });
   });
+  describe('Space Hossii connection entry emphasis', () => {
+    it('starts with overlay threads not emphasized', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      expect(result.current.connectionThreadsEmphasized).toBe(false);
+      expect(result.current.overlayProps.emphasized).toBe(false);
+    });
+
+    it('emphasizes overlay threads when entry handle is clicked', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      act(() => {
+        result.current.emphasizeConnectionThreads();
+      });
+
+      expect(result.current.connectionThreadsEmphasized).toBe(true);
+      expect(result.current.overlayProps.emphasized).toBe(true);
+    });
+
+    it('clears emphasis when connection state resets', () => {
+      const { result } = renderHook(() =>
+        useSpaceConnectionIntegration(makeOptions()),
+      );
+
+      act(() => {
+        result.current.emphasizeConnectionThreads();
+      });
+
+      act(() => {
+        result.current.resetConnectionState();
+      });
+
+      expect(result.current.connectionThreadsEmphasized).toBe(false);
+    });
+  });
+
 });

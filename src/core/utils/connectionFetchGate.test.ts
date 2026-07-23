@@ -3,6 +3,7 @@ import {
   connectionsEnabled,
   isConnectionsContextEnabled,
   shouldFetchHossiiConnections,
+  shouldShowSpaceHossiiConnectionHandle,
 } from './connectionFetchGate';
 
 describe('isConnectionsContextEnabled / connectionsEnabled', () => {
@@ -79,5 +80,45 @@ describe('shouldFetchHossiiConnections', () => {
   it('does not fetch without space or pane id', () => {
     expect(shouldFetchHossiiConnections({ ...base, spaceId: '' })).toBe(false);
     expect(shouldFetchHossiiConnections({ ...base, paneId: '' })).toBe(false);
+  });
+});
+
+
+describe('shouldShowSpaceHossiiConnectionHandle', () => {
+  const base = {
+    isMobile: false,
+    isConnectionsContextEnabled: true,
+    hossiiVisible: true,
+    selectedBubbleId: 'h1',
+    directConnectionCount: 2,
+  };
+
+  it('shows when selected bubble has direct connections in custom context', () => {
+    expect(shouldShowSpaceHossiiConnectionHandle(base)).toBe(true);
+  });
+
+  it('hides without direct connections', () => {
+    expect(
+      shouldShowSpaceHossiiConnectionHandle({ ...base, directConnectionCount: 0 }),
+    ).toBe(false);
+  });
+
+  it('hides when no bubble is selected', () => {
+    expect(
+      shouldShowSpaceHossiiConnectionHandle({ ...base, selectedBubbleId: null }),
+    ).toBe(false);
+  });
+
+  it('hides outside connections context gate', () => {
+    expect(
+      shouldShowSpaceHossiiConnectionHandle({
+        ...base,
+        isConnectionsContextEnabled: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('hides on mobile', () => {
+    expect(shouldShowSpaceHossiiConnectionHandle({ ...base, isMobile: true })).toBe(false);
   });
 });

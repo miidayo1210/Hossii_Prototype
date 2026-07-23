@@ -74,6 +74,7 @@ import { Bubble } from './Tree';
 import { useCustomBubbleActionMenu } from './useCustomBubbleActionMenu';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { useConnectionOverlayInputs } from './useConnectionOverlayInputs';
+import { shouldShowSpaceHossiiConnectionHandle } from '../../core/utils/connectionFetchGate';
 import { useSpaceConnectionIntegration } from './useSpaceConnectionIntegration';
 import { useSpaceConnectionPull } from './useSpaceConnectionPull';
 import { ConnectionEditorPortals } from './ConnectionEditorPortals';
@@ -1677,6 +1678,7 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     fetchError: connectionFetchError,
     isFetching: connectionFetchInFlight,
     isConnectionsContextEnabled: connectionsContextEnabled,
+    selectedDirectConnectionCount,
   } = connectionOverlayInputs;
 
   const showConnectionFetchErrorNotice =
@@ -1701,6 +1703,8 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     connectionListOpen,
     connectionListItems,
     handleConnectionListSelect,
+    connectionThreadsEmphasized,
+    emphasizeConnectionThreads,
   } = useSpaceConnectionIntegration({
     currentUser,
     activeSpace: contentSpace ?? activeSpace,
@@ -1791,6 +1795,14 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     !connectionPullHintDismissedSession &&
     !isVisiting &&
     !isContentArchived;
+
+  const showSpaceHossiiConnectionHandle = shouldShowSpaceHossiiConnectionHandle({
+    isMobile,
+    isConnectionsContextEnabled: connectionsContextEnabled,
+    hossiiVisible: controlState.hossiiVisible,
+    selectedBubbleId,
+    directConnectionCount: selectedDirectConnectionCount,
+  });
 
   shouldAllowBubbleResetRef.current = () =>
     !connectionEditor.isSaving && connectionEditor.phase !== 'saving';
@@ -2652,6 +2664,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
           idleImageOverride={spaceCharacterImageUrl ?? null}
           guideMessage={guideMessage}
           onGuideDismiss={dismissGuide}
+          showConnectionViewHandle={showSpaceHossiiConnectionHandle}
+          onConnectionViewClick={emphasizeConnectionThreads}
+          connectionViewHandleActive={connectionThreadsEmphasized}
         />
       )}
 

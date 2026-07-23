@@ -184,6 +184,7 @@ export function useSpaceConnectionIntegration({
 
   const editor = useConnectionEditor(editorCallbacks);
   const [connectionListOpen, setConnectionListOpen] = useState(false);
+  const [connectionThreadsEmphasized, setConnectionThreadsEmphasized] = useState(false);
 
   const closeConnectionList = useCallback(() => {
     setConnectionListOpen(false);
@@ -239,6 +240,7 @@ export function useSpaceConnectionIntegration({
   const resetConnectionState = useCallback(() => {
     if (isEditorSaving) return;
     closeConnectionList();
+    setConnectionThreadsEmphasized(false);
     editorReset();
     resetBubbleInteraction();
   }, [isEditorSaving, closeConnectionList, editorReset, resetBubbleInteraction]);
@@ -264,6 +266,10 @@ export function useSpaceConnectionIntegration({
     editorReset,
     resetBubbleInteraction,
   ]);
+
+  useEffect(() => {
+    queueMicrotask(() => setConnectionThreadsEmphasized(false));
+  }, [selectedBubbleId]);
 
   useEffect(() => {
     if (!connectionListOpen) return;
@@ -338,6 +344,7 @@ export function useSpaceConnectionIntegration({
         return;
       }
 
+      setConnectionThreadsEmphasized(false);
       setSelectedBubbleId(id);
       setActiveBubbleId(null);
       closeBubbleActionMenu();
@@ -482,12 +489,22 @@ export function useSpaceConnectionIntegration({
     canCreateTypeAConnection ||
     (editor.editingConnection != null && canEditConnection(editor.editingConnection));
 
+  const emphasizeConnectionThreads = useCallback(() => {
+    setConnectionThreadsEmphasized(true);
+  }, []);
+
   const overlayProps: ConnectionOverlayProps = useMemo(
     () => ({
       ...baseOverlayProps,
+      emphasized: connectionThreadsEmphasized,
       onConnectionClick: isConnectionsContextEnabled ? handleConnectionOverlayClick : undefined,
     }),
-    [baseOverlayProps, isConnectionsContextEnabled, handleConnectionOverlayClick],
+    [
+      baseOverlayProps,
+      connectionThreadsEmphasized,
+      isConnectionsContextEnabled,
+      handleConnectionOverlayClick,
+    ],
   );
 
   const isPickingTarget = editor.phase === 'pickingTarget';
@@ -511,5 +528,8 @@ export function useSpaceConnectionIntegration({
     connectionListOpen,
     connectionListItems,
     handleConnectionListSelect,
+    connectionThreadsEmphasized,
+    emphasizeConnectionThreads,
+    selectedDirectConnectionCount,
   };
 }

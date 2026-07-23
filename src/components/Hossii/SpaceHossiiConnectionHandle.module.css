@@ -1,0 +1,39 @@
+.handle {
+  position: absolute;
+  top: 8px;
+  right: -6px;
+  z-index: 2;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.icon {
+  font-size: 0.75rem;
+  line-height: 1;
+  color: rgba(168, 85, 247, 0.72);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+}
+
+.handleActive .icon {
+  color: rgba(168, 85, 247, 0.95);
+}
+
+.handle:focus-visible {
+  outline: 2px solid rgba(168, 85, 247, 0.55);
+  outline-offset: 2px;
+  border-radius: 999px;
+}

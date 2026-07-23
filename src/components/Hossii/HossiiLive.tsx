@@ -15,6 +15,7 @@ import { HOSSII_IDLE, getDefaultIdle, getRandomInteractionFace, getListeningFace
 import { MOBILE_BOTTOM_NAV_RESERVE_PX } from '../../core/utils/floatingPanelStorage';
 import { stripEmojisForSpeech } from '../../core/utils/stripEmojisForSpeech';
 import styles from './HossiiLive.module.css';
+import { SpaceHossiiConnectionHandle } from './SpaceHossiiConnectionHandle';
 
 type Props = {
   lastTriggerId?: string;
@@ -38,6 +39,10 @@ type Props = {
   guideMessage?: string | null;
   /** 117: ガイド吹き出しを閉じたとき */
   onGuideDismiss?: () => void;
+  /** つながり入口 ✦（Space Hossii のみ。My Hossii には付けない） */
+  showConnectionViewHandle?: boolean;
+  onConnectionViewClick?: () => void;
+  connectionViewHandleActive?: boolean;
 };
 
 /** Hossii のサイズ (CSS の width/height と一致させる) */
@@ -175,6 +180,9 @@ export function HossiiLive({
   idleImageOverride,
   guideMessage,
   onGuideDismiss,
+  showConnectionViewHandle = false,
+  onConnectionViewClick,
+  connectionViewHandleActive = false,
 }: Props) {
   // === State ===
   const [position, setPosition] = useState(getInitialPosition);
@@ -744,6 +752,12 @@ export function HossiiLive({
           <div className={styles.idleBubble}>
             <span className={styles.idleBubbleText}>{idleBubble}</span>
           </div>
+        )}
+        {showConnectionViewHandle && onConnectionViewClick && (
+          <SpaceHossiiConnectionHandle
+            onClick={onConnectionViewClick}
+            active={connectionViewHandleActive}
+          />
         )}
       </div>
 
