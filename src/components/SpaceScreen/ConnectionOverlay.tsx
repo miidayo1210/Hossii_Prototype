@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { LayoutMode, ViewMode } from '../../core/utils/displayPrefsStorage';
 import type { PresentationMode } from '../../core/utils/presentationModeStorage';
 import type { HossiiConnection } from '../../core/types/hossiiConnection';
@@ -7,6 +7,7 @@ import {
   shouldShowConnectionOverlay,
 } from '../../core/utils/connectionVisibility';
 import { formatConnectionReasonDisplay } from '../../core/utils/formatConnectionReasonDisplay';
+import { clampConnectionReasonTooltipPosition } from '../../core/utils/connectionReasonTooltipPosition';
 import { getConnectionStrokeStyle } from '../../core/utils/connectionPath';
 import {
   useConnectionOverlayGeometry,
@@ -33,8 +34,8 @@ export type ConnectionOverlayProps = {
 };
 
 type ConnectionHoverPoint = {
-  x: number;
-  y: number;
+  clientX: number;
+  clientY: number;
 };
 
 type ConnectionHoverState = {
@@ -83,7 +84,7 @@ function ConnectionPathPair({
   const reportHover = useCallback(
     (clientX: number, clientY: number) => {
       if (hitPathsDisabled) return;
-      onHoverChange(connection.id, { x: clientX, y: clientY });
+      onHoverChange(connection.id, { clientX, clientY });
     },
     [connection.id, hitPathsDisabled, onHoverChange],
   );
@@ -147,7 +148,11 @@ export function ConnectionOverlay({
   onConnectionClick,
 }: ConnectionOverlayProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [hoverState, setHoverState] = useState<ConnectionHoverState | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(
+    null,
+  );
   const pathRegistryRef = useRef<Map<string, ConnectionPathRefs>>(new Map());
 
   const gateOpen = shouldShowConnectionOverlay({
@@ -168,7 +173,7 @@ export function ConnectionOverlay({
     });
   }, [gateOpen, connections, selectedBubbleId, activePaneId, visibleHossiiIds]);
 
-const effectiveHoverState =
+  const effectiveHoverState =
     hoverState != null &&
     !hitPathsDisabled &&
     visibleConnections.some((connection) => connection.id === hoverState.connectionId)
@@ -197,21 +202,36 @@ const effectiveHoverState =
         setHoverState(null);
         return;
       }
-      const overlayRect = overlayRef.current?.getBoundingClientRect();
-      if (!overlayRect) {
-        setHoverState(null);
-        return;
-      }
       setHoverState({
         connectionId,
-        point: {
-          x: point.x - overlayRect.left + 12,
-          y: point.y - overlayRect.top + 12,
-        },
+        point,
       });
     },
     [],
   );
+
+  useLayoutEffect(() => {
+    if (!reasonTooltipText || !effectiveHoverState || !overlayRef.current || !tooltipRef.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- measure tooltip size before clamping
+      setTooltipPosition(null);
+      return;
+    }
+
+    const overlayRect = overlayRef.current.getBoundingClientRect();
+    const tooltipRect = tooltipRef.current.getBoundingClientRect();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- measure tooltip size before clamping
+    setTooltipPosition(
+      clampConnectionReasonTooltipPosition({
+        clientX: effectiveHoverState.point.clientX,
+        clientY: effectiveHoverState.point.clientY,
+        overlayRect,
+        tooltipWidth: tooltipRect.width,
+        tooltipHeight: tooltipRect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      }),
+    );
+  }, [reasonTooltipText, effectiveHoverState]);
 
   const registerPathRefs = useCallback((connectionId: string, refs: ConnectionPathRefs | null) => {
     if (!refs) {
@@ -257,11 +277,13 @@ const effectiveHoverState =
       </svg>
       {reasonTooltipText && effectiveHoverState ? (
         <div
+          ref={tooltipRef}
           className={styles.reasonTooltip}
           data-connection-reason-tooltip
           style={{
-            left: effectiveHoverState.point.x,
-            top: effectiveHoverState.point.y,
+            left: tooltipPosition?.left ?? -9999,
+            top: tooltipPosition?.top ?? -9999,
+            visibility: tooltipPosition ? 'visible' : 'hidden',
           }}
         >
           {reasonTooltipText}
