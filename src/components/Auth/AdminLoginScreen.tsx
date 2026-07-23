@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { Mail, Lock, Building2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
 import type { AppUser } from '../../core/contexts/AuthContext';
+import {
+  normalizeAdminLoginEmail,
+  resolveAdminLoginErrorMessage,
+} from './adminLoginErrorMessage';
 import { AuthEntryShell } from './AuthEntryShell';
 import shell from './authEntryShell.module.css';
 import styles from './LoginScreen.module.css';
@@ -13,6 +17,15 @@ type ViewState = 'form' | 'pending' | 'rejected';
 type Props = {
   onLoginSuccess: (user: AppUser) => void;
 };
+
+function getSafeAdminLoginErrorLog(err: unknown): { name?: string; code?: string } {
+  if (typeof err !== 'object' || err === null) return {};
+  const record = err as { name?: unknown; code?: unknown };
+  return {
+    name: typeof record.name === 'string' ? record.name : undefined,
+    code: typeof record.code === 'string' ? record.code : undefined,
+  };
+}
 
 export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
   const { adminLogin, adminSignUp, logout } = useAuth();
@@ -60,11 +73,11 @@ export const AdminLoginScreen = ({ onLoginSuccess }: Props) => {
     setLoading(true);
 
     try {
-      const user = await adminLogin(email, password);
+      const user = await adminLogin(normalizeAdminLoginEmail(email), password);
       await handleUserCheck(user);
     } catch (err: unknown) {
-      console.error('Admin login error:', err);
-      setError('ログインに失敗しました。メールアドレスとパスワードをご確認ください。');
+      console.error('Admin login error', getSafeAdminLoginErrorLog(err));
+      setError(resolveAdminLoginErrorMessage(err));
     } finally {
       setLoading(false);
     }

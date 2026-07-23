@@ -20,6 +20,7 @@ import {
   loadStoredCommunityId,
   saveStoredCommunityId,
 } from '../utils/selectedCommunityStorage';
+import { AdminAccessDeniedError } from '../auth/adminAccessDeniedError';
 import { AuthContext } from './useAuth';
 
 export type AppUser = {
@@ -357,7 +358,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // コミュニティ未登録（申請すらしていない）の場合のみ throw
     // pending / rejected はそのまま返し、UI 側でハンドリング
     if (!appUser.isAdmin && !appUser.communityStatus) {
-      throw new Error('管理者権限がありません。コミュニティ登録が必要です。');
+      throw new AdminAccessDeniedError();
     }
     return appUser;
   }, []);
