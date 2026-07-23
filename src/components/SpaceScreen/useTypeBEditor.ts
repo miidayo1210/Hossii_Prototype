@@ -25,6 +25,10 @@ type StartCreateInput = {
   positionY: number;
 };
 
+function createTypeBIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
 type Action =
   | { type: 'reset' }
   | { type: 'startCreate'; input: StartCreateInput }
@@ -41,7 +45,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       return {
         phase: 'composing',
         originHossiiId: action.input.originHossiiId,
-        idempotencyKey: generateId(),
+        idempotencyKey: createTypeBIdempotencyKey(),
         newHossiiId: generateId(),
         positionX: action.input.positionX,
         positionY: action.input.positionY,
