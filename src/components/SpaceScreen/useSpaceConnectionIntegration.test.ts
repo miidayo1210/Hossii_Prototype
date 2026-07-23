@@ -320,6 +320,87 @@ describe('useSpaceConnectionIntegration', () => {
       expect(result.current.editor.phase).toBe('editing');
     });
 
+    describe('overlay click while editor has draft', () => {
+      const connectionA = makeConnection({
+        id: 'conn-a',
+        createdBy: 'admin-1',
+        sourceHossiiId: 'h1',
+        targetHossiiId: 'h3',
+      });
+      const connectionB = makeConnection({
+        id: 'conn-b',
+        createdBy: 'admin-1',
+        sourceHossiiId: 'h1',
+        targetHossiiId: 'h4',
+      });
+
+      it('ignores another connection click while editing', () => {
+        const options = makeOptions({
+          overlayInputs: makeOverlayInputs({ connections: [connectionA, connectionB] }),
+        });
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+        act(() => {
+          result.current.editor.startEdit(connectionA);
+          result.current.editor.chooseStrength('strong');
+        });
+
+        act(() => {
+          result.current.overlayProps.onConnectionClick?.(connectionB);
+        });
+
+        expect(result.current.editor.phase).toBe('editing');
+        expect(result.current.editor.editingConnection?.id).toBe('conn-a');
+        expect(result.current.editor.selectedStrength).toBe('strong');
+      });
+
+      it('ignores another connection click while in error phase', async () => {
+        mockedUpdate.mockResolvedValue({ ok: false, message: 'failed' });
+        const options = makeOptions({
+          overlayInputs: makeOverlayInputs({ connections: [connectionA, connectionB] }),
+        });
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+        act(() => {
+          result.current.editor.startEdit(connectionA);
+          result.current.editor.chooseStrength('strong');
+        });
+
+        await act(async () => {
+          await result.current.editor.submitSave();
+        });
+        expect(result.current.editor.phase).toBe('error');
+
+        act(() => {
+          result.current.overlayProps.onConnectionClick?.(connectionB);
+        });
+
+        expect(result.current.editor.phase).toBe('error');
+        expect(result.current.editor.editingConnection?.id).toBe('conn-a');
+        expect(result.current.editor.selectedStrength).toBe('strong');
+      });
+
+      it('allows selecting another connection after cancel', () => {
+        const options = makeOptions({
+          overlayInputs: makeOverlayInputs({ connections: [connectionA, connectionB] }),
+        });
+        const { result } = renderHook(() => useSpaceConnectionIntegration(options));
+
+        act(() => {
+          result.current.editor.startEdit(connectionA);
+          result.current.editor.cancel();
+        });
+        expect(result.current.editor.phase).toBe('idle');
+
+        act(() => {
+          result.current.overlayProps.onConnectionClick?.(connectionB);
+        });
+
+        expect(result.current.editor.phase).toBe('editing');
+        expect(result.current.editor.editingConnection?.id).toBe('conn-b');
+      });
+    });
+
     it('does not open editor for others connections as participant', () => {
       const othersConnection = makeConnection({ createdBy: 'user-2' });
       const options = makeOptions({

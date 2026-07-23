@@ -365,9 +365,11 @@ export function useSpaceConnectionIntegration({
   const handleConnectionOverlayClick = useCallback(
     (connection: HossiiConnection) => {
       if (!isConnectionsContextEnabled || !canEditConnection(connection)) return;
+      if (isEditorSaving) return;
+      if (editor.phase === 'editing' || editor.phase === 'error') return;
       editor.startEdit(connection);
     },
-    [isConnectionsContextEnabled, canEditConnection, editor],
+    [isConnectionsContextEnabled, canEditConnection, isEditorSaving, editor],
   );
 
   const openConnectionList = useCallback(() => {
