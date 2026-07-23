@@ -259,6 +259,59 @@ describe('createMembershipJoinController', () => {
       expect(statuses).toContain('none');
     });
 
+    it('retry は error 以外では no-op', async () => {
+      const { controller, join } = makeController();
+      controller.sync(input());
+      await flush();
+      expect(controller.getStatus()).toBe('active');
+      controller.retry(input());
+      await flush();
+      expect(join).toHaveBeenCalledTimes(1);
+    });
+
+    it('retry は none / joining では no-op', async () => {
+      const { controller, join } = makeController();
+      controller.retry(input());
+      expect(join).not.toHaveBeenCalled();
+
+      controller.sync(input({ isGuest: true }));
+      controller.retry(input({ isGuest: true }));
+      expect(join).not.toHaveBeenCalled();
+
+      let resolveJoin: (v: unknown) => void = () => {};
+      const slow = makeController(
+        () => new Promise((res) => { resolveJoin = res; }),
+      );
+      slow.controller.sync(input());
+      expect(slow.controller.getStatus()).toBe('joining');
+      slow.controller.retry(input());
+      expect(slow.join).toHaveBeenCalledTimes(1);
+      resolveJoin({ id: 'm1' });
+      await flush();
+    });
+
+    it('retry 連打でも in-flight は 1 本', async () => {
+      let resolveJoin: (v: unknown) => void = () => {};
+      let calls = 0;
+      const { controller, join } = makeController(async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('boom');
+        return new Promise((res) => { resolveJoin = res; });
+      });
+      controller.sync(input());
+      await flush();
+      expect(controller.getStatus()).toBe('error');
+      controller.retry(input());
+      controller.retry(input());
+      controller.retry(input());
+      expect(join).toHaveBeenCalledTimes(2);
+      expect(controller.getStatus()).toBe('joining');
+      resolveJoin({ id: 'm1' });
+      await flush();
+      expect(controller.getStatus()).toBe('active');
+      expect(join).toHaveBeenCalledTimes(2);
+    });
+
     it('同一 space で二重 join しない（active を維持）', async () => {
       const { controller, join, statuses } = makeController();
       controller.sync(input());

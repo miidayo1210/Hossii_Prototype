@@ -111,11 +111,8 @@ import {
 import { joinSpaceAsMember } from '../utils/spaceMembershipsApi';
 import { checkCanAccessSpace } from '../utils/spaceAccessApi';
 import {
-  createMembershipJoinController,
   resolveMembershipNickname,
   type ActiveSpaceMembershipStatus,
-  type MembershipJoinController,
-  type MembershipJoinInput,
 } from '../utils/membershipJoinController';
 import { fetchSpacePostAuthorDisplayNames } from '../utils/spacePostAuthorNamesApi';
 import {
@@ -139,6 +136,7 @@ import { resolveSpacesCommunityId } from '../utils/adminCommunityScope';
 import { HossiiContext } from './useHossiiStore';
 import { setHossiiEntitiesSnapshot } from './hossiiEntityStore';
 import { HossiiActionsContext } from './useHossiiActions';
+import { useActiveSpaceMembershipJoin } from './useActiveSpaceMembershipJoin';
 
 // createdAt を Date に正規化（Supabase から string で来ても対応）
 const normalizeHossii = (h: unknown, defaultSpaceId: SpaceId): Hossii => {
@@ -1162,55 +1160,31 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   // 影響させず、PII を出さずに console.error へ記録するだけにとどめる。
   // controller は React state を持たず購読もしないため、authorship のような dispose は不要
   // （StrictMode の二重 setup は controller 内の in-flight / lastSuccessKey で吸収する）。
-  const [activeSpaceMembershipStatus, setActiveSpaceMembershipStatus] =
-    useState<ActiveSpaceMembershipStatus>('idle');
-  const membershipJoinRef = useRef<MembershipJoinController | null>(null);
-  const membershipJoinInputRef = useRef<MembershipJoinInput | null>(null);
-  if (membershipJoinRef.current === null) {
-    membershipJoinRef.current = createMembershipJoinController({
-      join: (spaceId, nickname) => joinSpaceAsMember(spaceId, nickname),
-      onError: () => {
-        console.error('[HossiiStore] failed to register space membership');
-      },
-      onStatusChange: setActiveSpaceMembershipStatus,
-    });
-  }
+  const resolveMembershipNicknameForJoin = useCallback(
+    () =>
+      resolveMembershipNickname(
+        {
+          spaceNicknames: stateRef.current.spaceNicknames,
+          profileDefaultNickname: stateRef.current.profile?.defaultNickname,
+          username: currentUserRef.current?.username,
+          displayName: currentUserRef.current?.displayName,
+        },
+        stateRef.current.activeSpaceId,
+      ),
+    [],
+  );
 
-  useEffect(() => {
-    const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId);
-    const isPersonalSpace = activeSpace?.spaceType === 'personal';
-    const allowAutoJoin =
-      activeSpace?.accessMode !== 'invite_only' && !isPersonalSpace;
-
-    const membershipInput: MembershipJoinInput = {
+  const { activeSpaceMembershipStatus, retryActiveSpaceMembershipJoin } =
+    useActiveSpaceMembershipJoin({
       configured: isSupabaseConfigured,
       authReady: !isResolvingAuth,
       uid: currentUser?.uid ?? null,
-      spaceId: state.activeSpaceId || null,
-      // ログインアカウント（auth uid）が無い＝ゲスト。ゲストは membership を作らない。
+      activeSpaceId: state.activeSpaceId,
+      spaces: state.spaces,
       isGuest: !currentUser?.uid,
-      allowAutoJoin,
-      // nickname は既存 state / currentUser からのみ解決（追加 DB query なし）。取得失敗は null。
-      resolveNickname: () =>
-        resolveMembershipNickname(
-          {
-            spaceNicknames: stateRef.current.spaceNicknames,
-            profileDefaultNickname: stateRef.current.profile?.defaultNickname,
-            username: currentUserRef.current?.username,
-            displayName: currentUserRef.current?.displayName,
-          },
-          stateRef.current.activeSpaceId,
-        ),
-    };
-    membershipJoinInputRef.current = membershipInput;
-    membershipJoinRef.current?.sync(membershipInput);
-  }, [currentUser?.uid, state.activeSpaceId, state.spaces, isResolvingAuth]);
-
-  const retryActiveSpaceMembershipJoin = useCallback(() => {
-    const input = membershipJoinInputRef.current;
-    if (!input) return;
-    membershipJoinRef.current?.retry(input);
-  }, []);
+      resolveNickname: resolveMembershipNicknameForJoin,
+      join: joinSpaceAsMember,
+    });
 
   // ===== 投稿者の現在表示名マップ（Phase 2C）=====
   // 過去投稿に「現在のスペースニックネーム」を表示するため、space 単位で
