@@ -366,7 +366,15 @@ export function useSpaceConnectionIntegration({
     (connection: HossiiConnection) => {
       if (!isConnectionsContextEnabled || !canEditConnection(connection)) return;
       if (isEditorSaving) return;
-      if (editor.phase === 'editing' || editor.phase === 'error') return;
+      if (
+        editor.phase === 'editing' ||
+        editor.phase === 'error' ||
+        editor.phase === 'deleting' ||
+        editor.phase === 'pickingTarget' ||
+        editor.phase === 'pickingStrength'
+      ) {
+        return;
+      }
       editor.startEdit(connection);
     },
     [isConnectionsContextEnabled, canEditConnection, isEditorSaving, editor],
