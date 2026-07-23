@@ -28,8 +28,13 @@
   cursor: pointer;
 }
 
-.retryButton:hover {
+.retryButton:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.22);
+}
+
+.retryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {

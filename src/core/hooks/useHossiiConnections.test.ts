@@ -261,17 +261,55 @@ describe('useHossiiConnections', () => {
     });
   });
 
-  it('does not spam fetchError when repeated refetch fails', async () => {
+  it('ignores repeated refetch while fetch is in flight', async () => {
     fetchConnectionsMock
-      .mockResolvedValueOnce({ ok: true, connections: [connectionP1] })
-      .mockResolvedValue({ ok: false, message: 'network error' });
+      .mockResolvedValueOnce({ ok: false, message: 'network error' })
+      .mockImplementation(
+        () =>
+          new Promise(() => {
+            /* never resolves */
+          }),
+      );
 
     const { result } = renderHook(() =>
       useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled: true }),
     );
 
     await waitFor(() => {
-      expect(result.current.connections).toHaveLength(1);
+      expect(result.current.fetchError).toBe(true);
+      expect(result.current.isFetching).toBe(false);
+    });
+
+    act(() => {
+      result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isFetching).toBe(true);
+    });
+
+    act(() => {
+      result.current.refetch();
+      result.current.refetch();
+    });
+
+    expect(fetchConnectionsMock).toHaveBeenCalledTimes(2);
+    expect(result.current.isFetching).toBe(true);
+  });
+
+  it('allows retry again after refetch failure completes', async () => {
+    fetchConnectionsMock
+      .mockResolvedValueOnce({ ok: false, message: 'network error' })
+      .mockResolvedValueOnce({ ok: false, message: 'network error' })
+      .mockResolvedValueOnce({ ok: true, connections: [connectionP1] });
+
+    const { result } = renderHook(() =>
+      useHossiiConnections({ spaceId: 's1', paneId: 'p1', enabled: true }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.fetchError).toBe(true);
+      expect(result.current.isFetching).toBe(false);
     });
 
     act(() => {
@@ -280,19 +318,20 @@ describe('useHossiiConnections', () => {
 
     await waitFor(() => {
       expect(result.current.fetchError).toBe(true);
+      expect(result.current.isFetching).toBe(false);
     });
 
     act(() => {
       result.current.refetch();
-      result.current.refetch();
     });
 
     await waitFor(() => {
-      expect(fetchConnectionsMock.mock.calls.length).toBeGreaterThanOrEqual(3);
+      expect(result.current.fetchError).toBe(false);
+      expect(result.current.connections).toEqual([connectionP1]);
+      expect(result.current.isFetching).toBe(false);
     });
 
-    expect(result.current.fetchError).toBe(true);
-    expect(result.current.connections).toEqual([connectionP1]);
+    expect(fetchConnectionsMock).toHaveBeenCalledTimes(3);
   });
 
   it('does not clear connections during refetch before fetch resolves', async () => {
