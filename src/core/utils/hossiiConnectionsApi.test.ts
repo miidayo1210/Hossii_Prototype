@@ -378,7 +378,107 @@ describe('updateConnectionReason', () => {
       connectionId: 'c1',
       reasonEmoji: '❤️',
     });
+    expect(updateMock).toHaveBeenCalledWith({ reason_emoji: '❤️' });
     expect(res).toEqual({ ok: false, message: 'permission denied', code: '42501' });
+  });
+
+  it('text だけ更新 → emoji を payload に含めない', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: { ...baseRow, reason_text: '更新' },
+      error: null,
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await updateConnectionReason({ connectionId: 'c1', reasonText: '更新' });
+
+    expect(updateMock).toHaveBeenCalledWith({ reason_text: '更新' });
+    expect(updateMock.mock.calls[0]?.[0]).not.toHaveProperty('reason_emoji');
+  });
+
+  it('emoji だけ更新 → text を payload に含めない', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: { ...baseRow, reason_emoji: '❤️' },
+      error: null,
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await updateConnectionReason({ connectionId: 'c1', reasonEmoji: '❤️' });
+
+    expect(updateMock).toHaveBeenCalledWith({ reason_emoji: '❤️' });
+    expect(updateMock.mock.calls[0]?.[0]).not.toHaveProperty('reason_text');
+  });
+
+  it('text を null → text だけ clear', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: { ...baseRow, reason_text: null },
+      error: null,
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await updateConnectionReason({ connectionId: 'c1', reasonText: null });
+
+    expect(updateMock).toHaveBeenCalledWith({ reason_text: null });
+    expect(updateMock.mock.calls[0]?.[0]).not.toHaveProperty('reason_emoji');
+  });
+
+  it('emoji を null → emoji だけ clear', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: { ...baseRow, reason_emoji: null },
+      error: null,
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await updateConnectionReason({ connectionId: 'c1', reasonEmoji: null });
+
+    expect(updateMock).toHaveBeenCalledWith({ reason_emoji: null });
+    expect(updateMock.mock.calls[0]?.[0]).not.toHaveProperty('reason_text');
+  });
+
+  it('両方 null → 両方 clear', async () => {
+    const singleMock = vi.fn().mockResolvedValue({
+      data: { ...baseRow, reason_text: null, reason_emoji: null },
+      error: null,
+    });
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const eqMock = vi.fn(() => ({ select: selectMock }));
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await updateConnectionReason({
+      connectionId: 'c1',
+      reasonText: null,
+      reasonEmoji: null,
+    });
+
+    expect(updateMock).toHaveBeenCalledWith({
+      reason_text: null,
+      reason_emoji: null,
+    });
+  });
+
+  it('両方 undefined → API を呼ばず拒否', async () => {
+    const updateMock = vi.fn();
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    const res = await updateConnectionReason({ connectionId: 'c1' });
+
+    expect(res).toEqual({
+      ok: false,
+      message: 'reasonText or reasonEmoji is required',
+    });
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });
 

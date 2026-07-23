@@ -10,6 +10,7 @@ import {
   isHossiiConnectionReasonEmoji,
 } from '../types/hossiiConnection';
 import {
+  buildConnectionReasonUpdatePayload,
   hasConnectionReasonInput,
   normalizeConnectionReasonInput,
   toConnectionReasonDbPayload,
@@ -247,11 +248,7 @@ export async function updateConnectionReason(
   if (!input.connectionId) {
     return { ok: false, message: 'connectionId is required' };
   }
-  if (!hasConnectionReasonInput(input)) {
-    return { ok: false, message: 'reasonText or reasonEmoji is required' };
-  }
-
-  const reasonResult = buildReasonPayloadFromInput(input);
+  const reasonResult = buildConnectionReasonUpdatePayload(input);
   if (!reasonResult.ok) {
     return reasonResult;
   }

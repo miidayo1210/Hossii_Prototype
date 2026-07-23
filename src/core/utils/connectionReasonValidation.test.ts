@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HOSSII_CONNECTION_REASON_EMOJIS } from '../types/hossiiConnection';
 import {
   MAX_CONNECTION_REASON_TEXT_LENGTH,
+  buildConnectionReasonUpdatePayload,
   normalizeConnectionReasonInput,
 } from './connectionReasonValidation';
 
@@ -69,6 +70,52 @@ describe('normalizeConnectionReasonInput', () => {
     ).toEqual({
       ok: true,
       value: { reasonText: 'つながり', reasonEmoji: '💡' },
+    });
+  });
+});
+
+describe('buildConnectionReasonUpdatePayload', () => {
+  it('text だけ更新 → emoji を payload に含めない', () => {
+    expect(buildConnectionReasonUpdatePayload({ reasonText: '更新' })).toEqual({
+      ok: true,
+      payload: { reason_text: '更新' },
+    });
+  });
+
+  it('emoji だけ更新 → text を payload に含めない', () => {
+    expect(buildConnectionReasonUpdatePayload({ reasonEmoji: '❤️' })).toEqual({
+      ok: true,
+      payload: { reason_emoji: '❤️' },
+    });
+  });
+
+  it('text を null → text だけ clear', () => {
+    expect(buildConnectionReasonUpdatePayload({ reasonText: null })).toEqual({
+      ok: true,
+      payload: { reason_text: null },
+    });
+  });
+
+  it('emoji を null → emoji だけ clear', () => {
+    expect(buildConnectionReasonUpdatePayload({ reasonEmoji: null })).toEqual({
+      ok: true,
+      payload: { reason_emoji: null },
+    });
+  });
+
+  it('両方 null → 両方 clear', () => {
+    expect(
+      buildConnectionReasonUpdatePayload({ reasonText: null, reasonEmoji: null }),
+    ).toEqual({
+      ok: true,
+      payload: { reason_text: null, reason_emoji: null },
+    });
+  });
+
+  it('両方 undefined → 拒否', () => {
+    expect(buildConnectionReasonUpdatePayload({})).toEqual({
+      ok: false,
+      message: 'reasonText or reasonEmoji is required',
     });
   });
 });

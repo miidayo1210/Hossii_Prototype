@@ -78,3 +78,55 @@ export function toConnectionReasonDbPayload(
     reason_emoji: value.reasonEmoji,
   };
 }
+
+export type ConnectionReasonUpdatePayload = {
+  reason_text?: string | null;
+  reason_emoji?: string | null;
+};
+
+/**
+ * updateConnectionReason 用の partial payload。
+ * undefined = 列を payload に含めない / null = 明示クリア / 値あり = その列のみ更新。
+ */
+export function buildConnectionReasonUpdatePayload(
+  input: ConnectionReasonInput,
+):
+  | { ok: true; payload: ConnectionReasonUpdatePayload }
+  | { ok: false; message: string } {
+  if (!hasConnectionReasonInput(input)) {
+    return { ok: false, message: 'reasonText or reasonEmoji is required' };
+  }
+
+  const payload: ConnectionReasonUpdatePayload = {};
+
+  if (input.reasonText !== undefined) {
+    if (input.reasonText === null) {
+      payload.reason_text = null;
+    } else {
+      const trimmed = input.reasonText.trim();
+      if (trimmed === '') {
+        payload.reason_text = null;
+      } else {
+        if (trimmed.length > MAX_CONNECTION_REASON_TEXT_LENGTH) {
+          return { ok: false, message: 'reason text must be at most 50 characters' };
+        }
+        if (NEWLINE_PATTERN.test(trimmed)) {
+          return { ok: false, message: 'reason text must not contain newlines' };
+        }
+        payload.reason_text = trimmed;
+      }
+    }
+  }
+
+  if (input.reasonEmoji !== undefined) {
+    if (input.reasonEmoji === null) {
+      payload.reason_emoji = null;
+    } else if (!isHossiiConnectionReasonEmoji(input.reasonEmoji)) {
+      return { ok: false, message: 'invalid connection reason emoji' };
+    } else {
+      payload.reason_emoji = input.reasonEmoji;
+    }
+  }
+
+  return { ok: true, payload };
+}
