@@ -15,6 +15,8 @@ import { HossiiFullTextPopover } from './HossiiFullTextPopover';
 import { PinButton } from './PinButton';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
+import { collectHossiiDisplayTags } from '../../core/utils/hossiiDisplayTags';
+import { HossiiDisplayTagRow } from './HossiiDisplayTagRow';
 import styles from './StarView.module.css';
 
 type Props = {
@@ -111,6 +113,7 @@ function StarViewInner({
 
   const fullText = getHossiiBubbleFullText(hossii);
   const previewText = fullText ? truncateStarPreviewText(fullText) : null;
+  const hasDisplayTags = collectHossiiDisplayTags(hossii).length > 0;
   const depthScale = resolveStarDotDepthScale(timelineDepthActive, displayIndex);
   const starDotStyle =
     depthScale === 1
@@ -255,7 +258,7 @@ function StarViewInner({
         {isLaughter && <span className={styles.laughterBadge}>😂</span>}
       </button>
 
-      {showPreview && (previewText || hossii.imageUrl || hossii.authorName) && (
+      {showPreview && (previewText || hossii.imageUrl || hossii.authorName || hasDisplayTags) && (
         <div
           ref={previewBubbleRef}
           className={[
@@ -289,6 +292,15 @@ function StarViewInner({
               <PostedNameLabel name={authorDisplay.postedNameLabel} />
             </span>
           )}
+          <HossiiDisplayTagRow
+            tags={hossii.tags}
+            hashtags={hossii.hashtags}
+            className={styles.previewTags}
+            tagClassName={styles.previewTag}
+            presetClassName={styles.previewTagPreset}
+            freeClassName={styles.previewTagFree}
+            moreClassName={styles.previewTagMore}
+          />
           {showPinUi && onPinToggle && (
             <PinButton
               className={styles.previewPinButton}

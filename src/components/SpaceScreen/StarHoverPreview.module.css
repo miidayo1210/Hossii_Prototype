@@ -95,6 +95,55 @@
   font-weight: 600;
 }
 
+/* タグ行: あるときだけ描画。操作対象にしない */
+.previewTags {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  justify-content: center;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+  pointer-events: none;
+}
+
+.previewTag {
+  display: inline-block;
+  font-size: 0.5625rem;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 0.05rem 0.3rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 6rem;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.previewTagPreset {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+
+.previewTagFree {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.previewTagMore {
+  font-size: 0.5625rem;
+  color: #6d28d9;
+  opacity: 0.7;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card {
     animation: hoverFadeIn 120ms ease both;
