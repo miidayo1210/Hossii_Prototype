@@ -75,6 +75,24 @@ describe('AdminLoginScreen', () => {
     expect(await screen.findByText(ADMIN_LOGIN_ERROR_MESSAGES.adminAccessDenied)).toBeTruthy();
   });
 
+  it('allows retry after admin access denied', async () => {
+    h.adminLogin
+      .mockRejectedValueOnce(new AdminAccessDeniedError())
+      .mockResolvedValueOnce({
+        uid: 'admin-1',
+        email: 'admin@example.test',
+        displayName: 'Admin',
+        isAdmin: true,
+      });
+
+    render(<AdminLoginScreen onLoginSuccess={h.onLoginSuccess} />);
+    await submitLogin('user@example.test', 'secret');
+    expect(await screen.findByText(ADMIN_LOGIN_ERROR_MESSAGES.adminAccessDenied)).toBeTruthy();
+
+    await submitLogin('admin@example.test', 'secret');
+    await waitFor(() => expect(h.onLoginSuccess).toHaveBeenCalled());
+  });
+
   it('shows network error message', async () => {
     h.adminLogin.mockRejectedValue(new Error('Failed to fetch'));
 

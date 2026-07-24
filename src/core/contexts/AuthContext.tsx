@@ -21,6 +21,7 @@ import {
   saveStoredCommunityId,
 } from '../utils/selectedCommunityStorage';
 import { AdminAccessDeniedError } from '../auth/adminAccessDeniedError';
+import { revokeSessionAfterAdminAccessDenied } from '../auth/adminLoginFlow';
 import { AuthContext } from './useAuth';
 
 export type AppUser = {
@@ -358,6 +359,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // コミュニティ未登録（申請すらしていない）の場合のみ throw
     // pending / rejected はそのまま返し、UI 側でハンドリング
     if (!appUser.isAdmin && !appUser.communityStatus) {
+      await revokeSessionAfterAdminAccessDenied({
+        signOut: () => supabase.auth.signOut({ scope: 'local' }),
+        clearStoredCommunityId,
+        clearCurrentUser: () => setCurrentUser(null),
+        logSignOutFailure: (error) => {
+          console.error('[AuthContext] adminLogin signOut after access denied failed', error);
+        },
+      });
       throw new AdminAccessDeniedError();
     }
     return appUser;
