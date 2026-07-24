@@ -294,8 +294,9 @@ export function LogListBody({
     if (selectedTags.length > 0) {
       const raw = selectedTags.map((t) => t.replace(/^#/, ''));
       result = result.filter((h) => {
-        const searchIn = h.tags ?? h.hashtags;
-        return raw.some((t) => searchIn?.includes(t));
+        // tags が []（DB default）でも hashtags を落とさないよう和集合で判定
+        const searchIn = [...(h.tags ?? []), ...(h.hashtags ?? [])];
+        return raw.some((t) => searchIn.includes(t));
       });
     }
     return result;

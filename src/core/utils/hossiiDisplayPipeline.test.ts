@@ -48,6 +48,21 @@ describe('runDisplayPipeline', () => {
     expect(result.filteredIds).toEqual(['a']);
   });
 
+  it('matches hashtags when tags is an empty array (DB default)', () => {
+    const hossiis = [
+      makeHossii('a', { tags: [], hashtags: ['idea'] }),
+      makeHossii('b', { tags: [], hashtags: ['other'] }),
+    ];
+    const result = runDisplayPipeline({
+      hossiis,
+      displayPeriod: 'all',
+      displayLimit: 50,
+      viewMode: 'full',
+      activeTagFilter: 'idea',
+    });
+    expect(result.filteredIds).toEqual(['a']);
+  });
+
   it('breaks ties by id DESC when createdAt is equal', () => {
     const same = new Date('2026-06-01T10:00:00.000Z');
     const hossiis = [

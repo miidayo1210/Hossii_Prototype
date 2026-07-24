@@ -75,10 +75,10 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
         }
         if (selectedTags.length > 0) {
           // OR 条件: 選択タグのいずれかを含む投稿のみ
-          // tags（プリセット選択）を優先し、未設定の場合は hashtags にフォールバック（移行期対応）
+          // tags / hashtags の和集合（tags が [] のときも hashtags を維持）
           const raw = selectedTags.map((t) => t.replace(/^#/, ''));
-          const searchIn = h.tags ?? h.hashtags;
-          const hasTag = raw.some((t) => searchIn?.includes(t));
+          const searchIn = [...(h.tags ?? []), ...(h.hashtags ?? [])];
+          const hasTag = raw.some((t) => searchIn.includes(t));
           if (!hasTag) return false;
         }
         return true;
