@@ -57,6 +57,7 @@ import {
   shouldResetSlugHandlingOnAuthRestore,
   type SlugFetchOutcome,
 } from './core/utils/slugUrlResolution';
+import { shouldBlockAdminLoginScreen } from './core/auth/adminLoginFlow';
 import { canEnterSpaceAsGuest } from './core/utils/guestParticipation';
 
 // /c/.../s/... および /s/... の URL スラッグ: 英数字の塊をハイフンでつなぐだけにし、末尾・連続ハイフンを禁止
@@ -78,7 +79,7 @@ const authResolvingScreenStyle = {
 } as const;
 
 const AppContent = () => {
-  const { currentUser, isResolvingAuth, logout } = useAuth();
+  const { currentUser, isResolvingAuth, logout, loading } = useAuth();
   const { screen, screenParam, navigate } = useRouter();
   const { memberships } = useSelectedCommunity();
   const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
@@ -506,7 +507,7 @@ const AppContent = () => {
   // /admin/login パスの場合: 管理者ログイン画面を表示
   if (appRoute === 'admin-login') {
     // ログイン済み管理者は useEffect で自動遷移するまでローディング表示
-    if (currentUser?.isAdmin || isResolvingAuth) {
+    if (shouldBlockAdminLoginScreen(loading, currentUser)) {
       return (
         <div style={{
           minHeight: '100dvh',
