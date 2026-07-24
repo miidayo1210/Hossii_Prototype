@@ -24,7 +24,7 @@ describe('computeTypeBNearOriginPlacement', () => {
       existingPositions: [origin],
     });
 
-    expect(result.positionX).toBeCloseTo(62, 5);
+    expect(result.positionX).toBeCloseTo(57, 5);
     expect(result.positionY).toBeCloseTo(50, 5);
     expectWithinBounds(result.positionX, result.positionY);
   });
@@ -64,14 +64,14 @@ describe('computeTypeBNearOriginPlacement', () => {
 
   it('uses the next angle when the first right candidate collides', () => {
     const origin = { x: 50, y: 50 };
-    const blocker = { x: 62, y: 50 };
+    const blocker = { x: 57, y: 50 };
     const result = computeTypeBNearOriginPlacement({
       origin,
       existingPositions: [origin, blocker],
       minimumDistance: MIN,
     });
 
-    expect(result.positionX).not.toBeCloseTo(62, 5);
+    expect(result.positionX).not.toBeCloseTo(57, 5);
     expect(
       typeBPlacementCollides(
         { x: result.positionX, y: result.positionY },
@@ -132,7 +132,7 @@ describe('computeTypeBNearOriginPlacement', () => {
     for (const testCase of cases) {
       const result = computeTypeBNearOriginPlacement({
         origin: testCase.origin,
-        existingPositions: [testCase.origin, { x: 62, y: 50 }, { x: 50, y: 62 }],
+        existingPositions: [testCase.origin, { x: 57, y: 50 }, { x: 50, y: 57 }],
         margin: testCase.margin,
       });
       expectWithinBounds(result.positionX, result.positionY, testCase.margin);

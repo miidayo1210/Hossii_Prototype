@@ -24,7 +24,8 @@ export type TypeBNearOriginPlacementResult = {
   positionY: number;
 };
 
-export const TYPE_B_PLACEMENT_DEFAULT_MIN_DISTANCE = 12;
+/** 起点 center から新規 center までの第一候補距離（%）。旧 12 は視覚的に遠すぎたため縮小。 */
+export const TYPE_B_PLACEMENT_DEFAULT_MIN_DISTANCE = 7;
 export const TYPE_B_PLACEMENT_DEFAULT_BOUNDS: TypeBPlacementBounds = { min: 0, max: 100 };
 export const TYPE_B_PLACEMENT_DEFAULT_MARGIN = 0;
 
@@ -33,7 +34,7 @@ export const TYPE_B_PLACEMENT_ANGLE_CANDIDATES_DEG = [
   0, 45, 90, 135, 180, 225, 270, 315,
 ] as const;
 
-const RADIUS_STEP = 4;
+const RADIUS_STEP = 2;
 const MAX_RADIUS_STEPS = 24;
 
 function degToRad(deg: number): number {
