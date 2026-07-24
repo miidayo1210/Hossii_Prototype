@@ -519,12 +519,16 @@ export function BubbleInner({
   const animationDelay = `${(index % 8) * 0.5}s`;
   const animationDuration = `${4 + (index % 3)}s`;
 
-  // フッターメタの表示制御（bubble モードでは非表示）
-  const hashtags = hossii.hashtags ?? [];
+  // プリセット tags と自由入力 hashtags を合わせて表示（重複除去）
+  const displayTags = Array.from(
+    new Set([...(hossii.tags ?? []), ...(hossii.hashtags ?? [])]),
+  );
   const MAX_VISIBLE_TAGS = 2;
-  const visibleTags = hashtags.slice(0, MAX_VISIBLE_TAGS);
-  const extraTagCount = hashtags.length - MAX_VISIBLE_TAGS;
-  const showFooterMeta = viewMode !== 'bubble' && !isCanvasPost;
+  const visibleTags = displayTags.slice(0, MAX_VISIBLE_TAGS);
+  const extraTagCount = displayTags.length - MAX_VISIBLE_TAGS;
+  // full 等: 時刻+タグ。bubble: タグがあるときだけタグ行を出す（時刻は出さない＝コンパクト維持）
+  const showFooterMeta =
+    !isCanvasPost && (viewMode !== 'bubble' || displayTags.length > 0);
 
   const bubbleStyle: React.CSSProperties & {
     '--bubble-stack'?: number;
@@ -845,10 +849,12 @@ export function BubbleInner({
         )}
       </div>
 
-      {/* フッターメタ行: 時刻 + タグ（bubble モード以外） */}
+      {/* フッターメタ行: full 等は時刻+タグ / bubble はタグのみ（タグ0件なら非表示） */}
       {showFooterMeta && (
         <div className={styles.bubbleFooterMeta}>
-          <span className={styles.bubbleTimeText}>{relativeTime}</span>
+          {viewMode !== 'bubble' && (
+            <span className={styles.bubbleTimeText}>{relativeTime}</span>
+          )}
           {visibleTags.map((tag) => (
             <span key={tag} className={styles.bubbleHashtag}>#{tag}</span>
           ))}

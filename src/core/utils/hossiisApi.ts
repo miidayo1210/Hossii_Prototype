@@ -47,8 +47,8 @@ export type HossiiRow = {
   content_edited_at?: string | null;
 };
 
-/** INSERT 用。未マイグレーション列（tags / post_kind）は含めない */
-export type HossiiInsertRow = Omit<HossiiRow, 'created_at' | 'post_kind' | 'tags'> & {
+/** INSERT 用。post_kind は未マイグレーション環境があるため含めない */
+export type HossiiInsertRow = Omit<HossiiRow, 'created_at' | 'post_kind'> & {
   created_at: string;
   space_pane_id?: string | null;
 };
@@ -98,8 +98,9 @@ export function rowToHossii(row: HossiiRow): Hossii {
     logType: row.log_type as Hossii['logType'] ?? undefined,
     createdAt: new Date(row.created_at),
     bubbleColor: row.bubble_color ?? undefined,
-    hashtags: row.hashtags ?? undefined,
-    tags: row.tags ?? undefined,
+    // jsonb 等の非配列値が来ても spread / .includes で落とさない（normalizeHossii と同方針）
+    hashtags: Array.isArray(row.hashtags) ? row.hashtags : undefined,
+    tags: Array.isArray(row.tags) ? row.tags : undefined,
     imageUrl: row.image_url ?? undefined,
     positionX: row.position_x ?? undefined,
     positionY: row.position_y ?? undefined,
@@ -135,6 +136,7 @@ function hossiiToInsertRow(hossii: Hossii): HossiiInsertRow {
     created_at: hossii.createdAt.toISOString(),
     bubble_color: hossii.bubbleColor ?? null,
     hashtags: hossii.hashtags ?? null,
+    tags: hossii.tags ?? null,
     image_url: hossii.imageUrl ?? null,
     position_x: hossii.positionX ?? null,
     position_y: hossii.positionY ?? null,
@@ -150,8 +152,6 @@ function hossiiToInsertRow(hossii: Hossii): HossiiInsertRow {
   if (hossii.spacePaneId != null) {
     row.space_pane_id = hossii.spacePaneId;
   }
-
-  // preset tags (T02): hossiis.tags 列は未マイグレーションのため INSERT では送らない
 
   return row;
 }

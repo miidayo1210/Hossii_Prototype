@@ -82,3 +82,25 @@ describe('rowToHossii Phase 2D-1 fields', () => {
     expect(h.contentEditedAt).toBeNull();
   });
 });
+
+describe('rowToHossii tags / hashtags', () => {
+  it('maps array tags and hashtags', () => {
+    const h = rowToHossii({
+      ...baseRow,
+      tags: ['質問'],
+      hashtags: ['free'],
+    });
+    expect(h.tags).toEqual(['質問']);
+    expect(h.hashtags).toEqual(['free']);
+  });
+
+  it('drops non-array tags/hashtags (e.g. unexpected jsonb object)', () => {
+    const h = rowToHossii({
+      ...baseRow,
+      tags: { bad: true } as unknown as string[],
+      hashtags: 'not-an-array' as unknown as string[],
+    });
+    expect(h.tags).toBeUndefined();
+    expect(h.hashtags).toBeUndefined();
+  });
+});

@@ -22,6 +22,8 @@ import { HossiiFullTextPopover } from './HossiiFullTextPopover';
 import { PinButton } from './PinButton';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
+import { collectHossiiDisplayTags } from '../../core/utils/hossiiDisplayTags';
+import { HossiiDisplayTagRow } from './HossiiDisplayTagRow';
 import styles from './StarView.module.css';
 
 type Props = {
@@ -124,8 +126,9 @@ function StarViewInner({
 
   const fullText = getHossiiBubbleFullText(hossii);
   const previewText = fullText ? truncateStarPreviewText(fullText) : null;
+  const hasDisplayTags = collectHossiiDisplayTags(hossii).length > 0;
   const hasPreviewContent = Boolean(
-    previewText || hossii.imageUrl || hossii.authorName || previewDateLabel,
+    previewText || hossii.imageUrl || hossii.authorName || previewDateLabel || hasDisplayTags,
   );
   /** SP横: 親のローテ選択に依存せず常時インライン表示 */
   const isPreviewVisible =
@@ -326,6 +329,15 @@ function StarViewInner({
               <PostedNameLabel name={authorDisplay.postedNameLabel} />
             </span>
           )}
+          <HossiiDisplayTagRow
+            tags={hossii.tags}
+            hashtags={hossii.hashtags}
+            className={styles.previewTags}
+            tagClassName={styles.previewTag}
+            presetClassName={styles.previewTagPreset}
+            freeClassName={styles.previewTagFree}
+            moreClassName={styles.previewTagMore}
+          />
           {showPinUi && onPinToggle && (
             <PinButton
               className={styles.previewPinButton}
