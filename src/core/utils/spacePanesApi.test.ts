@@ -52,9 +52,14 @@ describe('buildHossiiInsertPayload', () => {
     expect(payload.space_pane_id).toBe(paneId);
   });
 
-  it('omits tags because hossiis.tags column is not migrated', () => {
+  it('includes tags for preset tag persistence', () => {
     const payload = buildHossiiInsertPayload({ ...baseHossii, tags: ['preset-a'] });
-    expect(payload).not.toHaveProperty('tags');
+    expect(payload.tags).toEqual(['preset-a']);
+  });
+
+  it('sends null tags when unset (aligned with hashtags)', () => {
+    const payload = buildHossiiInsertPayload(baseHossii);
+    expect(payload.tags).toBeNull();
   });
 });
 
