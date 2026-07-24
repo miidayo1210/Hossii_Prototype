@@ -98,8 +98,9 @@ export function rowToHossii(row: HossiiRow): Hossii {
     logType: row.log_type as Hossii['logType'] ?? undefined,
     createdAt: new Date(row.created_at),
     bubbleColor: row.bubble_color ?? undefined,
-    hashtags: row.hashtags ?? undefined,
-    tags: row.tags ?? undefined,
+    // jsonb 等の非配列値が来ても spread / .includes で落とさない（normalizeHossii と同方針）
+    hashtags: Array.isArray(row.hashtags) ? row.hashtags : undefined,
+    tags: Array.isArray(row.tags) ? row.tags : undefined,
     imageUrl: row.image_url ?? undefined,
     positionX: row.position_x ?? undefined,
     positionY: row.position_y ?? undefined,
