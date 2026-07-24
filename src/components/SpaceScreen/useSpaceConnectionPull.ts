@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import type { RefObject } from 'react';
+import type { RefObject, PointerEvent as ReactPointerEvent } from 'react';
 import type { HossiiConnection } from '../../core/types/hossiiConnection';
 import {
   buildDirectPeerTwoHopStarCounts,
@@ -184,6 +184,15 @@ export function useSpaceConnectionPull({
     enabled: pullEnabled,
   });
 
+  const pullHandlers = useMemo(
+    () => ({
+      onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+        syncBubbleRefs();
+        handlers.onPointerDown(event);
+      },
+    }),
+    [handlers, syncBubbleRefs],
+  );
 
   useLayoutEffect(() => {
     if (isPulling) {
@@ -222,7 +231,7 @@ export function useSpaceConnectionPull({
     isPulling,
     pullEnabled,
     pullHandleVisible,
-    handlers,
+    handlers: pullHandlers,
     starParticleCount,
     directPeerIds,
     twoHopPeerCount,

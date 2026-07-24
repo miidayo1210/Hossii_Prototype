@@ -694,7 +694,8 @@
 .bubblePinButton {
   position: absolute;
   top: 6px;
-  right: 6px;
+  left: 6px;
+  right: auto;
   z-index: 25;
 }
 
@@ -1416,8 +1417,7 @@
     );
   }
 
-  .bubbleLandscapeClamp[data-connection-pull-source='true']:hover,
-  .bubbleLandscapeClamp[data-connection-pull-peer='true']:hover {
+  .bubbleLandscapeClamp[data-connection-pull-source='true']:hover {
     transform: translate(
       calc(var(--bubble-clamp-x, 0px) + var(--pull-x, 0px)),
       calc(var(--bubble-clamp-y, 0px) + var(--pull-y, 0px))

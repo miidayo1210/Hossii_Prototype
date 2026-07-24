@@ -421,7 +421,7 @@ export function BubbleInner({
       }
     };
 
-    const onPointerUp = () => {
+    const finishPointerInteraction = () => {
       if (!dragStateRef.current) return;
       const { mode, moved } = dragStateRef.current;
 
@@ -453,10 +453,12 @@ export function BubbleInner({
     };
 
     document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('pointerup', finishPointerInteraction);
+    document.addEventListener('pointercancel', finishPointerInteraction);
     return () => {
       document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointerup', finishPointerInteraction);
+      document.removeEventListener('pointercancel', finishPointerInteraction);
     };
   }, [hossii.id, onBubbleDragStateChange]);
 

@@ -210,6 +210,48 @@ describe('useSpaceConnectionPull', () => {
     expect(resizing.current.pullEnabled).toBe(false);
   });
 
+  it('re-syncs bubble refs at pull start when DOM nodes mount after selection', async () => {
+    const { area, source, peer } = setupBubbleArea();
+    source.remove();
+    peer.remove();
+    const bubbleAreaRef = { current: area };
+
+    const { result } = renderHook(() =>
+      useSpaceConnectionPull({
+        bubbleAreaRef,
+        connections,
+        selectedBubbleId: 'h1',
+        activePaneId: 'pane-a',
+        visibleHossiiIds: new Set(['h1', 'h2', 'h3']),
+        isConnectionsContextEnabled: true,
+        editorPhase: 'idle',
+        bubbleInteractionLock: { isDragging: false, isResizing: false },
+      }),
+    );
+
+    area.append(source, peer);
+
+    act(() => {
+      result.current.handlers.onPointerDown({
+        button: 0,
+        pointerId: 11,
+        pointerType: 'mouse',
+        clientX: 0,
+        clientY: 0,
+        currentTarget: source,
+        preventDefault: vi.fn(),
+      } as unknown as React.PointerEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.pointerMove(document, { clientX: 80, clientY: 0, pointerId: 11 });
+    });
+    await flushAnimationFrame();
+
+    expect(Number.parseFloat(source.style.getPropertyValue('--pull-x'))).toBeGreaterThan(0);
+    expect(Number.parseFloat(peer.style.getPropertyValue('--connected-shift-x'))).toBeGreaterThan(0);
+  });
+
   it('clamps pull distance and connected shift during pull', async () => {
     const { area, source, peer } = setupBubbleArea();
     const bubbleAreaRef = { current: area };
