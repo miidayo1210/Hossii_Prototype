@@ -58,8 +58,8 @@ export type Hossii = {
   hashtags?: string[];
   // T02: 投稿タグ（プリセットから選択）
   //   スペースの preset_tags から選択して付与するタグ。
-  //   保存先は hossiis テーブルの tags カラム（jsonb）。
-  //   ログ一覧フィルタリングの実際の対象になる。
+  //   保存先は hossiis テーブルの tags カラム（text[]。hashtags と同型）。
+  //   投稿 INSERT での永続化は別タスク。
   tags?: string[];
   // F10: 画像投稿
   imageUrl?: string;
