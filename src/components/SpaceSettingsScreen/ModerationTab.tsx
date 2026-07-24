@@ -284,16 +284,18 @@ export const ModerationTab = ({ spaceId, space }: Props) => {
                     </span>
                     {((hossii.tags?.length ?? 0) > 0 || (hossii.hashtags?.length ?? 0) > 0) && (
                       <div className={styles.rowTagChips}>
-                        {hossii.tags?.map((tag) => (
+                        {(hossii.tags ?? []).map((tag) => (
                           <span key={`t-${tag}`} className={`${styles.rowTagChip} ${styles.rowTagChipPreset}`}>
                             #{tag}
                           </span>
                         ))}
-                        {hossii.hashtags?.map((tag) => (
-                          <span key={`h-${tag}`} className={`${styles.rowTagChip} ${styles.rowTagChipFree}`}>
-                            #{tag}
-                          </span>
-                        ))}
+                        {(hossii.hashtags ?? [])
+                          .filter((tag) => !(hossii.tags ?? []).includes(tag))
+                          .map((tag) => (
+                            <span key={`h-${tag}`} className={`${styles.rowTagChip} ${styles.rowTagChipFree}`}>
+                              #{tag}
+                            </span>
+                          ))}
                       </div>
                     )}
                   </td>

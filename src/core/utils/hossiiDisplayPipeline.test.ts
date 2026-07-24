@@ -63,6 +63,21 @@ describe('runDisplayPipeline', () => {
     expect(result.filteredIds).toEqual(['a']);
   });
 
+  it('matches tags when tags is set and hashtags is null/undefined', () => {
+    const hossiis = [
+      makeHossii('a', { tags: ['質問'], hashtags: undefined }),
+      makeHossii('b', { tags: undefined, hashtags: undefined }),
+    ];
+    const result = runDisplayPipeline({
+      hossiis,
+      displayPeriod: 'all',
+      displayLimit: 50,
+      viewMode: 'full',
+      activeTagFilter: '質問',
+    });
+    expect(result.filteredIds).toEqual(['a']);
+  });
+
   it('breaks ties by id DESC when createdAt is equal', () => {
     const same = new Date('2026-06-01T10:00:00.000Z');
     const hossiis = [

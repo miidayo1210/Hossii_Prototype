@@ -505,7 +505,7 @@ export function LogListBody({
                     )}
                     {((hossii.tags?.length ?? 0) > 0 || (hossii.hashtags?.length ?? 0) > 0) && (
                       <div className={styles.cardTags}>
-                        {hossii.tags?.map((tag) => (
+                        {(hossii.tags ?? []).map((tag) => (
                           <span
                             key={`t-${tag}`}
                             className={`${styles.cardTag} ${styles.cardTagPreset}`}
@@ -513,14 +513,16 @@ export function LogListBody({
                             #{tag}
                           </span>
                         ))}
-                        {hossii.hashtags?.map((tag) => (
-                          <span
-                            key={`h-${tag}`}
-                            className={`${styles.cardTag} ${styles.cardTagFree}`}
-                          >
-                            #{tag}
-                          </span>
-                        ))}
+                        {(hossii.hashtags ?? [])
+                          .filter((tag) => !(hossii.tags ?? []).includes(tag))
+                          .map((tag) => (
+                            <span
+                              key={`h-${tag}`}
+                              className={`${styles.cardTag} ${styles.cardTagFree}`}
+                            >
+                              #{tag}
+                            </span>
+                          ))}
                       </div>
                     )}
                     <div className={styles.meta}>
