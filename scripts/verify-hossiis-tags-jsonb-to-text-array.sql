@@ -1,0 +1,17 @@
+-- Companion notes for jsonb → text[] tags conversion verification.
+-- Executable harness: scripts/verify-hossiis-tags-jsonb-to-text-array.py
+-- Migration under test: supabase/migrations/20260724210000_convert_hossiis_tags_jsonb_to_text_array.sql
+--
+-- Part A (Development / already text[]):
+--   Re-applying the migration must leave udt=_text and row counts unchanged.
+--
+-- Part B (TEMP jsonb reproduction — no Production data copy):
+--   NULL → NULL
+--   [] → {}
+--   string arrays (incl. Japanese, duplicates) keep order
+--   non-array jsonb / non-string elements → refuse (EXCEPTION)
+--   already text[] → no-op (DEFAULT align only)
+--
+-- Run:
+--   node scripts/check-supabase-target.mjs development
+--   python3 scripts/verify-hossiis-tags-jsonb-to-text-array.py
