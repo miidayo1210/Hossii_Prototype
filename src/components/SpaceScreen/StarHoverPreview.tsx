@@ -3,6 +3,7 @@ import type { Hossii } from '../../core/types';
 import { EMOJI_BY_EMOTION } from '../../core/assets/emotions';
 import { getHossiiBubbleFullText } from '../../core/utils/bubbleTextTruncation';
 import { PinButton } from './PinButton';
+import { HossiiDisplayTagRow } from './HossiiDisplayTagRow';
 import styles from './StarHoverPreview.module.css';
 
 type Props = {
@@ -67,6 +68,15 @@ export function StarHoverPreview({
         )}
         <span className={styles.author}>{author}</span>
       </span>
+      <HossiiDisplayTagRow
+        tags={hossii.tags}
+        hashtags={hossii.hashtags}
+        className={styles.previewTags}
+        tagClassName={styles.previewTag}
+        presetClassName={styles.previewTagPreset}
+        freeClassName={styles.previewTagFree}
+        moreClassName={styles.previewTagMore}
+      />
     </div>,
     document.body,
   );
