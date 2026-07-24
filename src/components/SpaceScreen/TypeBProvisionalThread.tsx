@@ -7,7 +7,10 @@ import {
   toLocalPoint,
   type Point2D,
 } from '../../core/utils/connectionEdgePoint';
-import { readBubbleHintsFromElement } from './typeBProvisionalThreadGeometry';
+import {
+  buildTypeBProvisionalTargetRect,
+  readBubbleHintsFromElement,
+} from './typeBProvisionalThreadGeometry';
 import styles from './TypeBProvisionalThread.module.css';
 
 type Props = {
@@ -61,12 +64,7 @@ function computeProvisionalEndpoints(
   const targetLocal = percentToLocalPoint(areaRect, positionX, positionY);
   const fromLocal = toLocalPoint(fromGlobal, areaRect);
 
-  const pseudoTargetRect = {
-    left: targetLocal.x - 8,
-    top: targetLocal.y - 8,
-    width: 16,
-    height: 16,
-  };
+  const pseudoTargetRect = buildTypeBProvisionalTargetRect(targetLocal);
   const toGlobal = getBubbleConnectionPoint(
     pseudoTargetRect,
     { hasLikeBadge: false, hasOwnerBar: false },

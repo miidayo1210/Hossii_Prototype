@@ -65,13 +65,16 @@ export function formatTypeBSubmitErrorMessage(error: { message: string; code?: s
 
 function resolveOriginPlacement(
   hossii: Hossii,
-  existingPositions: readonly { x: number; y: number }[],
+  existingPositions: readonly { x: number; y: number; id: string }[],
 ) {
   const originX = hossii.positionX ?? 50;
   const originY = hossii.positionY ?? 50;
+  const others = existingPositions
+    .filter((point) => point.id !== hossii.id)
+    .map(({ x, y }) => ({ x, y }));
   return computeTypeBNearOriginPlacement({
     origin: { x: originX, y: originY },
-    existingPositions,
+    existingPositions: others,
     seed: hossii.id,
   });
 }
@@ -141,7 +144,7 @@ export function useSpaceTypeBIntegration({
     () =>
       filteredHossiis
         .filter((h) => h.positionX != null && h.positionY != null)
-        .map((h) => ({ x: h.positionX!, y: h.positionY! })),
+        .map((h) => ({ id: h.id, x: h.positionX!, y: h.positionY! })),
     [filteredHossiis],
   );
 
