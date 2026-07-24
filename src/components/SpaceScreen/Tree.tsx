@@ -520,10 +520,13 @@ export function BubbleInner({
   const animationDuration = `${4 + (index % 3)}s`;
 
   // フッターメタの表示制御（bubble モードでは非表示）
-  const hashtags = hossii.hashtags ?? [];
+  // プリセット tags と自由入力 hashtags を合わせて表示（重複除去）
+  const displayTags = Array.from(
+    new Set([...(hossii.tags ?? []), ...(hossii.hashtags ?? [])]),
+  );
   const MAX_VISIBLE_TAGS = 2;
-  const visibleTags = hashtags.slice(0, MAX_VISIBLE_TAGS);
-  const extraTagCount = hashtags.length - MAX_VISIBLE_TAGS;
+  const visibleTags = displayTags.slice(0, MAX_VISIBLE_TAGS);
+  const extraTagCount = displayTags.length - MAX_VISIBLE_TAGS;
   const showFooterMeta = viewMode !== 'bubble' && !isCanvasPost;
 
   const bubbleStyle: React.CSSProperties & {
