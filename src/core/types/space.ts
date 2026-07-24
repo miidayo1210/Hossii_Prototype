@@ -82,7 +82,7 @@ export type Space = {
   bubbleShapePng?: string;          // 吹き出しのカスタム形状PNGパス（例: "/assets/bubble-shapes/speech.png"）
   // T01: スペースで使えるタグ候補（管理者が登録）
   //   投稿UIのワンタップ選択候補・ログ一覧フィルタの元データとして使用。
-  //   各投稿に実際についたタグは hossiis.tags（カラム追加済み。INSERT 永続化は別タスク）に分離して管理する。
+  //   各投稿に実際についたタグは hossiis.tags（text[]）に分離して管理する。
   presetTags?: string[];
   welcomeMessage?: string;  // 入室時ウェルカムメッセージ（未設定時はデフォルト文言）
   description?: string;     // スペースの一行説明（最大50文字、未設定時は説明 UI 非表示）
