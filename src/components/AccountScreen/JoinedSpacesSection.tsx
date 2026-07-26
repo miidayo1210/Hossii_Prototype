@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ExternalLink, Pencil } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
+import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { useHossiiActions } from '../../core/hooks/useHossiiActions';
 import { fetchMyJoinedSpaces, type JoinedSpace } from '../../core/utils/joinedSpacesApi';
-import {
-  fetchIssuedParticipantAccountScope,
-  toIssuedParticipantJoinedSpace,
-} from '../../core/utils/participantAccountScopeApi';
+import { toIssuedParticipantJoinedSpace } from '../../core/utils/participantAccountScopeApi';
 import { resolveAccountAffiliationSource } from '../../core/utils/resolveAccountAffiliationSource';
 import { updateMySpaceNickname } from '../../core/utils/spaceMembershipsApi';
 import {
@@ -23,7 +21,7 @@ type Status = 'idle' | 'loading' | 'error' | 'ready';
  * Phase 2E/2F: アカウントページに、ログイン本人が参加しているスペース一覧を表示し、
  * 各スペースの自分のニックネームを変更できるようにする。
  * - 未ログイン（ゲスト）は取得せず、ログイン案内を表示する。
- * - 参加IDアカウントは発行元スペース 1 件のみ（space_memberships 横断は使わない）。
+ * - 参加IDアカウントは発行元スペース 1 件のみ（SelectedCommunity が取得した scope を再利用）。
  * - loading / empty / error / success の各状態を持つ。
  * - スペースを開く導線は正規 URL（/c/{community}/s/{slug}#screen）を使う。
  * - ニックネーム変更は SECURITY DEFINER RPC 経由（本人・space_nickname のみ）。
@@ -31,6 +29,11 @@ type Status = 'idle' | 'loading' | 'error' | 'ready';
  */
 export const JoinedSpacesSection = () => {
   const { currentUser } = useAuth();
+  const {
+    loading: communityLoading,
+    issuedParticipantScope,
+    refreshMemberships,
+  } = useSelectedCommunity();
   const { refreshPostAuthorDisplayNames } = useHossiiActions();
   const uid = currentUser?.uid ?? null;
   const isIssuedParticipant =
@@ -44,17 +47,28 @@ export const JoinedSpacesSection = () => {
     const reqId = ++reqIdRef.current;
     setStatus('loading');
     try {
+      // 参加ID: SelectedCommunityProvider が取得済みの scope を再利用（二重 RPC 禁止）。
+      // membership 全件への fallback はしない。
       if (isIssuedParticipant) {
-        const scope = await fetchIssuedParticipantAccountScope();
-        if (reqId !== reqIdRef.current) return;
-        if (!scope.ok) {
-          // membership 全件への fallback はしない。
-          console.error('[JoinedSpacesSection] issued participant scope failed:', scope.reason);
+        if (communityLoading && !issuedParticipantScope) {
+          if (reqId !== reqIdRef.current) return;
+          setStatus('loading');
+          return;
+        }
+        if (!issuedParticipantScope || !issuedParticipantScope.ok) {
+          if (reqId !== reqIdRef.current) return;
+          if (issuedParticipantScope && !issuedParticipantScope.ok) {
+            console.error(
+              '[JoinedSpacesSection] issued participant scope failed:',
+              issuedParticipantScope.reason,
+            );
+          }
           setItems([]);
           setStatus('error');
           return;
         }
-        setItems([toIssuedParticipantJoinedSpace(scope)]);
+        if (reqId !== reqIdRef.current) return;
+        setItems([toIssuedParticipantJoinedSpace(issuedParticipantScope)]);
         setStatus('ready');
         return;
       }
@@ -69,7 +83,7 @@ export const JoinedSpacesSection = () => {
       console.error('[JoinedSpacesSection] failed to load joined spaces');
       setStatus('error');
     }
-  }, [isIssuedParticipant]);
+  }, [isIssuedParticipant, communityLoading, issuedParticipantScope]);
 
   useEffect(() => {
     // 未ログインでは取得しない（render 側で currentUser を見てログイン案内を出す）。
@@ -118,7 +132,14 @@ export const JoinedSpacesSection = () => {
     return (
       <div className={styles.note}>
         <p>参加スペースの取得に失敗しました。時間をおいて再度お試しください。</p>
-        <button type="button" className={styles.retryBtn} onClick={() => void load()}>
+        <button
+          type="button"
+          className={styles.retryBtn}
+          onClick={() => {
+            if (isIssuedParticipant) void refreshMemberships();
+            else void load();
+          }}
+        >
           再読み込み
         </button>
       </div>
