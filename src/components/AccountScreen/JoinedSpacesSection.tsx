@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ExternalLink, Pencil } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
+import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { useHossiiActions } from '../../core/hooks/useHossiiActions';
 import { fetchMyJoinedSpaces, type JoinedSpace } from '../../core/utils/joinedSpacesApi';
+import { toIssuedParticipantJoinedSpace } from '../../core/utils/participantAccountScopeApi';
+import { resolveAccountAffiliationSource } from '../../core/utils/resolveAccountAffiliationSource';
 import { updateMySpaceNickname } from '../../core/utils/spaceMembershipsApi';
 import {
   normalizeSpaceNickname,
@@ -18,6 +21,7 @@ type Status = 'idle' | 'loading' | 'error' | 'ready';
  * Phase 2E/2F: アカウントページに、ログイン本人が参加しているスペース一覧を表示し、
  * 各スペースの自分のニックネームを変更できるようにする。
  * - 未ログイン（ゲスト）は取得せず、ログイン案内を表示する。
+ * - 参加IDアカウントは発行元スペース 1 件のみ（SelectedCommunity が取得した scope を再利用）。
  * - loading / empty / error / success の各状態を持つ。
  * - スペースを開く導線は正規 URL（/c/{community}/s/{slug}#screen）を使う。
  * - ニックネーム変更は SECURITY DEFINER RPC 経由（本人・space_nickname のみ）。
@@ -25,8 +29,15 @@ type Status = 'idle' | 'loading' | 'error' | 'ready';
  */
 export const JoinedSpacesSection = () => {
   const { currentUser } = useAuth();
+  const {
+    loading: communityLoading,
+    issuedParticipantScope,
+    refreshMemberships,
+  } = useSelectedCommunity();
   const { refreshPostAuthorDisplayNames } = useHossiiActions();
   const uid = currentUser?.uid ?? null;
+  const isIssuedParticipant =
+    resolveAccountAffiliationSource(currentUser?.isIssuedParticipant) === 'issued_participant_scope';
   const [status, setStatus] = useState<Status>('idle');
   const [items, setItems] = useState<JoinedSpace[]>([]);
   // 古い非同期応答で新しい状態を上書きしないための世代カウンタ。
@@ -36,6 +47,32 @@ export const JoinedSpacesSection = () => {
     const reqId = ++reqIdRef.current;
     setStatus('loading');
     try {
+      // 参加ID: SelectedCommunityProvider が取得済みの scope を再利用（二重 RPC 禁止）。
+      // membership 全件への fallback はしない。
+      if (isIssuedParticipant) {
+        if (communityLoading && !issuedParticipantScope) {
+          if (reqId !== reqIdRef.current) return;
+          setStatus('loading');
+          return;
+        }
+        if (!issuedParticipantScope || !issuedParticipantScope.ok) {
+          if (reqId !== reqIdRef.current) return;
+          if (issuedParticipantScope && !issuedParticipantScope.ok) {
+            console.error(
+              '[JoinedSpacesSection] issued participant scope failed:',
+              issuedParticipantScope.reason,
+            );
+          }
+          setItems([]);
+          setStatus('error');
+          return;
+        }
+        if (reqId !== reqIdRef.current) return;
+        setItems([toIssuedParticipantJoinedSpace(issuedParticipantScope)]);
+        setStatus('ready');
+        return;
+      }
+
       const rows = await fetchMyJoinedSpaces();
       if (reqId !== reqIdRef.current) return;
       setItems(rows);
@@ -46,7 +83,7 @@ export const JoinedSpacesSection = () => {
       console.error('[JoinedSpacesSection] failed to load joined spaces');
       setStatus('error');
     }
-  }, []);
+  }, [isIssuedParticipant, communityLoading, issuedParticipantScope]);
 
   useEffect(() => {
     // 未ログインでは取得しない（render 側で currentUser を見てログイン案内を出す）。
@@ -63,7 +100,7 @@ export const JoinedSpacesSection = () => {
     return () => {
       cancelled = true;
     };
-  }, [uid, load]);
+  }, [uid, isIssuedParticipant, load]);
 
   // ニックネーム変更成功時、対象 membership の表示名だけをローカル更新し、
   // 同スペースが現在アクティブなら投稿者現在名マップを最小再取得する。
@@ -95,7 +132,14 @@ export const JoinedSpacesSection = () => {
     return (
       <div className={styles.note}>
         <p>参加スペースの取得に失敗しました。時間をおいて再度お試しください。</p>
-        <button type="button" className={styles.retryBtn} onClick={() => void load()}>
+        <button
+          type="button"
+          className={styles.retryBtn}
+          onClick={() => {
+            if (isIssuedParticipant) void refreshMemberships();
+            else void load();
+          }}
+        >
           再読み込み
         </button>
       </div>

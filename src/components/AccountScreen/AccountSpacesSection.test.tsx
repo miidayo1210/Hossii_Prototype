@@ -5,7 +5,12 @@ import { AccountSpacesSection } from './AccountSpacesSection';
 
 const h = vi.hoisted(() => ({
   navigate: vi.fn(),
-  currentUser: null as { uid: string; displayName: string; isAdmin: boolean } | null,
+  currentUser: null as {
+    uid: string;
+    displayName: string;
+    isAdmin: boolean;
+    isIssuedParticipant?: boolean;
+  } | null,
 }));
 
 vi.mock('../../core/hooks/useRouter', () => ({
@@ -18,6 +23,10 @@ vi.mock('../../core/contexts/useAuth', () => ({
 
 vi.mock('../Community/CommunitySwitcher', () => ({
   CommunitySwitcher: () => <div data-testid="community-switcher" />,
+}));
+
+vi.mock('./IssuedParticipantCommunityPanel', () => ({
+  IssuedParticipantCommunityPanel: () => <div data-testid="issued-participant-community" />,
 }));
 
 vi.mock('./JoinedSpacesSection', () => ({
@@ -44,11 +53,27 @@ describe('AccountSpacesSection', () => {
     expect(screen.queryByTestId('community-switcher')).toBeNull();
   });
 
-  it('shows community switcher when logged in', () => {
+  it('shows community switcher when logged in as a regular account', () => {
     h.currentUser = { uid: 'u1', displayName: 'User', isAdmin: false };
     render(<AccountSpacesSection />);
 
     expect(screen.getByTestId('community-switcher')).toBeTruthy();
+    expect(screen.queryByTestId('issued-participant-community')).toBeNull();
+  });
+
+  it('hides community switcher for issued participant accounts', () => {
+    h.currentUser = {
+      uid: 'p1',
+      displayName: 'Participant',
+      isAdmin: false,
+      isIssuedParticipant: true,
+    };
+    render(<AccountSpacesSection />);
+
+    expect(screen.queryByTestId('community-switcher')).toBeNull();
+    expect(screen.getByTestId('issued-participant-community')).toBeTruthy();
+    expect(screen.getByText('参加IDで発行されたコミュニティです。')).toBeTruthy();
+    expect(screen.getByText('参加IDで発行されたスペースです。')).toBeTruthy();
   });
 
   it('shows my-space intro copy in personal spaces section description', () => {

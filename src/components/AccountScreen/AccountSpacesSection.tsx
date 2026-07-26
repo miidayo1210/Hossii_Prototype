@@ -3,12 +3,16 @@ import { useRouter } from '../../core/hooks/useRouter';
 import { CommunitySwitcher } from '../Community/CommunitySwitcher';
 import { JoinedSpacesSection } from './JoinedSpacesSection';
 import { CommunityPersonalSpacesSection } from './CommunityPersonalSpacesSection';
+import { IssuedParticipantCommunityPanel } from './IssuedParticipantCommunityPanel';
 import { MY_SPACE_INTRO } from '../../core/utils/mySpaceCopy';
+import { resolveAccountAffiliationSource } from '../../core/utils/resolveAccountAffiliationSource';
 import styles from './AccountScreen.module.css';
 
 export const AccountSpacesSection = () => {
   const { currentUser } = useAuth();
   const { navigate } = useRouter();
+  const isIssuedParticipant =
+    resolveAccountAffiliationSource(currentUser?.isIssuedParticipant) === 'issued_participant_scope';
 
   return (
     <div data-testid="account-section-spaces" className={styles.sectionStack}>
@@ -16,16 +20,24 @@ export const AccountSpacesSection = () => {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>所属コミュニティ</h2>
           <p className={styles.sectionDesc}>
-            複数のコミュニティに所属している場合は、ここで切り替えられます。
+            {isIssuedParticipant
+              ? '参加IDで発行されたコミュニティです。'
+              : '複数のコミュニティに所属している場合は、ここで切り替えられます。'}
           </p>
-          <CommunitySwitcher onNavigateHome={(id) => navigate('community', id)} />
+          {isIssuedParticipant ? (
+            <IssuedParticipantCommunityPanel />
+          ) : (
+            <CommunitySwitcher onNavigateHome={(id) => navigate('community', id)} />
+          )}
         </section>
       )}
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>参加しているスペース</h2>
         <p className={styles.sectionDesc}>
-          あなたがログインして参加したスペースの一覧です。
+          {isIssuedParticipant
+            ? '参加IDで発行されたスペースです。'
+            : 'あなたがログインして参加したスペースの一覧です。'}
         </p>
         <JoinedSpacesSection />
       </section>

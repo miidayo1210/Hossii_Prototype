@@ -9,6 +9,12 @@ import { useAuth } from './useAuth';
 import { fetchMyCommunityMemberships } from '../utils/communityMembershipsApi';
 import type { MyCommunityMembership } from '../types/communityMembership';
 import {
+  fetchIssuedParticipantAccountScope,
+  toIssuedParticipantCommunityMembership,
+  type IssuedParticipantScopeResult,
+} from '../utils/participantAccountScopeApi';
+import { resolveAccountAffiliationSource } from '../utils/resolveAccountAffiliationSource';
+import {
   loadStoredCommunityId,
   saveStoredCommunityId,
 } from '../utils/selectedCommunityStorage';
@@ -17,6 +23,8 @@ import { SelectedCommunityContext } from './useSelectedCommunity';
 export function SelectedCommunityProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
   const [memberships, setMemberships] = useState<MyCommunityMembership[]>([]);
+  const [issuedParticipantScope, setIssuedParticipantScope] =
+    useState<IssuedParticipantScopeResult | null>(null);
   const [selectedCommunityId, setSelectedCommunityIdState] = useState<string | null>(
     () => loadStoredCommunityId(),
   );
@@ -25,15 +33,32 @@ export function SelectedCommunityProvider({ children }: { children: ReactNode })
   const refreshMemberships = useCallback(async () => {
     if (!currentUser) {
       setMemberships([]);
+      setIssuedParticipantScope(null);
       return;
     }
     setLoading(true);
     try {
+      // 参加ID: community_memberships 横断は使わず、発行元 community 1 件のみ。
+      // 取得失敗時も通常 membership 一覧へ fallback しない。
+      if (resolveAccountAffiliationSource(currentUser.isIssuedParticipant) === 'issued_participant_scope') {
+        const scope = await fetchIssuedParticipantAccountScope();
+        setIssuedParticipantScope(scope);
+        if (!scope.ok) {
+          console.error('[SelectedCommunity] issued participant scope failed:', scope.reason);
+          setMemberships([]);
+          return;
+        }
+        setMemberships([toIssuedParticipantCommunityMembership(scope)]);
+        return;
+      }
+
+      setIssuedParticipantScope(null);
       const rows = await fetchMyCommunityMemberships();
       setMemberships(rows);
     } catch (error) {
       console.error('[SelectedCommunity] fetch failed:', error);
       setMemberships([]);
+      setIssuedParticipantScope(null);
     } finally {
       setLoading(false);
     }
@@ -73,10 +98,19 @@ export function SelectedCommunityProvider({ children }: { children: ReactNode })
       selectedCommunityId,
       selectedMembership,
       loading,
+      issuedParticipantScope,
       setSelectedCommunityId,
       refreshMemberships,
     }),
-    [memberships, selectedCommunityId, selectedMembership, loading, setSelectedCommunityId, refreshMemberships],
+    [
+      memberships,
+      selectedCommunityId,
+      selectedMembership,
+      loading,
+      issuedParticipantScope,
+      setSelectedCommunityId,
+      refreshMemberships,
+    ],
   );
 
   return (
