@@ -3,17 +3,39 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup, within } from '@testing-library/react';
 import { CommunityPersonalSpacesSection } from './CommunityPersonalSpacesSection';
 import type { Space } from '../../core/types/space';
+import type { IssuedParticipantScopeResult } from '../../core/utils/participantAccountScopeApi';
 
 const h = vi.hoisted(() => ({
   fetchAccountCommunityPersonalSpaces: vi.fn(),
   ensureMyPersonalSpace: vi.fn(),
   fetchPersonalSpaceForStore: vi.fn(),
   addSpaceLocal: vi.fn(),
-  currentUser: { uid: 'user-1', displayName: 'Test User', isAdmin: false },
+  refreshMemberships: vi.fn(),
+  currentUser: {
+    uid: 'user-1',
+    displayName: 'Test User',
+    isAdmin: false,
+    isIssuedParticipant: undefined as boolean | undefined,
+  } as {
+    uid: string;
+    displayName: string;
+    isAdmin: boolean;
+    isIssuedParticipant?: boolean;
+  } | null,
+  communityLoading: false,
+  issuedParticipantScope: null as IssuedParticipantScopeResult | null,
 }));
 
 vi.mock('../../core/contexts/useAuth', () => ({
   useAuth: () => ({ currentUser: h.currentUser }),
+}));
+
+vi.mock('../../core/contexts/useSelectedCommunity', () => ({
+  useSelectedCommunity: () => ({
+    loading: h.communityLoading,
+    issuedParticipantScope: h.issuedParticipantScope,
+    refreshMemberships: h.refreshMemberships,
+  }),
 }));
 
 vi.mock('../../core/hooks/useHossiiStore', () => ({
@@ -28,6 +50,20 @@ vi.mock('../../core/utils/personalSpacesApi', () => ({
 
 const COMMUNITY_A = 'comm-a';
 const COMMUNITY_B = 'comm-b';
+
+const issuedScopeOk: IssuedParticipantScopeResult = {
+  ok: true,
+  spaceId: 'space-issued',
+  spaceName: '発行元スペース',
+  spaceUrl: 'issued-space',
+  isArchived: false,
+  communityId: 'community-issued',
+  communityName: '発行元コミュニティ',
+  communitySlug: 'issued-community',
+  spaceNickname: null,
+  membershipId: 'm-issued',
+  joinedAt: '2026-07-01T00:00:00.000Z',
+};
 
 function pendingItem(overrides: Partial<ReturnType<typeof baseItem>> = {}) {
   return {
@@ -85,6 +121,14 @@ describe('CommunityPersonalSpacesSection', () => {
     h.ensureMyPersonalSpace.mockReset();
     h.fetchPersonalSpaceForStore.mockReset();
     h.addSpaceLocal.mockReset();
+    h.refreshMemberships.mockReset();
+    h.currentUser = {
+      uid: 'user-1',
+      displayName: 'Test User',
+      isAdmin: false,
+    };
+    h.communityLoading = false;
+    h.issuedParticipantScope = null;
     h.fetchAccountCommunityPersonalSpaces.mockResolvedValue([pendingItem()]);
     h.ensureMyPersonalSpace.mockResolvedValue({ ok: true, spaceId: 'ps-comm-a', spaceUrl: 'p-comm-a' });
     h.fetchPersonalSpaceForStore.mockResolvedValue(personalSpaceA);
@@ -199,5 +243,78 @@ describe('CommunityPersonalSpacesSection', () => {
     const rowB = screen.getByText('Community B').closest('li');
     expect(within(rowB!).getByText('マイスペースあり')).toBeTruthy();
     expect(h.ensureMyPersonalSpace).not.toHaveBeenCalledWith(COMMUNITY_B);
+  });
+
+  describe('issued participant', () => {
+    beforeEach(() => {
+      h.currentUser = {
+        uid: 'participant-1',
+        displayName: 'Participant',
+        isAdmin: false,
+        isIssuedParticipant: true,
+      };
+      h.issuedParticipantScope = issuedScopeOk;
+    });
+
+    it('shows only the issuing space from context scope and does not call membership API', async () => {
+      render(<CommunityPersonalSpacesSection />);
+
+      expect(await screen.findByTestId('issued-participant-space-row')).toBeTruthy();
+      expect(screen.getByText('発行元スペース')).toBeTruthy();
+      expect(screen.getByText('発行元コミュニティ')).toBeTruthy();
+      expect(screen.getByRole('link', { name: /開く/ })).toBeTruthy();
+      expect(screen.queryByText('Community A')).toBeNull();
+      expect(screen.queryByText('Community B')).toBeNull();
+      expect(screen.queryByRole('button', { name: /マイスペースを作る/ })).toBeNull();
+      expect(h.fetchAccountCommunityPersonalSpaces).not.toHaveBeenCalled();
+    });
+
+    it('does not fallback to membership list while scope is loading', async () => {
+      h.communityLoading = true;
+      h.issuedParticipantScope = null;
+      h.fetchAccountCommunityPersonalSpaces.mockResolvedValue([
+        pendingItem({ communityId: COMMUNITY_B, communityName: 'Other Community' }),
+      ]);
+      render(<CommunityPersonalSpacesSection />);
+
+      expect(await screen.findByText('読み込み中…')).toBeTruthy();
+      expect(screen.queryByText('Other Community')).toBeNull();
+      expect(h.fetchAccountCommunityPersonalSpaces).not.toHaveBeenCalled();
+    });
+
+    it('does not fallback to membership list when scope fails', async () => {
+      h.issuedParticipantScope = { ok: false, reason: 'not_found' };
+      h.fetchAccountCommunityPersonalSpaces.mockResolvedValue([
+        pendingItem({ communityId: COMMUNITY_B, communityName: 'Other Community' }),
+      ]);
+      render(<CommunityPersonalSpacesSection />);
+
+      expect(await screen.findByText(/マイスペース情報の取得に失敗/)).toBeTruthy();
+      expect(screen.queryByText('Other Community')).toBeNull();
+      expect(h.fetchAccountCommunityPersonalSpaces).not.toHaveBeenCalled();
+    });
+
+    it('clears issued display when switching to a regular account', async () => {
+      const { rerender } = render(<CommunityPersonalSpacesSection />);
+      expect(await screen.findByText('発行元スペース')).toBeTruthy();
+
+      h.currentUser = {
+        uid: 'user-2',
+        displayName: 'Regular',
+        isAdmin: false,
+        isIssuedParticipant: false,
+      };
+      h.issuedParticipantScope = null;
+      h.fetchAccountCommunityPersonalSpaces.mockResolvedValue([
+        pendingItem({ communityId: COMMUNITY_A, communityName: 'Community A' }),
+        pendingItem({ communityId: COMMUNITY_B, communityName: 'Community B' }),
+      ]);
+      rerender(<CommunityPersonalSpacesSection />);
+
+      expect(await screen.findByText('Community A')).toBeTruthy();
+      expect(screen.getByText('Community B')).toBeTruthy();
+      expect(screen.queryByText('発行元スペース')).toBeNull();
+      expect(h.fetchAccountCommunityPersonalSpaces).toHaveBeenCalled();
+    });
   });
 });

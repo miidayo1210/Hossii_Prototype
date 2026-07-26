@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Archive, Lock, Plus } from 'lucide-react';
+import { Archive, ExternalLink, Lock, Plus } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
+import { useSelectedCommunity } from '../../core/contexts/useSelectedCommunity';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import type { CommunityMembershipRole } from '../../core/types/communityMembership';
 import {
@@ -16,6 +17,10 @@ import {
   fetchPersonalSpaceForStore,
   type AccountCommunityPersonalSpace,
 } from '../../core/utils/personalSpacesApi';
+import type { IssuedParticipantScopeOk } from '../../core/utils/participantAccountScopeApi';
+import { resolveAccountAffiliationSource } from '../../core/utils/resolveAccountAffiliationSource';
+import { buildCanonicalSpaceScreenHref } from '../../core/utils/spaceScreenRoute';
+import { SpaceArchiveBadge } from '../Spaces/SpaceArchiveBadge';
 import styles from './CommunityPersonalSpacesSection.module.css';
 
 type Status = 'idle' | 'loading' | 'error' | 'ready';
@@ -27,21 +32,59 @@ function membershipRoleLabel(role: CommunityMembershipRole): string {
 /**
  * アカウント画面: 所属コミュニティごとのマイスペース有無と作成導線。
  *
- * - active な community_memberships のコミュニティのみ表示。
- * - 作成は ensure_my_personal_space(community_id) を明示指定。画面遷移なし。
- * - 作成後は当該コミュニティ行のみ即時更新し、store へ personal space を追加。
+ * - 通常アカウント: active な community_memberships のコミュニティのみ表示。
+ * - 参加IDアカウント: SelectedCommunity の発行元 scope を再利用し、発行元スペース 1 件のみ。
+ *   list_my_community_personal_spaces / membership 一覧へ fallback しない。
  */
 export const CommunityPersonalSpacesSection = () => {
   const { currentUser } = useAuth();
+  const {
+    loading: communityLoading,
+    issuedParticipantScope,
+    refreshMemberships,
+  } = useSelectedCommunity();
   const uid = currentUser?.uid ?? null;
+  const isIssuedParticipant =
+    resolveAccountAffiliationSource(currentUser?.isIssuedParticipant) === 'issued_participant_scope';
   const [status, setStatus] = useState<Status>('idle');
   const [items, setItems] = useState<AccountCommunityPersonalSpace[]>([]);
+  const [issuedSpace, setIssuedSpace] = useState<IssuedParticipantScopeOk | null>(null);
   const reqIdRef = useRef(0);
 
   const load = useCallback(async () => {
     const reqId = ++reqIdRef.current;
     setStatus('loading');
     try {
+      // 参加ID: Context 取得済み scope のみ。membership 系 API は呼ばない。
+      if (isIssuedParticipant) {
+        if (communityLoading && !issuedParticipantScope) {
+          if (reqId !== reqIdRef.current) return;
+          setIssuedSpace(null);
+          setItems([]);
+          setStatus('loading');
+          return;
+        }
+        if (!issuedParticipantScope || !issuedParticipantScope.ok) {
+          if (reqId !== reqIdRef.current) return;
+          if (issuedParticipantScope && !issuedParticipantScope.ok) {
+            console.error(
+              '[CommunityPersonalSpacesSection] issued participant scope failed:',
+              issuedParticipantScope.reason,
+            );
+          }
+          setIssuedSpace(null);
+          setItems([]);
+          setStatus('error');
+          return;
+        }
+        if (reqId !== reqIdRef.current) return;
+        setIssuedSpace(issuedParticipantScope);
+        setItems([]);
+        setStatus('ready');
+        return;
+      }
+
+      setIssuedSpace(null);
       const rows = await fetchAccountCommunityPersonalSpaces();
       if (reqId !== reqIdRef.current) return;
       setItems(rows);
@@ -49,11 +92,14 @@ export const CommunityPersonalSpacesSection = () => {
     } catch {
       if (reqId !== reqIdRef.current) return;
       console.error('[CommunityPersonalSpacesSection] failed to load');
+      setIssuedSpace(null);
+      setItems([]);
       setStatus('error');
     }
-  }, []);
+  }, [isIssuedParticipant, communityLoading, issuedParticipantScope]);
 
   useEffect(() => {
+    // 未ログインでは取得しない（render 側で currentUser を見て案内を出す）。
     if (!uid) {
       reqIdRef.current += 1;
       return;
@@ -65,7 +111,7 @@ export const CommunityPersonalSpacesSection = () => {
     return () => {
       cancelled = true;
     };
-  }, [uid, load]);
+  }, [uid, isIssuedParticipant, load]);
 
   const handleCreated = useCallback(
     (communityId: string, spaceId: string, spaceUrl: string | null) => {
@@ -102,10 +148,35 @@ export const CommunityPersonalSpacesSection = () => {
     return (
       <div className={styles.note}>
         <p>マイスペース情報の取得に失敗しました。時間をおいて再度お試しください。</p>
-        <button type="button" className={styles.retryBtn} onClick={() => void load()}>
+        <button
+          type="button"
+          className={styles.retryBtn}
+          onClick={() => {
+            if (isIssuedParticipant) void refreshMemberships();
+            else void load();
+          }}
+        >
           再読み込み
         </button>
       </div>
+    );
+  }
+
+  if (isIssuedParticipant) {
+    if (!issuedSpace) {
+      return (
+        <p className={styles.note}>
+          発行元スペースを表示できませんでした。時間をおいて再度お試しください。
+        </p>
+      );
+    }
+    return (
+      <>
+        <p className={styles.introNote}>参加IDで発行されたスペースです。</p>
+        <ul className={styles.list} data-testid="issued-participant-personal-spaces">
+          <IssuedParticipantSpaceItem scope={issuedSpace} />
+        </ul>
+      </>
     );
   }
 
@@ -132,6 +203,40 @@ export const CommunityPersonalSpacesSection = () => {
         ))}
       </ul>
     </>
+  );
+};
+
+const IssuedParticipantSpaceItem = ({ scope }: { scope: IssuedParticipantScopeOk }) => {
+  const openHref =
+    scope.spaceUrl && scope.communitySlug
+      ? buildCanonicalSpaceScreenHref({
+          communitySlug: scope.communitySlug,
+          spaceUrl: scope.spaceUrl,
+        })
+      : scope.spaceUrl
+        ? `/s/${scope.spaceUrl}#screen`
+        : null;
+
+  return (
+    <li className={styles.issuedItem} data-testid="issued-participant-space-row">
+      <div className={styles.itemBody}>
+        <span className={styles.spaceNameRow}>
+          <span className={styles.spaceName}>{scope.spaceName ?? '不明なスペース'}</span>
+          {scope.isArchived && <SpaceArchiveBadge />}
+        </span>
+        <span className={styles.communityName}>{scope.communityName}</span>
+      </div>
+      {openHref ? (
+        <a className={styles.openLink} href={openHref}>
+          <ExternalLink size={14} />
+          開く
+        </a>
+      ) : (
+        <span className={styles.openDisabled} title="このスペースは現在開けません">
+          開けません
+        </span>
+      )}
+    </li>
   );
 };
 
