@@ -3,6 +3,11 @@ import { ExternalLink, Pencil } from 'lucide-react';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiActions } from '../../core/hooks/useHossiiActions';
 import { fetchMyJoinedSpaces, type JoinedSpace } from '../../core/utils/joinedSpacesApi';
+import {
+  fetchIssuedParticipantAccountScope,
+  toIssuedParticipantJoinedSpace,
+} from '../../core/utils/participantAccountScopeApi';
+import { resolveAccountAffiliationSource } from '../../core/utils/resolveAccountAffiliationSource';
 import { updateMySpaceNickname } from '../../core/utils/spaceMembershipsApi';
 import {
   normalizeSpaceNickname,
@@ -18,6 +23,7 @@ type Status = 'idle' | 'loading' | 'error' | 'ready';
  * Phase 2E/2F: アカウントページに、ログイン本人が参加しているスペース一覧を表示し、
  * 各スペースの自分のニックネームを変更できるようにする。
  * - 未ログイン（ゲスト）は取得せず、ログイン案内を表示する。
+ * - 参加IDアカウントは発行元スペース 1 件のみ（space_memberships 横断は使わない）。
  * - loading / empty / error / success の各状態を持つ。
  * - スペースを開く導線は正規 URL（/c/{community}/s/{slug}#screen）を使う。
  * - ニックネーム変更は SECURITY DEFINER RPC 経由（本人・space_nickname のみ）。
@@ -27,6 +33,8 @@ export const JoinedSpacesSection = () => {
   const { currentUser } = useAuth();
   const { refreshPostAuthorDisplayNames } = useHossiiActions();
   const uid = currentUser?.uid ?? null;
+  const isIssuedParticipant =
+    resolveAccountAffiliationSource(currentUser?.isIssuedParticipant) === 'issued_participant_scope';
   const [status, setStatus] = useState<Status>('idle');
   const [items, setItems] = useState<JoinedSpace[]>([]);
   // 古い非同期応答で新しい状態を上書きしないための世代カウンタ。
@@ -36,6 +44,21 @@ export const JoinedSpacesSection = () => {
     const reqId = ++reqIdRef.current;
     setStatus('loading');
     try {
+      if (isIssuedParticipant) {
+        const scope = await fetchIssuedParticipantAccountScope();
+        if (reqId !== reqIdRef.current) return;
+        if (!scope.ok) {
+          // membership 全件への fallback はしない。
+          console.error('[JoinedSpacesSection] issued participant scope failed:', scope.reason);
+          setItems([]);
+          setStatus('error');
+          return;
+        }
+        setItems([toIssuedParticipantJoinedSpace(scope)]);
+        setStatus('ready');
+        return;
+      }
+
       const rows = await fetchMyJoinedSpaces();
       if (reqId !== reqIdRef.current) return;
       setItems(rows);
@@ -46,7 +69,7 @@ export const JoinedSpacesSection = () => {
       console.error('[JoinedSpacesSection] failed to load joined spaces');
       setStatus('error');
     }
-  }, []);
+  }, [isIssuedParticipant]);
 
   useEffect(() => {
     // 未ログインでは取得しない（render 側で currentUser を見てログイン案内を出す）。
@@ -63,7 +86,7 @@ export const JoinedSpacesSection = () => {
     return () => {
       cancelled = true;
     };
-  }, [uid, load]);
+  }, [uid, isIssuedParticipant, load]);
 
   // ニックネーム変更成功時、対象 membership の表示名だけをローカル更新し、
   // 同スペースが現在アクティブなら投稿者現在名マップを最小再取得する。

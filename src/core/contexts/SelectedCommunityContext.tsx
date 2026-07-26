@@ -9,6 +9,11 @@ import { useAuth } from './useAuth';
 import { fetchMyCommunityMemberships } from '../utils/communityMembershipsApi';
 import type { MyCommunityMembership } from '../types/communityMembership';
 import {
+  fetchIssuedParticipantAccountScope,
+  toIssuedParticipantCommunityMembership,
+} from '../utils/participantAccountScopeApi';
+import { resolveAccountAffiliationSource } from '../utils/resolveAccountAffiliationSource';
+import {
   loadStoredCommunityId,
   saveStoredCommunityId,
 } from '../utils/selectedCommunityStorage';
@@ -29,6 +34,19 @@ export function SelectedCommunityProvider({ children }: { children: ReactNode })
     }
     setLoading(true);
     try {
+      // 参加ID: community_memberships 横断は使わず、発行元 community 1 件のみ。
+      // 取得失敗時も通常 membership 一覧へ fallback しない。
+      if (resolveAccountAffiliationSource(currentUser.isIssuedParticipant) === 'issued_participant_scope') {
+        const scope = await fetchIssuedParticipantAccountScope();
+        if (!scope.ok) {
+          console.error('[SelectedCommunity] issued participant scope failed:', scope.reason);
+          setMemberships([]);
+          return;
+        }
+        setMemberships([toIssuedParticipantCommunityMembership(scope)]);
+        return;
+      }
+
       const rows = await fetchMyCommunityMemberships();
       setMemberships(rows);
     } catch (error) {
