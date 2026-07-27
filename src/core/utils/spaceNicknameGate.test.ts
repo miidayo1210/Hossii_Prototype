@@ -94,4 +94,15 @@ describe('spaceNicknameGate', () => {
     expect(sanitizeMembershipNicknameCandidate(' みー ')).toBe('みー');
     expect(sanitizeMembershipNicknameCandidate('')).toBeNull();
   });
+
+  it('participant + 別space nickのみ → 当該spaceでは未登録', () => {
+    expect(
+      shouldShowNicknameModalForSpace({
+        spaceId: 'space-1',
+        spaceNicknames: { 'space-other': '別空間' },
+        isIssuedParticipant: true,
+        username: 'たろう',
+      }),
+    ).toBe(true);
+  });
 });

@@ -124,6 +124,7 @@ import {
 import { createControllerHost, type ControllerHost } from '../utils/controllerHost';
 import {
   upsertProfile,
+  upsertSpaceNickname,
   fetchSpaceNicknames,
   fetchLegacyDefaultNickname,
 } from '../utils/profilesApi';
@@ -1825,10 +1826,21 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     const previous = stateRef.current.spaceNicknames[spaceId];
     dispatch({ type: 'SET_SPACE_NICKNAME', payload: { spaceId, nickname: trimmed } });
 
-    // ゲストは端末ローカルのみ。ログインユーザーだけ Supabase へ保存する。
-    if (!isSupabaseConfigured || !currentUser?.uid) return;
+    if (!isSupabaseConfigured) return;
 
     const profile = stateRef.current.profile;
+    // ゲスト: 従来どおりローカル profile.id でも space_nicknames へ upsert（失敗は握りつぶす）
+    // ログインユーザー: persistSpaceNickname（正本 + membership best-effort）
+    const nicknameProfileId = currentUser?.uid ?? profile?.id;
+    if (!nicknameProfileId) return;
+
+    if (!currentUser?.uid) {
+      void upsertSpaceNickname(nicknameProfileId, spaceId, trimmed).catch((error) => {
+        console.error('[HossiiStore] guest upsertSpaceNickname failed', error);
+      });
+      return;
+    }
+
     const defaultNickname = profile?.defaultNickname?.trim()
       || (currentUser.isIssuedParticipant && isPlaceholderUsername(currentUser.username)
         ? ''

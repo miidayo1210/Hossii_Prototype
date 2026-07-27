@@ -4,7 +4,7 @@ import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { nicknameInputAntiAutofillProps } from '../../core/utils/nicknameInputProps';
 import { HOSSII_IDLE } from '../../core/assets/hossiiIdle';
 import { normalizeSpaceNickname } from '../../core/utils/spaceNicknameRules';
-import { isPlaceholderUsername } from '../../core/utils/spaceNicknameGate';
+import { resolveNicknameModalInitialValue } from '../../core/utils/participantNicknameModalDecision';
 import styles from './NicknameModal.module.css';
 
 type Props = {
@@ -14,39 +14,12 @@ type Props = {
   variant?: 'guest' | 'profile';
 };
 
-function initialNicknameValue(params: {
-  isProfileCompletion: boolean;
-  spaceNickname?: string;
-  defaultNickname?: string;
-  username?: string;
-  displayName?: string;
-}): string {
-  if (params.isProfileCompletion) {
-    const candidates = [
-      params.defaultNickname,
-      params.username,
-      params.displayName,
-    ];
-    for (const c of candidates) {
-      const trimmed = c?.trim();
-      if (trimmed && !isPlaceholderUsername(trimmed)) return trimmed;
-    }
-    return '';
-  }
-
-  const spaceNick = params.spaceNickname?.trim();
-  if (spaceNick) return spaceNick;
-
-  const defaultNick = params.defaultNickname?.trim();
-  if (defaultNick && !isPlaceholderUsername(defaultNick)) return defaultNick;
-  return '';
-}
-
 export const NicknameModal = ({ spaceId, onClose, variant = 'guest' }: Props) => {
   const { currentUser } = useAuth();
   const { state, setSpaceNickname, setDefaultNickname } = useHossiiStore();
   const { profile } = state;
   const isProfileCompletion = variant === 'profile';
+  const isIssuedParticipant = currentUser?.isIssuedParticipant === true;
 
   const space = state.spaces.find((s) => s.id === spaceId);
   const spaceName = space?.name ?? 'スペース';
@@ -56,7 +29,8 @@ export const NicknameModal = ({ spaceId, onClose, variant = 'guest' }: Props) =>
     : (space?.welcomeMessage ?? `「${spaceName}」にようこそ！ニックネームを入力してね。`);
 
   const [nickname, setNickname] = useState(() =>
-    initialNicknameValue({
+    resolveNicknameModalInitialValue({
+      isIssuedParticipant,
       isProfileCompletion,
       spaceNickname: state.spaceNicknames[spaceId],
       defaultNickname: profile?.defaultNickname,
