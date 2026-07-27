@@ -6,6 +6,8 @@ import {
   type MembershipJoinController,
   type MembershipJoinInput,
 } from '../utils/membershipJoinController';
+import { shouldAutoJoinSpace } from '../utils/participantAutoJoinGate';
+import type { IssuedParticipantScopeResult } from '../utils/participantAccountScopeApi';
 
 type UseActiveSpaceMembershipJoinParams = {
   configured: boolean;
@@ -14,6 +16,11 @@ type UseActiveSpaceMembershipJoinParams = {
   activeSpaceId: string;
   spaces: Space[];
   isGuest: boolean;
+  /** 参加IDのみ true。通常アカウント・ゲストは false */
+  isIssuedParticipant: boolean;
+  /** SelectedCommunityProvider 取得済み scope（二重 RPC 禁止） */
+  issuedParticipantScope: IssuedParticipantScopeResult | null;
+  affiliationLoading: boolean;
   resolveNickname: () => string | null;
   join: (spaceId: string, nickname: string | null) => Promise<unknown>;
 };
@@ -25,6 +32,9 @@ export function useActiveSpaceMembershipJoin({
   activeSpaceId,
   spaces,
   isGuest,
+  isIssuedParticipant,
+  issuedParticipantScope,
+  affiliationLoading,
   resolveNickname,
   join,
 }: UseActiveSpaceMembershipJoinParams) {
@@ -46,8 +56,15 @@ export function useActiveSpaceMembershipJoin({
   useEffect(() => {
     const activeSpace = spaces.find((s) => s.id === activeSpaceId);
     const isPersonalSpace = activeSpace?.spaceType === 'personal';
-    const allowAutoJoin =
+    const baseAllowAutoJoin =
       activeSpace?.accessMode !== 'invite_only' && !isPersonalSpace;
+    const allowAutoJoin = shouldAutoJoinSpace({
+      baseAllowAutoJoin,
+      isIssuedParticipant,
+      activeSpaceId: activeSpaceId || null,
+      affiliationLoading,
+      issuedParticipantScope,
+    });
 
     const membershipInput: MembershipJoinInput = {
       configured,
@@ -60,7 +77,18 @@ export function useActiveSpaceMembershipJoin({
     };
     membershipJoinInputRef.current = membershipInput;
     membershipJoinRef.current?.sync(membershipInput);
-  }, [configured, authReady, uid, activeSpaceId, spaces, isGuest, resolveNickname]);
+  }, [
+    configured,
+    authReady,
+    uid,
+    activeSpaceId,
+    spaces,
+    isGuest,
+    isIssuedParticipant,
+    issuedParticipantScope,
+    affiliationLoading,
+    resolveNickname,
+  ]);
 
   const retryActiveSpaceMembershipJoin = useCallback(() => {
     const input = membershipJoinInputRef.current;

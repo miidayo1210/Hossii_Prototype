@@ -970,7 +970,11 @@ type HossiiProviderProps = {
 export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProviderProps) => {
   const { currentUser, isResolvingAuth } = useAuth();
   const { overrideCommunityId, overrideCommunitySlug } = useAdminNavigation();
-  const { selectedCommunityId } = useSelectedCommunity();
+  const {
+    selectedCommunityId,
+    issuedParticipantScope,
+    loading: affiliationLoading,
+  } = useSelectedCommunity();
   /** 直近で成功した fetchSpaces のコミュニティ ID（スーパー管理者のスコープ切替検知用） */
   const lastScopedCommunityFetchKeyRef = useRef<string | undefined>(undefined);
   /** 直近で fetchSpaces を開始したコミュニティ ID（仕様 67 案2: ref 未定義でも fetch 前クリアを判定） */
@@ -1211,6 +1215,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       activeSpaceId: state.activeSpaceId,
       spaces: state.spaces,
       isGuest: !currentUser?.uid,
+      isIssuedParticipant: currentUser?.isIssuedParticipant === true,
+      issuedParticipantScope,
+      affiliationLoading,
       resolveNickname: resolveMembershipNicknameForJoin,
       join: joinSpaceAsMember,
     });
