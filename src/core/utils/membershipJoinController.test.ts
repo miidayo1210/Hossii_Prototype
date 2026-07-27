@@ -349,4 +349,16 @@ describe('resolveMembershipNickname', () => {
     expect(resolveMembershipNickname(base, 's1')).toBeNull();
     expect(resolveMembershipNickname({ ...base, profileDefaultNickname: '   ' }, 's1')).toBeNull();
   });
+
+  it('does not pass placeholder「ユーザー」to membership join', () => {
+    expect(
+      resolveMembershipNickname({ ...base, username: 'ユーザー', displayName: 'ユーザー' }, 's1'),
+    ).toBeNull();
+    expect(
+      resolveMembershipNickname(
+        { ...base, spaceNicknames: { s1: 'にっく' }, username: 'ユーザー' },
+        's1',
+      ),
+    ).toBe('にっく');
+  });
 });

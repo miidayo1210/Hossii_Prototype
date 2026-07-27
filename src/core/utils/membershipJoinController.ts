@@ -1,3 +1,5 @@
+import { sanitizeMembershipNicknameCandidate } from './spaceNicknameGate';
+
 // ログインユーザーの space_memberships 自動登録を司る純粋な controller（Phase 2B）。
 //
 // 責務:
@@ -185,8 +187,8 @@ export function resolveMembershipNickname(
     source.displayName,
   ];
   for (const c of candidates) {
-    const trimmed = c?.trim();
-    if (trimmed) return trimmed;
+    const sanitized = sanitizeMembershipNicknameCandidate(c);
+    if (sanitized) return sanitized;
   }
   return null;
 }

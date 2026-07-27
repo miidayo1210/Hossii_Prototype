@@ -1,4 +1,5 @@
 import type { AppUser } from '../contexts/AuthContext';
+import { isPlaceholderUsername } from './spaceNicknameGate';
 
 export type AccountIdentityStatus =
   | 'account'
@@ -48,13 +49,22 @@ function resolveDisplayName(params: ResolveAccountIdentityParams): string {
   if (community) return community;
 
   const profile = params.profileNickname?.trim();
-  if (profile) return profile;
+  if (profile && !(params.currentUser.isIssuedParticipant && isPlaceholderUsername(profile))) {
+    return profile;
+  }
 
-  const username = params.currentUser?.username?.trim();
-  if (username) return username;
+  const username = params.currentUser.username?.trim();
+  if (username && !(params.currentUser.isIssuedParticipant && isPlaceholderUsername(username))) {
+    return username;
+  }
 
-  const displayName = params.currentUser?.displayName?.trim();
-  if (displayName) return displayName;
+  const displayName = params.currentUser.displayName?.trim();
+  if (displayName && !(params.currentUser.isIssuedParticipant && isPlaceholderUsername(displayName))) {
+    return displayName;
+  }
+
+  // 参加IDでスペース nick 未登録のときは placeholder「ユーザー」を正式名として出さない
+  if (params.currentUser.isIssuedParticipant) return '';
 
   return 'ゲスト';
 }

@@ -12,6 +12,7 @@ export type HossiiActionsContextValue = Omit<
   | 'myAuthorshipIdsStatus'
   | 'postAuthorDisplayNames'
   | 'activeSpaceMembershipStatus'
+  | 'spaceNicknamesReady'
 >;
 
 export const HossiiActionsContext = createContext<HossiiActionsContextValue | null>(null);

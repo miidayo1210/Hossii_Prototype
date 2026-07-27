@@ -124,10 +124,11 @@ import {
 import { createControllerHost, type ControllerHost } from '../utils/controllerHost';
 import {
   upsertProfile,
-  upsertSpaceNickname,
   fetchSpaceNicknames,
   fetchLegacyDefaultNickname,
 } from '../utils/profilesApi';
+import { persistSpaceNickname } from '../utils/persistSpaceNickname';
+import { hasNicknameForSpaceGate, isPlaceholderUsername } from '../utils/spaceNicknameGate';
 import { upsertUserProfile } from '../utils/userProfilesApi';
 import { useAuth } from '../contexts/useAuth';
 import { useAdminNavigation } from '../contexts/useAdminNavigation';
@@ -923,10 +924,12 @@ export type HossiiContextValue = {
   removeSpace: (id: SpaceId) => void;
   setMode: (mode: AppMode) => void;
   setDefaultNickname: (nickname: string) => void;
-  setSpaceNickname: (spaceId: string, nickname: string) => void;
+  setSpaceNickname: (spaceId: string, nickname: string) => void | Promise<void>;
   getActiveNickname: () => string;
   getAuthorId: () => string | undefined;
   hasNicknameForSpace: (spaceId: string) => boolean;
+  /** Supabase から space_nicknames を取得済みか（参加ID初回判定の待機用） */
+  spaceNicknamesReady: boolean;
   setVisitingSpace: (spaceId: string | null) => void;
   updateHossiiColorAction: (id: string, color: string | null) => void;
   updateHossiiPositionAction: (id: string, positionX: number, positionY: number) => void;
@@ -1025,6 +1028,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     listQueryKey: null,
   });
 
+  // 未設定時はローカル初期値で即判定可。Supabase 時は fetch 完了まで参加ID初回判定を待つ。
+  const [spaceNicknamesReady, setSpaceNicknamesReady] = useState(!isSupabaseConfigured);
+
   // 自分が Supabase に INSERT した ID を追跡（fetch マージで掃除するまで保持）
   const insertedHossiiIdsRef = useRef<Set<string>>(new Set());
   /** SYNC で state から消えてもマージで戻せるよう楽観行を保持 */
@@ -1078,28 +1084,43 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
     if (!currentUser?.uid) {
       authorProfileIdRef.current = undefined;
+      setSpaceNicknamesReady(!isSupabaseConfigured);
       return;
     }
 
     authorProfileIdRef.current = currentUser.uid;
+    if (isSupabaseConfigured) {
+      setSpaceNicknamesReady(false);
+    }
 
     const syncLoggedInProfile = async () => {
       const existing = stateRef.current.profile;
       const isStaleGuestProfile = Boolean(existing && existing.id !== currentUser.uid);
+      const isParticipant = currentUser.isIssuedParticipant === true;
 
       let defaultNickname = '';
       if (!isStaleGuestProfile && existing?.defaultNickname?.trim()) {
-        defaultNickname = existing.defaultNickname.trim();
+        const existingNick = existing.defaultNickname.trim();
+        // 参加ID: placeholder「ユーザー」を defaultNickname に載せない
+        if (!(isParticipant && isPlaceholderUsername(existingNick))) {
+          defaultNickname = existingNick;
+        }
       }
       if (!defaultNickname && currentUser.username?.trim()) {
-        defaultNickname = currentUser.username.trim();
+        const username = currentUser.username.trim();
+        if (!(isParticipant && isPlaceholderUsername(username))) {
+          defaultNickname = username;
+        }
       }
       if (!defaultNickname && currentUser.displayName?.trim()) {
-        defaultNickname = currentUser.displayName.trim();
+        const displayName = currentUser.displayName.trim();
+        if (!(isParticipant && isPlaceholderUsername(displayName))) {
+          defaultNickname = displayName;
+        }
       }
       if (!defaultNickname && isSupabaseConfigured) {
         const legacyNickname = await fetchLegacyDefaultNickname(currentUser.uid);
-        if (legacyNickname) {
+        if (legacyNickname && !(isParticipant && isPlaceholderUsername(legacyNickname))) {
           defaultNickname = legacyNickname;
         }
       }
@@ -1113,8 +1134,14 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       saveProfile(nextProfile);
 
       if (isSupabaseConfigured) {
-        const nicknames = await fetchSpaceNicknames(currentUser.uid);
-        dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
+        try {
+          const nicknames = await fetchSpaceNicknames(currentUser.uid);
+          dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
+        } finally {
+          setSpaceNicknamesReady(true);
+        }
+      } else {
+        setSpaceNicknamesReady(true);
       }
     };
 
@@ -1123,6 +1150,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     currentUser?.uid,
     currentUser?.username,
     currentUser?.displayName,
+    currentUser?.isIssuedParticipant,
     isResolvingAuth,
   ]);
 
@@ -1792,22 +1820,39 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     }
   }, [currentUser]);
 
-  const setSpaceNickname = useCallback((spaceId: string, nickname: string) => {
-    dispatch({ type: 'SET_SPACE_NICKNAME', payload: { spaceId, nickname } });
-    if (isSupabaseConfigured) {
-      const profile = stateRef.current.profile;
-      const nicknameProfileId = currentUser?.uid ?? profile?.id;
-      if (!nicknameProfileId) return;
+  const setSpaceNickname = useCallback(async (spaceId: string, nickname: string) => {
+    const trimmed = nickname.trim();
+    const previous = stateRef.current.spaceNicknames[spaceId];
+    dispatch({ type: 'SET_SPACE_NICKNAME', payload: { spaceId, nickname: trimmed } });
 
-      if (currentUser?.uid) {
-        void upsertProfile({
-          id: currentUser.uid,
-          defaultNickname: profile?.defaultNickname ?? currentUser.username ?? '',
-          createdAt: profile?.createdAt ?? new Date(),
-        });
-      }
+    // ゲストは端末ローカルのみ。ログインユーザーだけ Supabase へ保存する。
+    if (!isSupabaseConfigured || !currentUser?.uid) return;
 
-      void upsertSpaceNickname(nicknameProfileId, spaceId, nickname.trim());
+    const profile = stateRef.current.profile;
+    const defaultNickname = profile?.defaultNickname?.trim()
+      || (currentUser.isIssuedParticipant && isPlaceholderUsername(currentUser.username)
+        ? ''
+        : (currentUser.username ?? ''));
+    void upsertProfile({
+      id: currentUser.uid,
+      defaultNickname,
+      createdAt: profile?.createdAt ?? new Date(),
+    });
+
+    try {
+      await persistSpaceNickname({
+        profileId: currentUser.uid,
+        spaceId,
+        nickname: trimmed,
+      });
+    } catch (error) {
+      // 失敗時はローカルを戻し、呼び出し側（NicknameModal）が遷移しないようにする
+      dispatch({
+        type: 'SET_SPACE_NICKNAME',
+        payload: { spaceId, nickname: previous?.trim() ? previous : '' },
+      });
+      console.error('[HossiiStore] persistSpaceNickname failed', error);
+      throw error;
     }
   }, [currentUser]);
 
@@ -1823,18 +1868,14 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
   }, [currentUser, state.profile?.id]);
 
   const hasNicknameForSpace = useCallback((spaceId: string) => {
-    const spaceNickname = state.spaceNicknames[spaceId]?.trim();
-    if (spaceNickname) return true;
-
-    if (!currentUser) return false;
-
-    const defaultNickname = state.profile?.defaultNickname?.trim();
-    if (defaultNickname) return true;
-
-    if (currentUser.username?.trim()) return true;
-    if (currentUser.displayName?.trim()) return true;
-
-    return false;
+    return hasNicknameForSpaceGate({
+      spaceId,
+      spaceNicknames: state.spaceNicknames,
+      isIssuedParticipant: currentUser?.isIssuedParticipant === true,
+      defaultNickname: state.profile?.defaultNickname,
+      username: currentUser?.username,
+      displayName: currentUser?.displayName,
+    });
   }, [state.spaceNicknames, state.profile?.defaultNickname, currentUser]);
 
   const setVisitingSpace = useCallback((spaceId: string | null) => {
@@ -2037,6 +2078,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         getActiveNickname,
         getAuthorId,
         hasNicknameForSpace,
+        spaceNicknamesReady,
         setVisitingSpace,
         updateHossiiColorAction,
         updateHossiiPositionAction,

@@ -40,4 +40,36 @@ describe('resolveAccountIdentity', () => {
     expect(identity.status).toBe('participant');
     expect(identity.statusLabel).toBe('参加IDでログイン中');
   });
+
+  it('does not treat placeholder「ユーザー」as participant display name', () => {
+    const identity = resolveAccountIdentity({
+      currentUser: {
+        uid: 'p1',
+        email: null,
+        displayName: null,
+        isAdmin: false,
+        isIssuedParticipant: true,
+        username: 'ユーザー',
+      },
+      profileNickname: 'ユーザー',
+    });
+    expect(identity.displayName).toBe('');
+    expect(identity.status).toBe('participant');
+  });
+
+  it('prefers space nickname over placeholder username for participants', () => {
+    const identity = resolveAccountIdentity({
+      currentUser: {
+        uid: 'p1',
+        email: null,
+        displayName: null,
+        isAdmin: false,
+        isIssuedParticipant: true,
+        username: 'ユーザー',
+      },
+      spaceNickname: 'みー',
+      profileNickname: 'ユーザー',
+    });
+    expect(identity.displayName).toBe('みー');
+  });
 });

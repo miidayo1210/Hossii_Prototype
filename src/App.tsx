@@ -82,7 +82,15 @@ const AppContent = () => {
   const { currentUser, isResolvingAuth, logout, loading } = useAuth();
   const { screen, screenParam, navigate } = useRouter();
   const { memberships } = useSelectedCommunity();
-  const { state, spacesLoadedFromSupabase, setActiveSpace, addSpace, addSpaceLocal, hasNicknameForSpace } = useHossiiStore();
+  const {
+    state,
+    spacesLoadedFromSupabase,
+    setActiveSpace,
+    addSpace,
+    addSpaceLocal,
+    hasNicknameForSpace,
+    spaceNicknamesReady,
+  } = useHossiiStore();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [pendingSpaceId, setPendingSpaceId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -212,23 +220,43 @@ const AppContent = () => {
     prevCurrentUserForSlugRef.current = currentUser;
   }, [currentUser, isOnSlugPath]);
 
-  // 参加者ログイン成功後: ログイン対象スペースへ必ず入室する
+  // 参加者ログイン成功後: 発行元スペースへ入室。space nick 未登録なら NicknameModal を先に出す。
   useEffect(() => {
     if (!currentUser || !pendingParticipantSpaceId) return;
+
+    // 参加IDは space_nicknames 取得完了まで判定しない（username「ユーザー」での誤スキップ防止）
+    if (currentUser.isIssuedParticipant && isSupabaseConfigured && !spaceNicknamesReady) {
+      return;
+    }
 
     const spaceId = pendingParticipantSpaceId;
     setPendingParticipantSpaceId(null);
     setIsGuestMode(false);
     setActiveSpace(spaceId);
-    if (!hasNicknameForSpace(spaceId)) {
+
+    const needsNickname = !hasNicknameForSpace(spaceId);
+    if (needsNickname) {
       setPendingSpaceId(spaceId);
       setShowNicknameModal(true);
     }
+
+    // 初回名前未登録の参加IDはモーダル完了までスペース画面へ進まない
+    if (currentUser.isIssuedParticipant && needsNickname) {
+      return;
+    }
+
     const hash = window.location.hash;
     if (!hash || hash === '#') {
       navigate('screen');
     }
-  }, [currentUser, pendingParticipantSpaceId, setActiveSpace, hasNicknameForSpace, navigate]);
+  }, [
+    currentUser,
+    pendingParticipantSpaceId,
+    setActiveSpace,
+    hasNicknameForSpace,
+    navigate,
+    spaceNicknamesReady,
+  ]);
 
   // ログイン/新規登録完了後にpendingLoginSlugへリダイレクト
   useEffect(() => {
@@ -422,8 +450,17 @@ const AppContent = () => {
   }, [state.spaces, setActiveSpace, addSpace, hasNicknameForSpace]);
 
   const handleNicknameModalClose = () => {
+    const completedSpaceId = pendingSpaceId;
     setShowNicknameModal(false);
     setPendingSpaceId(null);
+    // 参加ID初回登録後に発行元スペースへ進む
+    if (currentUser?.isIssuedParticipant && completedSpaceId) {
+      setActiveSpace(completedSpaceId);
+      const hash = window.location.hash;
+      if (!hash || hash === '#') {
+        navigate('screen');
+      }
+    }
   };
 
   const handleOnboardingComplete = (userId: string, nickname: string) => {
@@ -681,6 +718,20 @@ const AppContent = () => {
     }
   }
 
+  // 参加IDログイン直後: space_nicknames 取得完了までスペースへ進まない
+  if (
+    currentUser?.isIssuedParticipant &&
+    pendingParticipantSpaceId &&
+    isSupabaseConfigured &&
+    !spaceNicknamesReady
+  ) {
+    return (
+      <div style={authResolvingScreenStyle}>
+        読み込み中…
+      </div>
+    );
+  }
+
   // slug 直リンクの解決中は not-found / SpaceScreen を出さず待機する（ゲスト・ログイン共通）
   if (slugUrlStillResolving) {
     return (
@@ -759,7 +810,9 @@ const AppContent = () => {
         <NicknameModal
           spaceId={pendingSpaceId}
           onClose={handleNicknameModalClose}
-          variant={currentUser ? 'profile' : 'guest'}
+          variant={
+            currentUser && !currentUser.isIssuedParticipant ? 'profile' : 'guest'
+          }
         />
       )}
       <BottomNavBar isMobile={isMobile} onMobilePostPress={handleMobilePostNav} />

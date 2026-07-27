@@ -139,7 +139,14 @@
   background: #fff;
   transition: border-color 0.2s;
   box-sizing: border-box;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.errorText {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.75rem;
+  color: #b91c1c;
+  text-align: center;
 }
 
 .input:focus {

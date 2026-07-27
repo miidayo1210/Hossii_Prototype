@@ -209,6 +209,8 @@ Supabase Authのログインアカウントごとに、1体の「マイHossii」
 2. `profiles.default_nickname`
 3. `user_profiles.username`
 
+**参加 ID アカウント（[101](./101_管理者発行参加者アカウント.md) §4.4）:** 初回登録判定・表示の正本は発行元スペースのスペース内ニックネーム（上記 1）とする。`user_profiles.username='ユーザー'` 等のアカウント共通 placeholder だけでは登録済みとみなさず、スペース上の表示でもスペース内ニックネームを優先する。
+
 ### 7-4. スペース単位の有効化
 
 スペース設定に `my_hossii_enabled` を追加する。
