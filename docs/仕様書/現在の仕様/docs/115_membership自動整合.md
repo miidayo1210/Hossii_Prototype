@@ -7,6 +7,7 @@
 > **関連:** [110_アカウントマージ将来仕様](../110_アカウントマージ将来仕様.md)（自動 merge は対象外）  
 > **注記:** 参加 ID アカウントの Account 所属**表示**（発行元 space / community 限定）は [101](../101_管理者発行参加者アカウント.md) §6.4 を正本とする。本書の membership 自動整合とは分離し、表示限定と既存行整理は別課題。
 > **注記（参加 ID 初回名前）:** membership auto-join 時に placeholder「ユーザー」を `space_nickname` へ渡さない。初回名前登録の正本は [101](../101_管理者発行参加者アカウント.md) §4.4。
+> **注記（参加 ID の join）:** `join_space_as_member` は参加 ID について発行元 space 以外を拒否する（[101](../101_管理者発行参加者アカウント.md) §6.6）。拒否時は space membership も community 整合も行わない。
 
 ## 背景
 
