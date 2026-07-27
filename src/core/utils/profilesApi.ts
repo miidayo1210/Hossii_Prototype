@@ -46,6 +46,7 @@ export async function upsertSpaceNickname(
     .upsert(row, { onConflict: 'profile_id,space_id' });
   if (error) {
     console.error('[profilesApi] upsertSpaceNickname error:', error.message);
+    throw error;
   }
 }
 

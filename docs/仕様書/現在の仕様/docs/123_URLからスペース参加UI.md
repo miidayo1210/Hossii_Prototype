@@ -1332,6 +1332,10 @@ revisit   -- 追加
 
 ログイン済みユーザーに対する `variant: profile` の役割は別途整理する。
 
+**参加 ID 初回ログイン（[101](../101_管理者発行参加者アカウント.md) §4.4）:** 発行元スペースの `space_nicknames` 未登録時に既存 `NicknameModal`（`variant=guest`）を表示する。`user_profiles.username='ユーザー'` だけではスキップしない。保存成功後に発行元スペースへ進む。通常アカウントの既存判定は変更しない。
+
+**判定タイミング:** 参加 ID ログイン pending 経路および `/s/[slug]`（auth 復元で slug 処理が再実行される場合を含む）のいずれも、`space_nicknames` の hydrate 完了および発行元 scope 解決後にのみ登録済み判定を行う。hydrate 前に「未登録」とみなして NicknameModal を立てない（101 §4.4.1）。
+
 同一導線内で名前入力が重複しないようにする。
 
 ## 19.4 TutorialOverlay
