@@ -35,6 +35,9 @@ function makeParams(
     activeSpaceId: 'space-shared',
     spaces: defaultSpaces,
     isGuest: false,
+    isIssuedParticipant: false,
+    issuedParticipantScope: null,
+    affiliationLoading: false,
     resolveNickname,
     join,
     ...over,
@@ -112,6 +115,94 @@ describe('useActiveSpaceMembershipJoin', () => {
 
     expect(join).toHaveBeenCalledTimes(2);
     expect(result.current.activeSpaceMembershipStatus).toBe('active');
+  });
+
+  it('参加ID + 発行元外 public では join RPC を呼ばない（閲覧は継続）', async () => {
+    const join = vi.fn(async () => ({ id: 'm1' }));
+    const { result } = renderMembershipJoin(join, {
+      isIssuedParticipant: true,
+      activeSpaceId: 'space-shared',
+      issuedParticipantScope: {
+        ok: true,
+        spaceId: 'space-issued',
+        spaceName: '発行元',
+        spaceUrl: 'issued',
+        isArchived: false,
+        communityId: 'c1',
+        communityName: 'Comm',
+        communitySlug: 'comm',
+        spaceNickname: null,
+        membershipId: 'm-issued',
+        joinedAt: '2026-07-01T00:00:00.000Z',
+      },
+    });
+
+    await act(async () => {
+      await flush();
+    });
+
+    expect(join).not.toHaveBeenCalled();
+    expect(result.current.activeSpaceMembershipStatus).toBe('none');
+  });
+
+  it('参加ID + 発行元 public では join RPC を呼ぶ', async () => {
+    const join = vi.fn(async () => ({ id: 'm1' }));
+    const issuedScope = {
+      ok: true as const,
+      spaceId: 'space-shared',
+      spaceName: '発行元',
+      spaceUrl: 'shared',
+      isArchived: false,
+      communityId: 'c1',
+      communityName: 'Comm',
+      communitySlug: 'comm',
+      spaceNickname: null,
+      membershipId: 'm-issued',
+      joinedAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { result } = renderMembershipJoin(join, {
+      isIssuedParticipant: true,
+      activeSpaceId: 'space-shared',
+      issuedParticipantScope: issuedScope,
+    });
+
+    await act(async () => {
+      await flush();
+    });
+
+    expect(join).toHaveBeenCalledTimes(1);
+    expect(join).toHaveBeenCalledWith('space-shared', 'にっく');
+    expect(result.current.activeSpaceMembershipStatus).toBe('active');
+  });
+
+  it('参加ID + scope loading では join RPC を呼ばない', async () => {
+    const join = vi.fn(async () => ({ id: 'm1' }));
+    renderMembershipJoin(join, {
+      isIssuedParticipant: true,
+      affiliationLoading: true,
+      issuedParticipantScope: null,
+      activeSpaceId: 'space-shared',
+    });
+
+    await act(async () => {
+      await flush();
+    });
+
+    expect(join).not.toHaveBeenCalled();
+  });
+
+  it('ゲストは従来どおり join RPC を呼ばない', async () => {
+    const join = vi.fn(async () => ({ id: 'm1' }));
+    renderMembershipJoin(join, {
+      isGuest: true,
+      uid: null,
+    });
+
+    await act(async () => {
+      await flush();
+    });
+
+    expect(join).not.toHaveBeenCalled();
   });
 
   it('retry 連打でも in-flight は 1 本', async () => {

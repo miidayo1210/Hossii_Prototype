@@ -63,6 +63,20 @@ describe('createMembershipJoinController', () => {
     expect(join).not.toHaveBeenCalled();
   });
 
+  it('allowAutoJoin=false のあと同一 space へ戻っても再 join しない', async () => {
+    const { controller, join } = makeController();
+    controller.sync(input());
+    await flush();
+    expect(join).toHaveBeenCalledTimes(1);
+
+    controller.sync(input({ allowAutoJoin: false }));
+    expect(join).toHaveBeenCalledTimes(1);
+
+    controller.sync(input({ allowAutoJoin: true }));
+    await flush();
+    expect(join).toHaveBeenCalledTimes(1);
+  });
+
   it('#3 session（uid）なしでは呼ばない', () => {
     const { controller, join } = makeController();
     controller.sync(input({ uid: null }));

@@ -71,9 +71,17 @@ export function createMembershipJoinController(
   const syncInternal = (input: MembershipJoinInput, forceRetry: boolean) => {
     const { configured, authReady, uid, spaceId, isGuest, allowAutoJoin, resolveNickname } = input;
 
-    // ログアウト / ゲスト / invite_only / personal = 対象外。
-    if (!uid || isGuest || !allowAutoJoin) {
+    // ログアウト / ゲスト = 対象外（セッション成功キーも破棄）。
+    if (!uid || isGuest) {
       lastSuccessKey = null;
+      inFlightKey = null;
+      setStatus('none');
+      return;
+    }
+
+    // invite_only / personal / 参加IDの発行元外 = この space では join しない。
+    // lastSuccessKey は保持する（activeSpace 更新前のフリップや発行元復帰時の無駄な再 join を防ぐ）。
+    if (!allowAutoJoin) {
       inFlightKey = null;
       setStatus('none');
       return;
