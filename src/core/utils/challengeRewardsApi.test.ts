@@ -166,4 +166,26 @@ describe('challengeRewardsApi', () => {
     await expect(listMyChallengeRewards(['missing'])).resolves.toEqual([]);
     await expect(listMyChallengeCompletions(['missing'])).resolves.toEqual([]);
   });
+
+  it('returns empty without querying when itemIds is empty', async () => {
+    await expect(listMyChallengeRewards([])).resolves.toEqual([]);
+    await expect(listMyChallengeCompletions([])).resolves.toEqual([]);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('returns empty without querying when itemIds are whitespace-only', async () => {
+    await expect(listMyChallengeRewards(['  ', ''])).resolves.toEqual([]);
+    await expect(listMyChallengeCompletions(['  '])).resolves.toEqual([]);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('throws on supabase list errors', async () => {
+    const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+    chain.select = vi.fn(() => chain);
+    chain.in = vi.fn(() => chain);
+    chain.order = vi.fn(async () => ({ data: null, error: { message: 'boom' } }));
+    fromMock.mockReturnValue(chain);
+    await expect(listMyChallengeRewards(['i1'])).rejects.toThrow('boom');
+    await expect(listMyChallengeCompletions(['i1'])).rejects.toThrow('boom');
+  });
 });

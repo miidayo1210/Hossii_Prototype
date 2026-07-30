@@ -124,6 +124,19 @@ export const ChallengeScreen = () => {
     void reloadList();
   }, [reloadList]);
 
+  // Space switch must not keep previous space detail / stamp state.
+  useEffect(() => {
+    setView({ kind: 'list' });
+    setActiveProgram(null);
+    setItems([]);
+    setMyResponses({});
+    setMyRewards({});
+    setMyCompletions({});
+    setDrafts({});
+    setFormError(null);
+    setRewardModal(null);
+  }, [activeSpace?.id]);
+
   const openDetail = async (programId: string) => {
     setFormError(null);
     setBusyItemId('__open__');

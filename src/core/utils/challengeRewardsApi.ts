@@ -131,9 +131,17 @@ export async function listMyChallengeRewards(
 ): Promise<ChallengeReward[]> {
   if (!isSupabaseConfigured) return [];
 
+  // When itemIds is provided (including []), never fall through to an unscoped list.
+  // Empty / whitespace-only ids must return [] — Supabase `.in()` with [] is unsafe/undefined.
+  const scopedIds =
+    itemIds === undefined
+      ? null
+      : itemIds.map((id) => id.trim()).filter(Boolean);
+  if (scopedIds && scopedIds.length === 0) return [];
+
   let query = supabase.from('challenge_rewards').select('*');
-  if (itemIds && itemIds.length > 0) {
-    query = query.in('item_id', itemIds.map((id) => id.trim()).filter(Boolean));
+  if (scopedIds) {
+    query = query.in('item_id', scopedIds);
   }
 
   const { data, error } = await query.order('awarded_at', { ascending: false });
@@ -151,9 +159,15 @@ export async function listMyChallengeCompletions(
 ): Promise<ChallengeCompletion[]> {
   if (!isSupabaseConfigured) return [];
 
+  const scopedIds =
+    itemIds === undefined
+      ? null
+      : itemIds.map((id) => id.trim()).filter(Boolean);
+  if (scopedIds && scopedIds.length === 0) return [];
+
   let query = supabase.from('challenge_completions').select('*');
-  if (itemIds && itemIds.length > 0) {
-    query = query.in('item_id', itemIds.map((id) => id.trim()).filter(Boolean));
+  if (scopedIds) {
+    query = query.in('item_id', scopedIds);
   }
 
   const { data, error } = await query.order('completed_at', { ascending: false });
