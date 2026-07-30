@@ -4,8 +4,11 @@ import {
   DEFAULT_FOLDER,
   DEFAULT_FOLDER_ID,
   ORPHAN_FOLDER_NAME,
+  applyFolderStripInsert,
+  buildTabBarStrip,
   migrateLegacyLocalTabFoldersIfNeeded,
   parseTabFolders,
+  repositionTabFolder,
   resolveEffectiveTabFolders,
 } from './tabFolderStorage';
 
@@ -38,9 +41,66 @@ describe('parseTabFolders', () => {
     ]);
   });
 
+  it('parses beforePaneId', () => {
+    expect(
+      parseTabFolders([
+        { id: 'a', name: 'カゴ', sortOrder: 0, beforePaneId: 'pane-2' },
+        { id: 'b', name: '末尾', sortOrder: 1, beforePaneId: null },
+      ]),
+    ).toEqual([
+      { id: 'a', name: 'カゴ', sortOrder: 0, beforePaneId: 'pane-2' },
+      { id: 'b', name: '末尾', sortOrder: 1, beforePaneId: null },
+    ]);
+  });
+
   it('returns empty for invalid input', () => {
     expect(parseTabFolders(null)).toEqual([]);
     expect(parseTabFolders([{ id: '', name: 'x', sortOrder: 0 }])).toEqual([]);
+  });
+});
+
+describe('buildTabBarStrip / applyFolderStripInsert', () => {
+  const bar = [
+    pane({ id: 'p1', name: 'Main', sortOrder: 0, isDefault: true }),
+    pane({ id: 'p2', name: 'Week', sortOrder: 1 }),
+  ];
+
+  it('places folders with beforePaneId between tabs', () => {
+    const folders = [
+      { id: 'f1', name: 'カゴ', sortOrder: 0, beforePaneId: 'p2' },
+    ];
+    const strip = buildTabBarStrip(bar, folders);
+    expect(strip.map((item) => (item.kind === 'pane' ? item.pane.id : item.folder.id))).toEqual([
+      'p1',
+      'f1',
+      'p2',
+    ]);
+  });
+
+  it('falls back to end when beforePaneId is missing from bar', () => {
+    const folders = [
+      { id: 'f1', name: 'カゴ', sortOrder: 0, beforePaneId: 'gone' },
+    ];
+    const strip = buildTabBarStrip(bar, folders);
+    expect(strip.map((item) => (item.kind === 'pane' ? item.pane.id : item.folder.id))).toEqual([
+      'p1',
+      'p2',
+      'f1',
+    ]);
+  });
+
+  it('repositions folder before first pane via strip insert', () => {
+    const folders = [{ id: 'f1', name: 'カゴ', sortOrder: 0 }];
+    const next = applyFolderStripInsert(bar, folders, 'f1', 0);
+    expect(next).toEqual([{ id: 'f1', name: 'カゴ', sortOrder: 0, beforePaneId: 'p1' }]);
+  });
+
+  it('repositionTabFolder updates beforePaneId', () => {
+    const folders = [{ id: 'f1', name: 'カゴ', sortOrder: 0 }];
+    expect(repositionTabFolder(folders, 'f1', 'p2')).toEqual([
+      { id: 'f1', name: 'カゴ', sortOrder: 0, beforePaneId: 'p2' },
+    ]);
+    expect(repositionTabFolder(folders, 'f1', null)).toBeNull();
   });
 });
 

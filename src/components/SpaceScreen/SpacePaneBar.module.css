@@ -329,24 +329,18 @@
   overflow: hidden;
   max-width: 0;
   opacity: 0;
+  flex-shrink: 0;
   transition:
     max-width 220ms ease-out,
     opacity 220ms ease-out;
 }
 
 .folderTrayOpen {
-  max-width: min(50vw, 320px);
+  /* Show all tabs in one row; overflow scrolls via parent .scroll */
+  max-width: 10000px;
   opacity: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
-  scrollbar-width: none;
+  overflow: visible;
   padding-right: 2px;
-}
-
-.folderTrayOpen::-webkit-scrollbar {
-  display: none;
 }
 
 /* Add folder button */

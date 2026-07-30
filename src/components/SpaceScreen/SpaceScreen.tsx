@@ -123,10 +123,10 @@ import {
   DEFAULT_FOLDER,
   DEFAULT_FOLDER_ID,
   type TabFolder,
+  applyFolderStripInsert,
   clearLegacyLocalTabFolders,
   migrateLegacyLocalTabFoldersIfNeeded,
   normalizeStoredTabFolders,
-  reorderTabFolders,
   resolveEffectiveTabFolders,
 } from '../../core/utils/tabFolderStorage';
 import {
@@ -788,14 +788,20 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
   );
 
   const handleReorderFolder = useCallback(
-    (draggedId: string, insertBeforeIndex: number) => {
+    (draggedId: string, insertBeforeStripIndex: number) => {
       if (!activeSpaceId) return;
-      const sorted = [...effectiveFolders].sort((a, b) => a.sortOrder - b.sortOrder);
-      const reordered = reorderTabFolders(sorted, draggedId, insertBeforeIndex);
+      const { barPanes } = splitPanesByFolders(visiblePanes);
+      const reordered = applyFolderStripInsert(
+        barPanes,
+        effectiveFolders,
+        draggedId,
+        insertBeforeStripIndex,
+      );
       if (!reordered) return;
+      // Materialize virtual default folder when first repositioned
       persistTabFolders(reordered);
     },
-    [activeSpaceId, effectiveFolders, persistTabFolders],
+    [activeSpaceId, effectiveFolders, persistTabFolders, visiblePanes],
   );
 
   useEffect(() => {
