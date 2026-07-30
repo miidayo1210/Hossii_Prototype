@@ -22,6 +22,7 @@ import { MyLogsScreen } from './components/MyLogsScreen/MyLogsScreen';
 import { AccountScreen } from './components/AccountScreen/AccountScreen';
 import { SpaceSettingsScreen } from './components/SpaceSettingsScreen/SpaceSettingsScreen';
 import { StampCardScreen } from './components/StampCardScreen/StampCardScreen';
+import { ChallengeScreen } from './components/ChallengeScreen/ChallengeScreen';
 import { ReflectionScreen } from './components/ReflectionScreen/ReflectionScreen';
 import { NeighborsScreen } from './components/NeighborsScreen/NeighborsScreen';
 import { StartScreen } from './components/StartScreen/StartScreen';
@@ -891,6 +892,8 @@ const AppContent = () => {
         return <SpaceSettingsScreen />;
       case 'card':
         return <StampCardScreen />;
+      case 'challenge':
+        return <ChallengeScreen />;
       case 'reflection':
         return <ReflectionScreen />;
       case 'neighbors':

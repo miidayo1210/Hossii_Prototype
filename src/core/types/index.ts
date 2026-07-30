@@ -115,7 +115,7 @@ export type AddHossiiInput = {
   postPaneId?: string;
 };
 
-export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'communities' | 'reflection' | 'neighbors' | 'community' | 'community-invite';
+export type Screen = 'post' | 'screen' | 'comments' | 'spaces' | 'profile' | 'mylogs' | 'account' | 'settings' | 'card' | 'challenge' | 'communities' | 'reflection' | 'neighbors' | 'community' | 'community-invite';
 
 export type HossiiState = {
   hossiis: Hossii[];

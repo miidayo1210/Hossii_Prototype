@@ -17,7 +17,11 @@ import {
   listChallengePrograms,
   updateChallengeItem,
   updateChallengeProgram,
+  updateChallengeProgramStatus,
 } from '../../core/utils/challengeProgramsApi';
+import { listManagerChallengeResponses } from '../../core/utils/challengeResponsesApi';
+import { invalidatePublishedChallengeNavCache } from '../../core/hooks/useHasPublishedChallengePrograms';
+import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import sharedStyles from './SettingsShared.module.css';
@@ -99,6 +103,10 @@ export const ChallengeAdminTab = ({ space }: Props) => {
   const [itemForm, setItemForm] = useState<ItemFormState>(EMPTY_ITEM_FORM);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
+  const [responsesItemId, setResponsesItemId] = useState<string | null>(null);
+  const [managerResponses, setManagerResponses] = useState<ChallengeResponse[]>([]);
+  const [responsesLoading, setResponsesLoading] = useState(false);
+  const [responsesError, setResponsesError] = useState<string | null>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -332,6 +340,65 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     setItems(await listChallengeItems(editingProgram.id));
   };
 
+  const handlePublish = async () => {
+    if (!editingProgram || busy) return;
+    if (editingProgram.status !== 'draft') return;
+    if (!programTitle.trim()) {
+      setFormError('タイトルを入力してください');
+      return;
+    }
+    const commentItems = items.filter((item) => item.responseType === 'comment');
+    if (commentItems.length === 0) {
+      setFormError('公開するにはコメント形式の項目が1件以上必要です');
+      return;
+    }
+    const ok = window.confirm(
+      `「${programTitle.trim()}」を公開しますか？\n公開後は項目の追加・編集・削除ができなくなります。`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    setFormError(null);
+    if (
+      programTitle !== editingProgram.title ||
+      programDescription !== (editingProgram.description ?? '')
+    ) {
+      const saved = await updateChallengeProgram(editingProgram.id, {
+        title: programTitle,
+        description: programDescription,
+      });
+      if (!saved.ok) {
+        setBusy(false);
+        setFormError(saved.error);
+        return;
+      }
+    }
+    const result = await updateChallengeProgramStatus(editingProgram.id, 'published');
+    setBusy(false);
+    if (!result.ok) {
+      setFormError(result.error);
+      return;
+    }
+    setEditingProgram(result.value);
+    invalidatePublishedChallengeNavCache(space.id);
+    showToast('挑戦状を公開しました');
+  };
+
+  const openManagerResponses = async (itemId: string) => {
+    setResponsesItemId(itemId);
+    setResponsesLoading(true);
+    setResponsesError(null);
+    try {
+      // RLS: manager_only only. Do not infer self_only existence from empty list.
+      const listed = await listManagerChallengeResponses(itemId);
+      setManagerResponses(listed);
+    } catch (error) {
+      setManagerResponses([]);
+      setResponsesError(error instanceof Error ? error.message : '回答の取得に失敗しました');
+    } finally {
+      setResponsesLoading(false);
+    }
+  };
+
   if (!canManage) {
     return (
       <SettingsPageHeader
@@ -405,7 +472,11 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       <>
         <SettingsPageHeader
           title={editingProgram.title}
-          description="下書きの編集です。回答形式はコメント固定です。"
+          description={
+            isDraft
+              ? '下書きの編集です。回答形式はコメント固定です。'
+              : '公開中のストーリーです。項目構造は変更できません。'
+          }
         >
           <div className={styles.actions}>
             <button
@@ -454,6 +525,18 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                   disabled={busy || !programTitle.trim()}
                 >
                   {busy ? '保存中…' : 'ストーリーを保存'}
+                </button>
+                <button
+                  type="button"
+                  className={sharedStyles.primaryButton}
+                  onClick={() => void handlePublish()}
+                  disabled={
+                    busy ||
+                    !programTitle.trim() ||
+                    items.filter((item) => item.responseType === 'comment').length === 0
+                  }
+                >
+                  {busy ? '公開中…' : '公開する'}
                 </button>
                 <button
                   type="button"
@@ -601,24 +684,67 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                     </div>
                     <strong>{item.title}</strong>
                     {item.description && <p className={styles.muted}>{item.description}</p>}
-                    {isDraft && (
-                      <div className={styles.actions}>
+                    <div className={styles.actions}>
+                      {isDraft && (
+                        <>
+                          <button
+                            type="button"
+                            className={sharedStyles.ghostButton}
+                            onClick={() => startEditItem(item)}
+                            disabled={busy}
+                          >
+                            編集
+                          </button>
+                          <button
+                            type="button"
+                            className={sharedStyles.ghostButton}
+                            onClick={() => void handleDeleteItem(item)}
+                            disabled={busy}
+                          >
+                            削除
+                          </button>
+                        </>
+                      )}
+                      {!isDraft && (
                         <button
                           type="button"
                           className={sharedStyles.ghostButton}
-                          onClick={() => startEditItem(item)}
+                          onClick={() => void openManagerResponses(item.id)}
                           disabled={busy}
                         >
-                          編集
+                          回答を見る
                         </button>
-                        <button
-                          type="button"
-                          className={sharedStyles.ghostButton}
-                          onClick={() => void handleDeleteItem(item)}
-                          disabled={busy}
-                        >
-                          削除
-                        </button>
+                      )}
+                    </div>
+                    {responsesItemId === item.id && (
+                      <div className={styles.itemForm}>
+                        <p className={styles.itemFormTitle}>
+                          管理者だけに公開された回答
+                        </p>
+                        <p className={styles.muted}>
+                          「自分だけ」の回答は件数・内容とも表示しません。
+                        </p>
+                        {responsesLoading && <p className={styles.muted}>読み込み中…</p>}
+                        {responsesError && <p className={styles.error}>{responsesError}</p>}
+                        {!responsesLoading && !responsesError && managerResponses.length === 0 && (
+                          <p className={styles.muted}>表示できる回答はまだありません</p>
+                        )}
+                        <ul className={styles.itemList}>
+                          {managerResponses.map((response) => (
+                            <li key={response.id} className={styles.itemCard}>
+                              <div className={styles.itemMeta}>
+                                <span className={styles.badge}>管理者だけ</span>
+                                <span className={styles.muted}>
+                                  参加者 {response.userId.slice(0, 8)}…
+                                </span>
+                                <span className={styles.muted}>
+                                  {formatUpdatedAt(response.updatedAt)}
+                                </span>
+                              </div>
+                              <p className={styles.muted}>{response.comment}</p>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </li>
@@ -640,7 +766,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     <>
       <SettingsPageHeader
         title="質問・ミッション管理"
-        description="Hossiiからの挑戦状を作成します。いまは下書きの作成・編集のみできます。"
+        description="Hossiiからの挑戦状を作成・公開します。公開後は参加者がコメント回答できます。"
       >
         <div className={styles.actions}>
           <button

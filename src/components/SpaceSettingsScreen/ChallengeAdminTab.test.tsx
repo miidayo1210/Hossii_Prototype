@@ -10,6 +10,7 @@ const {
   createChallengeProgramMock,
   createChallengeItemMock,
   deleteChallengeProgramMock,
+  updateChallengeProgramStatusMock,
   canManageSpaceMock,
 } = vi.hoisted(() => ({
   listChallengeProgramsMock: vi.fn(),
@@ -17,6 +18,7 @@ const {
   createChallengeProgramMock: vi.fn(),
   createChallengeItemMock: vi.fn(),
   deleteChallengeProgramMock: vi.fn(),
+  updateChallengeProgramStatusMock: vi.fn(),
   canManageSpaceMock: vi.fn(),
 }));
 
@@ -38,11 +40,17 @@ vi.mock('../../core/utils/challengeProgramsApi', () => ({
   listChallengePrograms: (...args: unknown[]) => listChallengeProgramsMock(...args),
   listChallengeItems: (...args: unknown[]) => listChallengeItemsMock(...args),
   createChallengeProgram: (...args: unknown[]) => createChallengeProgramMock(...args),
-  updateChallengeProgram: vi.fn(),
+  updateChallengeProgram: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  updateChallengeProgramStatus: (...args: unknown[]) =>
+    updateChallengeProgramStatusMock(...args),
   deleteChallengeProgram: (...args: unknown[]) => deleteChallengeProgramMock(...args),
   createChallengeItem: (...args: unknown[]) => createChallengeItemMock(...args),
   updateChallengeItem: vi.fn(),
   deleteChallengeItem: vi.fn(),
+}));
+
+vi.mock('../../core/utils/challengeResponsesApi', () => ({
+  listManagerChallengeResponses: vi.fn().mockResolvedValue([]),
 }));
 
 import { ChallengeAdminTab } from './ChallengeAdminTab';
@@ -166,6 +174,41 @@ describe('ChallengeAdminTab', () => {
     render(<ChallengeAdminTab space={space} />);
     expect(await screen.findByText(/permission denied by RLS/)).toBeTruthy();
     expect(createChallengeProgramMock).not.toHaveBeenCalled();
+  });
+
+  it('publishes a draft program with comment items', async () => {
+    const program = makeProgram();
+    listChallengeProgramsMock.mockResolvedValue([program]);
+    listChallengeItemsMock.mockResolvedValue([
+      {
+        id: 'i1',
+        programId: program.id,
+        itemType: 'question',
+        title: 'q',
+        description: null,
+        reason: null,
+        responseType: 'comment',
+        isRequired: true,
+        sortOrder: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    updateChallengeProgramStatusMock.mockResolvedValue({
+      ok: true,
+      value: { ...program, status: 'published' },
+    });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<ChallengeAdminTab space={space} />);
+    await screen.findByText('下書きストーリー');
+    fireEvent.click(screen.getAllByRole('button', { name: '編集' })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: '公開する' }));
+
+    await waitFor(() => {
+      expect(updateChallengeProgramStatusMock).toHaveBeenCalledWith('p1', 'published');
+    });
+    confirmSpy.mockRestore();
   });
 
   it('adds a mission item with comment responseType and next sortOrder', async () => {
