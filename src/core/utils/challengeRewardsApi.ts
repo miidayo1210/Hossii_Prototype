@@ -85,9 +85,9 @@ function mapSubmitPayload(payload: SubmitRpcPayload): SubmitChallengeCommentResu
 }
 
 /**
- * Participant answer save path (P5+).
+ * Sole participant write path for comment answers (P5+).
  * Atomically upserts response, ensures completion, awards at most one Hossii.
- * Prefer this over createChallengeResponse / updateChallengeResponse in ChallengeScreen.
+ * Direct challenge_responses INSERT/UPDATE is blocked by RLS.
  */
 export async function submitChallengeCommentResponse(input: {
   itemId: string;

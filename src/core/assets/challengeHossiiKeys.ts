@@ -1,7 +1,11 @@
 /**
  * Stable Hossii keys for challenge rewards.
  * DB stores these keys; UI resolves to `/hossii/{key}.png`.
- * Keep in sync with public.challenge_reward_hossii_pool() migration.
+ *
+ * Dual definition (P5 known drift risk):
+ * - Runtime award pool SoT: SQL `public.challenge_reward_hossii_pool()`
+ * - UI/path SoT: this TypeScript list
+ * Keep both identical; challengeHossiiKeys.test.ts asserts files exist.
  */
 export const CHALLENGE_HOSSII_REWARD_KEYS = [
   'emotion/wow',

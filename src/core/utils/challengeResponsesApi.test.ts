@@ -9,8 +9,6 @@ vi.mock('../supabase', () => ({
 }));
 
 import {
-  buildCreateChallengeResponsePayload,
-  buildUpdateChallengeResponsePayload,
   rowToChallengeResponse,
   type ChallengeResponseRow,
 } from './challengeResponsesApi';
@@ -82,32 +80,5 @@ describe('challengeResponsesApi mapping', () => {
     expect(mapped.userId).toBe('u1');
     expect(mapped.visibility).toBe('self_only');
     expect(mapped.createdAt).toBeInstanceOf(Date);
-  });
-
-  it('create payload omits user_id', () => {
-    const payload = buildCreateChallengeResponsePayload({
-      itemId: 'i1',
-      comment: 'c',
-      visibility: 'manager_only',
-    });
-    expect(payload).toEqual({
-      item_id: 'i1',
-      comment: 'c',
-      visibility: 'manager_only',
-    });
-    expect(payload).not.toHaveProperty('user_id');
-  });
-
-  it('update payload omits item_id and user_id', () => {
-    const payload = buildUpdateChallengeResponsePayload({
-      comment: 'updated',
-      visibility: 'self_only',
-    });
-    expect(payload).toEqual({
-      comment: 'updated',
-      visibility: 'self_only',
-    });
-    expect(payload).not.toHaveProperty('item_id');
-    expect(payload).not.toHaveProperty('user_id');
   });
 });
