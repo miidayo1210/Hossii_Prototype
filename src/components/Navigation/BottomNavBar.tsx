@@ -1,4 +1,4 @@
-import { House, PlusCircle, ScrollText, User } from 'lucide-react';
+import { House, PlusCircle, ScrollText, Sparkles, User } from 'lucide-react';
 import { useRouter } from '../../core/hooks/useRouter';
 import type { Screen } from '../../core/types';
 import styles from './BottomNavBar.module.css';
@@ -9,10 +9,12 @@ type NavItem = {
   icon: React.ComponentType<{ size?: number }>;
 };
 
+// MVP暫定: 挑戦状ナビは常時表示。将来スペース全体ON/OFFで制御する。
 const USER_NAV: NavItem[] = [
   { label: 'スペース', screen: 'screen', icon: House },
   { label: '投稿', screen: 'post', icon: PlusCircle },
   { label: 'ログ', screen: 'comments', icon: ScrollText },
+  { label: '挑戦状', screen: 'challenge', icon: Sparkles },
   { label: 'アカウント', screen: 'account', icon: User },
 ];
 

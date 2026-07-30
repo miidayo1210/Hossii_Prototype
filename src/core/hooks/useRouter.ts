@@ -3,7 +3,7 @@ import type { Screen } from '../types';
 
 const VALID_SCREENS: Screen[] = [
   'post', 'screen', 'comments', 'spaces', 'profile',
-  'mylogs', 'account', 'settings', 'card', 'communities', 'reflection',
+  'mylogs', 'account', 'settings', 'card', 'challenge', 'communities', 'reflection',
   'neighbors', 'community', 'community-invite',
 ];
 

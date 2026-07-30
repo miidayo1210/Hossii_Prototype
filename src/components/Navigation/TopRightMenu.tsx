@@ -7,10 +7,12 @@ type NavItem = {
   screen: Screen;
 };
 
+// MVP暫定: 挑戦状ナビは常時表示。将来スペース全体ON/OFFで制御する。
 const NAV_ITEMS: NavItem[] = [
   { label: 'スペース', screen: 'screen' },
   { label: '投稿する', screen: 'post' },
   { label: 'ログ一覧', screen: 'comments' },
+  { label: '挑戦状', screen: 'challenge' },
   { label: 'アカウント', screen: 'account' },
 ];
 
