@@ -2,8 +2,6 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 import type {
   ChallengeResponse,
   ChallengeResponseVisibility,
-  CreateChallengeResponseInput,
-  UpdateChallengeResponseInput,
 } from '../types/challengeResponse';
 import type { ChallengeItem, ChallengeProgram } from '../types/challengeProgram';
 import {
@@ -11,13 +9,8 @@ import {
   rowToChallengeProgram,
   type ChallengeItemRow,
   type ChallengeProgramRow,
-  type ChallengeMutationResult,
   type ChallengeOkResult,
 } from './challengeProgramsApi';
-import {
-  normalizeCreateChallengeResponseInput,
-  normalizeUpdateChallengeResponseInput,
-} from './challengeResponseValidation';
 
 export type ChallengeResponseRow = {
   id: string;
@@ -39,30 +32,6 @@ export function rowToChallengeResponse(row: ChallengeResponseRow): ChallengeResp
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
-}
-
-/** Insert payload — never includes user_id. */
-export function buildCreateChallengeResponsePayload(input: {
-  itemId: string;
-  comment: string;
-  visibility: ChallengeResponseVisibility;
-}): { item_id: string; comment: string; visibility: string } {
-  return {
-    item_id: input.itemId,
-    comment: input.comment,
-    visibility: input.visibility,
-  };
-}
-
-/** Update payload — never includes item_id or user_id. */
-export function buildUpdateChallengeResponsePayload(input: {
-  comment?: string;
-  visibility?: ChallengeResponseVisibility;
-}): Record<string, string> {
-  const payload: Record<string, string> = {};
-  if (input.comment !== undefined) payload.comment = input.comment;
-  if (input.visibility !== undefined) payload.visibility = input.visibility;
-  return payload;
 }
 
 function formatChallengeError(error: { message: string; code?: string }, fallback: string): string {
@@ -158,70 +127,11 @@ export async function getMyChallengeResponse(
   return list[0] ?? null;
 }
 
-export async function createChallengeResponse(
-  input: CreateChallengeResponseInput,
-): Promise<ChallengeMutationResult<ChallengeResponse>> {
-  const normalized = normalizeCreateChallengeResponseInput(input);
-  if (!normalized.ok) {
-    return { ok: false, error: normalized.message };
-  }
-  if (!isSupabaseConfigured) {
-    return { ok: false, error: 'Supabase is not configured' };
-  }
-
-  const payload = buildCreateChallengeResponsePayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_responses')
-    .insert(payload)
-    .select('*')
-    .maybeSingle();
-
-  if (error) {
-    console.error('[challengeResponsesApi] createChallengeResponse:', error.message);
-    return mutationFailure(error, '回答の保存に失敗しました');
-  }
-  if (!data) {
-    return { ok: false, error: '回答の保存に失敗しました' };
-  }
-
-  return { ok: true, value: rowToChallengeResponse(data as ChallengeResponseRow) };
-}
-
-export async function updateChallengeResponse(
-  responseId: string,
-  input: UpdateChallengeResponseInput,
-): Promise<ChallengeMutationResult<ChallengeResponse>> {
-  if (!responseId.trim()) {
-    return { ok: false, error: 'responseId is required' };
-  }
-
-  const normalized = normalizeUpdateChallengeResponseInput(input);
-  if (!normalized.ok) {
-    return { ok: false, error: normalized.message };
-  }
-  if (!isSupabaseConfigured) {
-    return { ok: false, error: 'Supabase is not configured' };
-  }
-
-  const payload = buildUpdateChallengeResponsePayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_responses')
-    .update(payload)
-    .eq('id', responseId.trim())
-    .select('*')
-    .maybeSingle();
-
-  if (error) {
-    console.error('[challengeResponsesApi] updateChallengeResponse:', error.message);
-    return mutationFailure(error, '回答の更新に失敗しました');
-  }
-  if (!data) {
-    return { ok: false, error: '回答の更新に失敗しました' };
-  }
-
-  return { ok: true, value: rowToChallengeResponse(data as ChallengeResponseRow) };
-}
-
+/**
+ * Owner DELETE only. INSERT/UPDATE are RPC-only
+ * (`submit_challenge_comment_response`) so answers cannot exist without
+ * completion/reward. DELETE keeps completion/reward (response_id SET NULL).
+ */
 export async function deleteChallengeResponse(
   responseId: string,
 ): Promise<ChallengeOkResult> {

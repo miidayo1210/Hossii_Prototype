@@ -6,16 +6,14 @@ const {
   listPublishedChallengeProgramsMock,
   listPublishedChallengeItemsMock,
   listMyChallengeResponsesMock,
-  createChallengeResponseMock,
-  updateChallengeResponseMock,
-  getMyChallengeResponseMock,
+  listMyChallengeRewardsMock,
+  submitChallengeCommentResponseMock,
 } = vi.hoisted(() => ({
   listPublishedChallengeProgramsMock: vi.fn(),
   listPublishedChallengeItemsMock: vi.fn(),
   listMyChallengeResponsesMock: vi.fn(),
-  createChallengeResponseMock: vi.fn(),
-  updateChallengeResponseMock: vi.fn(),
-  getMyChallengeResponseMock: vi.fn(),
+  listMyChallengeRewardsMock: vi.fn(),
+  submitChallengeCommentResponseMock: vi.fn(),
 }));
 
 vi.mock('../../core/contexts/useAuth', () => ({
@@ -44,126 +42,188 @@ vi.mock('../../core/utils/challengeResponsesApi', () => ({
   listPublishedChallengeItems: (...args: unknown[]) =>
     listPublishedChallengeItemsMock(...args),
   listMyChallengeResponses: (...args: unknown[]) => listMyChallengeResponsesMock(...args),
-  createChallengeResponse: (...args: unknown[]) => createChallengeResponseMock(...args),
-  updateChallengeResponse: (...args: unknown[]) => updateChallengeResponseMock(...args),
-  getMyChallengeResponse: (...args: unknown[]) => getMyChallengeResponseMock(...args),
+}));
+
+vi.mock('../../core/utils/challengeRewardsApi', () => ({
+  listMyChallengeRewards: (...args: unknown[]) => listMyChallengeRewardsMock(...args),
+  submitChallengeCommentResponse: (...args: unknown[]) =>
+    submitChallengeCommentResponseMock(...args),
 }));
 
 import { ChallengeScreen } from './ChallengeScreen';
 
-describe('ChallengeScreen', () => {
+const publishedProgram = {
+  id: 'p1',
+  spaceId: 'dev-space-public',
+  title: '公開ストーリー',
+  description: null,
+  status: 'published' as const,
+  createdBy: 'admin',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+const commentItem = {
+  id: 'i1',
+  programId: 'p1',
+  itemType: 'question' as const,
+  title: '質問1',
+  description: null,
+  reason: null,
+  responseType: 'comment' as const,
+  isRequired: true,
+  sortOrder: 0,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+describe('ChallengeScreen rewards', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listPublishedChallengeProgramsMock.mockResolvedValue([]);
-    listPublishedChallengeItemsMock.mockResolvedValue([]);
+    listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
+    listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
-    getMyChallengeResponseMock.mockResolvedValue(null);
+    listMyChallengeRewardsMock.mockResolvedValue([]);
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('shows empty state when no published programs', async () => {
-    render(<ChallengeScreen />);
-    expect(await screen.findByText(/いま公開中の挑戦状はありません/)).toBeTruthy();
-  });
-
-  it('lists published programs and opens detail', async () => {
-    listPublishedChallengeProgramsMock.mockResolvedValue([
-      {
-        id: 'p1',
-        spaceId: 'dev-space-public',
-        title: '公開ストーリー',
-        description: '説明です',
-        status: 'published',
-        createdBy: 'admin',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-    listPublishedChallengeItemsMock.mockResolvedValue([
-      {
-        id: 'i1',
-        programId: 'p1',
-        itemType: 'question',
-        title: '質問1',
-        description: null,
-        reason: null,
-        responseType: 'comment',
-        isRequired: true,
-        sortOrder: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-
-    render(<ChallengeScreen />);
-    expect(await screen.findByText('公開ストーリー')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '挑戦する' }));
-    expect(await screen.findByText('質問1')).toBeTruthy();
-    expect(screen.getByText(/あなたとスペース管理者だけ/)).toBeTruthy();
-  });
-
-  it('creates a comment response with manager_only default', async () => {
-    listPublishedChallengeProgramsMock.mockResolvedValue([
-      {
-        id: 'p1',
-        spaceId: 'dev-space-public',
-        title: '公開ストーリー',
-        description: null,
-        status: 'published',
-        createdBy: 'admin',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-    listPublishedChallengeItemsMock.mockResolvedValue([
-      {
-        id: 'i1',
-        programId: 'p1',
-        itemType: 'mission',
-        title: 'ミッション1',
-        description: null,
-        reason: null,
-        responseType: 'comment',
-        isRequired: true,
-        sortOrder: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-    createChallengeResponseMock.mockResolvedValue({
+  it('shows reward modal only on first award', async () => {
+    submitChallengeCommentResponseMock.mockResolvedValue({
       ok: true,
       value: {
-        id: 'r1',
-        itemId: 'i1',
-        userId: 'user-1',
-        visibility: 'manager_only',
-        comment: '回答本文',
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        response: {
+          id: 'r1',
+          itemId: 'i1',
+          userId: 'user-1',
+          visibility: 'manager_only',
+          comment: '回答本文',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        completion: {
+          id: 'c1',
+          itemId: 'i1',
+          userId: 'user-1',
+          responseId: 'r1',
+          completedAt: new Date(),
+          createdAt: new Date(),
+        },
+        reward: {
+          id: 'rw1',
+          completionId: 'c1',
+          userId: 'user-1',
+          itemId: 'i1',
+          hossiiKey: 'emotion/wow',
+          awardedAt: new Date(),
+          createdAt: new Date(),
+        },
+        isNewReward: true,
+        wasInsert: true,
       },
     });
 
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: '挑戦する' }));
-    await screen.findByText('ミッション1');
+    await screen.findByText('質問1');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答本文' } });
     fireEvent.click(screen.getByRole('button', { name: '回答を保存' }));
 
-    await waitFor(() => {
-      expect(createChallengeResponseMock).toHaveBeenCalledWith({
-        itemId: 'i1',
-        comment: '回答本文',
-        visibility: 'manager_only',
-      });
+    expect(await screen.findByText('挑戦状クリア！')).toBeTruthy();
+    expect(screen.getByText('新しいHossiiが仲間になりました')).toBeTruthy();
+    expect(submitChallengeCommentResponseMock).toHaveBeenCalledWith({
+      itemId: 'i1',
+      comment: '回答本文',
+      visibility: 'manager_only',
     });
   });
 
-  it('shows load errors without clearing draft input path', async () => {
-    listPublishedChallengeProgramsMock.mockRejectedValue(new Error('permission denied'));
+  it('does not show reward modal on update without new reward', async () => {
+    listMyChallengeResponsesMock.mockResolvedValue([
+      {
+        id: 'r1',
+        itemId: 'i1',
+        userId: 'user-1',
+        visibility: 'manager_only',
+        comment: '旧回答',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    listMyChallengeRewardsMock.mockResolvedValue([
+      {
+        id: 'rw1',
+        completionId: 'c1',
+        userId: 'user-1',
+        itemId: 'i1',
+        hossiiKey: 'emotion/wow',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    submitChallengeCommentResponseMock.mockResolvedValue({
+      ok: true,
+      value: {
+        response: {
+          id: 'r1',
+          itemId: 'i1',
+          userId: 'user-1',
+          visibility: 'manager_only',
+          comment: '更新後',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        completion: {
+          id: 'c1',
+          itemId: 'i1',
+          userId: 'user-1',
+          responseId: 'r1',
+          completedAt: new Date(),
+          createdAt: new Date(),
+        },
+        reward: {
+          id: 'rw1',
+          completionId: 'c1',
+          userId: 'user-1',
+          itemId: 'i1',
+          hossiiKey: 'emotion/wow',
+          awardedAt: new Date(),
+          createdAt: new Date(),
+        },
+        isNewReward: false,
+        wasInsert: false,
+      },
+    });
+
     render(<ChallengeScreen />);
-    expect(await screen.findByText(/permission denied/)).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: 'つづける' }));
+    await screen.findByText('質問1');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '更新後' } });
+    fireEvent.click(screen.getByRole('button', { name: '回答を更新' }));
+
+    await waitFor(() => {
+      expect(submitChallengeCommentResponseMock).toHaveBeenCalled();
+    });
+    expect(screen.queryByText('挑戦状クリア！')).toBeNull();
+    expect(await screen.findByText('回答を更新しました')).toBeTruthy();
+  });
+
+  it('keeps input and shows error when RPC fails', async () => {
+    submitChallengeCommentResponseMock.mockResolvedValue({
+      ok: false,
+      error: '権限がありません',
+    });
+
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: '挑戦する' }));
+    await screen.findByText('質問1');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '残すべき入力' } });
+    fireEvent.click(screen.getByRole('button', { name: '回答を保存' }));
+
+    expect(await screen.findByText('権限がありません')).toBeTruthy();
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('残すべき入力');
+    expect(screen.queryByText('挑戦状クリア！')).toBeNull();
   });
 });

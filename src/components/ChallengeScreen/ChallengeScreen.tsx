@@ -8,13 +8,16 @@ import type {
 } from '../../core/types/challengeResponse';
 import { CHALLENGE_RESPONSE_COMMENT_MAX_LENGTH } from '../../core/types/challengeResponse';
 import {
-  createChallengeResponse,
-  getMyChallengeResponse,
   listMyChallengeResponses,
   listPublishedChallengeItems,
   listPublishedChallengePrograms,
-  updateChallengeResponse,
 } from '../../core/utils/challengeResponsesApi';
+import {
+  listMyChallengeRewards,
+  submitChallengeCommentResponse,
+} from '../../core/utils/challengeRewardsApi';
+import { getChallengeHossiiImageUrl } from '../../core/assets/challengeHossiiKeys';
+import type { ChallengeReward } from '../../core/types/challengeReward';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import styles from './ChallengeScreen.module.css';
 
@@ -55,6 +58,8 @@ export const ChallengeScreen = () => {
   const [drafts, setDrafts] = useState<
     Record<string, { comment: string; visibility: ChallengeResponseVisibility }>
   >({});
+  const [myRewards, setMyRewards] = useState<Record<string, ChallengeReward>>({});
+  const [rewardModal, setRewardModal] = useState<ChallengeReward | null>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -114,7 +119,9 @@ export const ChallengeScreen = () => {
       }
       const programItems = await listPublishedChallengeItems(programId);
       const mine = await listMyChallengeResponses(programItems.map((i) => i.id));
+      const rewards = await listMyChallengeRewards();
       const byItem: Record<string, ChallengeResponse> = {};
+      const rewardByItem: Record<string, ChallengeReward> = {};
       const nextDrafts: Record<
         string,
         { comment: string; visibility: ChallengeResponseVisibility }
@@ -122,6 +129,8 @@ export const ChallengeScreen = () => {
       for (const item of programItems) {
         const existing = mine.find((r) => r.itemId === item.id);
         if (existing) byItem[item.id] = existing;
+        const reward = rewards.find((r) => r.itemId === item.id);
+        if (reward) rewardByItem[item.id] = reward;
         nextDrafts[item.id] = {
           comment: existing?.comment ?? '',
           visibility: existing?.visibility ?? 'manager_only',
@@ -130,6 +139,7 @@ export const ChallengeScreen = () => {
       setActiveProgram(program);
       setItems(programItems);
       setMyResponses(byItem);
+      setMyRewards(rewardByItem);
       setDrafts(nextDrafts);
       setView({ kind: 'detail', programId });
     } catch (error) {
@@ -145,34 +155,44 @@ export const ChallengeScreen = () => {
       comment: '',
       visibility: 'manager_only' as const,
     };
+    const hadResponse = Boolean(myResponses[item.id]);
     setBusyItemId(item.id);
     setFormError(null);
     try {
-      const existing =
-        myResponses[item.id] ?? (await getMyChallengeResponse(item.id));
-      const result = existing
-        ? await updateChallengeResponse(existing.id, {
-            comment: draft.comment,
-            visibility: draft.visibility,
-          })
-        : await createChallengeResponse({
-            itemId: item.id,
-            comment: draft.comment,
-            visibility: draft.visibility,
-          });
+      const result = await submitChallengeCommentResponse({
+        itemId: item.id,
+        comment: draft.comment,
+        visibility: draft.visibility,
+      });
       if (!result.ok) {
         setFormError(result.error);
         return;
       }
-      setMyResponses((prev) => ({ ...prev, [item.id]: result.value }));
+      setMyResponses((prev) => ({
+        ...prev,
+        [item.id]: {
+          id: result.value.response.id,
+          itemId: result.value.response.itemId,
+          userId: result.value.response.userId,
+          visibility: result.value.response.visibility,
+          comment: result.value.response.comment,
+          createdAt: result.value.response.createdAt,
+          updatedAt: result.value.response.updatedAt,
+        },
+      }));
+      setMyRewards((prev) => ({ ...prev, [item.id]: result.value.reward }));
       setDrafts((prev) => ({
         ...prev,
         [item.id]: {
-          comment: result.value.comment,
-          visibility: result.value.visibility,
+          comment: result.value.response.comment,
+          visibility: result.value.response.visibility,
         },
       }));
-      showToast(existing ? '回答を更新しました' : '回答を保存しました');
+      if (result.value.isNewReward) {
+        setRewardModal(result.value.reward);
+      } else {
+        showToast(hadResponse ? '回答を更新しました' : '回答を保存しました');
+      }
     } finally {
       setBusyItemId(null);
     }
@@ -278,6 +298,11 @@ export const ChallengeScreen = () => {
                     {existing.comment}
                   </p>
                 )}
+                {!existing && myRewards[item.id] && (
+                  <p className={styles.muted}>
+                    この項目のHossiiは取得済みです（回答は未保存の状態でも報酬は保持されます）。
+                  </p>
+                )}
                 <div className={styles.itemForm}>
                   <label className={styles.label}>
                     コメント回答
@@ -334,6 +359,39 @@ export const ChallengeScreen = () => {
           })}
         </ul>
         {toast && <div className={styles.toast}>{toast}</div>}
+        {rewardModal && (
+          <div className={styles.rewardOverlay} role="dialog" aria-modal="true">
+            <div className={styles.rewardCard}>
+              <p className={styles.rewardEyebrow}>挑戦状クリア！</p>
+              <img
+                className={styles.rewardImage}
+                src={getChallengeHossiiImageUrl(rewardModal.hossiiKey)}
+                alt="新しいHossii"
+              />
+              <p className={styles.rewardTitle}>新しいHossiiが仲間になりました</p>
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => setRewardModal(null)}
+                >
+                  閉じる
+                </button>
+                <button
+                  type="button"
+                  className={styles.ghostButton}
+                  onClick={() => {
+                    setRewardModal(null);
+                    setView({ kind: 'list' });
+                    void reloadList();
+                  }}
+                >
+                  次の挑戦状へ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
