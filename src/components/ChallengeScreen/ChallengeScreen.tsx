@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import type { ChallengeItem, ChallengeProgram } from '../../core/types/challengeProgram';
@@ -13,12 +13,15 @@ import {
   listPublishedChallengePrograms,
 } from '../../core/utils/challengeResponsesApi';
 import {
+  listMyChallengeCompletions,
   listMyChallengeRewards,
   submitChallengeCommentResponse,
 } from '../../core/utils/challengeRewardsApi';
 import { getChallengeHossiiImageUrl } from '../../core/assets/challengeHossiiKeys';
-import type { ChallengeReward } from '../../core/types/challengeReward';
+import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
+import { buildChallengeStampSlots } from '../../core/utils/challengeStampProgress';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
+import { ChallengeStampCard } from './ChallengeStampCard';
 import styles from './ChallengeScreen.module.css';
 
 type View =
@@ -59,7 +62,20 @@ export const ChallengeScreen = () => {
     Record<string, { comment: string; visibility: ChallengeResponseVisibility }>
   >({});
   const [myRewards, setMyRewards] = useState<Record<string, ChallengeReward>>({});
+  const [myCompletions, setMyCompletions] = useState<Record<string, ChallengeCompletion>>(
+    {},
+  );
   const [rewardModal, setRewardModal] = useState<ChallengeReward | null>(null);
+
+  const stampSlots = useMemo(
+    () =>
+      buildChallengeStampSlots(
+        items,
+        Object.values(myCompletions),
+        Object.values(myRewards),
+      ),
+    [items, myCompletions, myRewards],
+  );
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -88,9 +104,10 @@ export const ChallengeScreen = () => {
       await Promise.all(
         listed.map(async (program) => {
           const programItems = await listPublishedChallengeItems(program.id);
+          const itemIds = programItems.map((i) => i.id);
           counts[program.id] = programItems.length;
-          const mine = await listMyChallengeResponses(programItems.map((i) => i.id));
-          answered[program.id] = mine.length;
+          const completions = await listMyChallengeCompletions(itemIds);
+          answered[program.id] = completions.length;
         }),
       );
       setItemCounts(counts);
@@ -107,6 +124,19 @@ export const ChallengeScreen = () => {
     void reloadList();
   }, [reloadList]);
 
+  // Space switch must not keep previous space detail / stamp state.
+  useEffect(() => {
+    setView({ kind: 'list' });
+    setActiveProgram(null);
+    setItems([]);
+    setMyResponses({});
+    setMyRewards({});
+    setMyCompletions({});
+    setDrafts({});
+    setFormError(null);
+    setRewardModal(null);
+  }, [activeSpace?.id]);
+
   const openDetail = async (programId: string) => {
     setFormError(null);
     setBusyItemId('__open__');
@@ -118,20 +148,27 @@ export const ChallengeScreen = () => {
         return;
       }
       const programItems = await listPublishedChallengeItems(programId);
-      const mine = await listMyChallengeResponses(programItems.map((i) => i.id));
-      const rewards = await listMyChallengeRewards();
+      const itemIds = programItems.map((i) => i.id);
+      const [mine, rewards, completions] = await Promise.all([
+        listMyChallengeResponses(itemIds),
+        listMyChallengeRewards(itemIds),
+        listMyChallengeCompletions(itemIds),
+      ]);
       const byItem: Record<string, ChallengeResponse> = {};
       const rewardByItem: Record<string, ChallengeReward> = {};
+      const completionByItem: Record<string, ChallengeCompletion> = {};
       const nextDrafts: Record<
         string,
         { comment: string; visibility: ChallengeResponseVisibility }
       > = {};
-      for (const item of programItems) {
-        const existing = mine.find((r) => r.itemId === item.id);
-        if (existing) byItem[item.id] = existing;
-        const reward = rewards.find((r) => r.itemId === item.id);
-        if (reward) rewardByItem[item.id] = reward;
-        nextDrafts[item.id] = {
+      for (const entry of programItems) {
+        const existing = mine.find((r) => r.itemId === entry.id);
+        if (existing) byItem[entry.id] = existing;
+        const reward = rewards.find((r) => r.itemId === entry.id);
+        if (reward) rewardByItem[entry.id] = reward;
+        const completion = completions.find((c) => c.itemId === entry.id);
+        if (completion) completionByItem[entry.id] = completion;
+        nextDrafts[entry.id] = {
           comment: existing?.comment ?? '',
           visibility: existing?.visibility ?? 'manager_only',
         };
@@ -140,6 +177,7 @@ export const ChallengeScreen = () => {
       setItems(programItems);
       setMyResponses(byItem);
       setMyRewards(rewardByItem);
+      setMyCompletions(completionByItem);
       setDrafts(nextDrafts);
       setView({ kind: 'detail', programId });
     } catch (error) {
@@ -181,6 +219,10 @@ export const ChallengeScreen = () => {
         },
       }));
       setMyRewards((prev) => ({ ...prev, [item.id]: result.value.reward }));
+      setMyCompletions((prev) => ({
+        ...prev,
+        [item.id]: result.value.completion,
+      }));
       setDrafts((prev) => ({
         ...prev,
         [item.id]: {
@@ -265,6 +307,8 @@ export const ChallengeScreen = () => {
 
         {formError && <p className={styles.error}>{formError}</p>}
 
+        <ChallengeStampCard slots={stampSlots} />
+
         <ul className={styles.itemList}>
           {items.map((item) => {
             const draft = drafts[item.id] ?? {
@@ -272,6 +316,7 @@ export const ChallengeScreen = () => {
               visibility: 'manager_only' as const,
             };
             const existing = myResponses[item.id];
+            const achieved = Boolean(myCompletions[item.id]);
             const saving = busyItemId === item.id;
             return (
               <li key={item.id} className={styles.card}>
@@ -284,6 +329,9 @@ export const ChallengeScreen = () => {
                   </span>
                   <span className={styles.badge}>
                     {existing ? '回答済み' : '未回答'}
+                  </span>
+                  <span className={styles.badge}>
+                    {achieved ? 'スタンプ獲得済' : 'スタンプ未獲得'}
                   </span>
                 </div>
                 <strong>{item.title}</strong>
@@ -431,7 +479,7 @@ export const ChallengeScreen = () => {
               <div className={styles.meta}>
                 <span className={styles.badge}>公開中</span>
                 <span>
-                  回答済み {answered} / {total}
+                  達成 {answered} / {total}
                 </span>
               </div>
               <strong>{program.title}</strong>
