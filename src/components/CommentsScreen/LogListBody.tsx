@@ -17,7 +17,7 @@ import {
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { resolveLogScopeSelection } from '../../core/utils/resolveLogScopeSelection';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
-import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import { resolvePostActionActor } from '../../core/utils/resolvePostActionActor';
 import { PostedNameLabel } from '../common/PostedNameLabel';
 import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
 import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
@@ -458,14 +458,16 @@ export function LogListBody({
               isOwnPost: false,
             });
             const isOwnerOnly = hossii.visibility === 'owner_only';
-            const canManageThis =
-              !readOnlyArchived &&
-              canManageOwnPost({
-                isAuthenticated: isAuthenticatedUser,
-                myAuthorshipIds,
-                myAuthorshipIdsStatus,
-                hossiiId: hossii.id,
-              });
+            const actor = readOnlyArchived
+              ? null
+              : resolvePostActionActor({
+                  isAuthenticated: isAuthenticatedUser,
+                  isSuperAdmin: currentUser?.isSuperAdmin === true,
+                  myAuthorshipIds,
+                  myAuthorshipIdsStatus,
+                  hossiiId: hossii.id,
+                });
+            const canManageThis = actor !== null;
 
             return (
               <div
@@ -534,31 +536,34 @@ export function LogListBody({
                         )}
                       </span>
                       <div className={styles.metaEnd}>
-                        {canManageThis && (
-                          <OwnPostActions hossii={hossii} />
+                        {canManageThis && actor && (
+                          <OwnPostActions
+                            hossii={hossii}
+                            actor={actor}
+                            visiblePanes={movePaneVisiblePanes ?? visiblePanes}
+                            defaultPaneId={movePaneDefaultPaneId}
+                          />
+                        )}
+                        {isAdmin && !actor && showMovePane && movePaneVisiblePanes && movePaneDefaultPaneId && onMoveHossiiToPane && (
+                          <MoveHossiiPaneSelect
+                            hossiiId={hossii.id}
+                            spaceId={hossii.spaceId}
+                            spacePaneId={hossii.spacePaneId}
+                            defaultPaneId={movePaneDefaultPaneId}
+                            visiblePanes={movePaneVisiblePanes}
+                            onMove={onMoveHossiiToPane}
+                            disabled={movePaneBusyId === hossii.id}
+                          />
                         )}
                         {isAdmin && (
-                          <>
-                            {showMovePane && (
-                              <MoveHossiiPaneSelect
-                                hossiiId={hossii.id}
-                                spaceId={hossii.spaceId}
-                                spacePaneId={hossii.spacePaneId}
-                                defaultPaneId={movePaneDefaultPaneId}
-                                visiblePanes={movePaneVisiblePanes}
-                                onMove={onMoveHossiiToPane}
-                                disabled={movePaneBusyId === hossii.id}
-                              />
-                            )}
-                            <button
-                              type="button"
-                              className={styles.adminHideButton}
-                              onClick={() => handleHideFromLog(hossii.id)}
-                              title="この投稿を非表示にする"
-                            >
-                              非表示
-                            </button>
-                          </>
+                          <button
+                            type="button"
+                            className={styles.adminHideButton}
+                            onClick={() => handleHideFromLog(hossii.id)}
+                            title="この投稿を非表示にする"
+                          >
+                            非表示
+                          </button>
                         )}
                         {likesEnabled ? (
                           <LikeButton

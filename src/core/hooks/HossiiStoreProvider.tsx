@@ -95,6 +95,9 @@ import {
   updateMyHossii,
   setMyHossiiVisibility,
   softDeleteMyHossii,
+  moveMyHossiiToPane,
+  superAdminUpdateHossii,
+  superAdminSoftDeleteHossii,
 } from '../utils/myHossiiMutationsApi';
 import { insertModerationLog } from '../utils/moderationLogsApi';
 import { fetchMyAuthorshipIdsForSpace } from '../utils/hossiiAuthorshipsApi';
@@ -937,12 +940,18 @@ export type HossiiContextValue = {
   hideHossii: (id: string, adminId?: string) => void;
   restoreHossii: (id: string, adminId?: string) => void;
   moveHossiiToPane: (id: string, targetPaneId: string) => Promise<void>;
+  /** 本人によるタブ（pane）移動（optimistic → RPC → 失敗時 rollback） */
+  moveMyHossiiToPaneAction: (id: string, targetPaneId: string) => Promise<OwnPostMutationResult>;
   /** Phase 2D-2: 本人による本文編集（optimistic → RPC → 失敗時 rollback） */
   editMyHossiiContent: (id: string, message: string) => Promise<OwnPostMutationResult>;
+  /** スーパー管理者による任意投稿の本文編集 */
+  editHossiiContentAsSuperAdmin: (id: string, message: string) => Promise<OwnPostMutationResult>;
   /** Phase 2D-2: 本人による公開範囲変更（public <-> owner_only） */
   setMyHossiiVisibilityAction: (id: string, visibility: HossiiVisibility) => Promise<OwnPostMutationResult>;
   /** Phase 2D-2: 本人によるソフト削除（物理 DELETE はしない） */
   softDeleteMyHossiiAction: (id: string) => Promise<OwnPostMutationResult>;
+  /** スーパー管理者による任意投稿のソフト削除 */
+  softDeleteHossiiAsSuperAdmin: (id: string) => Promise<OwnPostMutationResult>;
   /**
    * Phase 2F: 指定スペースの「投稿者の現在表示名」マップを強制再取得する。
    * スペースニックネーム変更後、過去投稿の現在名をリロードなしで反映するために使う。
@@ -1986,6 +1995,37 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     [state.entities.entitiesById, state.hossiis],
   );
 
+  const moveMyHossiiToPaneAction = useCallback(
+    async (id: string, targetPaneId: string): Promise<OwnPostMutationResult> => {
+      const hossii = stateRef.current.entities.entitiesById[id];
+      if (!hossii) return { ok: false, message: '投稿が見つかりません' };
+      if (
+        !validateHossiiPaneSpaceMatch(
+          { spaceId: hossii.spaceId, spacePaneId: targetPaneId },
+          hossii.spaceId,
+        )
+      ) {
+        return { ok: false, message: '移動先タブが不正です' };
+      }
+
+      const rollbackPaneId = hossii.spacePaneId ?? defaultSpacePaneId(hossii.spaceId);
+      dispatch({ type: 'MOVE_HOSSII_PANE', payload: { id, spacePaneId: targetPaneId } });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await moveMyHossiiToPane(id, targetPaneId);
+      if (!res.ok) {
+        dispatch({
+          type: 'MOVE_HOSSII_PANE',
+          payload: { id, spacePaneId: rollbackPaneId },
+        });
+        return { ok: false, message: res.message };
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
   // ===== Phase 2D-2: 本人投稿の操作（編集 / 公開範囲 / ソフト削除）=====
   // すべて optimistic 更新 → SECURITY DEFINER RPC → 失敗時 rollback。
   // 本人確認は RPC(auth.uid() + hossii_authorships) が正本。ここでは identity を渡さない。
@@ -2012,6 +2052,37 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         return { ok: false, message: res.message };
       }
       // 成功時は DB が返した content_edited_at を正本として反映する。
+      dispatch({
+        type: 'EDIT_HOSSII_CONTENT',
+        payload: { id, message, contentEditedAt: res.contentEditedAt },
+      });
+      return { ok: true };
+    },
+    [],
+  );
+
+  const editHossiiContentAsSuperAdmin = useCallback(
+    async (id: string, message: string): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+      const prevMessage = prev.message;
+      const prevEditedAt = prev.contentEditedAt ?? null;
+
+      dispatch({
+        type: 'EDIT_HOSSII_CONTENT',
+        payload: { id, message, contentEditedAt: new Date() },
+      });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await superAdminUpdateHossii(id, message);
+      if (!res.ok) {
+        dispatch({
+          type: 'EDIT_HOSSII_CONTENT',
+          payload: { id, message: prevMessage, contentEditedAt: prevEditedAt },
+        });
+        return { ok: false, message: res.message };
+      }
       dispatch({
         type: 'EDIT_HOSSII_CONTENT',
         payload: { id, message, contentEditedAt: res.contentEditedAt },
@@ -2058,6 +2129,25 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
       const res = await softDeleteMyHossii(id);
       if (!res.ok) {
         // 失敗時は元の投稿を復元する（画面から消えたままにしない）。
+        dispatch({ type: 'ADD_HOSSII_FULL', payload: prev });
+        return { ok: false, message: res.message };
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
+  const softDeleteHossiiAsSuperAdmin = useCallback(
+    async (id: string): Promise<OwnPostMutationResult> => {
+      const prev = stateRef.current.entities.entitiesById[id];
+      if (!prev) return { ok: false, message: '投稿が見つかりません' };
+
+      dispatch({ type: 'REMOVE_HOSSII', payload: id });
+
+      if (!isSupabaseConfigured) return { ok: true };
+
+      const res = await superAdminSoftDeleteHossii(id);
+      if (!res.ok) {
         dispatch({ type: 'ADD_HOSSII_FULL', payload: prev });
         return { ok: false, message: res.message };
       }
@@ -2114,9 +2204,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
         hideHossii,
         restoreHossii,
         moveHossiiToPane,
+        moveMyHossiiToPaneAction,
         editMyHossiiContent,
+        editHossiiContentAsSuperAdmin,
         setMyHossiiVisibilityAction,
         softDeleteMyHossiiAction,
+        softDeleteHossiiAsSuperAdmin,
         refreshPostAuthorDisplayNames,
         syncFetchedHossiis,
         setHossiiFetchLoading,
@@ -2149,9 +2242,12 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
           hideHossii,
           restoreHossii,
           moveHossiiToPane,
+          moveMyHossiiToPaneAction,
           editMyHossiiContent,
+          editHossiiContentAsSuperAdmin,
           setMyHossiiVisibilityAction,
           softDeleteMyHossiiAction,
+          softDeleteHossiiAsSuperAdmin,
           refreshPostAuthorDisplayNames,
           syncFetchedHossiis,
           setHossiiFetchLoading,

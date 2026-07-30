@@ -3,6 +3,7 @@ import type { Hossii } from '../../core/types';
 import { renderHossiiText, EMOJI_BY_EMOTION } from '../../core/utils/render';
 import { X } from 'lucide-react';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
+import { useSpacePane } from '../../core/hooks/SpacePaneProvider';
 import { fetchLikedIds, type LikeMutationResult } from '../../core/utils/likesApi';
 import {
   LIKE_MUTATION_ERROR_MESSAGE,
@@ -10,10 +11,11 @@ import {
 } from '../../core/utils/likeMutationUi';
 import { useAuth } from '../../core/contexts/useAuth';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
-import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import { resolvePostActionActor } from '../../core/utils/resolvePostActionActor';
 import { PostedNameLabel } from '../common/PostedNameLabel';
 import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
 import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
+import { defaultSpacePaneId } from '../../core/utils/spacePanesApi';
 import styles from './PostDetailModal.module.css';
 
 type Props = {
@@ -32,6 +34,7 @@ export const PostDetailModal = ({
   readOnlyArchived = false,
 }: Props) => {
   const { postAuthorDisplayNames, myAuthorshipIds, myAuthorshipIdsStatus } = useHossiiStore();
+  const { visiblePanes, defaultPane } = useSpacePane();
   const { currentUser } = useAuth();
   const authorDisplay = resolvePostAuthorDisplay({
     postedName: hossii.authorName,
@@ -39,14 +42,16 @@ export const PostDetailModal = ({
     isOwnPost: false,
   });
   const isOwnerOnly = hossii.visibility === 'owner_only';
-  const canManage =
-    !readOnlyArchived &&
-    canManageOwnPost({
-      isAuthenticated: !!currentUser,
-      myAuthorshipIds,
-      myAuthorshipIdsStatus,
-      hossiiId: hossii.id,
-    });
+  const actor = readOnlyArchived
+    ? null
+    : resolvePostActionActor({
+        isAuthenticated: !!currentUser,
+        isSuperAdmin: currentUser?.isSuperAdmin === true,
+        myAuthorshipIds,
+        myAuthorshipIdsStatus,
+        hossiiId: hossii.id,
+      });
+  const canManage = actor !== null;
   const emoji = hossii.emotion ? EMOJI_BY_EMOTION[hossii.emotion] : null;
   const timestamp = hossii.createdAt.toLocaleString('ja-JP');
   const [localLikeCount, setLocalLikeCount] = useState(hossii.likeCount ?? 0);
@@ -120,7 +125,15 @@ export const PostDetailModal = ({
           {(isOwnerOnly || canManage) && (
             <div className={styles.ownerBar}>
               {isOwnerOnly ? <OwnerOnlyBadge /> : <span />}
-              {canManage && <OwnPostActions hossii={hossii} onDeleted={onClose} />}
+              {canManage && actor && (
+                <OwnPostActions
+                  hossii={hossii}
+                  actor={actor}
+                  onDeleted={onClose}
+                  visiblePanes={visiblePanes}
+                  defaultPaneId={defaultPane?.id ?? defaultSpacePaneId(hossii.spaceId)}
+                />
+              )}
             </div>
           )}
 

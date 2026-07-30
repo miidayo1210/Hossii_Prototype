@@ -47,11 +47,10 @@ import {
 import { computePreviewSlotCount } from '../../core/utils/previewSlotCount';
 import { resolveCanvasExportAllowed } from '../../core/utils/spaceSettingResolvers';
 import { resolveCanEditBubble } from '../../core/utils/canEditBubble';
-import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import { resolvePostActionActor } from '../../core/utils/resolvePostActionActor';
 import {
   isSpaceArchivedReadOnly,
   resolveBubbleCanEditForArchivedSpace,
-  resolveCanManageOwnForArchivedSpace,
   resolveLikesEnabledForArchivedSpace,
 } from '../../core/utils/spaceArchivePolicy';
 import { ensureMyPersonalSpace } from '../../core/utils/personalSpacesApi';
@@ -1473,20 +1472,18 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
     resetBubbleInteraction();
   }, [isContentArchived, selectedBubbleId, hideHossii, resetBubbleInteraction]);
 
-  // 吹き出しごとに本人操作（編集/公開範囲/削除）を出せるか。
-  // authorship を正本にし、ゲスト投稿・他人投稿・authorship 未確定では出さない。
-  // presentationMode に依存せず、custom / ordered / random すべてで機能する。
-  const canManageOwnHossii = useCallback(
-    (hossiiId: string) =>
-      resolveCanManageOwnForArchivedSpace(
-        isContentArchived,
-        canManageOwnPost({
-          isAuthenticated: !!currentUser,
-          myAuthorshipIds,
-          myAuthorshipIdsStatus,
-          hossiiId,
-        }),
-      ),
+  // 吹き出しごとに本人／スーパー管理者操作を出せるか。
+  const resolvePostActorForHossii = useCallback(
+    (hossiiId: string) => {
+      if (isContentArchived) return null;
+      return resolvePostActionActor({
+        isAuthenticated: !!currentUser,
+        isSuperAdmin: currentUser?.isSuperAdmin === true,
+        myAuthorshipIds,
+        myAuthorshipIdsStatus,
+        hossiiId,
+      });
+    },
     [isContentArchived, currentUser, myAuthorshipIds, myAuthorshipIdsStatus],
   );
 
@@ -2666,7 +2663,9 @@ export const SpaceScreen = forwardRef<SpaceScreenHandle, SpaceScreenProps>(funct
                 onPinToggle={handlePinToggle}
                 showPinUi={showPinUi}
                 animationLevel={animationLevel}
-                canManageOwn={canManageOwnHossii(hossii.id)}
+                postActionActor={resolvePostActorForHossii(hossii.id)}
+                visiblePanes={visiblePanes}
+                defaultPaneId={defaultPane?.id}
                 onOwnerDeleted={handleBubbleDeselectWithTypeB}
                 connectionBadgeCount={getConnectionBadgeCount(hossii.id)}
                 isConnectionPickTarget={

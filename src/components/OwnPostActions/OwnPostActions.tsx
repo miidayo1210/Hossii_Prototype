@@ -2,8 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreVertical, Pencil, EyeOff, Eye, Trash2 } from 'lucide-react';
 import type { Hossii } from '../../core/types';
+import type { SpacePane } from '../../core/types/spacePane';
 import { useHossiiActions } from '../../core/hooks/useHossiiActions';
 import { isEditedMessageValid, nextVisibilityToggle } from '../../core/utils/ownPostEditRules';
+import type { PostActionActor } from '../../core/utils/resolvePostActionActor';
+import { MoveHossiiPaneSelect } from '../CommentsScreen/MoveHossiiPaneSelect';
+import { defaultSpacePaneId } from '../../core/utils/spacePanesApi';
 import styles from './OwnPostActions.module.css';
 
 type Props = {
@@ -14,28 +18,43 @@ type Props = {
   /**
    * 表示形式。
    * - 'menu'（既定）: ⋮ ボタン + ドロップダウン。詳細モーダル等の狭い場所向け。
-   * - 'bar': 鉛筆 / 目・鍵 / ゴミ箱 の3アイコンを直接並べる。吹き出し直下など、
-   *   ユーザーがすぐ気づける位置に置く用途。
+   * - 'bar': 鉛筆 / 目・鍵 / ゴミ箱 のアイコンを直接並べる。
    */
   variant?: 'menu' | 'bar';
+  /**
+   * own: 本人 RPC（公開範囲トグルあり）
+   * super_admin: スーパー管理者 RPC（公開範囲トグルなし）
+   */
+  actor?: PostActionActor;
+  /** タブ移動用。2件未満なら移動 UI を出さない */
+  visiblePanes?: SpacePane[];
+  defaultPaneId?: string;
 };
 
 type Mode = 'idle' | 'editing' | 'confirmDelete';
 
 /**
- * Phase 2D-2: ログイン本人向けの投稿操作メニュー（編集 / 公開範囲 / 削除）。
- *
- * この UI を出すかどうかは呼び出し側が canManageOwnPost で判定する（本人・authorship ready のみ）。
- * 実際の権限は DB(RPC + RLS) が正本で、ここは表示・操作導線のみ。ゲスト投稿・他人投稿には出さない。
+ * 投稿操作メニュー（編集 / 公開範囲 / 削除 / タブ移動）。
+ * 表示可否は呼び出し側が resolvePostActionActor で判定する。
  */
 export const OwnPostActions = ({
   hossii,
   onDeleted,
   className,
   variant = 'menu',
+  actor = 'own',
+  visiblePanes,
+  defaultPaneId,
 }: Props) => {
-  const { editMyHossiiContent, setMyHossiiVisibilityAction, softDeleteMyHossiiAction } =
-    useHossiiActions();
+  const {
+    editMyHossiiContent,
+    editHossiiContentAsSuperAdmin,
+    setMyHossiiVisibilityAction,
+    softDeleteMyHossiiAction,
+    softDeleteHossiiAsSuperAdmin,
+    moveMyHossiiToPaneAction,
+    moveHossiiToPane,
+  } = useHossiiActions();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('idle');
   const [draft, setDraft] = useState(hossii.message ?? '');
@@ -44,6 +63,9 @@ export const OwnPostActions = ({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const isOwnerOnly = hossii.visibility === 'owner_only';
+  const showVisibility = actor === 'own';
+  const paneDefault = defaultPaneId ?? defaultSpacePaneId(hossii.spaceId);
+  const showMove = Boolean(visiblePanes && visiblePanes.length >= 2);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -81,7 +103,7 @@ export const OwnPostActions = ({
   };
 
   const handleToggleVisibility = async () => {
-    if (busy) return;
+    if (busy || !showVisibility) return;
     setBusy(true);
     setError(null);
     const next = nextVisibilityToggle(hossii.visibility);
@@ -102,7 +124,10 @@ export const OwnPostActions = ({
     }
     setBusy(true);
     setError(null);
-    const res = await editMyHossiiContent(hossii.id, draft.trim());
+    const res =
+      actor === 'super_admin'
+        ? await editHossiiContentAsSuperAdmin(hossii.id, draft.trim())
+        : await editMyHossiiContent(hossii.id, draft.trim());
     setBusy(false);
     if (!res.ok) {
       setError('保存に失敗しました。時間をおいて再度お試しください。');
@@ -115,7 +140,10 @@ export const OwnPostActions = ({
     if (busy) return;
     setBusy(true);
     setError(null);
-    const res = await softDeleteMyHossiiAction(hossii.id);
+    const res =
+      actor === 'super_admin'
+        ? await softDeleteHossiiAsSuperAdmin(hossii.id)
+        : await softDeleteMyHossiiAction(hossii.id);
     setBusy(false);
     if (!res.ok) {
       setError('削除に失敗しました。時間をおいて再度お試しください。');
@@ -124,6 +152,38 @@ export const OwnPostActions = ({
     setMode('idle');
     onDeleted?.();
   };
+
+  const handleMove = async (hossiiId: string, targetPaneId: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    if (actor === 'own') {
+      const res = await moveMyHossiiToPaneAction(hossiiId, targetPaneId);
+      setBusy(false);
+      if (!res.ok) {
+        setError('タブ移動に失敗しました。時間をおいて再度お試しください。');
+        return;
+      }
+    } else {
+      await moveHossiiToPane(hossiiId, targetPaneId);
+      setBusy(false);
+    }
+    setMenuOpen(false);
+  };
+
+  const moveControl = showMove && visiblePanes ? (
+    <MoveHossiiPaneSelect
+      hossiiId={hossii.id}
+      spaceId={hossii.spaceId}
+      spacePaneId={hossii.spacePaneId}
+      defaultPaneId={paneDefault}
+      visiblePanes={visiblePanes}
+      onMove={(id, paneId) => {
+        void handleMove(id, paneId);
+      }}
+      disabled={busy}
+    />
+  ) : null;
 
   const overlays = (
     <>
@@ -224,16 +284,18 @@ export const OwnPostActions = ({
         >
           <Pencil size={16} />
         </button>
-        <button
-          type="button"
-          className={styles.barBtn}
-          aria-label={isOwnerOnly ? 'みんなに公開する' : '自分だけに見せる'}
-          title={isOwnerOnly ? 'みんなに公開する' : '自分だけに見せる'}
-          onClick={handleToggleVisibility}
-          disabled={busy}
-        >
-          {isOwnerOnly ? <Eye size={16} /> : <EyeOff size={16} />}
-        </button>
+        {showVisibility && (
+          <button
+            type="button"
+            className={styles.barBtn}
+            aria-label={isOwnerOnly ? 'みんなに公開する' : '自分だけに見せる'}
+            title={isOwnerOnly ? 'みんなに公開する' : '自分だけに見せる'}
+            onClick={handleToggleVisibility}
+            disabled={busy}
+          >
+            {isOwnerOnly ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+        )}
         <button
           type="button"
           className={`${styles.barBtn} ${styles.barBtnDanger}`}
@@ -244,6 +306,7 @@ export const OwnPostActions = ({
         >
           <Trash2 size={16} />
         </button>
+        {moveControl && <div className={styles.barMove}>{moveControl}</div>}
         {error && mode === 'idle' && <span className={styles.barError}>{error}</span>}
         {overlays}
       </div>
@@ -255,7 +318,7 @@ export const OwnPostActions = ({
       <button
         type="button"
         className={styles.trigger}
-        aria-label="自分の投稿を操作"
+        aria-label="投稿を操作"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={() => {
@@ -277,23 +340,25 @@ export const OwnPostActions = ({
           >
             <Pencil size={14} /> 編集する
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.menuItem}
-            onClick={handleToggleVisibility}
-            disabled={busy}
-          >
-            {isOwnerOnly ? (
-              <>
-                <Eye size={14} /> みんなに公開する
-              </>
-            ) : (
-              <>
-                <EyeOff size={14} /> 自分だけに見せる
-              </>
-            )}
-          </button>
+          {showVisibility && (
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.menuItem}
+              onClick={handleToggleVisibility}
+              disabled={busy}
+            >
+              {isOwnerOnly ? (
+                <>
+                  <Eye size={14} /> みんなに公開する
+                </>
+              ) : (
+                <>
+                  <EyeOff size={14} /> 自分だけに見せる
+                </>
+              )}
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -303,6 +368,7 @@ export const OwnPostActions = ({
           >
             <Trash2 size={14} /> 削除する
           </button>
+          {moveControl && <div className={styles.menuMove}>{moveControl}</div>}
           {error && <p className={styles.menuError}>{error}</p>}
         </div>
       )}

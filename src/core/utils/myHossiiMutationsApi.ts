@@ -73,3 +73,55 @@ export async function softDeleteMyHossii(
   }
   return { ok: true };
 }
+
+/** 本人投稿を同一スペース内の別タブ（pane）へ移動する。 */
+export async function moveMyHossiiToPane(
+  hossiiId: string,
+  paneId: string,
+): Promise<MyHossiiMutationResult> {
+  if (!isSupabaseConfigured) return { ok: false, message: NOT_CONFIGURED };
+
+  const { error } = await supabase.rpc('move_my_hossii_to_pane', {
+    p_hossii_id: hossiiId,
+    p_pane_id: paneId,
+  });
+  if (error) {
+    return { ok: false, message: error.message, code: error.code };
+  }
+  return { ok: true };
+}
+
+/** スーパー管理者: 任意投稿の本文を編集する（authorship 不要）。 */
+export async function superAdminUpdateHossii(
+  hossiiId: string,
+  message: string,
+): Promise<UpdateMyHossiiResult> {
+  if (!isSupabaseConfigured) return { ok: false, message: NOT_CONFIGURED };
+
+  const { data, error } = await supabase.rpc('super_admin_update_hossii', {
+    p_hossii_id: hossiiId,
+    p_message: message,
+  });
+  if (error) {
+    return { ok: false, message: error.message, code: error.code };
+  }
+  return {
+    ok: true,
+    contentEditedAt: data ? new Date(data as string) : null,
+  };
+}
+
+/** スーパー管理者: 任意投稿をソフト削除する（authorship 不要）。 */
+export async function superAdminSoftDeleteHossii(
+  hossiiId: string,
+): Promise<MyHossiiMutationResult> {
+  if (!isSupabaseConfigured) return { ok: false, message: NOT_CONFIGURED };
+
+  const { error } = await supabase.rpc('super_admin_soft_delete_hossii', {
+    p_hossii_id: hossiiId,
+  });
+  if (error) {
+    return { ok: false, message: error.message, code: error.code };
+  }
+  return { ok: true };
+}
