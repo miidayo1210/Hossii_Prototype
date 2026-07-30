@@ -19,35 +19,16 @@ function createMemoryStorage() {
   };
 }
 
-/** SET_SPACE_NICKNAMES reducer と同じ merge */
-function mergeSpaceNicknames(local: SpaceNicknames, server: SpaceNicknames): SpaceNicknames {
-  return { ...local, ...server };
-}
-
 /**
- * 修正後 syncLoggedInProfile: dispatch(SET_SPACE_NICKNAMES) の reducer 保存のみ。
+ * ログイン hydrate の SET_SPACE_NICKNAMES: サーバー取得結果で置き換える。
+ * 前アカウントの端末キャッシュと merge しない。
  */
-function persistAuthSyncNicknames(
-  load: () => SpaceNicknames,
+function replaceAuthSyncNicknames(
   save: (map: SpaceNicknames) => void,
   serverPayload: SpaceNicknames,
 ): SpaceNicknames {
-  const merged = mergeSpaceNicknames(load(), serverPayload);
-  save(merged);
-  return merged;
-}
-
-/**
- * 修正前の欠陥: reducer 保存後に server payload だけを再保存。
- * HossiiStoreProvider の saveSpaceNicknames(nicknames) 再導入と同型。
- */
-function persistAuthSyncNicknamesWithDuplicateServerSave(
-  load: () => SpaceNicknames,
-  save: (map: SpaceNicknames) => void,
-  serverPayload: SpaceNicknames,
-): void {
-  persistAuthSyncNicknames(load, save, serverPayload);
   save(serverPayload);
+  return serverPayload;
 }
 
 describe('profileStorage auth sync nickname persistence', () => {
@@ -86,42 +67,41 @@ describe('profileStorage auth sync nickname persistence', () => {
     expect(storage.loadSpaceNicknames()).toEqual({});
   });
 
-  it('preserves local-only nicknames when server returns empty object', () => {
+  it('replaces previous account nicknames when server returns empty', () => {
     storage.saveSpaceNicknames({ 'guest-space': 'GuestNick', 'other-space': 'Other' });
-    persistAuthSyncNicknames(storage.loadSpaceNicknames, storage.saveSpaceNicknames, {});
-    expect(storage.loadSpaceNicknames()).toEqual({
-      'guest-space': 'GuestNick',
-      'other-space': 'Other',
-    });
+    replaceAuthSyncNicknames(storage.saveSpaceNicknames, {});
+    expect(storage.loadSpaceNicknames()).toEqual({});
   });
 
-  it('merges server nicknames without dropping other local spaces', () => {
-    storage.saveSpaceNicknames({ 'guest-space': 'GuestNick', 'other-space': 'Other' });
-    persistAuthSyncNicknames(storage.loadSpaceNicknames, storage.saveSpaceNicknames, {
+  it('uses only the logged-in account server nicknames', () => {
+    storage.saveSpaceNicknames({ 'prev-account-space': 'PrevNick', 'other-space': 'Other' });
+    replaceAuthSyncNicknames(storage.saveSpaceNicknames, {
       'auth-space': 'ServerNick',
     });
     expect(storage.loadSpaceNicknames()).toEqual({
-      'guest-space': 'GuestNick',
-      'other-space': 'Other',
       'auth-space': 'ServerNick',
     });
   });
 
-  it('lets server nickname override the same space id on merge', () => {
-    storage.saveSpaceNicknames({ 'space-a': 'GuestNick' });
-    persistAuthSyncNicknames(storage.loadSpaceNicknames, storage.saveSpaceNicknames, {
+  it('lets server nickname for the same account override local cache', () => {
+    storage.saveSpaceNicknames({ 'space-a': 'StaleLocal' });
+    replaceAuthSyncNicknames(storage.saveSpaceNicknames, {
       'space-a': 'ServerNick',
     });
     expect(storage.loadSpaceNicknames()).toEqual({ 'space-a': 'ServerNick' });
   });
 
-  it('regression: duplicate server-only save after merge wipes local-only nicknames', () => {
-    storage.saveSpaceNicknames({ 'guest-space': 'GuestNick' });
-    persistAuthSyncNicknamesWithDuplicateServerSave(
-      storage.loadSpaceNicknames,
-      storage.saveSpaceNicknames,
-      {},
-    );
+  it('same account re-login restores server nicknames only', () => {
+    storage.saveSpaceNicknames({});
+    replaceAuthSyncNicknames(storage.saveSpaceNicknames, { 'space-a': 'mii' });
+    expect(storage.loadSpaceNicknames()).toEqual({ 'space-a': 'mii' });
+
+    // 別アカウントへ切替（サーバー空）→ 持ち越さない
+    replaceAuthSyncNicknames(storage.saveSpaceNicknames, {});
     expect(storage.loadSpaceNicknames()).toEqual({});
+
+    // 同じアカウント再ログイン → サーバーから復元
+    replaceAuthSyncNicknames(storage.saveSpaceNicknames, { 'space-a': 'mii' });
+    expect(storage.loadSpaceNicknames()).toEqual({ 'space-a': 'mii' });
   });
 });

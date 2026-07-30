@@ -727,14 +727,12 @@ const createReducer = (activeSpaceIdRef: { current: SpaceId }) => {
       }
 
       case 'SET_SPACE_NICKNAMES': {
-        const merged = {
-          ...state.spaceNicknames,
-          ...action.payload,
-        };
-        saveSpaceNicknames(merged);
+        // ログイン hydrate / ログアウト清空はサーバー（または空）を正本として置き換える。
+        // 前ユーザーの端末キャッシュと merge すると、別参加IDへ名前が持ち越される。
+        saveSpaceNicknames(action.payload);
         return {
           ...state,
-          spaceNicknames: merged,
+          spaceNicknames: action.payload,
         };
       }
 
@@ -1062,6 +1060,9 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
     currentUserRef.current = currentUser;
   });
 
+  /** 直前にログインしていた auth.uid。ログアウト時だけ端末 nick を清空するために使う */
+  const prevAuthUidRef = useRef<string | null>(null);
+
   // ===== myAuthorshipIds（本人性の正本）の取得・保持 =====
   // 実データの race / reset / fetch 判断は純粋な controller に委譲し、
   // ここでは snapshot を state に反映するだけの薄い glue にする。
@@ -1089,10 +1090,16 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
     if (!currentUser?.uid) {
       authorProfileIdRef.current = undefined;
+      // 認証セッション終了時のみ清空（ゲスト単独のリロードでは端末 nick を消さない）
+      if (prevAuthUidRef.current !== null) {
+        dispatch({ type: 'SET_SPACE_NICKNAMES', payload: {} });
+        prevAuthUidRef.current = null;
+      }
       setSpaceNicknamesReady(!isSupabaseConfigured);
       return;
     }
 
+    prevAuthUidRef.current = currentUser.uid;
     authorProfileIdRef.current = currentUser.uid;
     if (isSupabaseConfigured) {
       setSpaceNicknamesReady(false);
@@ -1140,6 +1147,7 @@ export const HossiiProvider = ({ children, initialHossiis = [] }: HossiiProvider
 
       if (isSupabaseConfigured) {
         try {
+          // 当該 auth.uid() のサーバー正本で置き換える（前ユーザー端末キャッシュは持ち込まない）
           const nicknames = await fetchSpaceNicknames(currentUser.uid);
           dispatch({ type: 'SET_SPACE_NICKNAMES', payload: nicknames });
         } finally {
