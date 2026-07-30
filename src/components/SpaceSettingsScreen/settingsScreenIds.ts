@@ -15,7 +15,8 @@ export type SettingsScreenId =
   | 'neighbors'
   | 'participantAccounts'
   | 'spaceMembers'
-  | 'spaceArchive';
+  | 'spaceArchive'
+  | 'challengeAdmin';
 
 export type NavItem = {
   id: SettingsScreenId;
@@ -74,6 +75,12 @@ export const SETTINGS_NAV_GROUPS: NavGroup[] = [
       { id: 'spaceMembers', label: 'スペースメンバー', description: '招待制スペースの参加メンバーを管理', adminOnly: true },
       { id: 'participantAccounts', label: '参加者アカウント', adminOnly: true },
       { id: 'exportRecord', label: '出力・記録', adminOnly: true },
+      {
+        id: 'challengeAdmin',
+        label: '質問・ミッション管理',
+        description: 'Hossiiからの挑戦状の下書き作成',
+        adminOnly: true,
+      },
       { id: 'neighbors', label: '隣のスペース', adminOnly: true },
     ],
   },

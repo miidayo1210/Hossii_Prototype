@@ -30,6 +30,7 @@ import { ParticipantAccountsTab } from './ParticipantAccountsTab';
 import { SpaceMembersTab } from './SpaceMembersTab';
 import { SpaceArchiveTab } from './SpaceArchiveTab';
 import { PaneManagementTab } from './PaneManagementTab';
+import { ChallengeAdminTab } from './ChallengeAdminTab';
 import { SettingsEditPaneProvider } from './SettingsEditPaneContext';
 import {
   DEFAULT_SETTINGS_SCREEN,
@@ -316,6 +317,8 @@ export const SpaceSettingsScreen = () => {
         return <SpaceMembersTab key={`members-${activeSpace.id}`} space={activeSpace} />;
       case 'exportRecord':
         return <ExportRecordTab key={`export-${activeSpace.id}`} space={activeSpace} />;
+      case 'challengeAdmin':
+        return <ChallengeAdminTab key={`challenge-${activeSpace.id}`} space={activeSpace} />;
       case 'neighbors':
         return (
           <NeighborsTab
