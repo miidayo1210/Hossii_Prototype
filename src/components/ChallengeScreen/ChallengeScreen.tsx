@@ -350,9 +350,9 @@ export const ChallengeScreen = () => {
         <TopRightMenu />
       </div>
 
-      {/* MVP暫定: スペース全体ON/OFF未実装のため、published program がある場合に利用する */}
+      {/* MVP暫定: 全体ON/OFF未実装。ナビも published program の SELECT 可否から導出する。 */}
       <p className={styles.mvpNote}>
-        ※挑戦状機能の全体ON/OFFは未実装です。公開中ストーリーがあるときだけ利用できます。
+        ※挑戦状機能の全体ON/OFFは未実装です。公開中ストーリーがあるときだけナビに表示されます。
       </p>
 
       {loading && <p className={styles.muted}>読み込み中…</p>}

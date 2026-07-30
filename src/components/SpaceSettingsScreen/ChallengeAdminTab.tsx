@@ -20,6 +20,7 @@ import {
   updateChallengeProgramStatus,
 } from '../../core/utils/challengeProgramsApi';
 import { listManagerChallengeResponses } from '../../core/utils/challengeResponsesApi';
+import { invalidatePublishedChallengeNavCache } from '../../core/hooks/useHasPublishedChallengePrograms';
 import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
@@ -378,6 +379,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       return;
     }
     setEditingProgram(result.value);
+    invalidatePublishedChallengeNavCache(space.id);
     showToast('挑戦状を公開しました');
   };
 

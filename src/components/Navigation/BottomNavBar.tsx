@@ -1,4 +1,7 @@
 import { House, PlusCircle, ScrollText, Sparkles, User } from 'lucide-react';
+import { useAuth } from '../../core/contexts/useAuth';
+import { useHasPublishedChallengePrograms } from '../../core/hooks/useHasPublishedChallengePrograms';
+import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import { useRouter } from '../../core/hooks/useRouter';
 import type { Screen } from '../../core/types';
 import styles from './BottomNavBar.module.css';
@@ -9,14 +12,18 @@ type NavItem = {
   icon: React.ComponentType<{ size?: number }>;
 };
 
-// MVP暫定: 挑戦状ナビは常時表示。将来スペース全体ON/OFFで制御する。
-const USER_NAV: NavItem[] = [
+const BASE_NAV: NavItem[] = [
   { label: 'スペース', screen: 'screen', icon: House },
   { label: '投稿', screen: 'post', icon: PlusCircle },
   { label: 'ログ', screen: 'comments', icon: ScrollText },
-  { label: '挑戦状', screen: 'challenge', icon: Sparkles },
   { label: 'アカウント', screen: 'account', icon: User },
 ];
+
+const CHALLENGE_NAV: NavItem = {
+  label: '挑戦状',
+  screen: 'challenge',
+  icon: Sparkles,
+};
 
 type Props = {
   isMobile?: boolean;
@@ -25,8 +32,23 @@ type Props = {
 
 export const BottomNavBar = ({ isMobile = false, onMobilePostPress }: Props) => {
   const { screen: currentScreen, navigate } = useRouter();
+  const { currentUser } = useAuth();
+  const { state } = useHossiiStore();
+  // MVP暫定: スペース全体ON/OFF未実装のため、SELECT可能な published program があるときだけ表示。
+  const showChallenge = useHasPublishedChallengePrograms(
+    state.activeSpaceId,
+    Boolean(currentUser?.uid),
+  );
 
-  const navItems = USER_NAV;
+  const navItems = showChallenge
+    ? [
+        BASE_NAV[0],
+        BASE_NAV[1],
+        BASE_NAV[2],
+        CHALLENGE_NAV,
+        BASE_NAV[3],
+      ]
+    : BASE_NAV;
 
   return (
     <nav className={styles.nav}>

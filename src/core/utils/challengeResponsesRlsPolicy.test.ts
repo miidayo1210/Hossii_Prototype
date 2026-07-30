@@ -61,7 +61,7 @@ describe('challenge_responses migration (static SQL)', () => {
     );
   });
 
-  it('adds participant SELECT for published programs/items', () => {
+  it('adds participant SELECT for member-visible programs/items', () => {
     expect(sqlBody).toContain('challenge_programs_select_member_visible');
     expect(sqlBody).toContain('challenge_items_select_member_visible');
     expect(sqlBody).toContain('is_active_space_member');
