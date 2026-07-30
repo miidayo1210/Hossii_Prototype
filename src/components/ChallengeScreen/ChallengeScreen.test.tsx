@@ -7,12 +7,14 @@ const {
   listPublishedChallengeItemsMock,
   listMyChallengeResponsesMock,
   listMyChallengeRewardsMock,
+  listMyChallengeCompletionsMock,
   submitChallengeCommentResponseMock,
 } = vi.hoisted(() => ({
   listPublishedChallengeProgramsMock: vi.fn(),
   listPublishedChallengeItemsMock: vi.fn(),
   listMyChallengeResponsesMock: vi.fn(),
   listMyChallengeRewardsMock: vi.fn(),
+  listMyChallengeCompletionsMock: vi.fn(),
   submitChallengeCommentResponseMock: vi.fn(),
 }));
 
@@ -36,6 +38,10 @@ vi.mock('../Navigation/TopRightMenu', () => ({
   TopRightMenu: () => <div data-testid="top-right-menu" />,
 }));
 
+vi.mock('../../core/hooks/useMediaQuery', () => ({
+  useMediaQuery: () => false,
+}));
+
 vi.mock('../../core/utils/challengeResponsesApi', () => ({
   listPublishedChallengePrograms: (...args: unknown[]) =>
     listPublishedChallengeProgramsMock(...args),
@@ -46,6 +52,8 @@ vi.mock('../../core/utils/challengeResponsesApi', () => ({
 
 vi.mock('../../core/utils/challengeRewardsApi', () => ({
   listMyChallengeRewards: (...args: unknown[]) => listMyChallengeRewardsMock(...args),
+  listMyChallengeCompletions: (...args: unknown[]) =>
+    listMyChallengeCompletionsMock(...args),
   submitChallengeCommentResponse: (...args: unknown[]) =>
     submitChallengeCommentResponseMock(...args),
 }));
@@ -84,6 +92,7 @@ describe('ChallengeScreen rewards', () => {
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
     listMyChallengeRewardsMock.mockResolvedValue([]);
+    listMyChallengeCompletionsMock.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -127,11 +136,11 @@ describe('ChallengeScreen rewards', () => {
 
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: '挑戦する' }));
-    await screen.findByText('質問1');
+    await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答本文' } });
     fireEvent.click(screen.getByRole('button', { name: '回答を保存' }));
 
-    expect(await screen.findByText('挑戦状クリア！')).toBeTruthy();
+    expect(await screen.findByText('Hossiiゲット！')).toBeTruthy();
     expect(screen.getByText('新しいHossiiが仲間になりました')).toBeTruthy();
     expect(submitChallengeCommentResponseMock).toHaveBeenCalledWith({
       itemId: 'i1',
@@ -160,6 +169,16 @@ describe('ChallengeScreen rewards', () => {
         itemId: 'i1',
         hossiiKey: 'emotion/wow',
         awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date(),
         createdAt: new Date(),
       },
     ]);
@@ -199,14 +218,14 @@ describe('ChallengeScreen rewards', () => {
 
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: 'つづける' }));
-    await screen.findByText('質問1');
+    await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '更新後' } });
     fireEvent.click(screen.getByRole('button', { name: '回答を更新' }));
 
     await waitFor(() => {
       expect(submitChallengeCommentResponseMock).toHaveBeenCalled();
     });
-    expect(screen.queryByText('挑戦状クリア！')).toBeNull();
+    expect(screen.queryByText('Hossiiゲット！')).toBeNull();
     expect(await screen.findByText('回答を更新しました')).toBeTruthy();
   });
 
@@ -218,12 +237,12 @@ describe('ChallengeScreen rewards', () => {
 
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: '挑戦する' }));
-    await screen.findByText('質問1');
+    await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '残すべき入力' } });
     fireEvent.click(screen.getByRole('button', { name: '回答を保存' }));
 
     expect(await screen.findByText('権限がありません')).toBeTruthy();
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('残すべき入力');
-    expect(screen.queryByText('挑戦状クリア！')).toBeNull();
+    expect(screen.queryByText('Hossiiゲット！')).toBeNull();
   });
 });

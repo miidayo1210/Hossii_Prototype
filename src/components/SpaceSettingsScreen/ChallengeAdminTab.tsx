@@ -415,7 +415,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       <>
         <SettingsPageHeader
           title="新しい挑戦状"
-          description="下書きとして作成します。公開や参加者表示はまだできません。"
+          description="下書きとして作成します。項目を追加したあと、編集画面から公開できます。"
         >
           <SettingsSection title="基本情報">
             <label className={formStyles.label}>
