@@ -410,7 +410,7 @@ export const ChallengeScreen = () => {
         {rewardModal && (
           <div className={styles.rewardOverlay} role="dialog" aria-modal="true">
             <div className={styles.rewardCard}>
-              <p className={styles.rewardEyebrow}>挑戦状クリア！</p>
+              <p className={styles.rewardEyebrow}>Hossiiゲット！</p>
               <img
                 className={styles.rewardImage}
                 src={getChallengeHossiiImageUrl(rewardModal.hossiiKey)}
