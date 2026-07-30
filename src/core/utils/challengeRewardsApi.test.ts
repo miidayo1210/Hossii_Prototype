@@ -1,22 +1,39 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const rpcMock = vi.fn();
+const fromMock = vi.fn();
 
 vi.mock('../supabase', () => ({
   isSupabaseConfigured: true,
   supabase: {
     rpc: (...args: unknown[]) => rpcMock(...args),
-    from: vi.fn(),
+    from: (...args: unknown[]) => fromMock(...args),
   },
 }));
 
 import {
+  listMyChallengeCompletions,
+  listMyChallengeRewards,
   rowToChallengeReward,
   submitChallengeCommentResponse,
   type ChallengeRewardRow,
 } from './challengeRewardsApi';
 
+function mockSelectChain(rows: unknown[]) {
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+  chain.select = vi.fn(() => chain);
+  chain.in = vi.fn(() => chain);
+  chain.order = vi.fn(async () => ({ data: rows, error: null }));
+  fromMock.mockReturnValue(chain);
+  return chain;
+}
+
 describe('challengeRewardsApi', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
   it('maps reward rows', () => {
     const row: ChallengeRewardRow = {
       id: 'rw1',
@@ -105,5 +122,48 @@ describe('challengeRewardsApi', () => {
       error: '権限がありません',
       code: '42501',
     });
+  });
+
+  it('lists my rewards filtered by item ids', async () => {
+    const chain = mockSelectChain([
+      {
+        id: 'rw1',
+        completion_id: 'c1',
+        user_id: 'u1',
+        item_id: 'i1',
+        hossii_key: 'emotion/wow',
+        awarded_at: '2026-07-31T00:00:00.000Z',
+        created_at: '2026-07-31T00:00:00.000Z',
+      },
+    ]);
+    const rewards = await listMyChallengeRewards(['i1', ' i2 ']);
+    expect(fromMock).toHaveBeenCalledWith('challenge_rewards');
+    expect(chain.in).toHaveBeenCalledWith('item_id', ['i1', 'i2']);
+    expect(rewards).toHaveLength(1);
+    expect(rewards[0].itemId).toBe('i1');
+  });
+
+  it('lists my completions filtered by item ids', async () => {
+    const chain = mockSelectChain([
+      {
+        id: 'c1',
+        item_id: 'i1',
+        user_id: 'u1',
+        response_id: null,
+        completed_at: '2026-07-31T00:00:00.000Z',
+        created_at: '2026-07-31T00:00:00.000Z',
+      },
+    ]);
+    const completions = await listMyChallengeCompletions(['i1']);
+    expect(fromMock).toHaveBeenCalledWith('challenge_completions');
+    expect(chain.in).toHaveBeenCalledWith('item_id', ['i1']);
+    expect(completions).toHaveLength(1);
+    expect(completions[0].itemId).toBe('i1');
+  });
+
+  it('returns empty array when list query has no rows', async () => {
+    mockSelectChain([]);
+    await expect(listMyChallengeRewards(['missing'])).resolves.toEqual([]);
+    await expect(listMyChallengeCompletions(['missing'])).resolves.toEqual([]);
   });
 });

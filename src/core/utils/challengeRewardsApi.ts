@@ -126,13 +126,17 @@ export async function submitChallengeCommentResponse(input: {
   return { ok: true, value: mapSubmitPayload(data as SubmitRpcPayload) };
 }
 
-export async function listMyChallengeRewards(): Promise<ChallengeReward[]> {
+export async function listMyChallengeRewards(
+  itemIds?: string[],
+): Promise<ChallengeReward[]> {
   if (!isSupabaseConfigured) return [];
 
-  const { data, error } = await supabase
-    .from('challenge_rewards')
-    .select('*')
-    .order('awarded_at', { ascending: false });
+  let query = supabase.from('challenge_rewards').select('*');
+  if (itemIds && itemIds.length > 0) {
+    query = query.in('item_id', itemIds.map((id) => id.trim()).filter(Boolean));
+  }
+
+  const { data, error } = await query.order('awarded_at', { ascending: false });
 
   if (error) {
     console.error('[challengeRewardsApi] listMyChallengeRewards:', error.message);
