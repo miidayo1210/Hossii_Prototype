@@ -158,6 +158,10 @@ export async function getMyChallengeResponse(
   return list[0] ?? null;
 }
 
+/**
+ * Low-level create (no completion/reward).
+ * Participant answer UI must use submitChallengeCommentResponse instead.
+ */
 export async function createChallengeResponse(
   input: CreateChallengeResponseInput,
 ): Promise<ChallengeMutationResult<ChallengeResponse>> {
@@ -187,6 +191,10 @@ export async function createChallengeResponse(
   return { ok: true, value: rowToChallengeResponse(data as ChallengeResponseRow) };
 }
 
+/**
+ * Low-level update (no reward re-roll).
+ * Prefer submitChallengeCommentResponse from participant UI so completion links stay fresh.
+ */
 export async function updateChallengeResponse(
   responseId: string,
   input: UpdateChallengeResponseInput,
