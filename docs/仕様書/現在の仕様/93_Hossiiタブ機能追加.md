@@ -1857,9 +1857,12 @@ Pane切替 / 投稿分離 / 背景 override / postFields override / Pane URL / P
 
 * 管理者が `#comments` ログ一覧から投稿を別 Pane へ移動（`MoveHossiiPaneSelect`、ラベル「タブへ」）
 * 表示条件: 管理者 + Pane 2 件以上 + 移動先候補が 1 件以上
-* API: `updateHossiiPaneId` — `space_pane_id` UPDATE
+* API: `updateHossiiPaneId` — `space_pane_id` UPDATE（管理者・super_admin）
+* API: `move_my_hossii_to_pane` — 本人 authorship による同一スペース内 Pane 移動
 * RLS: 既存 PERMISSIVE `public update hossiis` + RESTRICTIVE `hossii_pane_space_match_restrict_update`（追加 migration 不要）
 * Store: `moveHossiiToPane` — 楽観 UPDATE + `reconcileHossiiQueryKeys` + 失敗時ロールバック
+* Store: `moveMyHossiiToPaneAction` — 本人 RPC 経路
+* UI: `OwnPostActions` 内「タブへ」（本人・super_admin）。コミュニティ管理者はログ一覧の既存「タブへ」を維持（本文編集・soft削除は不可）
 * 座標: 移動時に `positionX/Y` はリセットしない（[45_投稿の位置](./45_投稿の位置を定める機能.md)）
 * Realtime 経由の他端末反映は Phase 0 基盤（`APPLY_REALTIME_PANE_UPDATE`）を利用
 * デモ: Supabase off 時は store のみ更新

@@ -17,7 +17,13 @@ import {
   resolveInsertBeforeVisibleIndex,
   splitPanesByFolders,
 } from '../../core/utils/spacePaneTabBar';
-import { loadTabFolderOpen, resolveFolderInsertBeforeIndex, saveTabFolderOpen } from '../../core/utils/tabFolderStorage';
+import {
+  buildTabBarStrip,
+  loadTabFolderOpen,
+  resolveStripInsertBeforeIndex,
+  saveTabFolderOpen,
+  stripItemKey,
+} from '../../core/utils/tabFolderStorage';
 import styles from './SpacePaneBar.module.css';
 
 const DRAG_THRESHOLD_PX = 6;
@@ -55,8 +61,8 @@ type Props = {
   onReorder?: (draggedId: string, insertBeforeIndex: number, stripId: string) => void;
   /** Move a pane to a folder (folderId) or back to bar (null). */
   onMoveToFolder?: (paneId: string, folderId: string | null, insertBeforeBarIndex?: number) => void;
-  /** Reorder folder chips among themselves. */
-  onReorderFolder?: (draggedId: string, insertBeforeIndex: number) => void;
+  /** Reorder / reposition a folder chip in the interleaved tab strip. */
+  onReorderFolder?: (draggedId: string, insertBeforeStripIndex: number) => void;
   /** モバイルバーの DOM 参照 */
   rootRef?: Ref<HTMLElement>;
   /** 個人スペースへのショートカット（Pane ではなく UI ボタン） */
@@ -82,7 +88,7 @@ type FolderDragState = {
   dragging: boolean;
 };
 
-type FolderDropTarget = { insertBeforeIndex: number };
+type FolderDropTarget = { insertBeforeStripIndex: number };
 
 // ─── FolderChip sub-component ────────────────────────────────────────────────
 
@@ -314,9 +320,13 @@ export function SpacePaneBar({
     () => splitPanesByFolders(visiblePanes),
     [visiblePanes],
   );
+  const strip = useMemo(
+    () => buildTabBarStrip(barPanes, folders),
+    [barPanes, folders],
+  );
 
   const canManageTabs = isAdmin && !disabled && (!!onReorder || !!onMoveToFolder);
-  const canManageFolders = isAdmin && !disabled && !!onReorderFolder && folders.length > 1;
+  const canManageFolders = isAdmin && !disabled && !!onReorderFolder;
 
   // refs
   const barTabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -376,27 +386,32 @@ export function SpacePaneBar({
     setDraggingFolderId(null);
   }, [clearLongPressTimer]);
 
-  const getFolderChipRects = useCallback((): Map<string, DOMRect> => {
+  const getStripItemRects = useCallback((): Map<string, DOMRect> => {
     const rects = new Map<string, DOMRect>();
-    for (const folder of folders) {
-      const el = folderChipRefs.current.get(folder.id);
-      if (el) rects.set(folder.id, el.getBoundingClientRect());
+    for (const item of strip) {
+      if (item.kind === 'pane') {
+        const el = barTabRefs.current.get(item.pane.id);
+        if (el) rects.set(stripItemKey(item), el.getBoundingClientRect());
+      } else {
+        const el = folderChipRefs.current.get(item.folder.id);
+        if (el) rects.set(stripItemKey(item), el.getBoundingClientRect());
+      }
     }
     return rects;
-  }, [folders]);
+  }, [strip]);
 
   const resolveFolderDropTarget = useCallback(
     (clientX: number): FolderDropTarget | null => {
-      if (folders.length <= 1) return null;
+      if (folders.length === 0) return null;
       return {
-        insertBeforeIndex: resolveFolderInsertBeforeIndex(
-          folders,
-          getFolderChipRects(),
+        insertBeforeStripIndex: resolveStripInsertBeforeIndex(
+          strip,
+          getStripItemRects(),
           clientX,
         ),
       };
     },
-    [folders, getFolderChipRects],
+    [folders.length, getStripItemRects, strip],
   );
 
   const getTabRects = useCallback(
@@ -659,7 +674,7 @@ export function SpacePaneBar({
         const target =
           folderDropTarget ?? resolveFolderDropTarget(event.clientX);
         if (target) {
-          onReorderFolder?.(folder.id, target.insertBeforeIndex);
+          onReorderFolder?.(folder.id, target.insertBeforeStripIndex);
         }
         suppressClickRef.current = true;
         window.setTimeout(() => {
@@ -778,41 +793,44 @@ export function SpacePaneBar({
         }`}
         role="tablist"
       >
-        {/* Bar tabs */}
-        {/* eslint-disable react-hooks/refs -- tab ref callbacks run on mount, not during render */}
-        {barPanes.map((pane, index) => {
-          const showIndicatorBefore =
-            dropTarget?.zone === 'bar' && dropTarget.insertBeforeIndex === index;
-          return (
-            <div key={pane.id} className={styles.tabSlot}>
-              {renderDropIndicator(showIndicatorBefore)}
-              <TabButton {...makeTabProps(pane, barTabRefs)} />
-            </div>
-          );
-        })}
-        {/* eslint-enable react-hooks/refs */}
-        {dropTarget?.zone === 'bar' &&
-          dropTarget.insertBeforeIndex === barPanes.length &&
-          draggingPaneId != null &&
-          renderDropIndicator(true)}
+        {/* Interleaved bar tabs + folder clusters */}
+        {/* eslint-disable react-hooks/refs -- tab/folder ref callbacks run on mount, not during render */}
+        {strip.map((item, stripIndex) => {
+          const showFolderStripIndicator =
+            draggingFolderId != null &&
+            folderDropTarget?.insertBeforeStripIndex === stripIndex;
 
-        {/* Folder clusters */}
-        {/* eslint-disable react-hooks/refs -- folder/tab ref callbacks run on mount, not during render */}
-        {folders.map((folder, index) => {
+          if (item.kind === 'pane') {
+            const pane = item.pane;
+            const barIndex = barPanes.findIndex((p) => p.id === pane.id);
+            const showPaneIndicatorBefore =
+              dropTarget?.zone === 'bar' && dropTarget.insertBeforeIndex === barIndex;
+            const showPaneIndicatorAfter =
+              dropTarget?.zone === 'bar' &&
+              dropTarget.insertBeforeIndex === barPanes.length &&
+              barIndex === barPanes.length - 1 &&
+              draggingPaneId != null;
+            return (
+              <div key={pane.id} className={styles.tabSlot}>
+                {renderDropIndicator(showFolderStripIndicator || showPaneIndicatorBefore)}
+                <TabButton {...makeTabProps(pane, barTabRefs)} />
+                {renderDropIndicator(showPaneIndicatorAfter)}
+              </div>
+            );
+          }
+
+          const folder = item.folder;
           const folderPanes = folderMap.get(folder.id) ?? [];
           const isOpen = openFolderIds.has(folder.id);
           const isDropTarget =
             draggingPaneId != null &&
             dropTarget?.zone === 'folder-chip' &&
             dropTarget.folderId === folder.id;
-          const showFolderIndicatorBefore =
-            draggingFolderId != null &&
-            folderDropTarget?.insertBeforeIndex === index;
           const trayVisible = isOpen && (folderPanes.length > 0 || draggingPaneId != null);
 
           return (
             <div key={folder.id} className={styles.folderCluster}>
-              {renderDropIndicator(showFolderIndicatorBefore)}
+              {renderDropIndicator(showFolderStripIndicator)}
               <FolderChip
                 folder={folder}
                 count={folderPanes.length}
@@ -865,7 +883,7 @@ export function SpacePaneBar({
         })}
         {/* eslint-enable react-hooks/refs */}
         {draggingFolderId != null &&
-          folderDropTarget?.insertBeforeIndex === folders.length &&
+          folderDropTarget?.insertBeforeStripIndex === strip.length &&
           renderDropIndicator(true)}
 
         {/* Add folder button (admin only) */}

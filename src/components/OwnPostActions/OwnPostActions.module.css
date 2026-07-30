@@ -47,6 +47,18 @@
   background: #fef2f2;
 }
 
+.barMove {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.15rem;
+  max-width: 9rem;
+}
+
+.menuMove {
+  padding: 0.35rem 0.6rem 0.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+
 .barError {
   font-size: 0.7rem;
   color: #dc2626;

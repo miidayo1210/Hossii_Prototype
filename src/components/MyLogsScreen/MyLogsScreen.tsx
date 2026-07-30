@@ -13,7 +13,7 @@ import {
 import { PaneFilterSegment, type PaneFilterCountMode, type PaneFilterValue } from '../CommentsScreen/PaneFilterSegment';
 import { coerceIsHidden } from '../../core/utils/hossiisApi';
 import { selectOwnHossiis } from '../../core/utils/selectOwnHossiis';
-import { canManageOwnPost } from '../../core/utils/canManageOwnPost';
+import { resolvePostActionActor } from '../../core/utils/resolvePostActionActor';
 import { resolvePostAuthorDisplay } from '../../core/utils/resolvePostAuthorDisplay';
 import { PostedNameLabel } from '../common/PostedNameLabel';
 import { OwnPostActions } from '../OwnPostActions/OwnPostActions';
@@ -277,12 +277,14 @@ export const MyLogsScreen = () => {
                 isOwnPost: true,
               });
               const isOwnerOnly = hossii.visibility === 'owner_only';
-              const canManage = canManageOwnPost({
+              const actor = resolvePostActionActor({
                 isAuthenticated,
+                isSuperAdmin: currentUser?.isSuperAdmin === true,
                 myAuthorshipIds,
                 myAuthorshipIdsStatus,
                 hossiiId: hossii.id,
               });
+              const canManage = actor !== null;
 
               return (
                 <article
@@ -298,7 +300,14 @@ export const MyLogsScreen = () => {
                     <div className={styles.cardHeaderRight}>
                       {isOwnerOnly && <OwnerOnlyBadge />}
                       <span className={styles.time}>{relativeTime}</span>
-                      {canManage && <OwnPostActions hossii={hossii} />}
+                      {canManage && actor && (
+                        <OwnPostActions
+                          hossii={hossii}
+                          actor={actor}
+                          visiblePanes={visiblePanes}
+                          defaultPaneId={defaultPane?.id}
+                        />
+                      )}
                     </div>
                   </div>
 

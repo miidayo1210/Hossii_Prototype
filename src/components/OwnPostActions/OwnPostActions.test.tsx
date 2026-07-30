@@ -27,8 +27,12 @@ function renderWithActions(
 ) {
   const value = {
     editMyHossiiContent: vi.fn(async () => ({ ok: true })),
+    editHossiiContentAsSuperAdmin: vi.fn(async () => ({ ok: true })),
     setMyHossiiVisibilityAction: vi.fn(async () => ({ ok: true })),
     softDeleteMyHossiiAction: vi.fn(async () => ({ ok: true })),
+    softDeleteHossiiAsSuperAdmin: vi.fn(async () => ({ ok: true })),
+    moveMyHossiiToPaneAction: vi.fn(async () => ({ ok: true })),
+    moveHossiiToPane: vi.fn(async () => undefined),
     ...actions,
   } as unknown as HossiiActionsContextValue;
   return render(
@@ -63,5 +67,14 @@ describe('OwnPostActions bar variant', () => {
     renderWithActions(<OwnPostActions hossii={makeHossii()} variant="bar" />);
     fireEvent.click(screen.getByRole('button', { name: '削除する' }));
     expect(screen.getByRole('dialog', { name: '投稿を削除' })).toBeTruthy();
+  });
+
+  it('hides visibility toggle for super_admin actor', () => {
+    renderWithActions(
+      <OwnPostActions hossii={makeHossii()} variant="bar" actor="super_admin" />,
+    );
+    expect(screen.getByRole('button', { name: '編集する' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '削除する' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '自分だけに見せる' })).toBeNull();
   });
 });

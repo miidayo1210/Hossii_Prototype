@@ -23,7 +23,6 @@ import { hasCommittedTags, isTagsFieldSatisfied, normalizeTagInput } from '../..
 import { addStamp } from '../../core/utils/stampStorage';
 import { upsertStampCount } from '../../core/utils/stampsApi';
 import { uploadHossiiImage } from '../../core/utils/imageStorageApi';
-import { saveImageLocally } from '../../core/utils/saveImageLocally';
 import { generateId } from '../../core/utils';
 import type { SpaceSettings } from '../../core/types/settings';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
@@ -41,6 +40,10 @@ import {
   savePostBubbleColorDraft,
 } from '../../core/utils/displayPrefsStorage';
 import {
+  dismissCameraCaptureNotice,
+  isCameraCaptureNoticeDismissed,
+} from '../../core/utils/cameraCaptureNoticeStorage';
+import {
   BUBBLE_COLOR_PALETTES,
   getBubblePalette,
   type BubblePaletteId,
@@ -48,6 +51,7 @@ import {
 import styles from './PostScreen.module.css';
 import { PostFieldLabel } from './PostFieldLabel';
 import { PostPrivacyNotice } from './PostPrivacyNotice';
+import { CameraCaptureNoticeModal } from './CameraCaptureNoticeModal';
 import { CanvasPostEditor, type CanvasPostEditorHandle } from './CanvasPostEditor';
 import {
   isWebSerialSupported,
@@ -205,13 +209,16 @@ export const PostScreen = ({
   // F10: 画像投稿
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const messageTextareaRef = useRef<HTMLTextAreaElement>(null);
   const colorPaletteRef = useRef<HTMLDivElement>(null);
   const bubbleColorLabelId = useId();
 
   // F08: お絵描きモーダル
   const [showDrawingModal, setShowDrawingModal] = useState(false);
+  // F10: カメラ撮影前の端末保存注意
+  const [showCameraCaptureNotice, setShowCameraCaptureNotice] = useState(false);
 
   // numberPost: 数値投稿
   const [numberInput, setNumberInput] = useState('');
@@ -543,9 +550,9 @@ export const PostScreen = ({
     setShowDrawingModal(false);
   };
 
-  // F10: 画像選択（カメラ撮影 / ギャラリー共通）
-  // lastModified が1分以内 → カメラで撮りたてとみなしてローカル保存も実行
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // F10: 画像選択（ギャラリー / カメラ共通）
+  // 撮影画像は Safari 制限により端末アルバムへ自動保存されない（撮影前に注意モーダルで案内）
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -561,17 +568,37 @@ export const PostScreen = ({
       setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
 
-    const isJustTaken = Date.now() - file.lastModified < 60_000;
-    if (isJustTaken) {
-      await saveImageLocally(file, `hossii-photo-${Date.now()}.jpg`);
+  const openCameraInput = () => {
+    cameraInputRef.current?.click();
+  };
+
+  const handleCameraButtonClick = () => {
+    if (isCameraCaptureNoticeDismissed()) {
+      openCameraInput();
+      return;
     }
+    setShowCameraCaptureNotice(true);
+  };
+
+  const handleCameraNoticeAcknowledge = () => {
+    setShowCameraCaptureNotice(false);
+    // iOS は同一ユーザー操作内で input.click() する必要がある
+    openCameraInput();
+  };
+
+  const handleCameraNoticeDismissForever = () => {
+    dismissCameraCaptureNotice();
+    setShowCameraCaptureNotice(false);
+    openCameraInput();
   };
 
   const handleImageRemove = () => {
     setImagePreview(null);
     setImageFile(null);
-    if (imageInputRef.current) imageInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
   // F09: ハッシュタグ追加
@@ -1339,16 +1366,32 @@ export const PostScreen = ({
             ) : (
               <div className={styles.mediaButtons}>
                 <label className={styles.imageUploadArea}>
-                  <span className={styles.imageUploadIcon}>📸</span>
+                  <span className={styles.imageUploadIcon}>🖼️</span>
                   <span className={styles.imageUploadText}>写真を添付</span>
                   <input
-                    ref={imageInputRef}
+                    ref={galleryInputRef}
                     type="file"
                     accept="image/*"
                     onChange={handleImageSelect}
                     className={styles.imageInput}
                   />
                 </label>
+                <button
+                  type="button"
+                  className={styles.cameraButton}
+                  onClick={handleCameraButtonClick}
+                >
+                  <span className={styles.imageUploadIcon}>📷</span>
+                  <span className={styles.imageUploadText}>写真を撮る</span>
+                </button>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleImageSelect}
+                  className={styles.imageInput}
+                />
                 <button
                   type="button"
                   className={styles.drawingButton}
@@ -1461,6 +1504,13 @@ export const PostScreen = ({
         <DrawingModal
           onComplete={handleDrawingComplete}
           onClose={() => setShowDrawingModal(false)}
+        />
+      )}
+      {showCameraCaptureNotice && (
+        <CameraCaptureNoticeModal
+          onAcknowledge={handleCameraNoticeAcknowledge}
+          onDismissForever={handleCameraNoticeDismissForever}
+          onCancel={() => setShowCameraCaptureNotice(false)}
         />
       )}
     </div>

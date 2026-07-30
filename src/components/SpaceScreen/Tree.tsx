@@ -25,6 +25,8 @@ import { OwnerOnlyBadge } from '../OwnPostActions/OwnerOnlyBadge';
 import { BubbleActionMenu } from './BubbleActionMenu';
 import { exceedsBubbleDragThreshold } from '../../core/utils/bubbleDragThreshold';
 import { useAuth } from '../../core/contexts/useAuth';
+import type { PostActionActor } from '../../core/utils/resolvePostActionActor';
+import type { SpacePane } from '../../core/types/spacePane';
 import {
   LIKE_MUTATION_ERROR_MESSAGE,
   previewOptimisticLikeState,
@@ -96,10 +98,12 @@ type BubbleProps = {
   onPinToggle?: (id: string) => void;
   showPinUi?: boolean;
   /**
-   * ログイン本人の投稿で、本人操作（編集/公開範囲/削除）を吹き出し直下に出せるか。
-   * 呼び出し側が canManageOwnPost で判定する（authorship 正本・他人/ゲストには出さない）。
+   * 本人またはスーパー管理者の操作バーを出す主体。
+   * null ならバー非表示。
    */
-  canManageOwn?: boolean;
+  postActionActor?: PostActionActor | null;
+  visiblePanes?: SpacePane[];
+  defaultPaneId?: string;
   /** 本人操作から削除が成功したときに選択解除するためのコールバック */
   onOwnerDeleted?: () => void;
   /** PC custom random/ordered: compact action menu gate */
@@ -159,7 +163,9 @@ export function BubbleInner({
   isPinned = false,
   onPinToggle,
   showPinUi = false,
-  canManageOwn = false,
+  postActionActor = null,
+  visiblePanes,
+  defaultPaneId,
   onOwnerDeleted,
   actionMenuEnabled = false,
   actionMenuOpen = false,
@@ -958,7 +964,7 @@ export function BubbleInner({
         />
       )}
 
-      {isSelected && canManageOwn && (
+      {isSelected && postActionActor && (
         <div
           className={styles.bubbleOwnerBar}
           data-owner-actions
@@ -970,6 +976,9 @@ export function BubbleInner({
           <OwnPostActions
             hossii={hossii}
             variant="bar"
+            actor={postActionActor}
+            visiblePanes={visiblePanes}
+            defaultPaneId={defaultPaneId}
             onDeleted={onOwnerDeleted}
           />
         </div>
@@ -1062,7 +1071,9 @@ function bubblePropsEqual(prev: BubbleProps, next: BubbleProps): boolean {
     prev.isRecentHighlight === next.isRecentHighlight &&
     prev.isPinned === next.isPinned &&
     prev.showPinUi === next.showPinUi &&
-    prev.canManageOwn === next.canManageOwn &&
+    prev.postActionActor === next.postActionActor &&
+    prev.defaultPaneId === next.defaultPaneId &&
+    prev.visiblePanes === next.visiblePanes &&
     prev.onOwnerDeleted === next.onOwnerDeleted &&
     prev.onPinToggle === next.onPinToggle &&
     prev.onActivate === next.onActivate &&
