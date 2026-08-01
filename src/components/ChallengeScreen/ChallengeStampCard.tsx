@@ -19,7 +19,7 @@ type Props = {
 
 function StampSlotCell({ slot }: { slot: ChallengeStampSlot }) {
   const typeLabel = slot.item.itemType === 'question' ? '質問' : 'ミッション';
-  const requiredLabel = slot.item.isRequired ? '必須' : 'おまけ';
+  const requiredLabel = slot.item.isRequired ? 'クリアに必要' : 'おまけ';
   const stateLabel = slot.achieved ? '達成済み' : '未達成';
   const ariaLabel = `${slot.item.title}、${typeLabel}、${requiredLabel}、${stateLabel}`;
 
@@ -28,7 +28,9 @@ function StampSlotCell({ slot }: { slot: ChallengeStampSlot }) {
       className={`${styles.slot} ${slot.achieved ? styles.slotAchieved : ''}`}
       aria-label={ariaLabel}
     >
-      <span className={styles.slotIndex}>#{slot.index}</span>
+      <span className={styles.slotIndex} aria-hidden="true">
+        {slot.index}
+      </span>
       <p className={styles.slotTitle}>{slot.item.title}</p>
       <span className={styles.slotMeta}>
         {typeLabel}・{requiredLabel}

@@ -678,7 +678,7 @@ export const ChallengeScreen = () => {
       {!loading && !loadError && programs.length === 0 && (
         <div className={styles.emptyState}>
           <img className={styles.emptyDecor} src={LIST_DECOR_HOSSII} alt="" />
-          <p className={styles.emptyTitle}>いま挑戦できるストーリーはありません</p>
+          <p className={styles.emptyTitle}>いま挑戦できる挑戦状はありません</p>
           <p className={styles.muted}>
             新しい挑戦状が届くまで、少し待っていてね
           </p>

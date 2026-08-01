@@ -29,9 +29,9 @@ type Props = {
 
 function visibilityHelp(visibility: ChallengeResponseVisibility): string {
   if (visibility === 'self_only') {
-    return 'この回答は、あなただけが見ることができます。';
+    return '「自分だけに残す」を選ぶと、この回答はあなただけが見られます。';
   }
-  return 'この回答は、あなたとスペース管理者だけが見ることができます。';
+  return '「管理者にだけ共有」を選ぶと、スペース管理者にもこの回答が見られます。';
 }
 
 function visibilityLabel(visibility: ChallengeResponseVisibility): string {
@@ -49,7 +49,9 @@ function ItemHeader({
 }) {
   return (
     <div className={styles.headerRow}>
-      <span className={styles.index}>#{index}</span>
+      <span className={styles.index} aria-hidden="true">
+        {index}
+      </span>
       <span
         className={`${styles.statusBadge} ${
           answered ? styles.statusAnswered : styles.statusPending
@@ -61,7 +63,7 @@ function ItemHeader({
         {item.itemType === 'question' ? '質問' : 'ミッション'}
       </span>
       <span className={styles.metaBadge}>
-        {item.isRequired ? '必須' : 'おまけ'}
+        {item.isRequired ? 'クリアに必要' : 'おまけ'}
       </span>
     </div>
   );

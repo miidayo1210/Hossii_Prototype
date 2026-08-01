@@ -205,7 +205,7 @@ describe('ChallengeStampCard', () => {
       />,
     );
     expect(screen.getByText('未達成')).toBeTruthy();
-    expect(screen.getByText('質問・必須')).toBeTruthy();
+    expect(screen.getByText('質問・クリアに必要')).toBeTruthy();
     expect(screen.queryByRole('img')).toBeNull();
     expect(screen.queryByRole('button', { name: 'スタンプを見る' })).toBeNull();
     expect(screen.getByText('一度もらったHossiiは残ります')).toBeTruthy();
@@ -281,7 +281,7 @@ describe('ChallengeStampCard', () => {
     expect(screen.getByText('獲得済み')).toBeTruthy();
     expect(screen.getAllByText('まだ').length).toBe(3);
     expect(screen.queryByText('一度もらったHossiiは残ります')).toBeNull();
-    expect(screen.queryByText('質問・必須')).toBeNull();
+    expect(screen.queryByText('質問・クリアに必要')).toBeNull();
 
     fireEvent.click(toggle);
     expect(
@@ -290,7 +290,7 @@ describe('ChallengeStampCard', () => {
       ),
     ).toBe('true');
     expect(screen.getByText('一度もらったHossiiは残ります')).toBeTruthy();
-    expect(screen.getAllByText('質問・必須').length).toBe(5);
+    expect(screen.getAllByText('質問・クリアに必要').length).toBe(5);
 
     fireEvent.click(screen.getByRole('button', { name: 'スタンプを閉じる' }));
     expect(screen.getByRole('button', { name: 'スタンプを見る' })).toBeTruthy();
