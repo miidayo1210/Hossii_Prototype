@@ -30,10 +30,14 @@ function StampSlotCell({
 }) {
   const typeLabel = slot.item.itemType === 'question' ? '質問' : 'ミッション';
   const requiredLabel = slot.item.isRequired ? 'クリアに必要' : 'おまけ';
-  const stateLabel = slot.achieved ? '獲得済み' : '未獲得';
+  const stateLabel = slot.achieved
+    ? slot.hossiiKey
+      ? 'GET!'
+      : '獲得済み'
+    : 'まだ';
   const ariaLabel = slot.achieved
-    ? `${slot.item.title}のスタンプを振り返る`
-    : `${slot.item.title}に答える`;
+    ? `${slot.item.title}のスタンプを振り返る、${typeLabel}、${requiredLabel}、獲得済み`
+    : `${slot.item.title}に答える、${typeLabel}、${requiredLabel}、未獲得`;
 
   const stampVisual =
     slot.achieved && slot.hossiiKey ? (
@@ -52,7 +56,7 @@ function StampSlotCell({
     );
 
   return (
-    <li className={`${styles.slot} ${slot.achieved ? styles.slotAchieved : ''}`}>
+    <li className={`${styles.slot} ${slot.achieved ? styles.slotAchieved : styles.slotPending}`}>
       <button
         type="button"
         className={styles.slotButton}
@@ -62,24 +66,18 @@ function StampSlotCell({
           else onSelectPending?.(slot);
         }}
       >
-        <span className={styles.slotIndex} aria-hidden="true">
-          {slot.index}
-        </span>
-        <p className={styles.slotTitle}>{slot.item.title}</p>
-        <span className={styles.slotMeta}>
-          {typeLabel}・{requiredLabel}
-        </span>
         <div className={styles.stampArea}>
           {stampVisual}
           <span
-            className={`${styles.stateText} ${
-              slot.achieved ? '' : styles.stateTextEmpty
+            className={`${styles.stateChip} ${
+              slot.achieved ? styles.stateChipGot : styles.stateChipEmpty
             }`}
           >
             {stateLabel}
             {slot.achieved && !slot.hossiiKey ? '（画像なし）' : ''}
           </span>
         </div>
+        <p className={styles.slotTitle}>{slot.item.title}</p>
       </button>
     </li>
   );
@@ -111,6 +109,11 @@ export function ChallengeProgressSummary({ slots }: Props) {
       }`}
       aria-label="挑戦状の進捗"
     >
+      {progress.isComplete ? (
+        <p className={styles.clearBadge} aria-hidden="true">
+          クリア！
+        </p>
+      ) : null}
       <div className={styles.progressRow}>
         {progress.treatsAllAsOptional ? (
           <span>
@@ -224,7 +227,9 @@ export const ChallengeStampCard = ({
                 <button
                   type="button"
                   className={`${styles.previewSlot} ${
-                    slot.achieved ? styles.previewSlotAchieved : ''
+                    slot.achieved
+                      ? styles.previewSlotAchieved
+                      : styles.previewSlotPending
                   }`}
                   aria-label={
                     slot.achieved
@@ -250,9 +255,6 @@ export const ChallengeStampCard = ({
                       aria-hidden="true"
                     />
                   )}
-                  <span className={styles.previewState}>
-                    {slot.achieved ? '獲得済み' : 'まだ'}
-                  </span>
                 </button>
               </li>
             ))}
@@ -265,9 +267,7 @@ export const ChallengeStampCard = ({
 
       {(expanded || autoExpand) && (
         <div id={panelId}>
-          <p className={styles.hint}>
-            スタンプを押すと、挑戦の記憶を振り返れます
-          </p>
+          <p className={styles.hint}>スタンプを押して、思い出をひらこう</p>
           {progress.isComplete ? (
             <p className={styles.detailClearNote} aria-live="polite">
               {formatRemainingLabel(progress)}

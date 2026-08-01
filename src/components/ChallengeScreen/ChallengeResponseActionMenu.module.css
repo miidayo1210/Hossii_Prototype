@@ -9,24 +9,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 40px;
+  min-height: 40px;
   padding: 0;
-  border: 1px solid #e9d5ff;
+  border: none;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #6d28d9;
-  font-size: 1.15rem;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 1.05rem;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.08);
+  box-shadow: none;
 }
 
 .trigger:hover:not(:disabled) {
-  background: #faf5ff;
-  border-color: #d8b4fe;
+  background: rgba(250, 245, 255, 0.9);
+  color: #7c3aed;
 }
 
 .trigger:disabled {

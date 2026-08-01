@@ -550,7 +550,7 @@ describe('ChallengeScreen focused response UI', () => {
     expect(focus.compareDocumentPosition(stamps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(stamps.compareDocumentPosition(answered) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('あと2つでクリア')).toBeTruthy();
-    expect(screen.getByText('スタンプを押すと、挑戦の記憶を振り返れます')).toBeTruthy();
+    expect(screen.getByText('スタンプを押して、思い出をひらこう')).toBeTruthy();
   });
 
   it('moves focus to optional after required items are answered', async () => {
@@ -932,7 +932,7 @@ describe('ChallengeScreen focused response UI', () => {
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     fireEvent.click(
-      await screen.findByRole('button', { name: '質問1のスタンプを振り返る' }),
+      await screen.findByRole('button', { name: /質問1のスタンプを振り返る/ }),
     );
     let dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('回想の回答')).toBeTruthy();
@@ -949,7 +949,7 @@ describe('ChallengeScreen focused response UI', () => {
     fireEvent.click(screen.getByRole('button', { name: '回答を削除' }));
     expect(await screen.findByText('回答を削除しました')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: '質問1のスタンプを振り返る' }));
+    fireEvent.click(screen.getByRole('button', { name: /質問1のスタンプを振り返る/ }));
     dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/回答は削除済みです/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度答える' }));
@@ -980,7 +980,7 @@ describe('ChallengeScreen focused response UI', () => {
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     fireEvent.click(
-      await screen.findByRole('button', { name: '質問1のスタンプを振り返る' }),
+      await screen.findByRole('button', { name: /質問1のスタンプを振り返る/ }),
     );
     expect(await screen.findByRole('dialog')).toBeTruthy();
     expect(screen.getByText(/回答は削除済みです/)).toBeTruthy();
@@ -989,7 +989,7 @@ describe('ChallengeScreen focused response UI', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '質問2に答える' }));
+    fireEvent.click(screen.getByRole('button', { name: /質問2に答える/ }));
     expect(await screen.findByRole('textbox')).toBeTruthy();
   });
 

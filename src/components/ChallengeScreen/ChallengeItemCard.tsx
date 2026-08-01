@@ -62,12 +62,20 @@ function ItemHeader({
   answered: boolean;
   actions?: ReactNode;
 }) {
+  const typeLabel = item.itemType === 'question' ? '質問' : 'ミッション';
+  const requiredLabel = item.isRequired ? 'クリアに必要' : 'おまけ';
   return (
-    <div className={styles.headerBar}>
+    <div
+      className={`${styles.headerBar} ${
+        answered ? styles.headerBarAnswered : ''
+      }`}
+    >
       <div className={styles.headerRow}>
-        <span className={styles.index} aria-hidden="true">
-          {index}
-        </span>
+        {!answered ? (
+          <span className={styles.index} aria-hidden="true">
+            {index}
+          </span>
+        ) : null}
         <span
           className={`${styles.statusBadge} ${
             answered ? styles.statusAnswered : styles.statusPending
@@ -75,12 +83,16 @@ function ItemHeader({
         >
           {answered ? '回答済み' : '未回答'}
         </span>
-        <span className={styles.metaBadge}>
-          {item.itemType === 'question' ? '質問' : 'ミッション'}
-        </span>
-        <span className={styles.metaBadge}>
-          {item.isRequired ? 'クリアに必要' : 'おまけ'}
-        </span>
+        {answered ? (
+          <span className={styles.metaSoft}>
+            {typeLabel} · {requiredLabel}
+          </span>
+        ) : (
+          <>
+            <span className={styles.metaBadge}>{typeLabel}</span>
+            <span className={styles.metaBadge}>{requiredLabel}</span>
+          </>
+        )}
       </div>
       {actions}
     </div>
@@ -275,7 +287,9 @@ export function ChallengeItemCard({
   if (!expanded) {
     return (
       <li
-        className={`${styles.card} ${emphasized ? styles.cardEmphasized : ''}`}
+        className={`${styles.card} ${
+          emphasized ? styles.cardEmphasized : ''
+        } ${answered ? styles.cardAnswered : ''}`}
       >
         <ItemHeader
           item={item}
@@ -283,8 +297,10 @@ export function ChallengeItemCard({
           answered={answered}
           actions={actionMenu}
         />
-        <h3 className={styles.title}>{item.title}</h3>
-        <ItemDescription item={item} compact />
+        <h3 className={`${styles.title} ${answered ? styles.titleAnswered : ''}`}>
+          {item.title}
+        </h3>
+        {!answered ? <ItemDescription item={item} compact /> : null}
         {answered && existing ? (
           <>
             <button
