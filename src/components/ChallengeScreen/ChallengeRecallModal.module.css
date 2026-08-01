@@ -25,10 +25,21 @@
   text-align: left;
 }
 
-.closeIcon {
+.topActions {
   position: absolute;
-  top: 0.4rem;
-  right: 0.45rem;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.menuWrap {
+  display: flex;
+  align-items: center;
+}
+
+.closeIcon {
   width: 2.75rem;
   height: 2.75rem;
   border: none;

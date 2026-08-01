@@ -64,6 +64,7 @@ describe('ChallengeRecallModal', () => {
         }}
         onRewrite={onRewrite}
         onAnswerAgain={vi.fn()}
+        onDelete={vi.fn()}
         onDismiss={vi.fn()}
       />,
     );
@@ -72,7 +73,8 @@ describe('ChallengeRecallModal', () => {
     expect(screen.getByText('自分だけに残す')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '書き直す' }));
     expect(onRewrite).toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: '回答を削除' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /の回答操作/ }));
+    expect(screen.getByRole('menuitem', { name: '回答を削除' })).toBeTruthy();
   });
 
   it('shows deleted state and answer-again CTA without response', () => {

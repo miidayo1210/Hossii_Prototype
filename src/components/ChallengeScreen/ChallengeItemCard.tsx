@@ -28,10 +28,12 @@ type Props = {
   onCollapse: () => void;
   onDraftChange: (draft: ChallengeItemDraft) => void;
   onSave: () => void;
-  onRewrite: () => void;
-  onDelete: () => Promise<void> | void;
+  onRewrite?: () => void;
+  onDelete?: () => Promise<void> | void;
   /** 回答済み抜粋から回想Modalを開く */
-  onRecall: () => void;
+  onRecall?: () => void;
+  /** 詳細では記録Modal側に寄せるため false 可 */
+  showManageActions?: boolean;
 };
 
 function visibilityHelp(visibility: ChallengeResponseVisibility): string {
@@ -261,16 +263,18 @@ export function ChallengeItemCard({
   onRewrite,
   onDelete,
   onRecall,
+  showManageActions = true,
 }: Props) {
   const answered = Boolean(existing);
-  const actionMenu = answered ? (
-    <ChallengeResponseActionMenu
-      itemTitle={item.title}
-      disabled={saving}
-      onRewrite={onRewrite}
-      onDelete={onDelete}
-    />
-  ) : null;
+  const actionMenu =
+    answered && showManageActions && onRewrite && onDelete ? (
+      <ChallengeResponseActionMenu
+        itemTitle={item.title}
+        disabled={saving}
+        onRewrite={onRewrite}
+        onDelete={onDelete}
+      />
+    ) : null;
 
   if (!expanded) {
     return (
@@ -292,6 +296,7 @@ export function ChallengeItemCard({
               className={styles.excerptButton}
               aria-label={`「${item.title}」の回答を振り返る`}
               onClick={onRecall}
+              disabled={!onRecall}
             >
               <span className={styles.excerptText}>
                 {formatExcerpt(existing.comment)}

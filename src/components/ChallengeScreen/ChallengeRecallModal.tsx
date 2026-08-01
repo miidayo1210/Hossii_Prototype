@@ -3,6 +3,7 @@ import { getChallengeHossiiImageUrl, isChallengeHossiiKey } from '../../core/ass
 import type { ChallengeItem } from '../../core/types/challengeProgram';
 import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
+import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
 import styles from './ChallengeRecallModal.module.css';
 
 export type ChallengeRecallModalModel = {
@@ -16,6 +17,7 @@ type Props = {
   model: ChallengeRecallModalModel;
   onRewrite: () => void;
   onAnswerAgain: () => void;
+  onDelete?: () => Promise<void> | void;
   onDismiss: () => void;
 };
 
@@ -39,6 +41,7 @@ export function ChallengeRecallModal({
   model,
   onRewrite,
   onAnswerAgain,
+  onDelete,
   onDismiss,
 }: Props) {
   const titleId = useId();
@@ -123,14 +126,28 @@ export function ChallengeRecallModal({
         aria-describedby={descId}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          className={styles.closeIcon}
-          aria-label="回想を閉じる"
-          onClick={() => runAndSkipRestore(onDismiss)}
-        >
-          ×
-        </button>
+        <div className={styles.topActions}>
+          {hasResponse && onDelete ? (
+            <div className={styles.menuWrap}>
+              <ChallengeResponseActionMenu
+                itemTitle={itemTitle}
+                onRewrite={() => runAndSkipRestore(onRewrite)}
+                onDelete={async () => {
+                  await onDelete();
+                  runAndSkipRestore(onDismiss);
+                }}
+              />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className={styles.closeIcon}
+            aria-label="回想を閉じる"
+            onClick={() => runAndSkipRestore(onDismiss)}
+          >
+            ×
+          </button>
+        </div>
 
         <div className={styles.imageWrap}>
           {hossiiKey ? (
