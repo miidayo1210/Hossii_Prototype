@@ -204,15 +204,20 @@ describe('ChallengeStampCard', () => {
         ]}
       />,
     );
-    expect(screen.getByText('未達成')).toBeTruthy();
+    expect(screen.getByText('未獲得')).toBeTruthy();
     expect(screen.getByText('質問・クリアに必要')).toBeTruthy();
     expect(screen.queryByRole('img')).toBeNull();
     expect(screen.queryByRole('button', { name: 'スタンプを見る' })).toBeNull();
-    expect(screen.getByText('一度もらったHossiiは残ります')).toBeTruthy();
+    expect(screen.getByText('スタンプを押すと、挑戦の記憶を振り返れます')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: '朝の気持ちに答える' }),
+    ).toBeTruthy();
   });
 
   it('renders hossii image in expanded detail for achieved slots', () => {
-    render(
+    const onSelectAchieved = vi.fn();
+    const onSelectPending = vi.fn();
+    const { container } = render(
       <ChallengeStampCard
         slots={[
           achievedSlot('i1', '朝の気持ち', 1),
@@ -226,13 +231,20 @@ describe('ChallengeStampCard', () => {
             }),
           }),
         ]}
+        onSelectAchieved={onSelectAchieved}
+        onSelectPending={onSelectPending}
       />,
     );
     expect(screen.getByText('1 / 2 獲得')).toBeTruthy();
-    const img = screen.getByRole('img', { name: /獲得Hossii/ });
-    expect(img.getAttribute('src')).toContain('/hossii/emotion/wow.png');
-    expect(screen.getByText('達成済み')).toBeTruthy();
-    expect(screen.getByText('未達成')).toBeTruthy();
+    const img = container.querySelector('img');
+    expect(img?.getAttribute('src')).toContain('/hossii/emotion/wow.png');
+    expect(screen.getByText('獲得済み')).toBeTruthy();
+    expect(screen.getByText('未獲得')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '朝の気持ちのスタンプを振り返る' }));
+    expect(onSelectAchieved).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'おまけに答える' }));
+    expect(onSelectPending).toHaveBeenCalledTimes(1);
   });
 
   it('starts collapsed for 5+ stamps and toggles expand/collapse', () => {
@@ -280,7 +292,7 @@ describe('ChallengeStampCard', () => {
     expect(screen.getByText('ほか1個')).toBeTruthy();
     expect(screen.getByText('獲得済み')).toBeTruthy();
     expect(screen.getAllByText('まだ').length).toBe(3);
-    expect(screen.queryByText('一度もらったHossiiは残ります')).toBeNull();
+    expect(screen.queryByText('スタンプを押すと、挑戦の記憶を振り返れます')).toBeNull();
     expect(screen.queryByText('質問・クリアに必要')).toBeNull();
 
     fireEvent.click(toggle);
@@ -289,7 +301,7 @@ describe('ChallengeStampCard', () => {
         'aria-expanded',
       ),
     ).toBe('true');
-    expect(screen.getByText('一度もらったHossiiは残ります')).toBeTruthy();
+    expect(screen.getByText('スタンプを押すと、挑戦の記憶を振り返れます')).toBeTruthy();
     expect(screen.getAllByText('質問・クリアに必要').length).toBe(5);
 
     fireEvent.click(screen.getByRole('button', { name: 'スタンプを閉じる' }));
@@ -323,13 +335,13 @@ describe('ChallengeStampCard', () => {
 
     const preview = screen.getByLabelText('スタンププレビュー');
     const labels = within(preview)
-      .getAllByRole('listitem')
+      .getAllByRole('button')
       .map((node) => node.getAttribute('aria-label'));
     expect(labels).toEqual([
-      '先頭、未獲得',
-      '二番目、獲得済み',
-      '三番目、未獲得',
-      '四番目、獲得済み',
+      '先頭に答える',
+      '二番目のスタンプを振り返る',
+      '三番目に答える',
+      '四番目のスタンプを振り返る',
     ]);
     // Decorative preview images use empty alt and are excluded from the a11y tree.
     expect(preview.querySelectorAll('img').length).toBe(2);
@@ -342,7 +354,7 @@ describe('ChallengeStampCard', () => {
         slots={[achievedSlot('i1', '画像なし', 1, { hossiiKey: null })]}
       />,
     );
-    expect(screen.getByText('達成済み（画像なし）')).toBeTruthy();
+    expect(screen.getByText('獲得済み（画像なし）')).toBeTruthy();
     expect(screen.queryByRole('img')).toBeNull();
   });
 });

@@ -30,6 +30,8 @@ type Props = {
   onSave: () => void;
   onRewrite: () => void;
   onDelete: () => Promise<void> | void;
+  /** 回答済み抜粋から回想Modalを開く */
+  onRecall: () => void;
 };
 
 function visibilityHelp(visibility: ChallengeResponseVisibility): string {
@@ -258,6 +260,7 @@ export function ChallengeItemCard({
   onSave,
   onRewrite,
   onDelete,
+  onRecall,
 }: Props) {
   const answered = Boolean(existing);
   const actionMenu = answered ? (
@@ -287,10 +290,8 @@ export function ChallengeItemCard({
             <button
               type="button"
               className={styles.excerptButton}
-              aria-expanded={false}
-              aria-controls={panelId}
               aria-label={`「${item.title}」の回答を振り返る`}
-              onClick={onExpand}
+              onClick={onRecall}
             >
               <span className={styles.excerptText}>
                 {formatExcerpt(existing.comment)}
