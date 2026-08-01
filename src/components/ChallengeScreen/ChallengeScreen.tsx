@@ -420,19 +420,28 @@ export const ChallengeScreen = () => {
     void reloadList();
   };
 
+  const openRecordsPage = (programId: string) => {
+    setRecallModal(null);
+    setRewardModal(null);
+    setActiveItemId(null);
+    setView({ kind: 'trajectory', programId });
+  };
+
   const closeRewardModal = (action: 'primary' | 'secondary' | 'dismiss') => {
     const modal = rewardModal;
+    const programId = activeProgram?.id ?? null;
     setRewardModal(null);
     if (!modal) return;
     if (action === 'secondary') {
       returnToList();
       return;
     }
-    if (modal.kind === 'complete') {
-      setActiveItemId(null);
-      window.requestAnimationFrame(() => {
-        document.getElementById('challenge-trajectory-cta')?.focus();
-      });
+    // Required clear (with or without optional left) → open records after celebration.
+    if (
+      (modal.kind === 'complete' || modal.kind === 'clear_optional') &&
+      programId
+    ) {
+      openRecordsPage(programId);
       return;
     }
     setActiveItemId(modal.nextFocusItemId);
@@ -527,8 +536,18 @@ export const ChallengeScreen = () => {
       } else if (hadResponse) {
         showToast('回答を更新しました');
       } else {
-        setActiveItemId(nextFocus);
+        const nextSlots = buildChallengeStampSlots(
+          items,
+          Object.values(nextCompletions),
+          Object.values(nextRewards),
+        );
+        const nextProgress = getChallengeStampProgress(nextSlots);
         showToast('回答を保存しました');
+        if (nextProgress.isComplete && activeProgram) {
+          openRecordsPage(activeProgram.id);
+        } else {
+          setActiveItemId(nextFocus);
+        }
       }
     } finally {
       setBusyItemId(null);
@@ -654,11 +673,35 @@ export const ChallengeScreen = () => {
           onBack={() => {
             setView({ kind: 'detail', programId: activeProgram.id });
           }}
+          onOpenRecord={(itemId) => openRecallForItem(itemId)}
         />
         {toast && (
           <div className={styles.toast} aria-live="polite">
             {toast}
           </div>
+        )}
+        {recallModal && (
+          <ChallengeRecallModal
+            model={recallModal}
+            onRewrite={() => {
+              const item = recallModal.item;
+              setRecallModal(null);
+              setView({ kind: 'detail', programId: activeProgram.id });
+              rewriteResponse(item);
+            }}
+            onAnswerAgain={() => {
+              const itemId = recallModal.item.id;
+              setRecallModal(null);
+              setView({ kind: 'detail', programId: activeProgram.id });
+              setActiveItemId(itemId);
+            }}
+            onDelete={
+              recallModal.response
+                ? () => deleteResponse(recallModal.item)
+                : undefined
+            }
+            onDismiss={() => setRecallModal(null)}
+          />
         )}
       </div>
     );
@@ -698,11 +741,6 @@ export const ChallengeScreen = () => {
         return compareChallengeItems(a.item, b.item);
       });
 
-    const openTrajectory = () => {
-      setRecallModal(null);
-      setRewardModal(null);
-      setView({ kind: 'trajectory', programId: activeProgram.id });
-    };
     const collectedLabel = formatCollectedHossiiLabel(stampSlots);
 
     const renderHeroCard = (item: ChallengeItem) => {
@@ -738,15 +776,10 @@ export const ChallengeScreen = () => {
     };
 
     const heroHeading = heroIsRewrite
-      ? '回答を書き直す'
+      ? '回答を更新'
       : focusSectionKind === 'optional'
         ? 'おまけの挑戦'
         : '次の挑戦';
-    const heroLead = heroIsRewrite
-      ? '記録をそっと更新しよう'
-      : focusSectionKind === 'optional'
-        ? 'もっとHossiiを集めたい人へ'
-        : 'まずはこの質問に答えてみよう';
 
     return (
       <div className={styles.container}>
@@ -787,20 +820,10 @@ export const ChallengeScreen = () => {
             <div className={styles.clearBannerText}>
               <span className={styles.clearAccent}>クリア</span>
               <span className={styles.clearBannerMeta}>
-                {focusItem
-                  ? '必須クリア · 軌跡ができあがっています'
-                  : '軌跡がそろいました'}
+                {focusItem ? '必須クリア' : 'コンプリート'}
                 {collectedLabel ? ` · ${collectedLabel}` : ''}
               </span>
             </div>
-            <button
-              id="challenge-trajectory-cta"
-              type="button"
-              className={styles.trajectoryPrimary}
-              onClick={openTrajectory}
-            >
-              完成した軌跡を見る
-            </button>
           </section>
         ) : (
           <ChallengeProgressSummary slots={stampSlots} />
@@ -824,7 +847,6 @@ export const ChallengeScreen = () => {
                 >
                   {heroHeading}
                 </h2>
-                <p className={styles.focusLead}>{heroLead}</p>
                 <ul className={styles.itemList}>{renderHeroCard(heroItem)}</ul>
               </section>
             ) : null}
@@ -841,15 +863,13 @@ export const ChallengeScreen = () => {
               onOpenRecord={(itemId) => openRecallForItem(itemId)}
             />
 
-            {!stampProgress.isComplete ? (
-              <button
-                type="button"
-                className={styles.trajectoryLink}
-                onClick={openTrajectory}
-              >
-                わたしの軌跡を見る
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className={styles.trajectoryLink}
+              onClick={() => openRecordsPage(activeProgram.id)}
+            >
+              挑戦の記録
+            </button>
           </>
         )}
 

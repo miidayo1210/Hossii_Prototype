@@ -41,7 +41,7 @@
 
 .menu {
   position: fixed;
-  z-index: 1300;
+  z-index: 1500;
   width: 200px;
   padding: 0.35rem;
   border-radius: 0.85rem;
@@ -89,7 +89,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 1400;
+  z-index: 1600;
   background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: center;

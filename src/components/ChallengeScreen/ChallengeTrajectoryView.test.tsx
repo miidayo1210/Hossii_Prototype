@@ -7,6 +7,10 @@ import type { ChallengeCompletion, ChallengeReward } from '../../core/types/chal
 import type { ChallengeStampSlot } from '../../core/utils/challengeStampProgress';
 import { ChallengeTrajectoryView } from './ChallengeTrajectoryView';
 
+vi.mock('../../core/hooks/useMediaQuery', () => ({
+  useMediaQuery: () => true,
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -53,7 +57,7 @@ function slot(
 }
 
 describe('ChallengeTrajectoryView', () => {
-  it('renders mid-progress trajectory as artwork without edit actions', () => {
+  it('renders records page with stamp card and answers only', () => {
     const onBack = vi.fn();
     const response: ChallengeResponse = {
       id: 'r1',
@@ -104,23 +108,19 @@ describe('ChallengeTrajectoryView', () => {
       />,
     );
 
-    expect(screen.getByLabelText('わたしの軌跡')).toBeTruthy();
-    expect(screen.getByText('途中経過')).toBeTruthy();
+    expect(screen.getByLabelText('挑戦の記録')).toBeTruthy();
     expect(screen.getByText('春の挑戦状')).toBeTruthy();
+    expect(screen.getByLabelText('Hossiiスタンプカード')).toBeTruthy();
     expect(screen.getByText('はじめての気持ち')).toBeTruthy();
-    expect(screen.getByText('まだこれから')).toBeTruthy();
-    expect(screen.getByText('朝のごあいさつ')).toBeTruthy();
+    expect(screen.queryByText('夜のふりかえり')).toBeNull();
+    expect(screen.queryByText(/積み重ねた/)).toBeNull();
     expect(screen.queryByRole('button', { name: '書き直す' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /削除/ })).toBeNull();
-    expect(
-      document.querySelector('[data-challenge-trajectory-export="true"]'),
-    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '← 挑戦状へ戻る' }));
     expect(onBack).toHaveBeenCalled();
   });
 
-  it('shows completed artwork and soft deleted answer copy', () => {
+  it('shows deleted answer quietly when complete', () => {
     const completion: ChallengeCompletion = {
       id: 'c1',
       itemId: 'i1',
@@ -156,8 +156,8 @@ describe('ChallengeTrajectoryView', () => {
       />,
     );
 
-    expect(screen.getByLabelText('完成した軌跡')).toBeTruthy();
     expect(screen.getByText('クリア')).toBeTruthy();
-    expect(screen.getByText(/そっとしまってあります/)).toBeTruthy();
+    expect(screen.getByText('回答は削除済みです')).toBeTruthy();
+    expect(screen.queryByText(/そっとしまって/)).toBeNull();
   });
 });

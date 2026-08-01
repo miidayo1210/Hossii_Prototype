@@ -12,8 +12,11 @@ import styles from './ChallengeResponseActionMenu.module.css';
 type Props = {
   itemTitle: string;
   disabled?: boolean;
+  /** full: 書き直す+削除 / answerAgain: もう一度答えるのみ */
+  variant?: 'full' | 'answerAgain';
   onRewrite: () => void;
   onDelete: () => Promise<void> | void;
+  onAnswerAgain?: () => void;
 };
 
 type Mode = 'idle' | 'confirmDelete';
@@ -35,8 +38,10 @@ function computeMenuPosition(anchor: HTMLElement): { top: number; left: number }
 export function ChallengeResponseActionMenu({
   itemTitle,
   disabled = false,
+  variant = 'full',
   onRewrite,
   onDelete,
+  onAnswerAgain,
 }: Props) {
   const menuId = useId();
   const titleId = useId();
@@ -208,26 +213,43 @@ export function ChallengeResponseActionMenu({
               tabIndex={-1}
               onKeyDown={handleMenuKeyDown}
             >
-              <button
-                type="button"
-                role="menuitem"
-                className={styles.menuItem}
-                tabIndex={focusedIndex === 0 ? 0 : -1}
-                onMouseEnter={() => setFocusedIndex(0)}
-                onClick={handleRewrite}
-              >
-                書き直す
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                tabIndex={focusedIndex === 1 ? 0 : -1}
-                onMouseEnter={() => setFocusedIndex(1)}
-                onClick={handleOpenDelete}
-              >
-                回答を削除
-              </button>
+              {variant === 'answerAgain' ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.menuItem}
+                  tabIndex={0}
+                  onClick={() => {
+                    closeMenu(false);
+                    onAnswerAgain?.();
+                  }}
+                >
+                  もう一度答える
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.menuItem}
+                    tabIndex={focusedIndex === 0 ? 0 : -1}
+                    onMouseEnter={() => setFocusedIndex(0)}
+                    onClick={handleRewrite}
+                  >
+                    書き直す
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                    tabIndex={focusedIndex === 1 ? 0 : -1}
+                    onMouseEnter={() => setFocusedIndex(1)}
+                    onClick={handleOpenDelete}
+                  >
+                    回答を削除
+                  </button>
+                </>
+              )}
             </div>,
             document.body,
           )

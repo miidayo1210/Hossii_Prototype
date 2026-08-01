@@ -47,7 +47,7 @@ export function ChallengeRecallModal({
   const titleId = useId();
   const descId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
-  const primaryRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const restoreFocusRef = useRef(true);
 
@@ -70,7 +70,7 @@ export function ChallengeRecallModal({
         : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    primaryRef.current?.focus();
+    closeRef.current?.focus();
 
     return () => {
       document.body.style.overflow = previousOverflow;
@@ -116,7 +116,10 @@ export function ChallengeRecallModal({
   }, [onDismiss]);
 
   return (
-    <div className={styles.overlay} onMouseDown={() => runAndSkipRestore(onDismiss)}>
+    <div
+      className={styles.overlay}
+      onMouseDown={() => runAndSkipRestore(onDismiss)}
+    >
       <div
         ref={cardRef}
         className={styles.card}
@@ -126,107 +129,94 @@ export function ChallengeRecallModal({
         aria-describedby={descId}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className={styles.topActions}>
-          {hasResponse && onDelete ? (
-            <div className={styles.menuWrap}>
-              <ChallengeResponseActionMenu
-                itemTitle={itemTitle}
-                onRewrite={() => runAndSkipRestore(onRewrite)}
-                onDelete={async () => {
-                  await onDelete();
-                  runAndSkipRestore(onDismiss);
-                }}
-              />
-            </div>
-          ) : null}
-          <button
-            type="button"
-            className={styles.closeIcon}
-            aria-label="回想を閉じる"
-            onClick={() => runAndSkipRestore(onDismiss)}
-          >
-            ×
-          </button>
-        </div>
-
-        <div className={styles.imageWrap}>
-          {hossiiKey ? (
-            <img
-              className={styles.image}
-              src={getChallengeHossiiImageUrl(hossiiKey)}
-              alt={`獲得したHossii（${itemTitle}）`}
-            />
-          ) : (
-            <div
-              className={styles.imageFallback}
-              role="img"
-              aria-label="獲得済みのスタンプ"
+        <div className={styles.topBar}>
+          <div className={styles.topBarSpacer} />
+          <div className={styles.topActions}>
+            {hasResponse && onDelete ? (
+              <div className={styles.menuWrap}>
+                <ChallengeResponseActionMenu
+                  itemTitle={itemTitle}
+                  onRewrite={() => runAndSkipRestore(onRewrite)}
+                  onDelete={async () => {
+                    await onDelete();
+                    runAndSkipRestore(onDismiss);
+                  }}
+                />
+              </div>
+            ) : !hasResponse ? (
+              <div className={styles.menuWrap}>
+                <ChallengeResponseActionMenu
+                  itemTitle={itemTitle}
+                  variant="answerAgain"
+                  onRewrite={() => {}}
+                  onDelete={() => {}}
+                  onAnswerAgain={() => runAndSkipRestore(onAnswerAgain)}
+                />
+              </div>
+            ) : null}
+            <button
+              ref={closeRef}
+              type="button"
+              className={styles.closeIcon}
+              aria-label="閉じる"
+              onClick={() => runAndSkipRestore(onDismiss)}
             >
-              獲得済み
-            </div>
-          )}
+              ×
+            </button>
+          </div>
         </div>
 
-        <p className={styles.meta}>
-          {typeLabel}・{requiredLabel}
-          {awardedLabel ? `・${awardedLabel}` : ''}
-        </p>
-        <h2 id={titleId} className={styles.title}>
-          {itemTitle}
-        </h2>
-        {model.item.description ? (
-          <p id={descId} className={styles.description}>
-            {model.item.description}
-          </p>
-        ) : (
-          <p id={descId} className={styles.srOnly}>
-            挑戦の記憶
-          </p>
-        )}
+        <div className={styles.body}>
+          <div className={styles.imageWrap}>
+            {hossiiKey ? (
+              <img
+                className={styles.image}
+                src={getChallengeHossiiImageUrl(hossiiKey)}
+                alt={`獲得したHossii（${itemTitle}）`}
+              />
+            ) : (
+              <div
+                className={styles.imageFallback}
+                role="img"
+                aria-label="獲得済みのスタンプ"
+              >
+                獲得済み
+              </div>
+            )}
+          </div>
 
-        <div className={styles.answerBlock}>
-          <p className={styles.answerLabel}>あなたの回答</p>
-          {hasResponse && model.response ? (
-            <>
-              <p className={styles.answerBody}>{model.response.comment || '（回答なし）'}</p>
-              <p className={styles.visibility}>
-                {visibilityLabel(model.response.visibility)}
-              </p>
-            </>
+          <p className={styles.meta}>
+            {typeLabel}・{requiredLabel}
+            {awardedLabel ? `・${awardedLabel}` : ''}
+          </p>
+          <h2 id={titleId} className={styles.title}>
+            {itemTitle}
+          </h2>
+          {model.item.description ? (
+            <p id={descId} className={styles.description}>
+              {model.item.description}
+            </p>
           ) : (
-            <p className={styles.answerDeleted}>
-              回答は削除済みです。Hossiiとスタンプはそのまま残っています。
+            <p id={descId} className={styles.srOnly}>
+              回答の記録
             </p>
           )}
-        </div>
 
-        <div className={styles.actions}>
-          {hasResponse ? (
-            <button
-              ref={primaryRef}
-              type="button"
-              className={styles.primaryButton}
-              onClick={() => runAndSkipRestore(onRewrite)}
-            >
-              書き直す
-            </button>
-          ) : (
-            <button
-              ref={primaryRef}
-              type="button"
-              className={styles.primaryButton}
-              onClick={() => runAndSkipRestore(onAnswerAgain)}
-            >
-              もう一度答える
-            </button>
-          )}
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => runAndSkipRestore(onDismiss)}
-          >
-            閉じる
-          </button>
+          <div className={styles.answerBlock}>
+            <p className={styles.answerLabel}>回答</p>
+            {hasResponse && model.response ? (
+              <>
+                <p className={styles.answerBody}>
+                  {model.response.comment || '（回答なし）'}
+                </p>
+                <p className={styles.visibility}>
+                  {visibilityLabel(model.response.visibility)}
+                </p>
+              </>
+            ) : (
+              <p className={styles.answerDeleted}>回答は削除済みです</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

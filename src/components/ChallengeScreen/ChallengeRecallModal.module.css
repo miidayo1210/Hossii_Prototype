@@ -1,34 +1,52 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: 1400;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 1rem;
-  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  padding: 0.75rem;
+  padding-bottom: max(5.75rem, calc(env(safe-area-inset-bottom, 0px) + 4.75rem));
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
 }
 
 .card {
   position: relative;
   width: min(100%, 26rem);
-  max-height: min(88vh, 40rem);
-  overflow: auto;
-  padding: 1.25rem 1.15rem 1.1rem;
+  max-height: min(78vh, 36rem);
+  display: flex;
+  flex-direction: column;
   border-radius: 1.35rem 1.35rem 1.15rem 1.15rem;
   border: 1px solid rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.97);
+  background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 18px 44px rgba(124, 58, 237, 0.18);
   text-align: left;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+  padding: 0.35rem 0.35rem 0.25rem;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid rgba(241, 245, 249, 0.95);
+}
+
+.topBarSpacer {
+  flex: 1;
 }
 
 .topActions {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
   display: flex;
   align-items: center;
   gap: 0.1rem;
@@ -37,23 +55,35 @@
 .menuWrap {
   display: flex;
   align-items: center;
+  position: relative;
+  z-index: 3;
 }
 
 .closeIcon {
+  position: relative;
+  z-index: 3;
   width: 2.75rem;
   height: 2.75rem;
   border: none;
   border-radius: 999px;
-  background: transparent;
-  color: #64748b;
+  background: rgba(248, 250, 252, 0.95);
+  color: #475569;
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .closeIcon:focus-visible {
   outline: 2px solid #a855f7;
   outline-offset: 2px;
+}
+
+.body {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.65rem 1.15rem 1.25rem;
+  overscroll-behavior: contain;
 }
 
 .imageWrap {
@@ -79,7 +109,7 @@
   font-size: 0.8rem;
   font-weight: 700;
   color: #7c3aed;
-  background: linear-gradient(160deg, #faf5ff, #fdf2f8);
+  background: #faf5ff;
   border: 1px solid #e9d5ff;
 }
 
@@ -99,7 +129,7 @@
   color: #1f2937;
   text-align: center;
   overflow-wrap: anywhere;
-  padding-inline: 1.5rem;
+  padding-inline: 0.25rem;
 }
 
 .description {
@@ -160,59 +190,14 @@
   color: #64748b;
 }
 
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  margin-top: 1rem;
-}
-
-.primaryButton,
-.secondaryButton {
-  min-height: 44px;
-  border-radius: 9999px;
-  padding: 0.65rem 1.1rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.primaryButton {
-  border: none;
-  color: #fff;
-  background: linear-gradient(135deg, #a855f7, #ec4899);
-  box-shadow: 0 4px 0 #7c3aed;
-}
-
-.primaryButton:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #7c3aed;
-}
-
-.secondaryButton {
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #475569;
-}
-
-.primaryButton:focus-visible,
-.secondaryButton:focus-visible {
-  outline: 2px solid #a855f7;
-  outline-offset: 2px;
-}
-
 @media (min-width: 640px) {
   .overlay {
     align-items: center;
+    padding-bottom: 1.5rem;
   }
 
   .card {
     border-radius: 1.35rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .primaryButton {
-    transition: none;
+    max-height: min(84vh, 38rem);
   }
 }
