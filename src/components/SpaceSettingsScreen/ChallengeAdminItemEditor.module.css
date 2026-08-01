@@ -1,0 +1,242 @@
+.editor {
+  margin: 0.75rem 0 1rem;
+  padding: 1rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+}
+
+.editorTitle {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.fieldset {
+  margin: 0 0 0.9rem;
+  padding: 0;
+  border: none;
+}
+
+.legend {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.choiceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.choiceCard input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choiceCardSelected {
+  border-color: #a855f7;
+  background: #faf5ff;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.25);
+}
+
+.choiceTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.choiceBody {
+  font-size: 0.78rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.label > label {
+  font: inherit;
+  color: inherit;
+}
+
+.help {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  color: #111827;
+  background: #fff;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.input:focus-visible,
+.textarea:focus-visible,
+.detailsToggle:focus-visible,
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
+}
+
+.counter {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #9ca3af;
+  align-self: flex-end;
+}
+
+.responseMethod {
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.preview {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px dashed #d1d5db;
+  background: #fff;
+}
+
+.previewLabel {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.previewType {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.previewTitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.previewMeta {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.detailsToggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin: 0 0 0.75rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detailsPanel {
+  margin: 0 0 0.75rem;
+  padding-top: 0.25rem;
+}
+
+.error {
+  margin: 0 0 0.75rem;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #4b5563;
+}
+
+@media (max-width: 640px) {
+  .typeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+}

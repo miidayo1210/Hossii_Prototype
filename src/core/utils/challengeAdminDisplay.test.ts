@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildChallengePublishChecks,
   clampAdminDescription,
   countChallengeItemStats,
   formatChallengeResponderLabel,
   hasUnsavedProgramEdits,
+  itemFormHasContent,
+  validateChallengeItemForm,
 } from './challengeAdminDisplay';
 
 describe('challengeAdminDisplay', () => {
@@ -48,6 +51,41 @@ describe('challengeAdminDisplay', () => {
         savedTitle: 'A',
         savedDescription: null,
       }),
+    ).toBe(true);
+  });
+
+  it('builds publish checks aligned with publish gate', () => {
+    const empty = buildChallengePublishChecks({
+      title: '',
+      itemTotal: 0,
+      requiredTotal: 0,
+    });
+    expect(empty.map((item) => item.ok)).toEqual([false, false, true]);
+    expect(empty[1].label).toContain('1件以上');
+
+    const ready = buildChallengePublishChecks({
+      title: '挑戦',
+      itemTotal: 3,
+      requiredTotal: 2,
+    });
+    expect(ready.every((item) => item.ok)).toBe(true);
+    expect(ready[1].label).toContain('3件');
+    expect(ready[2].label).toContain('2件');
+  });
+
+  it('validates item form fields', () => {
+    expect(
+      validateChallengeItemForm({ title: '', description: '', reason: '' }),
+    ).toContain('問い・ミッション');
+    expect(
+      validateChallengeItemForm({
+        title: 'ok',
+        description: '',
+        reason: '',
+      }),
+    ).toBeNull();
+    expect(
+      itemFormHasContent({ title: '', description: 'x', reason: '' }),
     ).toBe(true);
   });
 });

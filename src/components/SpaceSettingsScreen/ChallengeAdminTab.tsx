@@ -23,14 +23,23 @@ import { listManagerChallengeResponses } from '../../core/utils/challengeRespons
 import { fetchParticipantAccounts } from '../../core/utils/participantAccountsApi';
 import { fetchSpaceMembershipNicknames } from '../../core/utils/spaceMembershipsApi';
 import {
+  buildChallengePublishChecks,
   clampAdminDescription,
   countChallengeItemStats,
   formatChallengeResponderLabel,
   hasUnsavedProgramEdits,
+  itemFormHasContent,
+  toParticipantItemSaveError,
+  validateChallengeItemForm,
   type ChallengeItemCountStats,
 } from '../../core/utils/challengeAdminDisplay';
 import { invalidatePublishedChallengeNavCache } from '../../core/hooks/useHasPublishedChallengePrograms';
 import type { ChallengeResponse } from '../../core/types/challengeResponse';
+import { ChallengeAdminItemCard } from './ChallengeAdminItemCard';
+import {
+  ChallengeAdminItemEditor,
+  type ChallengeAdminItemFormState,
+} from './ChallengeAdminItemEditor';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import sharedStyles from './SettingsShared.module.css';
@@ -46,20 +55,12 @@ type View =
   | { kind: 'create' }
   | { kind: 'edit'; programId: string };
 
-type ItemFormState = {
-  itemType: ChallengeItemType;
-  title: string;
-  description: string;
-  reason: string;
-  isRequired: boolean;
-};
-
 type ManagerResponseRow = ChallengeResponse & {
   itemTitle: string;
   itemType: ChallengeItemType;
 };
 
-const EMPTY_ITEM_FORM: ItemFormState = {
+const EMPTY_ITEM_FORM: ChallengeAdminItemFormState = {
   itemType: 'question',
   title: '',
   description: '',
@@ -151,9 +152,10 @@ export const ChallengeAdminTab = ({ space }: Props) => {
 
   const [programTitle, setProgramTitle] = useState('');
   const [programDescription, setProgramDescription] = useState('');
-  const [itemForm, setItemForm] = useState<ItemFormState>(EMPTY_ITEM_FORM);
+  const [itemForm, setItemForm] = useState<ChallengeAdminItemFormState>(EMPTY_ITEM_FORM);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
+  const [itemFormError, setItemFormError] = useState<string | null>(null);
 
   const [managerResponses, setManagerResponses] = useState<ManagerResponseRow[]>([]);
   const [responsesLoading, setResponsesLoading] = useState(false);
@@ -266,6 +268,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setEditingItemId(null);
       setShowItemForm(false);
       setItemForm(EMPTY_ITEM_FORM);
+      setItemFormError(null);
       setView({ kind: 'edit', programId });
       if (program.status === 'published') {
         void loadManagerResponsesForItems(programItems);
@@ -350,14 +353,55 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     }
   };
 
+  const closeItemForm = () => {
+    setShowItemForm(false);
+    setEditingItemId(null);
+    setItemForm(EMPTY_ITEM_FORM);
+    setItemFormError(null);
+  };
+
   const startAddItem = (itemType: ChallengeItemType) => {
+    setFormError(null);
+    setItemFormError(null);
+    if (showItemForm && editingItemId) {
+      const ok = window.confirm(
+        '編集中の内容を破棄して、新しい項目を追加しますか？',
+      );
+      if (!ok) return;
+      setEditingItemId(null);
+      setItemForm({ ...EMPTY_ITEM_FORM, itemType });
+      setShowItemForm(true);
+      return;
+    }
+    if (showItemForm && !editingItemId) {
+      // Keep in-progress create form; only switch type.
+      setItemForm((prev) => ({ ...prev, itemType }));
+      return;
+    }
     setEditingItemId(null);
     setItemForm({ ...EMPTY_ITEM_FORM, itemType });
     setShowItemForm(true);
-    setFormError(null);
   };
 
   const startEditItem = (item: ChallengeItem) => {
+    setFormError(null);
+    setItemFormError(null);
+    if (
+      showItemForm &&
+      !editingItemId &&
+      itemFormHasContent(itemForm)
+    ) {
+      const ok = window.confirm(
+        '入力中の新しい項目を破棄して、この項目を編集しますか？',
+      );
+      if (!ok) return;
+    }
+    if (showItemForm && editingItemId && editingItemId !== item.id) {
+      const ok = window.confirm(
+        '別の項目を編集中です。内容を破棄して切り替えますか？',
+      );
+      if (!ok) return;
+    }
     setEditingItemId(item.id);
     setItemForm({
       itemType: item.itemType,
@@ -367,22 +411,27 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       isRequired: item.isRequired,
     });
     setShowItemForm(true);
-    setFormError(null);
   };
 
   const handleSaveItem = async () => {
     if (!editingProgram || busy) return;
     if (editingProgram.status !== 'draft') {
-      setFormError('下書き以外では項目を変更できません');
+      setItemFormError('下書き以外では項目を変更できません');
+      return;
+    }
+    const validationError = validateChallengeItemForm(itemForm);
+    if (validationError) {
+      setItemFormError(validationError);
       return;
     }
     setBusy(true);
+    setItemFormError(null);
     setFormError(null);
 
     if (editingItemId) {
       const result = await updateChallengeItem(editingItemId, {
         itemType: itemForm.itemType,
-        title: itemForm.title,
+        title: itemForm.title.trim(),
         description: itemForm.description,
         reason: itemForm.reason,
         isRequired: itemForm.isRequired,
@@ -390,7 +439,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       });
       setBusy(false);
       if (!result.ok) {
-        setFormError(result.error);
+        setItemFormError(toParticipantItemSaveError(result.error));
         return;
       }
       showToast('項目を更新しました');
@@ -400,7 +449,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       const result = await createChallengeItem({
         programId: editingProgram.id,
         itemType: itemForm.itemType,
-        title: itemForm.title,
+        title: itemForm.title.trim(),
         description: itemForm.description,
         reason: itemForm.reason,
         isRequired: itemForm.isRequired,
@@ -409,7 +458,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       });
       setBusy(false);
       if (!result.ok) {
-        setFormError(result.error);
+        setItemFormError(toParticipantItemSaveError(result.error));
         return;
       }
       showToast('項目を追加しました');
@@ -417,9 +466,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
 
     const refreshed = await listChallengeItems(editingProgram.id);
     setItems(refreshed);
-    setShowItemForm(false);
-    setEditingItemId(null);
-    setItemForm(EMPTY_ITEM_FORM);
+    closeItemForm();
   };
 
   const handleDeleteItem = async (item: ChallengeItem) => {
@@ -573,6 +620,12 @@ export const ChallengeAdminTab = ({ space }: Props) => {
 
   if (view.kind === 'edit' && editingProgram) {
     const isDraft = editingProgram.status === 'draft';
+    const itemStats = countChallengeItemStats(items);
+    const publishChecks = buildChallengePublishChecks({
+      title: programTitle,
+      itemTotal: itemStats.total,
+      requiredTotal: itemStats.required,
+    });
     const canPublish =
       isDraft &&
       programTitle.trim().length > 0 &&
@@ -654,168 +707,95 @@ export const ChallengeAdminTab = ({ space }: Props) => {
           </SettingsSection>
 
           <SettingsSection title="質問・ミッション">
-            <p className={styles.muted}>
-              質問：考えたことや気づきを書いてもらう項目
-            </p>
-            <p className={styles.muted}>
-              ミッション：行動したことや達成を報告してもらう項目
-            </p>
-            <p className={styles.muted}>回答形式：コメント（固定）</p>
-            {isDraft && (
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={sharedStyles.primaryButton}
-                  onClick={() => startAddItem('question')}
-                  disabled={busy}
-                >
-                  質問を追加
-                </button>
-                <button
-                  type="button"
-                  className={sharedStyles.ghostButton}
-                  onClick={() => startAddItem('mission')}
-                  disabled={busy}
-                >
-                  ミッションを追加
-                </button>
-              </div>
+            <div className={styles.typeExplain}>
+              <p>
+                <strong>質問</strong>
+                考えたことや気づきを、コメントで書いてもらう項目です
+              </p>
+              <p>
+                <strong>ミッション</strong>
+                行動したことや、できたことを報告してもらう項目です
+              </p>
+            </div>
+
+            {!isDraft && (
+              <p className={styles.warning}>公開後は内容を変更できません</p>
             )}
 
-            {showItemForm && isDraft && (
-              <div className={styles.itemForm}>
-                <p className={styles.itemFormTitle}>
-                  {editingItemId ? '項目を編集' : '項目を追加'}
+            <div className={styles.itemListHeader}>
+              <h3 className={styles.itemListHeading}>作成済み項目</h3>
+              {items.length > 0 ? (
+                <p className={styles.muted}>
+                  参加者には上からこの順番で表示されます
                 </p>
-                <label className={formStyles.label}>
-                  種別
-                  <select
-                    className={formStyles.nameInput}
-                    value={itemForm.itemType}
-                    onChange={(e) =>
-                      setItemForm((prev) => ({
-                        ...prev,
-                        itemType: e.target.value as ChallengeItemType,
-                      }))
-                    }
-                    disabled={busy}
-                  >
-                    <option value="question">質問</option>
-                    <option value="mission">ミッション</option>
-                  </select>
-                </label>
-                <label className={formStyles.label}>
-                  タイトル（必須）
-                  <input
-                    className={formStyles.nameInput}
-                    value={itemForm.title}
-                    maxLength={CHALLENGE_TITLE_MAX_LENGTH}
-                    onChange={(e) =>
-                      setItemForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                    disabled={busy}
-                  />
-                </label>
-                <label className={formStyles.label}>
-                  説明（任意）
-                  <textarea
-                    className={formStyles.textarea}
-                    value={itemForm.description}
-                    rows={3}
-                    onChange={(e) =>
-                      setItemForm((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    disabled={busy}
-                  />
-                </label>
-                <label className={formStyles.label}>
-                  なぜ取り組むのか（任意）
-                  <textarea
-                    className={formStyles.textarea}
-                    value={itemForm.reason}
-                    rows={2}
-                    onChange={(e) =>
-                      setItemForm((prev) => ({ ...prev, reason: e.target.value }))
-                    }
-                    disabled={busy}
-                  />
-                </label>
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={itemForm.isRequired}
-                    onChange={(e) =>
-                      setItemForm((prev) => ({ ...prev, isRequired: e.target.checked }))
-                    }
-                    disabled={busy}
-                  />
-                  必須項目（オフにするとおまけ）
-                </label>
-                <p className={styles.muted}>回答形式：コメント</p>
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={sharedStyles.ghostButton}
-                    onClick={() => {
-                      setShowItemForm(false);
-                      setEditingItemId(null);
-                    }}
-                    disabled={busy}
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="button"
-                    className={sharedStyles.primaryButton}
-                    onClick={() => void handleSaveItem()}
-                    disabled={busy || !itemForm.title.trim()}
-                  >
-                    {busy ? '保存中…' : editingItemId ? '項目を更新' : '項目を追加'}
-                  </button>
-                </div>
-              </div>
-            )}
+              ) : null}
+            </div>
 
             {items.length === 0 ? (
               <p className={styles.muted}>まだ項目がありません</p>
             ) : (
               <ul className={styles.itemList}>
-                {items.map((item) => (
-                  <li key={item.id} className={styles.itemCard}>
-                    <div className={styles.itemMeta}>
-                      <span className={styles.badge}>
-                        {item.itemType === 'question' ? '質問' : 'ミッション'}
-                      </span>
-                      <span className={styles.badge}>
-                        {item.isRequired ? '必須' : 'おまけ'}
-                      </span>
-                      <span className={styles.muted}>#{item.sortOrder}</span>
-                    </div>
-                    <strong>{item.title}</strong>
-                    {item.description && <p className={styles.muted}>{item.description}</p>}
-                    {isDraft && (
-                      <div className={styles.actions}>
-                        <button
-                          type="button"
-                          className={sharedStyles.ghostButton}
-                          onClick={() => startEditItem(item)}
-                          disabled={busy}
-                        >
-                          編集
-                        </button>
-                        <button
-                          type="button"
-                          className={sharedStyles.ghostButton}
-                          onClick={() => void handleDeleteItem(item)}
-                          disabled={busy}
-                        >
-                          削除
-                        </button>
-                      </div>
-                    )}
+                {items.map((item, index) => (
+                  <li key={item.id}>
+                    <ChallengeAdminItemCard
+                      item={item}
+                      order={index + 1}
+                      readOnly={!isDraft}
+                      busy={busy}
+                      onEdit={() => startEditItem(item)}
+                      onDelete={() => void handleDeleteItem(item)}
+                    />
+                    {isDraft &&
+                    showItemForm &&
+                    editingItemId === item.id ? (
+                      <ChallengeAdminItemEditor
+                        mode="edit"
+                        value={itemForm}
+                        busy={busy}
+                        error={itemFormError}
+                        onChange={setItemForm}
+                        onSubmit={() => void handleSaveItem()}
+                        onCancel={closeItemForm}
+                      />
+                    ) : null}
                   </li>
                 ))}
               </ul>
+            )}
+
+            {isDraft && (
+              <div className={styles.addBlock}>
+                <h3 className={styles.itemListHeading}>新しい項目を追加</h3>
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={sharedStyles.primaryButton}
+                    onClick={() => startAddItem('question')}
+                    disabled={busy}
+                  >
+                    質問を追加
+                  </button>
+                  <button
+                    type="button"
+                    className={sharedStyles.ghostButton}
+                    onClick={() => startAddItem('mission')}
+                    disabled={busy}
+                  >
+                    ミッションを追加
+                  </button>
+                </div>
+                {showItemForm && !editingItemId ? (
+                  <ChallengeAdminItemEditor
+                    mode="create"
+                    value={itemForm}
+                    busy={busy}
+                    error={itemFormError}
+                    onChange={setItemForm}
+                    onSubmit={() => void handleSaveItem()}
+                    onCancel={closeItemForm}
+                  />
+                ) : null}
+              </div>
             )}
           </SettingsSection>
 
@@ -825,9 +805,21 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                 公開すると、参加者の「挑戦状」に表示されます。
                 公開後は質問・ミッションの内容を変更できません。
               </p>
-              {items.length === 0 && (
-                <p className={styles.warning}>公開するには項目を1件以上追加してください。</p>
-              )}
+              <div className={styles.publishChecks} aria-label="公開前チェック">
+                <p className={styles.publishChecksTitle}>公開前チェック</p>
+                <ul className={styles.publishCheckList}>
+                  {publishChecks.map((check) => (
+                    <li
+                      key={check.id}
+                      className={
+                        check.ok ? styles.publishCheckOk : styles.publishCheckNg
+                      }
+                    >
+                      {check.ok ? '✓' : '・'} {check.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
               {programDirty && (
                 <p className={styles.warning}>
                   未保存の変更があります。先に「下書きを保存」してください。
@@ -835,7 +827,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
               )}
               {showItemForm && (
                 <p className={styles.warning}>
-                  項目の編集中です。保存またはキャンセルしてから公開してください。
+                  項目の編集中です。保存または入力をやめてから公開してください。
                 </p>
               )}
               <div className={styles.actions}>
