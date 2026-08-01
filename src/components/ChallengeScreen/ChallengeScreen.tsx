@@ -29,7 +29,10 @@ import {
 } from '../../core/utils/challengeStampProgress';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { ChallengeItemCard } from './ChallengeItemCard';
-import { ChallengeStampCard } from './ChallengeStampCard';
+import {
+  ChallengeProgressSummary,
+  ChallengeStampCard,
+} from './ChallengeStampCard';
 import styles from './ChallengeScreen.module.css';
 
 type View =
@@ -492,7 +495,7 @@ export const ChallengeScreen = () => {
           </p>
         )}
 
-        <ChallengeStampCard slots={stampSlots} />
+        <ChallengeProgressSummary slots={stampSlots} />
 
         {sortedItems.length === 0 ? (
           <div className={styles.detailEmpty}>
@@ -532,6 +535,8 @@ export const ChallengeScreen = () => {
                 </ul>
               </section>
             ) : null}
+
+            <ChallengeStampCard key={activeProgram.id} slots={stampSlots} />
 
             {answeredItems.length > 0 ? (
               <section
