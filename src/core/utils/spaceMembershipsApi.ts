@@ -215,6 +215,34 @@ export async function fetchAdminSpaceMembers(spaceId: string): Promise<AdminSpac
   return ((data ?? []) as AdminSpaceMemberRow[]).map(mapAdminSpaceMemberRow);
 }
 
+/**
+ * Admin-readable membership nicknames for a space (RLS: self + space managers).
+ * Returns auth_user_id → trimmed space_nickname. Empty nicknames are omitted.
+ */
+export async function fetchSpaceMembershipNicknames(
+  spaceId: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (!isSupabaseConfigured || !spaceId) return map;
+  const { data, error } = await supabase
+    .from('space_memberships')
+    .select('auth_user_id, space_nickname')
+    .eq('space_id', spaceId);
+  if (error) {
+    throw new Error(
+      `[spaceMembershipsApi] fetchSpaceMembershipNicknames failed: ${error.message}`,
+    );
+  }
+  for (const row of (data ?? []) as Array<{
+    auth_user_id: string;
+    space_nickname: string | null;
+  }>) {
+    const nickname = row.space_nickname?.trim();
+    if (nickname) map.set(row.auth_user_id, nickname);
+  }
+  return map;
+}
+
 export async function fetchSpaceMemberCandidates(spaceId: string): Promise<SpaceMemberCandidate[]> {
   if (!isSupabaseConfigured || !spaceId) return [];
   const { data, error } = await supabase.rpc('admin_list_space_member_candidates', { p_space_id: spaceId });

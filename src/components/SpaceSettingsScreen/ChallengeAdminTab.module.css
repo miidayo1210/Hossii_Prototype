@@ -6,6 +6,20 @@
   margin: 0.75rem 0 1rem;
 }
 
+.topActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+}
+
+.introHint {
+  margin: 0 0 1rem;
+  color: #6b7280;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
 .muted {
   margin: 0.35rem 0;
   color: #6b7280;
@@ -27,15 +41,56 @@
   border: 1px solid #fed7aa;
   color: #9a3412;
   font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .empty {
   margin: 1rem 0;
-  padding: 1rem;
+  padding: 1.1rem 1rem;
   border: 1px dashed #d1d5db;
   border-radius: 0.75rem;
   color: #6b7280;
   font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.loadingBlock,
+.errorBlock {
+  margin: 1rem 0;
+}
+
+.skeleton {
+  height: 5.5rem;
+  border-radius: 0.75rem;
+  margin-top: 0.65rem;
+  background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }
 
 .badge {
@@ -49,8 +104,58 @@
   font-weight: 600;
 }
 
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.statusDraft {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.statusPublished {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusBanner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+}
+
+.statusBannerDraft {
+  background: #f9fafb;
+}
+
+.statusBannerPublished {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.statusBannerTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.statusBannerText {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
 .programList,
-.itemList {
+.itemList,
+.responseList {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -60,11 +165,28 @@
 }
 
 .programCard,
-.itemCard {
+.itemCard,
+.responseCard {
   padding: 0.875rem 1rem;
   border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
   background: #ffffff;
+}
+
+.programTitle {
+  display: block;
+  font-size: 1.05rem;
+  color: #111827;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.programDescription {
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .itemMeta {
@@ -98,13 +220,74 @@
   color: #374151;
 }
 
+.responseNotice {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.responderName {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111827;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.responseItemTitle {
+  margin: 0.2rem 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+}
+
+.responseBody {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #111827;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dangerButton {
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dangerButton:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
-  .actions {
+  .actions,
+  .topActions {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .actions button {
+  .actions button,
+  .topActions button,
+  .dangerButton {
     width: 100%;
   }
 }
