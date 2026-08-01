@@ -5,6 +5,8 @@ import {
   buildChallengeStampSlots,
   compareChallengeItems,
   formatRemainingLabel,
+  getChallengeListCtaLabel,
+  getChallengeListProgress,
   getChallengeStampProgress,
   getStampGridColumns,
 } from './challengeStampProgress';
@@ -159,5 +161,45 @@ describe('challengeStampProgress', () => {
     expect(getStampGridColumns(12)).toBe(4);
     expect(getStampGridColumns(20)).toBe(5);
     expect(getStampGridColumns(20, true)).toBe(4);
+  });
+
+  it('derives list progress with the same completion rules', () => {
+    expect(getChallengeListProgress([], [])).toEqual({
+      total: 0,
+      achieved: 0,
+      remaining: 0,
+      started: false,
+      isComplete: false,
+    });
+
+    const withRequired = [
+      item({ id: 'r1', title: '必須1', isRequired: true }),
+      item({ id: 'r2', title: '必須2', isRequired: true }),
+      item({ id: 'o1', title: 'おまけ', isRequired: false }),
+    ];
+    const mid = getChallengeListProgress(withRequired, ['r1']);
+    expect(mid).toEqual({
+      total: 3,
+      achieved: 1,
+      remaining: 1,
+      started: true,
+      isComplete: false,
+    });
+    expect(getChallengeListCtaLabel(mid)).toBe('つづける');
+
+    const clear = getChallengeListProgress(withRequired, ['r1', 'r2']);
+    expect(clear.isComplete).toBe(true);
+    expect(clear.achieved).toBe(2);
+    expect(getChallengeListCtaLabel(clear)).toBe('振り返る');
+
+    const optionalOnly = [
+      item({ id: 'o1', title: 'a', isRequired: false }),
+      item({ id: 'o2', title: 'b', isRequired: false }),
+    ];
+    expect(getChallengeListProgress(optionalOnly, ['o1']).isComplete).toBe(false);
+    expect(getChallengeListProgress(optionalOnly, ['o1', 'o2']).isComplete).toBe(true);
+    expect(getChallengeListCtaLabel(getChallengeListProgress(optionalOnly, []))).toBe(
+      '挑戦する',
+    );
   });
 });

@@ -59,7 +59,6 @@
   color: #64748b;
 }
 
-.programList,
 .itemList {
   list-style: none;
   margin: 0;
@@ -193,10 +192,241 @@
   z-index: 20;
 }
 
-.mvpNote {
-  margin: 0 0 1rem;
-  font-size: 0.75rem;
-  color: #94a3b8;
+.listIntro {
+  flex: 1;
+  min-width: 12rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.listIntroText {
+  flex: 1;
+  min-width: 0;
+}
+
+.listTitle {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.35;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.listLead {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  color: #5b6472;
+  line-height: 1.45;
+}
+
+.listDecor {
+  width: 3.25rem;
+  height: 3.25rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  opacity: 0.92;
+  filter: drop-shadow(0 4px 10px rgba(168, 85, 247, 0.18));
+}
+
+.programList {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.programCard {
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 1.15rem;
+  padding: 1.1rem 1.15rem 1rem;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(168, 85, 247, 0.08);
+}
+
+.programTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+.programDescription {
+  margin: 0.45rem 0 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.progressBlock {
+  margin-top: 0.85rem;
+}
+
+.progressMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 0.4rem;
+}
+
+.progressClear {
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+.progressTrack {
+  height: 0.55rem;
+  border-radius: 9999px;
+  background: #f3e8ff;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  transition: width 0.25s ease;
+}
+
+.listCta {
+  border: none;
+  border-radius: 9999px;
+  padding: 0.65rem 1.15rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  box-shadow: 0 4px 0 #7c3aed;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.listCta:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #7c3aed;
+}
+
+.listCta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.listCta:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 3px;
+}
+
+.listLoading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.skeletonCard {
+  height: 7.5rem;
+  border-radius: 1.15rem;
+  background: linear-gradient(
+    90deg,
+    rgba(243, 232, 255, 0.7) 0%,
+    rgba(252, 231, 243, 0.95) 45%,
+    rgba(243, 232, 255, 0.7) 100%
+  );
+  background-size: 200% 100%;
+  animation: challengeListShimmer 1.4s ease-in-out infinite;
+}
+
+.listError {
+  padding: 1.25rem 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #fecdd3;
+}
+
+.listErrorTitle {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: #b42318;
+}
+
+.listRetryButton {
+  margin-top: 0.85rem;
+  border: 1px solid #e9d5ff;
+  background: #faf5ff;
+  color: #6d28d9;
+  border-radius: 9999px;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.listRetryButton:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 3px;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 2rem 1rem 1.5rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px dashed #e9d5ff;
+}
+
+.emptyTitle {
+  margin: 0.5rem 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.emptyDecor {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+  opacity: 0.85;
+}
+
+@keyframes challengeListShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonCard {
+    animation: none;
+  }
+
+  .listCta {
+    transition: none;
+  }
+
+  .progressFill {
+    transition: none;
+  }
 }
 
 .rewardOverlay {
