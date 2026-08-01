@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Space } from '../../core/types/space';
 import type {
   ChallengeItem,
@@ -20,6 +20,15 @@ import {
   updateChallengeProgramStatus,
 } from '../../core/utils/challengeProgramsApi';
 import { listManagerChallengeResponses } from '../../core/utils/challengeResponsesApi';
+import { fetchParticipantAccounts } from '../../core/utils/participantAccountsApi';
+import { fetchSpaceMembershipNicknames } from '../../core/utils/spaceMembershipsApi';
+import {
+  clampAdminDescription,
+  countChallengeItemStats,
+  formatChallengeResponderLabel,
+  hasUnsavedProgramEdits,
+  type ChallengeItemCountStats,
+} from '../../core/utils/challengeAdminDisplay';
 import { invalidatePublishedChallengeNavCache } from '../../core/hooks/useHasPublishedChallengePrograms';
 import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import { SettingsPageHeader } from './SettingsPageHeader';
@@ -45,6 +54,11 @@ type ItemFormState = {
   isRequired: boolean;
 };
 
+type ManagerResponseRow = ChallengeResponse & {
+  itemTitle: string;
+  itemType: ChallengeItemType;
+};
+
 const EMPTY_ITEM_FORM: ItemFormState = {
   itemType: 'question',
   title: '',
@@ -52,6 +66,9 @@ const EMPTY_ITEM_FORM: ItemFormState = {
   reason: '',
   isRequired: true,
 };
+
+const LIST_LOAD_ERROR_TITLE = '挑戦状を読み込めませんでした';
+const LIST_LOAD_ERROR_HINT = '時間をおいて、もう一度お試しください';
 
 function formatUpdatedAt(value: Date): string {
   try {
@@ -82,13 +99,47 @@ function statusLabel(status: ChallengeProgram['status']): string {
   }
 }
 
+async function resolveResponderNames(
+  spaceId: string,
+  userIds: string[],
+): Promise<Record<string, string>> {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return {};
+  const names: Record<string, string> = {};
+
+  try {
+    const nicknames = await fetchSpaceMembershipNicknames(spaceId);
+    for (const userId of uniqueIds) {
+      const nickname = nicknames.get(userId);
+      if (nickname) names[userId] = nickname;
+    }
+  } catch {
+    // Keep fallbacks; nickname lookup must not block response viewing.
+  }
+
+  try {
+    const accounts = await fetchParticipantAccounts(spaceId);
+    for (const account of accounts) {
+      if (!uniqueIds.includes(account.authUserId) || names[account.authUserId]) continue;
+      const loginId = account.loginId?.trim();
+      if (loginId) names[account.authUserId] = loginId;
+    }
+  } catch {
+    // Optional fallback only.
+  }
+
+  return names;
+}
+
 export const ChallengeAdminTab = ({ space }: Props) => {
   const { currentUser } = useAuth();
   const canManage = canManageSpace(currentUser, space);
 
   const [view, setView] = useState<View>({ kind: 'list' });
   const [programs, setPrograms] = useState<ChallengeProgram[]>([]);
-  const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
+  const [itemStatsByProgram, setItemStatsByProgram] = useState<
+    Record<string, ChallengeItemCountStats>
+  >({});
   const [items, setItems] = useState<ChallengeItem[]>([]);
   const [editingProgram, setEditingProgram] = useState<ChallengeProgram | null>(null);
 
@@ -103,10 +154,11 @@ export const ChallengeAdminTab = ({ space }: Props) => {
   const [itemForm, setItemForm] = useState<ItemFormState>(EMPTY_ITEM_FORM);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
-  const [responsesItemId, setResponsesItemId] = useState<string | null>(null);
-  const [managerResponses, setManagerResponses] = useState<ChallengeResponse[]>([]);
+
+  const [managerResponses, setManagerResponses] = useState<ManagerResponseRow[]>([]);
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responsesError, setResponsesError] = useState<string | null>(null);
+  const [responderNames, setResponderNames] = useState<Record<string, string>>({});
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -119,18 +171,18 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     try {
       const listed = await listChallengePrograms(space.id);
       setPrograms(listed);
-      const counts: Record<string, number> = {};
+      const stats: Record<string, ChallengeItemCountStats> = {};
       await Promise.all(
         listed.map(async (program) => {
           const programItems = await listChallengeItems(program.id);
-          counts[program.id] = programItems.length;
+          stats[program.id] = countChallengeItemStats(programItems);
         }),
       );
-      setItemCounts(counts);
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : '読み込みに失敗しました');
+      setItemStatsByProgram(stats);
+    } catch {
+      setLoadError(LIST_LOAD_ERROR_TITLE);
       setPrograms([]);
-      setItemCounts({});
+      setItemStatsByProgram({});
     } finally {
       setLoading(false);
     }
@@ -144,6 +196,49 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     void reloadPrograms();
   }, [canManage, reloadPrograms]);
 
+  useEffect(() => {
+    setView({ kind: 'list' });
+    setEditingProgram(null);
+    setItems([]);
+    setManagerResponses([]);
+    setResponderNames({});
+    setFormError(null);
+  }, [space.id]);
+
+  const loadManagerResponsesForItems = useCallback(
+    async (programItems: ChallengeItem[]) => {
+      setResponsesLoading(true);
+      setResponsesError(null);
+      try {
+        const grouped = await Promise.all(
+          programItems.map(async (item) => {
+            const listed = await listManagerChallengeResponses(item.id);
+            return listed.map((response) => ({
+              ...response,
+              itemTitle: item.title,
+              itemType: item.itemType,
+            }));
+          }),
+        );
+        const flat = grouped.flat().sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        setManagerResponses(flat);
+        setResponderNames(
+          await resolveResponderNames(
+            space.id,
+            flat.map((response) => response.userId),
+          ),
+        );
+      } catch {
+        setManagerResponses([]);
+        setResponderNames({});
+        setResponsesError('回答を読み込めませんでした');
+      } finally {
+        setResponsesLoading(false);
+      }
+    },
+    [space.id],
+  );
+
   const openCreate = () => {
     setProgramTitle('');
     setProgramDescription('');
@@ -154,11 +249,13 @@ export const ChallengeAdminTab = ({ space }: Props) => {
   const openEdit = async (programId: string) => {
     setFormError(null);
     setBusy(true);
+    setManagerResponses([]);
+    setResponsesError(null);
     try {
       const listed = await listChallengePrograms(space.id);
       const program = listed.find((p) => p.id === programId) ?? null;
       if (!program) {
-        setFormError('ストーリーが見つかりません');
+        setFormError('挑戦状が見つかりません');
         return;
       }
       const programItems = await listChallengeItems(programId);
@@ -170,6 +267,9 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setShowItemForm(false);
       setItemForm(EMPTY_ITEM_FORM);
       setView({ kind: 'edit', programId });
+      if (program.status === 'published') {
+        void loadManagerResponsesForItems(programItems);
+      }
     } finally {
       setBusy(false);
     }
@@ -179,6 +279,8 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     setView({ kind: 'list' });
     setEditingProgram(null);
     setItems([]);
+    setManagerResponses([]);
+    setResponderNames({});
     setFormError(null);
     await reloadPrograms();
   };
@@ -197,14 +299,14 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setFormError(result.error);
       return;
     }
-    showToast('下書きストーリーを作成しました');
+    showToast('下書きの挑戦状を作成しました');
     await openEdit(result.value.id);
   };
 
   const handleSaveProgram = async () => {
     if (!editingProgram || busy) return;
     if (editingProgram.status !== 'draft') {
-      setFormError('下書き以外のストーリーは編集できません');
+      setFormError('下書き以外の挑戦状は編集できません');
       return;
     }
     setBusy(true);
@@ -219,13 +321,13 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       return;
     }
     setEditingProgram(result.value);
-    showToast('ストーリーを保存しました');
+    showToast('下書きを保存しました');
   };
 
   const handleDeleteProgram = async (program: ChallengeProgram) => {
     if (busy) return;
     if (program.status !== 'draft') {
-      window.alert('下書き以外のストーリーは削除できません');
+      window.alert('下書き以外の挑戦状は削除できません');
       return;
     }
     const ok = window.confirm(
@@ -240,7 +342,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       showToast(result.error);
       return;
     }
-    showToast('ストーリーを削除しました');
+    showToast('挑戦状を削除しました');
     if (view.kind === 'edit' && view.programId === program.id) {
       await backToList();
     } else {
@@ -347,31 +449,33 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setFormError('タイトルを入力してください');
       return;
     }
+    if (items.length === 0) {
+      setFormError('公開するには質問またはミッションが1件以上必要です');
+      return;
+    }
     const commentItems = items.filter((item) => item.responseType === 'comment');
     if (commentItems.length === 0) {
       setFormError('公開するにはコメント形式の項目が1件以上必要です');
       return;
     }
+    if (
+      hasUnsavedProgramEdits({
+        title: programTitle,
+        description: programDescription,
+        savedTitle: editingProgram.title,
+        savedDescription: editingProgram.description,
+      }) ||
+      showItemForm
+    ) {
+      setFormError('先に下書きを保存してください。未保存の変更がある状態では公開できません。');
+      return;
+    }
     const ok = window.confirm(
-      `「${programTitle.trim()}」を公開しますか？\n公開後は項目の追加・編集・削除ができなくなります。`,
+      `この挑戦状を公開しますか？\n「${programTitle.trim()}」が参加者の画面に表示され、質問・ミッションの内容は変更できなくなります。`,
     );
     if (!ok) return;
     setBusy(true);
     setFormError(null);
-    if (
-      programTitle !== editingProgram.title ||
-      programDescription !== (editingProgram.description ?? '')
-    ) {
-      const saved = await updateChallengeProgram(editingProgram.id, {
-        title: programTitle,
-        description: programDescription,
-      });
-      if (!saved.ok) {
-        setBusy(false);
-        setFormError(saved.error);
-        return;
-      }
-    }
     const result = await updateChallengeProgramStatus(editingProgram.id, 'published');
     setBusy(false);
     if (!result.ok) {
@@ -381,28 +485,23 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     setEditingProgram(result.value);
     invalidatePublishedChallengeNavCache(space.id);
     showToast('挑戦状を公開しました');
+    void loadManagerResponsesForItems(items);
   };
 
-  const openManagerResponses = async (itemId: string) => {
-    setResponsesItemId(itemId);
-    setResponsesLoading(true);
-    setResponsesError(null);
-    try {
-      // RLS: manager_only only. Do not infer self_only existence from empty list.
-      const listed = await listManagerChallengeResponses(itemId);
-      setManagerResponses(listed);
-    } catch (error) {
-      setManagerResponses([]);
-      setResponsesError(error instanceof Error ? error.message : '回答の取得に失敗しました');
-    } finally {
-      setResponsesLoading(false);
-    }
-  };
+  const programDirty = useMemo(() => {
+    if (!editingProgram) return false;
+    return hasUnsavedProgramEdits({
+      title: programTitle,
+      description: programDescription,
+      savedTitle: editingProgram.title,
+      savedDescription: editingProgram.description,
+    });
+  }, [editingProgram, programTitle, programDescription]);
 
   if (!canManage) {
     return (
       <SettingsPageHeader
-        title="質問・ミッション管理"
+        title="挑戦状の管理"
         description="このスペースの挑戦状を管理する権限がありません。"
       >
         <p className={styles.muted}>スペース管理者のみが利用できます。</p>
@@ -438,7 +537,11 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                 disabled={busy}
               />
             </label>
-            {formError && <p className={styles.error}>{formError}</p>}
+            {formError && (
+              <p className={styles.error} role="alert">
+                {formError}
+              </p>
+            )}
             <div className={styles.actions}>
               <button
                 type="button"
@@ -460,7 +563,9 @@ export const ChallengeAdminTab = ({ space }: Props) => {
           </SettingsSection>
         </SettingsPageHeader>
         {toast && (
-          <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`}>{toast}</div>
+          <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`} aria-live="polite">
+            {toast}
+          </div>
         )}
       </>
     );
@@ -468,15 +573,18 @@ export const ChallengeAdminTab = ({ space }: Props) => {
 
   if (view.kind === 'edit' && editingProgram) {
     const isDraft = editingProgram.status === 'draft';
+    const canPublish =
+      isDraft &&
+      programTitle.trim().length > 0 &&
+      items.length > 0 &&
+      !programDirty &&
+      !showItemForm;
+
     return (
       <>
         <SettingsPageHeader
-          title={editingProgram.title}
-          description={
-            isDraft
-              ? '下書きの編集です。回答形式はコメント固定です。'
-              : '公開中のストーリーです。項目構造は変更できません。'
-          }
+          title={editingProgram.title || '挑戦状の編集'}
+          description="参加者に届ける質問やミッションを作成・公開できます"
         >
           <div className={styles.actions}>
             <button
@@ -487,13 +595,28 @@ export const ChallengeAdminTab = ({ space }: Props) => {
             >
               ← 一覧へ戻る
             </button>
-            <span className={styles.badge}>{statusLabel(editingProgram.status)}</span>
           </div>
 
-          <SettingsSection title="ストーリー">
+          <section
+            className={`${styles.statusBanner} ${
+              isDraft ? styles.statusBannerDraft : styles.statusBannerPublished
+            }`}
+            aria-label="挑戦状の公開状態"
+          >
+            <p className={styles.statusBannerTitle}>
+              {isDraft ? '下書き' : '公開中'}
+            </p>
+            <p className={styles.statusBannerText}>
+              {isDraft
+                ? '参加者にはまだ表示されていません'
+                : '参加者の挑戦状画面に表示されています。公開後は質問・ミッションの内容を変更できません。'}
+            </p>
+          </section>
+
+          <SettingsSection title={isDraft ? '挑戦状の内容' : '挑戦状の内容'}>
             {!isDraft && (
               <p className={styles.warning}>
-                このストーリーは下書きではないため、内容の変更・削除はできません。
+                公開済みのため、タイトル・説明・項目の追加や削除はできません。管理者に共有された回答は下のセクションで確認できます。
               </p>
             )}
             <label className={formStyles.label}>
@@ -524,33 +647,19 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                   onClick={() => void handleSaveProgram()}
                   disabled={busy || !programTitle.trim()}
                 >
-                  {busy ? '保存中…' : 'ストーリーを保存'}
-                </button>
-                <button
-                  type="button"
-                  className={sharedStyles.primaryButton}
-                  onClick={() => void handlePublish()}
-                  disabled={
-                    busy ||
-                    !programTitle.trim() ||
-                    items.filter((item) => item.responseType === 'comment').length === 0
-                  }
-                >
-                  {busy ? '公開中…' : '公開する'}
-                </button>
-                <button
-                  type="button"
-                  className={sharedStyles.ghostButton}
-                  onClick={() => void handleDeleteProgram(editingProgram)}
-                  disabled={busy}
-                >
-                  下書きを削除
+                  {busy ? '保存中…' : '下書きを保存'}
                 </button>
               </div>
             )}
           </SettingsSection>
 
           <SettingsSection title="質問・ミッション">
+            <p className={styles.muted}>
+              質問：考えたことや気づきを書いてもらう項目
+            </p>
+            <p className={styles.muted}>
+              ミッション：行動したことや達成を報告してもらう項目
+            </p>
             <p className={styles.muted}>回答形式：コメント（固定）</p>
             {isDraft && (
               <div className={styles.actions}>
@@ -684,67 +793,24 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                     </div>
                     <strong>{item.title}</strong>
                     {item.description && <p className={styles.muted}>{item.description}</p>}
-                    <div className={styles.actions}>
-                      {isDraft && (
-                        <>
-                          <button
-                            type="button"
-                            className={sharedStyles.ghostButton}
-                            onClick={() => startEditItem(item)}
-                            disabled={busy}
-                          >
-                            編集
-                          </button>
-                          <button
-                            type="button"
-                            className={sharedStyles.ghostButton}
-                            onClick={() => void handleDeleteItem(item)}
-                            disabled={busy}
-                          >
-                            削除
-                          </button>
-                        </>
-                      )}
-                      {!isDraft && (
+                    {isDraft && (
+                      <div className={styles.actions}>
                         <button
                           type="button"
                           className={sharedStyles.ghostButton}
-                          onClick={() => void openManagerResponses(item.id)}
+                          onClick={() => startEditItem(item)}
                           disabled={busy}
                         >
-                          回答を見る
+                          編集
                         </button>
-                      )}
-                    </div>
-                    {responsesItemId === item.id && (
-                      <div className={styles.itemForm}>
-                        <p className={styles.itemFormTitle}>
-                          管理者だけに公開された回答
-                        </p>
-                        <p className={styles.muted}>
-                          「自分だけ」の回答は件数・内容とも表示しません。
-                        </p>
-                        {responsesLoading && <p className={styles.muted}>読み込み中…</p>}
-                        {responsesError && <p className={styles.error}>{responsesError}</p>}
-                        {!responsesLoading && !responsesError && managerResponses.length === 0 && (
-                          <p className={styles.muted}>表示できる回答はまだありません</p>
-                        )}
-                        <ul className={styles.itemList}>
-                          {managerResponses.map((response) => (
-                            <li key={response.id} className={styles.itemCard}>
-                              <div className={styles.itemMeta}>
-                                <span className={styles.badge}>管理者だけ</span>
-                                <span className={styles.muted}>
-                                  参加者 {response.userId.slice(0, 8)}…
-                                </span>
-                                <span className={styles.muted}>
-                                  {formatUpdatedAt(response.updatedAt)}
-                                </span>
-                              </div>
-                              <p className={styles.muted}>{response.comment}</p>
-                            </li>
-                          ))}
-                        </ul>
+                        <button
+                          type="button"
+                          className={sharedStyles.ghostButton}
+                          onClick={() => void handleDeleteItem(item)}
+                          disabled={busy}
+                        >
+                          削除
+                        </button>
                       </div>
                     )}
                   </li>
@@ -753,10 +819,110 @@ export const ChallengeAdminTab = ({ space }: Props) => {
             )}
           </SettingsSection>
 
-          {formError && <p className={styles.error}>{formError}</p>}
+          {isDraft && (
+            <SettingsSection title="参加者へ公開">
+              <p className={styles.muted}>
+                公開すると、参加者の「挑戦状」に表示されます。
+                公開後は質問・ミッションの内容を変更できません。
+              </p>
+              {items.length === 0 && (
+                <p className={styles.warning}>公開するには項目を1件以上追加してください。</p>
+              )}
+              {programDirty && (
+                <p className={styles.warning}>
+                  未保存の変更があります。先に「下書きを保存」してください。
+                </p>
+              )}
+              {showItemForm && (
+                <p className={styles.warning}>
+                  項目の編集中です。保存またはキャンセルしてから公開してください。
+                </p>
+              )}
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={sharedStyles.primaryButton}
+                  onClick={() => void handlePublish()}
+                  disabled={busy || !canPublish}
+                >
+                  {busy ? '公開中…' : 'この挑戦状を公開する'}
+                </button>
+              </div>
+            </SettingsSection>
+          )}
+
+          {!isDraft && (
+            <SettingsSection title="管理者に共有された回答">
+              <p className={styles.responseNotice}>
+                ここには「管理者にだけ共有」を選んだ回答だけが表示されます。
+                「自分だけに残す」を選んだ回答は、件数にも含まれません。
+              </p>
+              {responsesLoading && (
+                <p className={styles.muted} aria-live="polite">
+                  回答を読み込んでいます…
+                </p>
+              )}
+              {responsesError && (
+                <p className={styles.error} role="alert">
+                  {responsesError}
+                </p>
+              )}
+              {!responsesLoading && !responsesError && managerResponses.length === 0 && (
+                <p className={styles.empty}>管理者に共有された回答はまだありません</p>
+              )}
+              {!responsesLoading && managerResponses.length > 0 && (
+                <ul className={styles.responseList}>
+                  {managerResponses.map((response) => (
+                    <li key={response.id}>
+                      <article className={styles.responseCard}>
+                        <div className={styles.itemMeta}>
+                          <span className={styles.responderName}>
+                            {formatChallengeResponderLabel(response.userId, responderNames)}
+                          </span>
+                          <span className={styles.muted}>
+                            {formatUpdatedAt(response.updatedAt)}
+                          </span>
+                          <span className={styles.badge}>管理者にだけ共有</span>
+                        </div>
+                        <p className={styles.responseItemTitle}>
+                          {response.itemType === 'question' ? '質問' : 'ミッション'}：
+                          {response.itemTitle}
+                        </p>
+                        <p className={styles.responseBody}>{response.comment}</p>
+                      </article>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SettingsSection>
+          )}
+
+          {isDraft && (
+            <SettingsSection title="その他の操作">
+              <p className={styles.muted}>下書きの挑戦状のみ削除できます。</p>
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.dangerButton}
+                  onClick={() => void handleDeleteProgram(editingProgram)}
+                  disabled={busy}
+                >
+                  この下書きを削除
+                </button>
+              </div>
+            </SettingsSection>
+          )}
+
+          {formError && (
+            <p className={styles.error} role="alert" aria-live="polite">
+              {formError}
+            </p>
+          )}
         </SettingsPageHeader>
         {toast && (
-          <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`}>{toast}</div>
+          <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`} aria-live="polite">
+            {toast}
+          </div>
         )}
       </>
     );
@@ -765,72 +931,116 @@ export const ChallengeAdminTab = ({ space }: Props) => {
   return (
     <>
       <SettingsPageHeader
-        title="質問・ミッション管理"
-        description="Hossiiからの挑戦状を作成・公開します。公開後は参加者がコメント回答できます。"
+        title="挑戦状の管理"
+        description="参加者に届ける質問やミッションを作成・公開できます"
       >
-        <div className={styles.actions}>
+        <div className={styles.topActions}>
           <button
             type="button"
             className={sharedStyles.primaryButton}
             onClick={openCreate}
             disabled={busy || loading}
           >
-            新しい挑戦状を作る
+            新しい挑戦状をつくる
           </button>
         </div>
 
-        {loading && <p className={styles.muted}>読み込み中…</p>}
-        {loadError && <p className={styles.error}>{loadError}</p>}
+        <p className={styles.introHint}>
+          質問：考えたことや気づきを書いてもらう項目 ／
+          ミッション：行動したことや達成を報告してもらう項目
+        </p>
 
-        {!loading && !loadError && programs.length === 0 && (
-          <p className={styles.empty}>まだ挑戦状はありません。下書きから作成できます。</p>
+        {loading && (
+          <div className={styles.loadingBlock} aria-busy="true" aria-live="polite">
+            <p className={styles.muted}>挑戦状を読み込んでいます…</p>
+            <div className={styles.skeleton} />
+            <div className={styles.skeleton} />
+          </div>
         )}
 
-        <ul className={styles.programList}>
-          {programs.map((program) => {
-            const isDraft = program.status === 'draft';
-            return (
-              <li key={program.id} className={styles.programCard}>
-                <div className={styles.itemMeta}>
-                  <span className={styles.badge}>{statusLabel(program.status)}</span>
-                  <span className={styles.muted}>
-                    項目 {itemCounts[program.id] ?? 0} 件
-                  </span>
-                  <span className={styles.muted}>{formatUpdatedAt(program.updatedAt)}</span>
-                </div>
-                <strong>{program.title}</strong>
-                {program.description && (
-                  <p className={styles.muted}>{program.description}</p>
-                )}
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={sharedStyles.primaryButton}
-                    onClick={() => void openEdit(program.id)}
-                    disabled={busy}
-                  >
-                    {isDraft ? '編集' : '内容を見る'}
-                  </button>
-                  {isDraft ? (
+        {!loading && loadError && (
+          <div className={styles.errorBlock} role="alert">
+            <p className={styles.error}>{LIST_LOAD_ERROR_TITLE}</p>
+            <p className={styles.muted}>{LIST_LOAD_ERROR_HINT}</p>
+            <button
+              type="button"
+              className={sharedStyles.ghostButton}
+              onClick={() => void reloadPrograms()}
+            >
+              もう一度試す
+            </button>
+          </div>
+        )}
+
+        {!loading && !loadError && programs.length === 0 && (
+          <div className={styles.empty}>
+            <p className={styles.emptyTitle}>まだ挑戦状はありません</p>
+            <p className={styles.muted}>最初の質問やミッションをつくってみましょう</p>
+            <button
+              type="button"
+              className={sharedStyles.primaryButton}
+              onClick={openCreate}
+              disabled={busy}
+            >
+              挑戦状をつくる
+            </button>
+          </div>
+        )}
+
+        {!loading && !loadError && programs.length > 0 && (
+          <ul className={styles.programList}>
+            {programs.map((program) => {
+              const isDraft = program.status === 'draft';
+              const stats = itemStatsByProgram[program.id] ?? {
+                total: 0,
+                required: 0,
+                optional: 0,
+              };
+              const description = clampAdminDescription(program.description);
+              return (
+                <li key={program.id} className={styles.programCard}>
+                  <div className={styles.itemMeta}>
+                    <span
+                      className={`${styles.statusBadge} ${
+                        isDraft ? styles.statusDraft : styles.statusPublished
+                      }`}
+                    >
+                      {statusLabel(program.status)}
+                    </span>
+                    <span className={styles.muted}>項目 {stats.total} 件</span>
+                    <span className={styles.muted}>
+                      必須 {stats.required} ／ おまけ {stats.optional}
+                    </span>
+                    <span className={styles.muted}>
+                      更新 {formatUpdatedAt(program.updatedAt)}
+                    </span>
+                  </div>
+                  <strong className={styles.programTitle}>{program.title}</strong>
+                  {description ? (
+                    <p className={styles.programDescription}>{description}</p>
+                  ) : (
+                    <p className={styles.muted}>説明なし</p>
+                  )}
+                  <div className={styles.actions}>
                     <button
                       type="button"
-                      className={sharedStyles.ghostButton}
-                      onClick={() => void handleDeleteProgram(program)}
+                      className={sharedStyles.primaryButton}
+                      onClick={() => void openEdit(program.id)}
                       disabled={busy}
                     >
-                      削除
+                      {isDraft ? '編集をつづける' : '内容・回答を見る'}
                     </button>
-                  ) : (
-                    <span className={styles.muted}>削除不可</span>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </SettingsPageHeader>
       {toast && (
-        <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`}>{toast}</div>
+        <div className={`${sharedStyles.toast} ${sharedStyles.toastSuccess}`} aria-live="polite">
+          {toast}
+        </div>
       )}
     </>
   );

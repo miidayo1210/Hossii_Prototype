@@ -77,8 +77,8 @@ export const SETTINGS_NAV_GROUPS: NavGroup[] = [
       { id: 'exportRecord', label: '出力・記録', adminOnly: true },
       {
         id: 'challengeAdmin',
-        label: '質問・ミッション管理',
-        description: 'Hossiiからの挑戦状の下書き作成',
+        label: '挑戦状の管理',
+        description: '参加者に届ける質問やミッションを作成・公開できます',
         adminOnly: true,
       },
       { id: 'neighbors', label: '隣のスペース', adminOnly: true },
