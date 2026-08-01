@@ -36,8 +36,8 @@
 
 | 論点 | 結論 |
 | --- | --- |
-| 公開範囲の決定者 | 📌 今後は**管理者**が設定。✅ 現在実装は**参加者が回答時に選択**（移行前） |
-| 公開範囲の設定単位 | 📌 `challenge_program` デフォルト ＋ `challenge_item` 上書き |
+| 公開範囲の決定者 | 📌／✅ DB・RPCは管理者設定（program＋item）。UI移行は後続 |
+| 公開範囲の設定単位 | ✅ `challenge_programs.default_response_visibility` ＋ `challenge_items.response_visibility` |
 | クリアとコンプリート | 📌 **クリア**＝必須全達成。**コンプリート**＝全項目達成。混同禁止 |
 | スタンプカードの役割 | 📌 進捗表示 ＋ 挑戦の記憶を開く入口 |
 | 回答履歴と美しい作品 | 📌 作品は「挑戦の軌跡」の表示モード。第三の回答正本を作らない |
@@ -876,58 +876,79 @@ Hossiiコレクションは、スペース単位ではなく**アカウント全
 
 | 状態 | 内容 |
 | --- | --- |
-| ✅ Production | `manager_only` / `self_only` の2種。**参加者が回答時に選択**する |
-| 📌 今回確定 | 今後は**管理者が設定**する3種。参加者は変更できない |
-| 🗑 置換 | 「回答者が毎回公開範囲を選ぶ」方式は、新仕様適用後は廃止する |
+| ✅ Production（移行前UI） | 参加者向けにはまだ選択UIが残る場合がある。DB正本は Phase 2 土台へ移行中 |
+| ✅ Phase 2 土台（DB／RLS／RPC） | 3種・program 標準＋item 上書き・回答スナップショット・再回答で visibility 維持 |
+| 📌 参加者／管理UI | 選択UI削除・説明表示・管理者設定UIは後続PR |
+| 🗑 置換 | 「回答者が毎回公開範囲を選ぶ」方式は、UI移行後に廃止する |
 | 🔭 | 旧最終案の「匿名で共有」等は将来再検討。現在の3種方針と混同しない |
 
-## 20.1 Production実装（移行前）✅
+## 20.1 公開範囲の種類（正本）✅／📌
 
-内部値と利用者向け表示：
+公開範囲は次の3種類とする。
 
-| 内部値 | 表示 |
-| --- | --- |
-| `manager_only` | 管理者にだけ共有 |
-| `self_only` | 自分だけに残す |
-
-* 参加者は回答カード上で選択する
-* RLSにより `self_only` は管理者に存在・件数とも見せない
-* `manager_only` のみ管理者が閲覧できる
-
-## 20.2 今後の正式方針（管理者設定・3種）📌／🟡
-
-回答者ではなく、**管理者が挑戦状の設定として決める**。
-
-| 内部値（候補） | 利用者向け表示 | 閲覧できる人 |
+| 内部値 | 利用者向け表示（案） | 閲覧できる人 |
 | --- | --- | --- |
-| `space_members` | スペースのみんなに共有 | 回答者本人・active space member・管理者 |
-| `manager_only` | 管理者にだけ共有 | 回答者本人・管理者 |
 | `self_only` | 自分だけに残す | 回答者本人のみ |
+| `manager_only` | 管理者にだけ共有 | 回答者本人・対象スペースの管理者 |
+| `space_members` | スペースのみんなに共有 | 回答者本人・対象スペースの active member・管理者 |
 
-🟡 DB列名・CHECK制約・migrationの詳細は未確定。実装PR前に設計する。フロント非表示のみでの実現は禁止する（RLS必須）。
+閲覧権限の正本は RLS とする。フロントの非表示だけで公開範囲を実現してはならない。
 
-### 設定単位 📌
+管理者判定は既存の `is_space_community_admin(space_id)`、参加者判定は既存の `is_active_space_member(space_id)` を用いる（類似関数を新設しない）。
 
-1. `challenge_program` のデフォルト公開範囲
-2. `challenge_item` ごとの上書き（任意）
-3. item に上書きがなければ program デフォルトを使用
+`self_only` について、監査付き特別アクセスは現行に存在しない。現時点では特別アクセスを前提にしない。
 
-### 参加者UI 📌
+## 20.2 設定モデル（program 標準＋item 上書き）✅
+
+* `challenge_programs.default_response_visibility` … NOT NULL、DEFAULT `manager_only`
+* `challenge_items.response_visibility` … NULL 可（NULL なら program を継承）
+
+解決式:
+
+```text
+COALESCE(item.response_visibility, program.default_response_visibility)
+```
+
+初期値:
+
+* 新規プログラムの標準は **`manager_only`**
+* 新規項目の上書きは **`NULL`（継承）**
+
+管理者が明示的に広げない限り、参加者間で共有しない。
+
+## 20.3 回答行へのスナップショット ✅
+
+`challenge_responses.visibility` は、**回答を新規保存した時点**の解決結果を stamp したスナップショットである。CHECK は `self_only` / `manager_only` / `space_members`。
+
+* 再回答（同一行 UPDATE）では `visibility` を変更しない
+* 回答削除後に新規回答する場合は、その時点の設定を新たに stamp してよい
+* 既存回答の `visibility` を migration や一括 UPDATE で変更してはならない
+* プログラム／項目の設定変更は、既存回答のスナップショットを自動では書き換えない
+
+## 20.4 書き込み経路（RPC）✅
+
+参加者のコメント回答の INSERT／UPDATE は SECURITY DEFINER RPC（`submit_challenge_comment_response`）経由のみとする。
+
+* INSERT: item override → program default の順で解決し stamp
+* UPDATE（再回答）: `comment` のみ更新し、`visibility` は維持
+* クライアント引数 `p_visibility` は互換のため受け取っても無視する
+
+## 20.5 参加者UI 📌（後続）
 
 * 回答時に公開範囲を変更できない
 * 回答画面では、設定された公開先の**説明のみ**を表示する
 
-例：
+例:
 
 > この回答は、スペースに参加しているみんなへ共有されます。
 
-### 既存回答 📌
+## 20.6 公開範囲の拡大
 
-* 既存 `challenge_responses.visibility` は変更しない
-* 新仕様適用後の**新規回答**から管理者設定を使う
-* migration で既存回答を一括変更しない
+既存回答のスナップショットを、管理者が一方的に広げて書き換えてはならない。
 
-## 20.3 過去案（5種類）🗑／参考
+設定側（program／item）の変更ルールや UI ロックは管理画面実装時に定める。
+
+## 20.7 過去案（5種類）🗑／参考
 
 以下は初期最終仕様の候補である。現在有効な3種方針と混同しない。
 
@@ -935,11 +956,11 @@ Hossiiコレクションは、スペース単位ではなく**アカウント全
 * 最初からみんなに公開
 * 匿名で共有
 
-`space_members` の詳細意味（回答前から見えるか／回答後か）は実装設計で確定する（❓）。当面の推奨は「active member が閲覧可能」とし、匿名共有は採用しない。
+`space_members` は「active member または管理者が閲覧可能」とする。回答前／回答後ゲートや匿名共有は本値の範囲外（🔭）。
 
-## 20.4 公開範囲の拡大
+## 20.8 Production移行前の参加者選択UI ✅／🗑
 
-回答が1件以上存在する場合、管理者は既存回答の公開範囲を一方的に広げられない、という保護方針は維持する（📌／🟡。管理者設定移行後の運用ルールとして再確認する）。
+移行完了前の Production では、参加者向けに `manager_only` / `self_only` の選択UIが残っている場合がある。DB／RPC 正本が Phase 2 に切り替わった後も、UI は別PRで削除する。
 
 ---
 
@@ -1433,8 +1454,9 @@ Hossiiは、一度取り組んだ軌跡として扱う。
 
 * 公開範囲3種（`space_members` / `manager_only` / `self_only`）のRLS
 * program デフォルト ＋ item 上書きの適用
-* `space_members` は active member のみ閲覧
+* `space_members` は active member **または** 管理者が閲覧
 * 既存回答の visibility を一括変更しない
+* 再回答では visibility を維持し、削除後の新規回答は再 stamp
 * 参加者が回答時に公開範囲を変更できない（説明のみ）
 * 回答削除後もスタンプ／reward を保持し、回想では削除済みと表示
 * クリアとコンプリートの区別（一覧・Modal・スタンプ）
