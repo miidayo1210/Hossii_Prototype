@@ -220,6 +220,81 @@
   color: #374151;
 }
 
+.typeExplain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.typeExplain p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.typeExplain strong {
+  display: inline-block;
+  min-width: 5.5rem;
+  margin-right: 0.35rem;
+  color: #111827;
+}
+
+.itemListHeader,
+.addBlock {
+  margin: 0.5rem 0 0.75rem;
+}
+
+.itemListHeading {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.publishChecks {
+  margin: 0.75rem 0 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.publishChecksTitle {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.publishCheckList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.publishCheckOk,
+.publishCheckNg {
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.publishCheckOk {
+  color: #166534;
+}
+
+.publishCheckNg {
+  color: #9a3412;
+}
+
 .responseNotice {
   margin: 0 0 0.85rem;
   padding: 0.75rem 0.875rem;

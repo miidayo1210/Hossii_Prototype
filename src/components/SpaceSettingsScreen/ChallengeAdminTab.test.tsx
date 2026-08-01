@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Space } from '../../core/types/space';
 import type { ChallengeProgram } from '../../core/types/challengeProgram';
 
@@ -410,14 +410,14 @@ describe('ChallengeAdminTab', () => {
     await screen.findByText('下書きストーリー');
     fireEvent.click(screen.getByRole('button', { name: '編集をつづける' }));
     fireEvent.click(await screen.findByRole('button', { name: 'ミッションを追加' }));
-    const formTitle = screen.getByText('項目を追加', { selector: 'p' });
-    const form = formTitle.closest('div');
-    expect(form).toBeTruthy();
-    const textboxes = within(form as HTMLElement).getAllByRole('textbox');
-    fireEvent.change(textboxes[0], {
-      target: { value: '新しいミッション' },
-    });
-    fireEvent.click(within(form as HTMLElement).getByRole('button', { name: '項目を追加' }));
+    expect(screen.getByRole('heading', { name: '項目の内容を入力' })).toBeTruthy();
+    expect(screen.getByText('回答方法：コメント')).toBeTruthy();
+    fireEvent.change(
+      screen.getByLabelText('参加者に表示する問い・ミッション'),
+      { target: { value: '新しいミッション' } },
+    );
+    fireEvent.click(screen.getByRole('radio', { name: /おまけ/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'この項目を追加' }));
 
     await waitFor(() => {
       expect(createChallengeItemMock).toHaveBeenCalledWith(
@@ -426,9 +426,55 @@ describe('ChallengeAdminTab', () => {
           itemType: 'mission',
           title: '新しいミッション',
           responseType: 'comment',
+          isRequired: false,
           sortOrder: 3,
         }),
       );
     });
+  });
+
+  it('shows ordered item cards and publish checks', async () => {
+    const program = makeProgram();
+    listChallengeProgramsMock.mockResolvedValue([program]);
+    listChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      {
+        ...commentItem,
+        id: 'i2',
+        title: 'おまけミッション',
+        itemType: 'mission',
+        isRequired: false,
+        sortOrder: 1,
+      },
+    ]);
+
+    render(<ChallengeAdminTab space={space} />);
+    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    expect(await screen.findByText('参加者には上からこの順番で表示されます')).toBeTruthy();
+    expect(screen.getByLabelText(/1\. 質問 朝の質問/)).toBeTruthy();
+    expect(screen.getByLabelText(/2\. ミッション おまけミッション/)).toBeTruthy();
+    expect(screen.getByText('公開前チェック')).toBeTruthy();
+    expect(screen.getByText(/質問・ミッションが2件あります/)).toBeTruthy();
+    expect(screen.getByText(/クリアに必要な項目が1件あります/)).toBeTruthy();
+  });
+
+  it('keeps create form content when switching add type buttons', async () => {
+    const program = makeProgram();
+    listChallengeProgramsMock.mockResolvedValue([program]);
+    listChallengeItemsMock.mockResolvedValue([]);
+
+    render(<ChallengeAdminTab space={space} />);
+    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    fireEvent.click(await screen.findByRole('button', { name: '質問を追加' }));
+    fireEvent.change(
+      screen.getByLabelText('参加者に表示する問い・ミッション'),
+      { target: { value: '途中入力' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'ミッションを追加' }));
+    expect(
+      (screen.getByLabelText('参加者に表示する問い・ミッション') as HTMLInputElement)
+        .value,
+    ).toBe('途中入力');
+    expect(screen.getByRole('radio', { name: /ミッション/ })).toBeTruthy();
   });
 });
