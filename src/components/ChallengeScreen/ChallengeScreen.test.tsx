@@ -273,7 +273,8 @@ describe('ChallengeScreen rewards', () => {
     // Single required item is complete → list CTA is「開く」
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     const dialog = await openRecordRecall('質問1');
-    fireEvent.click(within(dialog).getByRole('button', { name: '書き直す' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /の回答操作/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '書き直す' }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '更新後' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を更新/ }));
@@ -540,13 +541,12 @@ describe('ChallengeScreen focused response UI', () => {
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     expect(await screen.findByRole('heading', { name: '次の挑戦' })).toBeTruthy();
-    expect(screen.getByText('まずはこの質問に答えてみよう')).toBeTruthy();
     expect(screen.getByRole('textbox')).toBeTruthy();
     expect(screen.getByDisplayValue('')).toBeTruthy();
     expect(screen.getByLabelText('管理者にだけ共有')).toBeTruthy();
     expect(screen.getAllByText('クリアに必要').length).toBeGreaterThan(0);
     expect(screen.getByText(/「管理者にだけ共有」を選ぶと/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'わたしの軌跡を見る' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '挑戦の記録' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'これから答える' })).toBeNull();
     expect(screen.queryByRole('heading', { name: '回答済み' })).toBeNull();
   });
@@ -559,7 +559,7 @@ describe('ChallengeScreen focused response UI', () => {
     const progress = screen.getByLabelText(/挑戦状の進捗/);
     const focus = screen.getByRole('heading', { name: '次の挑戦' });
     const stamps = screen.getByLabelText('Hossiiスタンプカード');
-    const trajectory = screen.getByRole('button', { name: 'わたしの軌跡を見る' });
+    const trajectory = screen.getByRole('button', { name: '挑戦の記録' });
 
     expect(progress.compareDocumentPosition(focus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(focus.compareDocumentPosition(stamps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -611,12 +611,12 @@ describe('ChallengeScreen focused response UI', () => {
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
-    expect(screen.getByText('もっとHossiiを集めたい人へ')).toBeTruthy();
     expect(screen.getByText(/必須クリア/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: '完成した軌跡を見る' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '完成した軌跡を見る' })).toBeNull();
+    expect(screen.getByRole('button', { name: '挑戦の記録' })).toBeTruthy();
     expect(screen.getByRole('textbox')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '完成した軌跡を見る' }));
-    expect(await screen.findByLabelText('完成した軌跡')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '挑戦の記録' }));
+    expect(await screen.findByLabelText('挑戦の記録')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: '公開ストーリー' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '← 挑戦状へ戻る' }));
     expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
@@ -653,8 +653,8 @@ describe('ChallengeScreen focused response UI', () => {
     const dialog = await openRecordRecall('質問1');
     expect(within(dialog).getByText('秘密の回答')).toBeTruthy();
     expect(within(dialog).getByText('自分だけに残す')).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: '書き直す' })).toBeTruthy();
-    fireEvent.click(within(dialog).getByRole('button', { name: '書き直す' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /の回答操作/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '書き直す' }));
     expect(await screen.findByRole('textbox')).toBeTruthy();
     expect(
       (screen.getByLabelText('自分だけに残す') as HTMLInputElement).checked,
@@ -731,7 +731,8 @@ describe('ChallengeScreen focused response UI', () => {
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     const rewriteDialog = await openRecordRecall('質問1');
-    fireEvent.click(within(rewriteDialog).getByRole('button', { name: '書き直す' }));
+    fireEvent.click(within(rewriteDialog).getByRole('button', { name: /の回答操作/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '書き直す' }));
     expect(await screen.findByRole('textbox')).toBeTruthy();
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(
       '初回の回答',
@@ -963,7 +964,7 @@ describe('ChallengeScreen focused response UI', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }));
 
     dialog = await openRecordRecall('質問1');
-    expect(within(dialog).getByRole('button', { name: '書き直す' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: /の回答操作/ })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }));
 
     dialog = await openRecordRecall('質問1');
@@ -977,7 +978,8 @@ describe('ChallengeScreen focused response UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /質問1のスタンプを振り返る/ }));
     dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/回答は削除済みです/)).toBeTruthy();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度答える' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /の回答操作/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'もう一度答える' }));
     expect(await screen.findByRole('textbox')).toBeTruthy();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '再回答' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
@@ -1068,7 +1070,7 @@ describe('ChallengeScreen focused response UI', () => {
     expect(screen.getByRole('textbox')).toBeTruthy();
   });
 
-  it('shows clear celebration and focuses optional item', async () => {
+  it('opens records page after clear celebration when required items finish', async () => {
     listMyChallengeResponsesMock.mockResolvedValue([
       {
         id: 'r1',
@@ -1150,8 +1152,8 @@ describe('ChallengeScreen focused response UI', () => {
         name: 'おまけに挑戦する',
       }),
     );
-    expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 3, name: 'おまけ質問' })).toBeTruthy();
+    expect(await screen.findByLabelText('挑戦の記録')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: '公開ストーリー' })).toBeTruthy();
   });
 
   it('does not show reward modal when re-answering without new reward', async () => {
