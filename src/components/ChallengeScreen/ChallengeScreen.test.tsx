@@ -259,9 +259,8 @@ describe('ChallengeScreen rewards', () => {
     render(<ChallengeScreen />);
     // Single required item is complete → list CTA is「開く」
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: /の回答を振り返る/ }),
-    );
+    fireEvent.click(await screen.findByRole('button', { name: /の回答操作/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '書き直す' }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '更新後' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を更新/ }));
@@ -551,7 +550,7 @@ describe('ChallengeScreen focused response UI', () => {
     expect(focus.compareDocumentPosition(stamps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(stamps.compareDocumentPosition(answered) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('あと2つでクリア')).toBeTruthy();
-    expect(screen.getByText('一度もらったHossiiは残ります')).toBeTruthy();
+    expect(screen.getByText('スタンプを押すと、挑戦の記憶を振り返れます')).toBeTruthy();
   });
 
   it('moves focus to optional after required items are answered', async () => {
@@ -631,8 +630,12 @@ describe('ChallengeScreen focused response UI', () => {
     expect(screen.getByText('秘密の回答')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /回答を見る・書き直す/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /の回答を振り返る/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('秘密の回答')).toBeTruthy();
+    expect(within(dialog).getByText('自分だけに残す')).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: '書き直す' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: '書き直す' }));
     expect(await screen.findByRole('textbox')).toBeTruthy();
-    expect(await screen.findByText(/保存済み（自分だけに残す）/)).toBeTruthy();
     expect(
       (screen.getByLabelText('自分だけに残す') as HTMLInputElement).checked,
     ).toBe(true);
@@ -852,6 +855,142 @@ describe('ChallengeScreen focused response UI', () => {
     ).toBeTruthy();
     expect(screen.getByText('残すべき回答')).toBeTruthy();
     expect(screen.getByRole('alertdialog')).toBeTruthy();
+  });
+
+  it('opens recall modal from stamp and excerpt, and supports deleted answer again', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+    ]);
+    listMyChallengeResponsesMock.mockResolvedValue([
+      {
+        id: 'r1',
+        itemId: 'i1',
+        userId: 'user-1',
+        visibility: 'manager_only',
+        comment: '回想の回答',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    listMyChallengeRewardsMock.mockResolvedValue([
+      {
+        id: 'rw1',
+        completionId: 'c1',
+        userId: 'user-1',
+        itemId: 'i1',
+        hossiiKey: 'emotion/wow',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    deleteChallengeResponseMock.mockResolvedValue({ ok: true });
+    submitChallengeCommentResponseMock.mockResolvedValue({
+      ok: true,
+      value: {
+        response: {
+          id: 'r1b',
+          itemId: 'i1',
+          userId: 'user-1',
+          visibility: 'manager_only',
+          comment: '再回答',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        completion: {
+          id: 'c1',
+          itemId: 'i1',
+          userId: 'user-1',
+          responseId: 'r1b',
+          completedAt: new Date(),
+          createdAt: new Date(),
+        },
+        reward: {
+          id: 'rw1',
+          completionId: 'c1',
+          userId: 'user-1',
+          itemId: 'i1',
+          hossiiKey: 'emotion/wow',
+          awardedAt: new Date(),
+          createdAt: new Date(),
+        },
+        isNewReward: false,
+        wasInsert: true,
+      },
+    });
+
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: '質問1のスタンプを振り返る' }),
+    );
+    let dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('回想の回答')).toBeTruthy();
+    expect(within(dialog).getByText('管理者にだけ共有')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /の回答を振り返る/ }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: '書き直す' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '「質問1」の回答操作' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '回答を削除' }));
+    fireEvent.click(screen.getByRole('button', { name: '回答を削除' }));
+    expect(await screen.findByText('回答を削除しました')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '質問1のスタンプを振り返る' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/回答は削除済みです/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度答える' }));
+    expect(await screen.findByRole('textbox')).toBeTruthy();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '再回答' } });
+    fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
+    expect(await screen.findByText('回答を保存しました')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Hossiiをゲット！' })).toBeNull();
+  });
+
+  it('opens pending stamp into answer form and closes recall with Escape', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: null,
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    listMyChallengeRewardsMock.mockResolvedValue([]);
+
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: '質問1のスタンプを振り返る' }),
+    );
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+    expect(screen.getByText(/回答は削除済みです/)).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '質問2に答える' }));
+    expect(await screen.findByRole('textbox')).toBeTruthy();
   });
 
   it('advances focus after closing reward modal', async () => {

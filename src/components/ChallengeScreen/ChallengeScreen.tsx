@@ -40,6 +40,7 @@ import {
   pickNextChallengeFocusItemId,
   resolveChallengeRewardCelebrationKind,
   type ChallengeListProgress,
+  type ChallengeStampSlot,
 } from '../../core/utils/challengeStampProgress';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { ChallengeItemCard } from './ChallengeItemCard';
@@ -47,6 +48,10 @@ import {
   ChallengeRewardModal,
   type ChallengeRewardModalModel,
 } from './ChallengeRewardModal';
+import {
+  ChallengeRecallModal,
+  type ChallengeRecallModalModel,
+} from './ChallengeRecallModal';
 import {
   ChallengeProgressSummary,
   ChallengeStampCard,
@@ -191,6 +196,9 @@ export const ChallengeScreen = () => {
   const [rewardModal, setRewardModal] = useState<ChallengeRewardModalModel | null>(
     null,
   );
+  const [recallModal, setRecallModal] = useState<ChallengeRecallModalModel | null>(
+    null,
+  );
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
 
   const listRequestIdRef = useRef(0);
@@ -323,6 +331,7 @@ export const ChallengeScreen = () => {
     setDrafts({});
     setFormError(null);
     setRewardModal(null);
+    setRecallModal(null);
     setActiveItemId(null);
     setPrograms([]);
     setListProgressByProgram({});
@@ -392,6 +401,7 @@ export const ChallengeScreen = () => {
         ),
       );
       setRewardModal(null);
+      setRecallModal(null);
       setView({ kind: 'detail', programId });
     } catch {
       setFormError('挑戦状の詳細を読み込めませんでした');
@@ -402,6 +412,7 @@ export const ChallengeScreen = () => {
 
   const returnToList = () => {
     setRewardModal(null);
+    setRecallModal(null);
     setActiveItemId(null);
     setView({ kind: 'list' });
     void reloadList();
@@ -571,6 +582,39 @@ export const ChallengeScreen = () => {
     }
   };
 
+  const openRecallForItem = (itemId: string) => {
+    const completion = myCompletions[itemId];
+    if (!completion) return;
+    const item = items.find((entry) => entry.id === itemId);
+    if (!item) return;
+    setRecallModal({
+      item,
+      response: myResponses[itemId] ?? null,
+      completion,
+      reward: myRewards[itemId] ?? null,
+    });
+  };
+
+  const openRecallFromSlot = (slot: ChallengeStampSlot) => {
+    if (!slot.completion) return;
+    setRecallModal({
+      item: slot.item,
+      response: myResponses[slot.item.id] ?? null,
+      completion: slot.completion,
+      reward: slot.reward,
+    });
+  };
+
+  const openPendingFromSlot = (slot: ChallengeStampSlot) => {
+    setRecallModal(null);
+    setActiveItemId(slot.item.id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`challenge-item-panel-${slot.item.id}`)?.scrollIntoView({
+        block: 'nearest',
+      });
+    });
+  };
+
   if (!currentUser?.uid) {
     return (
       <div className={styles.container}>
@@ -644,6 +688,7 @@ export const ChallengeScreen = () => {
           onSave={() => void saveResponse(item)}
           onRewrite={() => rewriteResponse(item)}
           onDelete={() => deleteResponse(item)}
+          onRecall={() => openRecallForItem(item.id)}
         />
       );
     };
@@ -659,6 +704,7 @@ export const ChallengeScreen = () => {
                 setView({ kind: 'list' });
                 setActiveItemId(null);
                 setRewardModal(null);
+                setRecallModal(null);
                 void reloadList();
               }}
             >
@@ -723,7 +769,12 @@ export const ChallengeScreen = () => {
               </section>
             ) : null}
 
-            <ChallengeStampCard key={activeProgram.id} slots={stampSlots} />
+            <ChallengeStampCard
+              key={activeProgram.id}
+              slots={stampSlots}
+              onSelectAchieved={openRecallFromSlot}
+              onSelectPending={openPendingFromSlot}
+            />
 
             {answeredItems.length > 0 ? (
               <section
@@ -782,6 +833,22 @@ export const ChallengeScreen = () => {
             onPrimary={() => closeRewardModal('primary')}
             onSecondary={() => closeRewardModal('secondary')}
             onDismiss={() => closeRewardModal('dismiss')}
+          />
+        )}
+        {recallModal && (
+          <ChallengeRecallModal
+            model={recallModal}
+            onRewrite={() => {
+              const item = recallModal.item;
+              setRecallModal(null);
+              rewriteResponse(item);
+            }}
+            onAnswerAgain={() => {
+              const itemId = recallModal.item.id;
+              setRecallModal(null);
+              setActiveItemId(itemId);
+            }}
+            onDismiss={() => setRecallModal(null)}
           />
         )}
       </div>
