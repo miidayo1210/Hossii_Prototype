@@ -182,13 +182,30 @@ export function formatRewardCelebrationProgressLabel(
 }
 
 /** List-card progress derived with the same completion rules as stamp progress. */
+export type ChallengeListStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'cleared'
+  | 'completed';
+
 export type ChallengeListProgress = {
   total: number;
   achieved: number;
   /** Remaining items needed for clear (required, or all when no required). */
   remaining: number;
   started: boolean;
+  /** Cleared (required done, or all when no required). Kept for existing callers. */
   isComplete: boolean;
+  requiredTotal: number;
+  requiredDone: number;
+  optionalTotal: number;
+  optionalDone: number;
+  remainingRequired: number;
+  remainingOptional: number;
+  isCleared: boolean;
+  /** All items completed (complete / コンプリート). */
+  isCompletedAll: boolean;
+  listStatus: ChallengeListStatus;
 };
 
 export function getChallengeListProgress(
@@ -205,31 +222,109 @@ export function getChallengeListProgress(
     0,
   );
   const required = items.filter((item) => item.isRequired);
+  const optional = items.filter((item) => !item.isRequired);
   const requiredDone = required.reduce(
     (count, item) => count + (completed.has(item.id) ? 1 : 0),
     0,
   );
+  const optionalDone = optional.reduce(
+    (count, item) => count + (completed.has(item.id) ? 1 : 0),
+    0,
+  );
   const treatsAllAsOptional = total > 0 && required.length === 0;
-  const isComplete = treatsAllAsOptional
-    ? items.every((item) => completed.has(item.id))
-    : required.length > 0 && requiredDone === required.length;
+  const isCleared =
+    total > 0 &&
+    (treatsAllAsOptional
+      ? items.every((item) => completed.has(item.id))
+      : requiredDone === required.length);
+  const isCompletedAll = total > 0 && achieved === total;
   const remaining = treatsAllAsOptional
     ? Math.max(total - achieved, 0)
     : Math.max(required.length - requiredDone, 0);
+  const remainingRequired = treatsAllAsOptional
+    ? Math.max(total - achieved, 0)
+    : Math.max(required.length - requiredDone, 0);
+  const remainingOptional = Math.max(optional.length - optionalDone, 0);
+
+  let listStatus: ChallengeListStatus = 'not_started';
+  if (total === 0) {
+    listStatus = 'not_started';
+  } else if (isCompletedAll) {
+    listStatus = 'completed';
+  } else if (isCleared) {
+    listStatus = 'cleared';
+  } else if (achieved > 0) {
+    listStatus = 'in_progress';
+  }
 
   return {
     total,
     achieved,
     remaining,
     started: achieved > 0,
-    isComplete,
+    isComplete: isCleared,
+    requiredTotal: required.length,
+    requiredDone,
+    optionalTotal: optional.length,
+    optionalDone,
+    remainingRequired,
+    remainingOptional,
+    isCleared,
+    isCompletedAll,
+    listStatus,
   };
 }
 
-export function getChallengeListCtaLabel(progress: ChallengeListProgress): string {
-  if (progress.isComplete) return '振り返る';
-  if (progress.started) return 'つづける';
-  return '挑戦する';
+/** Participant list CTA — state is shown via badges, not CTA wording. */
+export function getChallengeListCtaLabel(): string {
+  return '開く';
+}
+
+export function getChallengeListStatusLabel(
+  status: ChallengeListStatus,
+  itemCount = 1,
+): string {
+  if (itemCount <= 0) return '準備中';
+  switch (status) {
+    case 'completed':
+      return 'コンプリート';
+    case 'cleared':
+      return 'クリア済み';
+    case 'in_progress':
+      return '挑戦中';
+    case 'not_started':
+    default:
+      return 'まだこれから';
+  }
+}
+
+/** Short supporting line under the progress bar for list cards. */
+export function getChallengeListStatusHint(
+  progress: ChallengeListProgress,
+): string {
+  if (progress.total <= 0) {
+    return 'まだ挑戦できる項目がありません';
+  }
+  switch (progress.listStatus) {
+    case 'completed':
+      return 'すべての挑戦を達成しました';
+    case 'cleared':
+      if (progress.remainingOptional > 0) {
+        return `おまけがあと${progress.remainingOptional}つあります`;
+      }
+      return 'クリアに必要な挑戦を達成しました';
+    case 'in_progress':
+      return `あと${Math.max(progress.total - progress.achieved, 0)}つ`;
+    case 'not_started':
+    default:
+      return '最初の挑戦から始めてみよう';
+  }
+}
+
+/** Accessible name for the list CTA button. */
+export function getChallengeListOpenLabel(title: string): string {
+  const trimmed = title.trim() || '挑戦状';
+  return `「${trimmed}」を開く`;
 }
 
 /** Next item to emphasize on the participant detail screen. */

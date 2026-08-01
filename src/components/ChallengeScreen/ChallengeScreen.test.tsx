@@ -169,7 +169,7 @@ describe('ChallengeScreen rewards', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答本文' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
@@ -254,8 +254,8 @@ describe('ChallengeScreen rewards', () => {
     });
 
     render(<ChallengeScreen />);
-    // Single required item is complete → list CTA is「振り返る」
-    fireEvent.click(await screen.findByRole('button', { name: /振り返る/ }));
+    // Single required item is complete → list CTA is「開く」
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     fireEvent.click(await screen.findByRole('button', { name: /回答を見る・書き直す/ }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '更新後' } });
@@ -276,7 +276,7 @@ describe('ChallengeScreen rewards', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '残すべき入力' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
@@ -324,15 +324,17 @@ describe('ChallengeScreen list UI', () => {
 
     render(<ChallengeScreen />);
     expect(await screen.findByText(longDescription)).toBeTruthy();
+    expect(screen.getByText('まだこれから')).toBeTruthy();
     expect(screen.getByText('0 / 2 達成')).toBeTruthy();
-    expect(screen.getByText('全2問')).toBeTruthy();
+    expect(screen.getByText('最初の挑戦から始めてみよう')).toBeTruthy();
     expect(
       screen.getByRole('progressbar', { name: '公開ストーリーの進捗：0 / 2 達成' }),
     ).toBeTruthy();
-    expect(screen.getByRole('button', { name: '挑戦する：公開ストーリー' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '「公開ストーリー」を開く' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /挑戦する|つづける|振り返る/ })).toBeNull();
   });
 
-  it('shows continue CTA for partial progress', async () => {
+  it('shows open CTA for partial progress with in-progress badge', async () => {
     listPublishedChallengeItemsMock.mockResolvedValue([
       commentItem,
       { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
@@ -349,12 +351,13 @@ describe('ChallengeScreen list UI', () => {
     ]);
 
     render(<ChallengeScreen />);
-    expect(await screen.findByText('1 / 2 達成')).toBeTruthy();
+    expect(await screen.findByText('挑戦中')).toBeTruthy();
+    expect(screen.getByText('1 / 2 達成')).toBeTruthy();
     expect(screen.getByText('あと1つ')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'つづける：公開ストーリー' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '「公開ストーリー」を開く' })).toBeTruthy();
   });
 
-  it('shows clear state and review CTA when required items are done', async () => {
+  it('shows cleared badge when required items are done with leftovers', async () => {
     listPublishedChallengeItemsMock.mockResolvedValue([
       commentItem,
       { ...commentItem, id: 'i2', title: 'おまけ', isRequired: false, sortOrder: 1 },
@@ -372,8 +375,83 @@ describe('ChallengeScreen list UI', () => {
 
     render(<ChallengeScreen />);
     expect(await screen.findByText('クリア済み')).toBeTruthy();
-    expect(screen.getByText('1 / 2 達成')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '振り返る：公開ストーリー' })).toBeTruthy();
+    expect(screen.queryByText('コンプリート')).toBeNull();
+    expect(screen.getByText('必須 1 / 1 達成')).toBeTruthy();
+    expect(screen.getByText('おまけがあと1つあります')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '「公開ストーリー」を開く' })).toBeTruthy();
+  });
+
+  it('shows complete badge when all items are done', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: 'おまけ', isRequired: false, sortOrder: 1 },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+      {
+        id: 'c2',
+        itemId: 'i2',
+        userId: 'user-1',
+        responseId: 'r2',
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('コンプリート')).toBeTruthy();
+    expect(screen.queryByText('クリア済み')).toBeNull();
+    expect(screen.getByText('2 / 2 達成')).toBeTruthy();
+    expect(screen.getByText('すべての挑戦を達成しました')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '「公開ストーリー」を開く' })).toBeTruthy();
+  });
+
+  it('keeps progress from completions even when responses are deleted', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+    ]);
+    listMyChallengeResponsesMock.mockResolvedValue([]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: null,
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+      {
+        id: 'c2',
+        itemId: 'i2',
+        userId: 'user-1',
+        responseId: null,
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('コンプリート')).toBeTruthy();
+    expect(screen.getByText('2 / 2 達成')).toBeTruthy();
+  });
+
+  it('shows preparing state when published program has zero items', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('準備中')).toBeTruthy();
+    expect(screen.getByText('まだ挑戦できる項目がありません')).toBeTruthy();
+    expect(screen.queryByText('クリア済み')).toBeNull();
+    expect(screen.queryByText('コンプリート')).toBeNull();
+    expect(screen.getByRole('button', { name: '「公開ストーリー」を開く' })).toBeTruthy();
   });
 
   it('shows empty state when there are no published programs', async () => {
@@ -399,7 +477,7 @@ describe('ChallengeScreen list UI', () => {
 
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
-    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /開く/ })).toBeTruthy();
   });
 
   it('omits empty description block', async () => {
@@ -407,7 +485,7 @@ describe('ChallengeScreen list UI', () => {
       { ...publishedProgram, description: null },
     ]);
     const { container } = render(<ChallengeScreen />);
-    await screen.findByRole('button', { name: /挑戦する/ });
+    await screen.findByRole('button', { name: /開く/ });
     expect(container.querySelector('[class*="programDescription"]')).toBeNull();
   });
 });
@@ -443,7 +521,7 @@ describe('ChallengeScreen focused response UI', () => {
 
   it('emphasizes the first unanswered required item', async () => {
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     expect(await screen.findByRole('heading', { name: '次の挑戦' })).toBeTruthy();
     expect(screen.getByText('まずはこの質問に答えてみよう')).toBeTruthy();
     expect(screen.getByRole('textbox')).toBeTruthy();
@@ -456,7 +534,7 @@ describe('ChallengeScreen focused response UI', () => {
 
   it('places compact progress and next challenge before stamp details', async () => {
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     await screen.findByRole('heading', { name: '次の挑戦' });
 
     const progress = screen.getByLabelText('挑戦状の進捗');
@@ -512,7 +590,7 @@ describe('ChallengeScreen focused response UI', () => {
     ]);
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /振り返る|つづける/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
     expect(screen.getByText('もっとHossiiを集めたい人へ')).toBeTruthy();
     expect(screen.getByText('必須の挑戦はクリアしました')).toBeTruthy();
@@ -543,7 +621,7 @@ describe('ChallengeScreen focused response UI', () => {
     ]);
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /つづける/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     await screen.findByRole('heading', { name: '次の挑戦' });
     expect(screen.queryByText('秘密の回答')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /回答を見る・書き直す/ }));
@@ -589,7 +667,7 @@ describe('ChallengeScreen focused response UI', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     await screen.findByRole('heading', { name: '次の挑戦' });
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答本文' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
@@ -671,7 +749,7 @@ describe('ChallengeScreen focused response UI', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /つづける/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     await screen.findByRole('heading', { name: '次の挑戦' });
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答2' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
@@ -747,7 +825,7 @@ describe('ChallengeScreen focused response UI', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /つづける|挑戦する/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     await screen.findByRole('heading', { name: '次の挑戦' });
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '再回答' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
@@ -792,7 +870,7 @@ describe('ChallengeScreen list loading races', () => {
 
     testStore.activeSpaceMembershipStatus = 'active';
     rerender(<ChallengeScreen />);
-    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /開く/ })).toBeTruthy();
     expect(listPublishedChallengeProgramsMock).toHaveBeenCalled();
   });
 
@@ -815,14 +893,14 @@ describe('ChallengeScreen list loading races', () => {
 
   it('does not refetch when only activeSpace object identity changes', async () => {
     const { rerender } = render(<ChallengeScreen />);
-    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /開く/ })).toBeTruthy();
     const callsAfterFirst = listPublishedChallengeProgramsMock.mock.calls.length;
 
     testStore.spaces = [{ id: 'dev-space-public', name: 'Dev Public Renamed' }];
     rerender(<ChallengeScreen />);
     await act(async () => {});
     expect(listPublishedChallengeProgramsMock.mock.calls.length).toBe(callsAfterFirst);
-    expect(screen.getByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /開く/ })).toBeTruthy();
     expect(screen.queryByText('挑戦状をひろっています…')).toBeNull();
   });
 
@@ -918,9 +996,9 @@ describe('ChallengeScreen list loading races', () => {
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
 
     render(<ChallengeScreen />);
-    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /開く/ })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: /挑戦する/ }));
+    fireEvent.click(screen.getByRole('button', { name: /開く/ }));
     await screen.findByRole('heading', { level: 1, name: '公開ストーリー' });
 
     listPublishedChallengeProgramsMock.mockImplementation(
@@ -964,7 +1042,7 @@ describe('ChallengeScreen list loading races', () => {
     expect(await screen.findByText('挑戦状を読み込めませんでした')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
-    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /開く/ })).toBeTruthy();
   });
 
   it('does not update state after unmount', async () => {

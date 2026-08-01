@@ -293,6 +293,46 @@
   box-shadow: 0 4px 24px rgba(168, 85, 247, 0.08);
 }
 
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 0 0 0.55rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.statusBadgeNotStarted,
+.statusBadgePreparing {
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.statusBadgeInProgress {
+  color: #7e22ce;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+}
+
+.statusBadgeCleared {
+  color: #a16207;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.statusBadgeCompleted {
+  color: #9d174d;
+  background: linear-gradient(135deg, #fdf2f8, #fae8ff);
+  border: 1px solid #f9a8d4;
+  box-shadow: 0 1px 0 rgba(236, 72, 153, 0.18);
+}
+
 .programTitle {
   margin: 0;
   font-size: 1.05rem;
@@ -344,6 +384,21 @@
   border-radius: 9999px;
   background: linear-gradient(135deg, #a855f7, #ec4899);
   transition: width 0.25s ease;
+}
+
+.progressFillCleared {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+
+.progressFillComplete {
+  background: linear-gradient(135deg, #ec4899, #a855f7);
+}
+
+.progressHint {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
 }
 
 .listCta {
