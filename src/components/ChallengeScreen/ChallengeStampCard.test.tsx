@@ -195,6 +195,7 @@ describe('ChallengeStampCard', () => {
             item: item({ id: 'i1', title: '朝の気持ち' }),
           }),
         ]}
+        onSelectPending={() => {}}
       />,
     );
     expect(screen.getByText('1')).toBeTruthy();
@@ -278,7 +279,13 @@ describe('ChallengeStampCard', () => {
       }),
     );
 
-    render(<ChallengeStampCard slots={slots} />);
+    render(
+      <ChallengeStampCard
+        slots={slots}
+        onSelectAchieved={() => {}}
+        onSelectPending={() => {}}
+      />,
+    );
 
     const toggle = screen.getByRole('button', { name: 'スタンプを見る' });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
@@ -323,6 +330,8 @@ describe('ChallengeStampCard', () => {
             item: item({ id: 'i5', title: '五番目', sortOrder: 4 }),
           }),
         ]}
+        onSelectAchieved={() => {}}
+        onSelectPending={() => {}}
       />,
     );
 
@@ -338,6 +347,26 @@ describe('ChallengeStampCard', () => {
     ]);
     // Decorative preview images use empty alt and are excluded from the a11y tree.
     expect(preview.querySelectorAll('img').length).toBe(2);
+  });
+
+  it('renders read-only stamps without pressable controls', () => {
+    render(
+      <ChallengeStampCard
+        slots={[
+          achievedSlot('i1', '完了済み', 1),
+          slot({
+            index: 2,
+            item: item({ id: 'i2', title: '未獲得', sortOrder: 1 }),
+          }),
+        ]}
+      />,
+    );
+    expect(screen.queryByText('スタンプを押して、思い出をひらこう')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /完了済み/ }),
+    ).toBeNull();
+    expect(screen.getByLabelText(/完了済みのスタンプ/)).toBeTruthy();
+    expect(screen.getByLabelText(/未獲得/)).toBeTruthy();
   });
 
   it('shows achieved fallback mark when completion exists without reward image', () => {

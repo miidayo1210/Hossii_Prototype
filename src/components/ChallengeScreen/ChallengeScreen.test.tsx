@@ -203,6 +203,10 @@ describe('ChallengeScreen rewards', () => {
   });
 
   it('does not show reward modal on update without new reward', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+    ]);
     listMyChallengeResponsesMock.mockResolvedValue([
       {
         id: 'r1',
@@ -270,8 +274,9 @@ describe('ChallengeScreen rewards', () => {
     });
 
     render(<ChallengeScreen />);
-    // Single required item is complete → list CTA is「開く」
+    // 未完了のまま詳細を開き、記録から書き直す
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
+    expect(await screen.findByRole('heading', { name: '次の挑戦' })).toBeTruthy();
     const dialog = await openRecordRecall('質問1');
     fireEvent.click(within(dialog).getByRole('button', { name: /の回答操作/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: '書き直す' }));
@@ -749,6 +754,7 @@ describe('ChallengeScreen focused response UI', () => {
     listPublishedChallengeItemsMock.mockResolvedValue([
       commentItem,
       { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+      optionalItem,
     ]);
     listMyChallengeResponsesMock.mockResolvedValue([
       {
@@ -812,6 +818,8 @@ describe('ChallengeScreen focused response UI', () => {
 
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
+    // 必須クリア済み・おまけ未達 → 詳細（おまけの挑戦）から削除
+    expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
     expect(await screen.findByRole('button', { name: /これまでの記録 2件/ })).toBeTruthy();
     const deleteDialog = await openRecordRecall('質問1');
     expect(within(deleteDialog).getByText('削除される回答')).toBeTruthy();
@@ -829,17 +837,134 @@ describe('ChallengeScreen focused response UI', () => {
     expect(await screen.findByText('回答を削除しました')).toBeTruthy();
     expect(deleteChallengeResponseMock).toHaveBeenCalledWith('r1');
     expect(screen.queryByText('削除される回答')).toBeNull();
-    expect(screen.getByText('スタンプ獲得済み')).toBeTruthy();
+    expect(
+      screen.getByRole('button', {
+        name: /質問1のスタンプを振り返る/,
+      }),
+    ).toBeTruthy();
     expect(screen.getByRole('button', { name: /これまでの記録 2件/ })).toBeTruthy();
     expect(screen.getByLabelText('Hossiiスタンプカード')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Hossiiをゲット！' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '← 一覧へ戻る' }));
+    expect(await screen.findByText('クリア済み')).toBeTruthy();
+    expect(screen.getByText(/必須 2 \/ 2 達成/)).toBeTruthy();
+  });
+
+  it('opens completed challenge as records view from the list', async () => {
+    listMyChallengeResponsesMock.mockResolvedValue([
+      {
+        id: 'r1',
+        itemId: 'i1',
+        userId: 'user-1',
+        visibility: 'manager_only',
+        comment: '完了した回答1',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-01T00:00:00Z'),
+      },
+      {
+        id: 'r2',
+        itemId: 'i2',
+        userId: 'user-1',
+        visibility: 'manager_only',
+        comment: '完了した回答2',
+        createdAt: new Date('2026-01-02T00:00:00Z'),
+        updatedAt: new Date('2026-01-02T00:00:00Z'),
+      },
+      {
+        id: 'r3',
+        itemId: 'i3',
+        userId: 'user-1',
+        visibility: 'self_only',
+        comment: '完了した回答3',
+        createdAt: new Date('2026-01-03T00:00:00Z'),
+        updatedAt: new Date('2026-01-03T00:00:00Z'),
+      },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date('2026-01-01T00:00:00Z'),
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      },
+      {
+        id: 'c2',
+        itemId: 'i2',
+        userId: 'user-1',
+        responseId: 'r2',
+        completedAt: new Date('2026-01-02T00:00:00Z'),
+        createdAt: new Date('2026-01-02T00:00:00Z'),
+      },
+      {
+        id: 'c3',
+        itemId: 'i3',
+        userId: 'user-1',
+        responseId: 'r3',
+        completedAt: new Date('2026-01-03T00:00:00Z'),
+        createdAt: new Date('2026-01-03T00:00:00Z'),
+      },
+    ]);
+    listMyChallengeRewardsMock.mockResolvedValue([
+      {
+        id: 'rw1',
+        completionId: 'c1',
+        userId: 'user-1',
+        itemId: 'i1',
+        hossiiKey: 'emotion/wow',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+      {
+        id: 'rw2',
+        completionId: 'c2',
+        userId: 'user-1',
+        itemId: 'i2',
+        hossiiKey: 'emotion/kirakira',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+      {
+        id: 'rw3',
+        completionId: 'c3',
+        userId: 'user-1',
+        itemId: 'i3',
+        hossiiKey: 'idle/idle_smile',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+
+    render(<ChallengeScreen />);
     expect(await screen.findByText('コンプリート')).toBeTruthy();
-    expect(screen.getByText('2 / 2 達成')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /開く/ }));
+
+    expect(await screen.findByLabelText('挑戦の記録')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: '公開ストーリー' })).toBeTruthy();
+    expect(screen.getByText('クリア')).toBeTruthy();
+    expect(screen.getByLabelText('Hossiiスタンプカード')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '回答記録' })).toBeTruthy();
+    expect(screen.getByText('完了した回答1')).toBeTruthy();
+    expect(screen.getByText('完了した回答3')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: '次の挑戦' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'おまけの挑戦' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '挑戦の記録' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /スタンプを振り返る/ }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: /の回答操作/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '← 一覧へ戻る' }));
+    expect(await screen.findByText('コンプリート')).toBeTruthy();
   });
 
   it('keeps answered record when delete API fails', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+    ]);
     listMyChallengeResponsesMock.mockResolvedValue([
       {
         id: 'r1',
@@ -868,6 +993,7 @@ describe('ChallengeScreen focused response UI', () => {
 
     render(<ChallengeScreen />);
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
+    expect(await screen.findByRole('heading', { name: '次の挑戦' })).toBeTruthy();
     const failDialog = await openRecordRecall('質問1');
     fireEvent.click(
       within(failDialog).getByRole('button', { name: /の回答操作/ }),

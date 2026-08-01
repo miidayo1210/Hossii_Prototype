@@ -396,15 +396,25 @@ export const ChallengeScreen = () => {
       setMyRewards(rewardByItem);
       setMyCompletions(completionByItem);
       setDrafts(nextDrafts);
-      setActiveItemId(
-        pickNextChallengeFocusItemId(
-          programItems,
-          Object.keys(byItem),
-        ),
-      );
       setRewardModal(null);
       setRecallModal(null);
-      setView({ kind: 'detail', programId });
+      const listProgress = getChallengeListProgress(
+        programItems,
+        Object.keys(completionByItem),
+      );
+      // コンプリート済みは詳細の代わりに「挑戦の記録」を主画面にする
+      if (listProgress.isCompletedAll) {
+        setActiveItemId(null);
+        setView({ kind: 'trajectory', programId });
+      } else {
+        setActiveItemId(
+          pickNextChallengeFocusItemId(
+            programItems,
+            Object.keys(byItem),
+          ),
+        );
+        setView({ kind: 'detail', programId });
+      }
     } catch {
       setFormError('挑戦状の詳細を読み込めませんでした');
     } finally {
@@ -664,16 +674,33 @@ export const ChallengeScreen = () => {
   }
 
   if (view.kind === 'trajectory' && activeProgram) {
+    const recordsFullyComplete =
+      getChallengeListProgress(
+        items,
+        Object.keys(myCompletions),
+      ).isCompletedAll;
     return (
       <div className={styles.container}>
         <ChallengeTrajectoryView
           program={activeProgram}
           slots={stampSlots}
           responsesByItemId={myResponses}
+          backLabel={
+            recordsFullyComplete ? '← 一覧へ戻る' : '← 挑戦状へ戻る'
+          }
           onBack={() => {
+            if (recordsFullyComplete) {
+              returnToList();
+              return;
+            }
             setView({ kind: 'detail', programId: activeProgram.id });
           }}
-          onOpenRecord={(itemId) => openRecallForItem(itemId)}
+          // コンプリート済みの記録画面は見るだけ（編集・削除なし）
+          onOpenRecord={
+            recordsFullyComplete
+              ? undefined
+              : (itemId) => openRecallForItem(itemId)
+          }
         />
         {toast && (
           <div className={styles.toast} aria-live="polite">
@@ -863,13 +890,17 @@ export const ChallengeScreen = () => {
               onOpenRecord={(itemId) => openRecallForItem(itemId)}
             />
 
-            <button
-              type="button"
-              className={styles.trajectoryLink}
-              onClick={() => openRecordsPage(activeProgram.id)}
-            >
-              挑戦の記録
-            </button>
+            {/* コンプリート済みは openDetail で記録を主画面にするためリンク不要 */}
+            {!getChallengeListProgress(items, Object.keys(myCompletions))
+              .isCompletedAll ? (
+              <button
+                type="button"
+                className={styles.trajectoryLink}
+                onClick={() => openRecordsPage(activeProgram.id)}
+              >
+                挑戦の記録
+              </button>
+            ) : null}
           </>
         )}
 
