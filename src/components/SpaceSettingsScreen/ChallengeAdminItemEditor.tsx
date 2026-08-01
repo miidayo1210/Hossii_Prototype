@@ -1,7 +1,16 @@
 import { useId, useState } from 'react';
 import type { ChallengeItemType } from '../../core/types/challengeProgram';
 import { CHALLENGE_TITLE_MAX_LENGTH } from '../../core/types/challengeProgram';
+import {
+  CHALLENGE_RESPONSE_VISIBILITIES,
+  type ChallengeResponseVisibility,
+} from '../../core/types/challengeResponse';
 import { CHALLENGE_ITEM_BODY_MAX_LENGTH } from '../../core/utils/challengeAdminDisplay';
+import {
+  challengeResponseVisibilityHelp,
+  challengeResponseVisibilityLabel,
+  resolveChallengeResponseVisibility,
+} from '../../core/utils/challengeVisibility';
 import styles from './ChallengeAdminItemEditor.module.css';
 
 export type ChallengeAdminItemFormState = {
@@ -10,11 +19,14 @@ export type ChallengeAdminItemFormState = {
   description: string;
   reason: string;
   isRequired: boolean;
+  /** null = inherit program default */
+  responseVisibility: ChallengeResponseVisibility | null;
 };
 
 type Props = {
   mode: 'create' | 'edit';
   value: ChallengeAdminItemFormState;
+  programDefaultVisibility: ChallengeResponseVisibility;
   busy: boolean;
   error: string | null;
   onChange: (next: ChallengeAdminItemFormState) => void;
@@ -40,6 +52,7 @@ function typeCopy(itemType: ChallengeItemType): { title: string; body: string; p
 export function ChallengeAdminItemEditor({
   mode,
   value,
+  programDefaultVisibility,
   busy,
   error,
   onChange,
@@ -49,9 +62,18 @@ export function ChallengeAdminItemEditor({
   const titleId = useId();
   const errorId = useId();
   const [detailsOpen, setDetailsOpen] = useState(
-    Boolean(value.description.trim() || value.reason.trim()),
+    Boolean(
+      value.description.trim() ||
+        value.reason.trim() ||
+        value.responseVisibility != null,
+    ),
   );
   const copy = typeCopy(value.itemType);
+  const effectiveVisibility = resolveChallengeResponseVisibility({
+    itemResponseVisibility: value.responseVisibility,
+    programDefaultResponseVisibility: programDefaultVisibility,
+  });
+  const selectValue = value.responseVisibility ?? 'inherit';
 
   return (
     <div className={styles.editor} aria-labelledby={titleId}>
@@ -166,7 +188,8 @@ export function ChallengeAdminItemEditor({
           {value.title.trim() || copy.placeholder}
         </p>
         <p className={styles.previewMeta}>
-          {value.isRequired ? 'クリアに必要' : 'おまけ'} ／ コメントで回答
+          {value.isRequired ? 'クリアに必要' : 'おまけ'} ／ コメントで回答 ／{' '}
+          {challengeResponseVisibilityLabel(effectiveVisibility)}
         </p>
       </div>
 
@@ -181,6 +204,44 @@ export function ChallengeAdminItemEditor({
 
       {detailsOpen && (
         <div className={styles.detailsPanel}>
+          <label className={styles.label} htmlFor={`${titleId}-visibility`}>
+            公開範囲（任意）
+            <span className={styles.help}>
+              未設定のときは挑戦状の標準公開範囲（
+              {challengeResponseVisibilityLabel(programDefaultVisibility)}
+              ）を使います
+            </span>
+            <select
+              id={`${titleId}-visibility`}
+              className={styles.input}
+              value={selectValue}
+              disabled={busy}
+              aria-describedby={`${titleId}-visibility-help`}
+              onChange={(event) => {
+                const next = event.target.value;
+                onChange({
+                  ...value,
+                  responseVisibility:
+                    next === 'inherit'
+                      ? null
+                      : (next as ChallengeResponseVisibility),
+                });
+              }}
+            >
+              <option value="inherit">
+                挑戦状の標準を使う（
+                {challengeResponseVisibilityLabel(programDefaultVisibility)}）
+              </option>
+              {CHALLENGE_RESPONSE_VISIBILITIES.map((option) => (
+                <option key={option} value={option}>
+                  {challengeResponseVisibilityLabel(option)}
+                </option>
+              ))}
+            </select>
+            <span id={`${titleId}-visibility-help`} className={styles.help}>
+              {challengeResponseVisibilityHelp(effectiveVisibility)}
+            </span>
+          </label>
           <label className={styles.label} htmlFor={`${titleId}-description`}>
             補足説明（任意）
             <span className={styles.help}>

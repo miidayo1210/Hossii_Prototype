@@ -6,6 +6,11 @@ import type {
   ChallengeProgram,
 } from '../../core/types/challengeProgram';
 import { CHALLENGE_TITLE_MAX_LENGTH } from '../../core/types/challengeProgram';
+import {
+  CHALLENGE_RESPONSE_VISIBILITIES,
+  CHALLENGE_RESPONSE_VISIBILITY_DEFAULT,
+  type ChallengeResponseVisibility,
+} from '../../core/types/challengeResponse';
 import { useAuth } from '../../core/contexts/useAuth';
 import { canManageSpace } from '../../core/utils/spaceAdminAccess';
 import {
@@ -33,6 +38,10 @@ import {
   validateChallengeItemForm,
   type ChallengeItemCountStats,
 } from '../../core/utils/challengeAdminDisplay';
+import {
+  challengeResponseVisibilityHelp,
+  challengeResponseVisibilityLabel,
+} from '../../core/utils/challengeVisibility';
 import { invalidatePublishedChallengeNavCache } from '../../core/hooks/useHasPublishedChallengePrograms';
 import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import { ChallengeAdminItemCard } from './ChallengeAdminItemCard';
@@ -66,6 +75,7 @@ const EMPTY_ITEM_FORM: ChallengeAdminItemFormState = {
   description: '',
   reason: '',
   isRequired: true,
+  responseVisibility: null,
 };
 
 const LIST_LOAD_ERROR_TITLE = '挑戦状を読み込めませんでした';
@@ -152,6 +162,8 @@ export const ChallengeAdminTab = ({ space }: Props) => {
 
   const [programTitle, setProgramTitle] = useState('');
   const [programDescription, setProgramDescription] = useState('');
+  const [programDefaultVisibility, setProgramDefaultVisibility] =
+    useState<ChallengeResponseVisibility>(CHALLENGE_RESPONSE_VISIBILITY_DEFAULT);
   const [itemForm, setItemForm] = useState<ChallengeAdminItemFormState>(EMPTY_ITEM_FORM);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
@@ -244,6 +256,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
   const openCreate = () => {
     setProgramTitle('');
     setProgramDescription('');
+    setProgramDefaultVisibility(CHALLENGE_RESPONSE_VISIBILITY_DEFAULT);
     setFormError(null);
     setView({ kind: 'create' });
   };
@@ -264,6 +277,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setEditingProgram(program);
       setProgramTitle(program.title);
       setProgramDescription(program.description ?? '');
+      setProgramDefaultVisibility(program.defaultResponseVisibility);
       setItems(programItems);
       setEditingItemId(null);
       setShowItemForm(false);
@@ -296,6 +310,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       spaceId: space.id,
       title: programTitle,
       description: programDescription,
+      defaultResponseVisibility: programDefaultVisibility,
     });
     setBusy(false);
     if (!result.ok) {
@@ -317,6 +332,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     const result = await updateChallengeProgram(editingProgram.id, {
       title: programTitle,
       description: programDescription,
+      defaultResponseVisibility: programDefaultVisibility,
     });
     setBusy(false);
     if (!result.ok) {
@@ -324,6 +340,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       return;
     }
     setEditingProgram(result.value);
+    setProgramDefaultVisibility(result.value.defaultResponseVisibility);
     showToast('下書きを保存しました');
   };
 
@@ -409,6 +426,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       description: item.description ?? '',
       reason: item.reason ?? '',
       isRequired: item.isRequired,
+      responseVisibility: item.responseVisibility,
     });
     setShowItemForm(true);
   };
@@ -436,6 +454,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
         reason: itemForm.reason,
         isRequired: itemForm.isRequired,
         responseType: 'comment',
+        responseVisibility: itemForm.responseVisibility,
       });
       setBusy(false);
       if (!result.ok) {
@@ -455,6 +474,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
         isRequired: itemForm.isRequired,
         responseType: 'comment',
         sortOrder: nextSort,
+        responseVisibility: itemForm.responseVisibility,
       });
       setBusy(false);
       if (!result.ok) {
@@ -509,8 +529,10 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       hasUnsavedProgramEdits({
         title: programTitle,
         description: programDescription,
+        defaultResponseVisibility: programDefaultVisibility,
         savedTitle: editingProgram.title,
         savedDescription: editingProgram.description,
+        savedDefaultResponseVisibility: editingProgram.defaultResponseVisibility,
       }) ||
       showItemForm
     ) {
@@ -540,10 +562,17 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     return hasUnsavedProgramEdits({
       title: programTitle,
       description: programDescription,
+      defaultResponseVisibility: programDefaultVisibility,
       savedTitle: editingProgram.title,
       savedDescription: editingProgram.description,
+      savedDefaultResponseVisibility: editingProgram.defaultResponseVisibility,
     });
-  }, [editingProgram, programTitle, programDescription]);
+  }, [
+    editingProgram,
+    programTitle,
+    programDescription,
+    programDefaultVisibility,
+  ]);
 
   if (!canManage) {
     return (
@@ -584,6 +613,33 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                 disabled={busy}
               />
             </label>
+            <label className={formStyles.label} htmlFor="challenge-create-visibility">
+              標準の公開範囲
+              <select
+                id="challenge-create-visibility"
+                className={styles.visibilitySelect}
+                value={programDefaultVisibility}
+                disabled={busy}
+                aria-describedby="challenge-create-visibility-help"
+                onChange={(e) =>
+                  setProgramDefaultVisibility(
+                    e.target.value as ChallengeResponseVisibility,
+                  )
+                }
+              >
+                {CHALLENGE_RESPONSE_VISIBILITIES.map((value) => (
+                  <option key={value} value={value}>
+                    {challengeResponseVisibilityLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span
+              id="challenge-create-visibility-help"
+              className={styles.visibilityHelp}
+            >
+              {challengeResponseVisibilityHelp(programDefaultVisibility)}
+            </span>
             {formError && (
               <p className={styles.error} role="alert">
                 {formError}
@@ -692,6 +748,34 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                 disabled={busy || !isDraft}
               />
             </label>
+            <label className={formStyles.label} htmlFor="challenge-program-visibility">
+              標準の公開範囲
+              <select
+                id="challenge-program-visibility"
+                className={styles.visibilitySelect}
+                value={programDefaultVisibility}
+                disabled={busy || !isDraft}
+                aria-describedby="challenge-program-visibility-help"
+                onChange={(e) =>
+                  setProgramDefaultVisibility(
+                    e.target.value as ChallengeResponseVisibility,
+                  )
+                }
+              >
+                {CHALLENGE_RESPONSE_VISIBILITIES.map((value) => (
+                  <option key={value} value={value}>
+                    {challengeResponseVisibilityLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span
+              id="challenge-program-visibility-help"
+              className={styles.visibilityHelp}
+            >
+              {challengeResponseVisibilityHelp(programDefaultVisibility)}
+              。項目ごとに上書きもできます。参加者は回答時に公開範囲を選べません。
+            </span>
             {isDraft && (
               <div className={styles.actions}>
                 <button
@@ -740,6 +824,9 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                     <ChallengeAdminItemCard
                       item={item}
                       order={index + 1}
+                      programDefaultVisibility={
+                        editingProgram.defaultResponseVisibility
+                      }
                       readOnly={!isDraft}
                       busy={busy}
                       onEdit={() => startEditItem(item)}
@@ -751,6 +838,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                       <ChallengeAdminItemEditor
                         mode="edit"
                         value={itemForm}
+                        programDefaultVisibility={programDefaultVisibility}
                         busy={busy}
                         error={itemFormError}
                         onChange={setItemForm}
@@ -788,6 +876,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                   <ChallengeAdminItemEditor
                     mode="create"
                     value={itemForm}
+                    programDefaultVisibility={programDefaultVisibility}
                     busy={busy}
                     error={itemFormError}
                     onChange={setItemForm}

@@ -40,16 +40,20 @@ describe('challengeAdminDisplay', () => {
       hasUnsavedProgramEdits({
         title: 'A',
         description: '',
+        defaultResponseVisibility: 'manager_only',
         savedTitle: 'A',
         savedDescription: null,
+        savedDefaultResponseVisibility: 'manager_only',
       }),
     ).toBe(false);
     expect(
       hasUnsavedProgramEdits({
         title: 'B',
         description: '',
+        defaultResponseVisibility: 'manager_only',
         savedTitle: 'A',
         savedDescription: null,
+        savedDefaultResponseVisibility: 'manager_only',
       }),
     ).toBe(true);
   });

@@ -86,7 +86,12 @@ describe('challengeValidation', () => {
     });
     expect(program).toEqual({
       ok: true,
-      value: { spaceId: 's1', title: 'hello', description: 'desc' },
+      value: {
+        spaceId: 's1',
+        title: 'hello',
+        description: 'desc',
+        defaultResponseVisibility: 'manager_only',
+      },
     });
 
     const item = normalizeCreateChallengeItemInput({
@@ -124,6 +129,7 @@ describe('row mapping', () => {
       title: 'Story',
       description: null,
       status: 'draft',
+      defaultResponseVisibility: 'manager_only',
       createdBy: row.created_by,
     });
     expect(program.createdAt.toISOString()).toBe('2026-07-31T00:00:00.000Z');
@@ -152,6 +158,7 @@ describe('row mapping', () => {
       sortOrder: 3,
       description: 'desc',
       reason: 'why',
+      responseVisibility: null,
     });
   });
 });
@@ -162,11 +169,13 @@ describe('payload builders', () => {
       spaceId: 's1',
       title: 't',
       description: null,
+      defaultResponseVisibility: 'manager_only',
     });
     expect(payload).toEqual({
       space_id: 's1',
       title: 't',
       description: null,
+      default_response_visibility: 'manager_only',
     });
     expect(payload).not.toHaveProperty('created_by');
     expect(payload).not.toHaveProperty('status');
@@ -174,8 +183,16 @@ describe('payload builders', () => {
   });
 
   it('update program payload does not include space_id', () => {
-    const payload = buildUpdateChallengeProgramPayload({ title: 'n', description: 'd' });
-    expect(payload).toEqual({ title: 'n', description: 'd' });
+    const payload = buildUpdateChallengeProgramPayload({
+      title: 'n',
+      description: 'd',
+      defaultResponseVisibility: 'space_members',
+    });
+    expect(payload).toEqual({
+      title: 'n',
+      description: 'd',
+      default_response_visibility: 'space_members',
+    });
     expect(payload).not.toHaveProperty('space_id');
     expect(payload).not.toHaveProperty('status');
   });
@@ -211,6 +228,7 @@ describe('payload builders', () => {
       response_type: 'comment',
       is_required: true,
       sort_order: 0,
+      response_visibility: null,
     });
   });
 });

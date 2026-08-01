@@ -10,6 +10,7 @@ import type {
   UpdateChallengeItemInput,
   UpdateChallengeProgramInput,
 } from '../types/challengeProgram';
+import type { ChallengeResponseVisibility } from '../types/challengeResponse';
 import {
   normalizeChallengeProgramStatus,
   normalizeCreateChallengeItemInput,
@@ -17,6 +18,10 @@ import {
   normalizeUpdateChallengeItemInput,
   normalizeUpdateChallengeProgramInput,
 } from './challengeValidation';
+import {
+  coerceChallengeResponseVisibility,
+  coerceOptionalChallengeResponseVisibility,
+} from './challengeVisibility';
 
 export type ChallengeProgramRow = {
   id: string;
@@ -24,6 +29,7 @@ export type ChallengeProgramRow = {
   title: string;
   description: string | null;
   status: string;
+  default_response_visibility?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -39,6 +45,7 @@ export type ChallengeItemRow = {
   response_type: string;
   is_required: boolean;
   sort_order: number;
+  response_visibility?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -56,6 +63,9 @@ export function rowToChallengeProgram(row: ChallengeProgramRow): ChallengeProgra
     title: row.title,
     description: row.description,
     status: row.status as ChallengeProgramStatus,
+    defaultResponseVisibility: coerceChallengeResponseVisibility(
+      row.default_response_visibility,
+    ),
     createdBy: row.created_by,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -73,6 +83,9 @@ export function rowToChallengeItem(row: ChallengeItemRow): ChallengeItem {
     responseType: row.response_type as ChallengeResponseType,
     isRequired: row.is_required,
     sortOrder: row.sort_order,
+    responseVisibility: coerceOptionalChallengeResponseVisibility(
+      row.response_visibility,
+    ),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -83,21 +96,32 @@ export function buildCreateChallengeProgramPayload(input: {
   spaceId: string;
   title: string;
   description: string | null;
-}): { space_id: string; title: string; description: string | null } {
+  defaultResponseVisibility: ChallengeResponseVisibility;
+}): {
+  space_id: string;
+  title: string;
+  description: string | null;
+  default_response_visibility: ChallengeResponseVisibility;
+} {
   return {
     space_id: input.spaceId,
     title: input.title,
     description: input.description,
+    default_response_visibility: input.defaultResponseVisibility,
   };
 }
 
 export function buildUpdateChallengeProgramPayload(input: {
   title?: string;
   description?: string | null;
+  defaultResponseVisibility?: ChallengeResponseVisibility;
 }): Record<string, string | null> {
   const payload: Record<string, string | null> = {};
   if (input.title !== undefined) payload.title = input.title;
   if (input.description !== undefined) payload.description = input.description;
+  if (input.defaultResponseVisibility !== undefined) {
+    payload.default_response_visibility = input.defaultResponseVisibility;
+  }
   return payload;
 }
 
@@ -110,6 +134,7 @@ export function buildCreateChallengeItemPayload(input: {
   responseType: ChallengeResponseType;
   isRequired: boolean;
   sortOrder: number;
+  responseVisibility: ChallengeResponseVisibility | null;
 }): Record<string, string | number | boolean | null> {
   return {
     program_id: input.programId,
@@ -120,6 +145,7 @@ export function buildCreateChallengeItemPayload(input: {
     response_type: input.responseType,
     is_required: input.isRequired,
     sort_order: input.sortOrder,
+    response_visibility: input.responseVisibility,
   };
 }
 
@@ -131,6 +157,7 @@ export function buildUpdateChallengeItemPayload(input: {
   responseType?: ChallengeResponseType;
   isRequired?: boolean;
   sortOrder?: number;
+  responseVisibility?: ChallengeResponseVisibility | null;
 }): Record<string, string | number | boolean | null> {
   const payload: Record<string, string | number | boolean | null> = {};
   if (input.itemType !== undefined) payload.item_type = input.itemType;
@@ -140,6 +167,9 @@ export function buildUpdateChallengeItemPayload(input: {
   if (input.responseType !== undefined) payload.response_type = input.responseType;
   if (input.isRequired !== undefined) payload.is_required = input.isRequired;
   if (input.sortOrder !== undefined) payload.sort_order = input.sortOrder;
+  if (input.responseVisibility !== undefined) {
+    payload.response_visibility = input.responseVisibility;
+  }
   return payload;
 }
 

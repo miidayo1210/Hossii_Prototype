@@ -25,7 +25,10 @@ export function normalizeChallengeResponseVisibility(
   ) {
     return { ok: true, value: value as ChallengeResponseVisibility };
   }
-  return { ok: false, message: 'visibility must be self_only or manager_only' };
+  return {
+    ok: false,
+    message: 'visibility must be space_members, manager_only, or self_only',
+  };
 }
 
 export function normalizeChallengeResponseComment(
