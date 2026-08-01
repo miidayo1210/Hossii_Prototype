@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import type { ChallengeItem, ChallengeProgram } from '../../core/types/challengeProgram';
@@ -18,6 +18,12 @@ import {
 } from '../../core/utils/challengeRewardsApi';
 import { getChallengeHossiiImageUrl } from '../../core/assets/challengeHossiiKeys';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
+import {
+  canFetchChallengeParticipantList,
+  isChallengeListAccessDenied,
+  isChallengeListWaitingMembership,
+  withChallengeListTimeout,
+} from '../../core/utils/challengeListLoadGate';
 import {
   buildChallengeStampSlots,
   compareChallengeItems,
@@ -132,17 +138,22 @@ export const ChallengeScreen = () => {
   const { currentUser } = useAuth();
   const { state, activeSpaceMembershipStatus } = useHossiiStore();
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId) ?? null;
+  const spaceId = activeSpace?.id ?? null;
+  const userId = currentUser?.uid ?? null;
+  const membershipStatus = activeSpaceMembershipStatus;
 
   const [view, setView] = useState<View>({ kind: 'list' });
   const [programs, setPrograms] = useState<ChallengeProgram[]>([]);
   const [listProgressByProgram, setListProgressByProgram] = useState<
     Record<string, ChallengeListProgress>
   >({});
+  const [listBoundSpaceId, setListBoundSpaceId] = useState<string | null>(null);
   const [items, setItems] = useState<ChallengeItem[]>([]);
   const [myResponses, setMyResponses] = useState<Record<string, ChallengeResponse>>({});
   const [activeProgram, setActiveProgram] = useState<ChallengeProgram | null>(null);
 
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -159,6 +170,12 @@ export const ChallengeScreen = () => {
     null,
   );
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+
+  const listRequestIdRef = useRef(0);
+  const programsRef = useRef(programs);
+  const listBoundSpaceIdRef = useRef(listBoundSpaceId);
+  programsRef.current = programs;
+  listBoundSpaceIdRef.current = listBoundSpaceId;
 
   const stampSlots = useMemo(
     () =>
@@ -198,51 +215,78 @@ export const ChallengeScreen = () => {
   }, []);
 
   const canAccess =
-    Boolean(currentUser?.uid) &&
-    activeSpace != null &&
-    (activeSpaceMembershipStatus === 'active' ||
-      activeSpaceMembershipStatus === 'idle');
+    Boolean(userId) &&
+    Boolean(spaceId) &&
+    canFetchChallengeParticipantList(membershipStatus);
+
+  const waitingMembership =
+    Boolean(userId) &&
+    Boolean(spaceId) &&
+    isChallengeListWaitingMembership(membershipStatus);
+
+  const hasVisibleList = listBoundSpaceId === spaceId && programs.length > 0;
 
   const reloadList = useCallback(async () => {
-    if (!activeSpace || !currentUser?.uid) {
-      setPrograms([]);
-      setListProgressByProgram({});
-      setLoading(false);
+    if (!spaceId || !userId || !canFetchChallengeParticipantList(membershipStatus)) {
       return;
     }
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const listed = await listPublishedChallengePrograms(activeSpace.id);
-      setPrograms(listed);
-      const progressByProgram: Record<string, ChallengeListProgress> = {};
-      await Promise.all(
-        listed.map(async (program) => {
-          const programItems = await listPublishedChallengeItems(program.id);
-          const itemIds = programItems.map((i) => i.id);
-          const completions = await listMyChallengeCompletions(itemIds);
-          progressByProgram[program.id] = getChallengeListProgress(
-            programItems,
-            completions.map((completion) => completion.itemId),
-          );
-        }),
-      );
-      setListProgressByProgram(progressByProgram);
-    } catch {
-      setLoadError(LIST_LOAD_ERROR_TITLE);
-      setPrograms([]);
-      setListProgressByProgram({});
-    } finally {
-      setLoading(false);
+
+    const requestId = ++listRequestIdRef.current;
+    const isRefresh =
+      listBoundSpaceIdRef.current === spaceId && programsRef.current.length > 0;
+
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setInitialLoading(true);
     }
-  }, [activeSpace, currentUser?.uid]);
+    setLoadError(null);
 
-  useEffect(() => {
-    void reloadList();
-  }, [reloadList]);
+    try {
+      const result = await withChallengeListTimeout(
+        (async () => {
+          const listed = await listPublishedChallengePrograms(spaceId);
+          const progressByProgram: Record<string, ChallengeListProgress> = {};
+          await Promise.all(
+            listed.map(async (program) => {
+              const programItems = await listPublishedChallengeItems(program.id);
+              const itemIds = programItems.map((i) => i.id);
+              const completions = await listMyChallengeCompletions(itemIds);
+              progressByProgram[program.id] = getChallengeListProgress(
+                programItems,
+                completions.map((completion) => completion.itemId),
+              );
+            }),
+          );
+          return { listed, progressByProgram };
+        })(),
+      );
 
-  // Space switch must not keep previous space detail / stamp / list progress.
+      if (requestId !== listRequestIdRef.current) return;
+
+      setPrograms(result.listed);
+      setListProgressByProgram(result.progressByProgram);
+      setListBoundSpaceId(spaceId);
+      setLoadError(null);
+    } catch {
+      if (requestId !== listRequestIdRef.current) return;
+      setLoadError(LIST_LOAD_ERROR_TITLE);
+      if (!isRefresh) {
+        setPrograms([]);
+        setListProgressByProgram({});
+        setListBoundSpaceId(null);
+      }
+    } finally {
+      if (requestId === listRequestIdRef.current) {
+        setInitialLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [spaceId, userId, membershipStatus]);
+
+  // Space / user switch must not keep previous space detail / stamp / list.
   useEffect(() => {
+    listRequestIdRef.current += 1;
     setView({ kind: 'list' });
     setActiveProgram(null);
     setItems([]);
@@ -255,15 +299,28 @@ export const ChallengeScreen = () => {
     setActiveItemId(null);
     setPrograms([]);
     setListProgressByProgram({});
+    setListBoundSpaceId(null);
     setLoadError(null);
-    setLoading(Boolean(activeSpace?.id && currentUser?.uid));
-  }, [activeSpace?.id, currentUser?.uid]);
+    setInitialLoading(false);
+    setRefreshing(false);
+  }, [spaceId, userId]);
+
+  useEffect(() => {
+    if (!spaceId || !userId) return;
+    if (!canFetchChallengeParticipantList(membershipStatus)) return;
+
+    void reloadList();
+    return () => {
+      listRequestIdRef.current += 1;
+    };
+  }, [spaceId, userId, membershipStatus, reloadList]);
 
   const openDetail = async (programId: string) => {
+    if (!spaceId) return;
     setFormError(null);
     setBusyItemId('__open__');
     try {
-      const listed = await listPublishedChallengePrograms(activeSpace!.id);
+      const listed = await listPublishedChallengePrograms(spaceId);
       const program = listed.find((p) => p.id === programId) ?? null;
       if (!program) {
         setFormError('公開中の挑戦状が見つかりません');
@@ -456,7 +513,7 @@ export const ChallengeScreen = () => {
     );
   }
 
-  if (activeSpaceMembershipStatus === 'none' || activeSpaceMembershipStatus === 'error') {
+  if (isChallengeListAccessDenied(membershipStatus)) {
     return (
       <div className={styles.container}>
         <ListIntro />
@@ -649,19 +706,93 @@ export const ChallengeScreen = () => {
     );
   }
 
+  const showInitialLoading =
+    canFetchChallengeParticipantList(membershipStatus) &&
+    initialLoading &&
+    !hasVisibleList;
+  const showWaitingMembership = waitingMembership && !hasVisibleList;
+  const showListError =
+    Boolean(loadError) &&
+    !showInitialLoading &&
+    !showWaitingMembership &&
+    !hasVisibleList;
+  const showEmpty =
+    canFetchChallengeParticipantList(membershipStatus) &&
+    !initialLoading &&
+    !refreshing &&
+    !loadError &&
+    !hasVisibleList &&
+    listBoundSpaceId === spaceId;
+  const showProgramList = hasVisibleList;
+
   return (
     <div className={styles.container}>
       <ListIntro />
 
-      {loading && (
+      {(showInitialLoading || showWaitingMembership) && (
         <div className={styles.listLoading} aria-busy="true" aria-live="polite">
-          <p className={styles.muted}>挑戦状をひろっています…</p>
+          <p className={styles.muted}>
+            {showWaitingMembership
+              ? '挑戦状を準備しています…'
+              : '挑戦状をひろっています…'}
+          </p>
           <div className={styles.skeletonCard} />
           <div className={styles.skeletonCard} />
         </div>
       )}
 
-      {!loading && loadError && (
+      {showProgramList && (
+        <>
+          {refreshing ? (
+            <p className={styles.refreshHint} aria-live="polite">
+              最新の挑戦状を確認しています…
+            </p>
+          ) : null}
+          {loadError ? (
+            <div className={styles.listErrorInline} role="alert">
+              <p className={styles.listErrorTitle}>{LIST_LOAD_ERROR_TITLE}</p>
+              <p className={styles.muted}>{LIST_LOAD_ERROR_HINT}</p>
+              <button
+                type="button"
+                className={styles.listRetryButton}
+                onClick={() => void reloadList()}
+              >
+                もう一度読み込む
+              </button>
+            </div>
+          ) : null}
+          <ul className={styles.programList}>
+            {programs.map((program) => {
+              const progress =
+                listProgressByProgram[program.id] ??
+                getChallengeListProgress([], []);
+              const ctaLabel = getChallengeListCtaLabel(progress);
+              return (
+                <li key={program.id} className={styles.programCard}>
+                  <h2 className={styles.programTitle}>{program.title}</h2>
+                  {program.description ? (
+                    <p className={styles.programDescription}>{program.description}</p>
+                  ) : null}
+                  <ProgramProgressBar progress={progress} title={program.title} />
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.listCta}
+                      disabled={!canAccess || busyItemId != null}
+                      aria-label={`${ctaLabel}：${program.title}`}
+                      onClick={() => void openDetail(program.id)}
+                    >
+                      {ctaLabel}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      {showListError && (
         <div className={styles.listError} role="alert">
           <p className={styles.listErrorTitle}>{LIST_LOAD_ERROR_TITLE}</p>
           <p className={styles.muted}>{LIST_LOAD_ERROR_HINT}</p>
@@ -675,7 +806,7 @@ export const ChallengeScreen = () => {
         </div>
       )}
 
-      {!loading && !loadError && programs.length === 0 && (
+      {showEmpty && (
         <div className={styles.emptyState}>
           <img className={styles.emptyDecor} src={LIST_DECOR_HOSSII} alt="" />
           <p className={styles.emptyTitle}>いま挑戦できる挑戦状はありません</p>
@@ -685,36 +816,6 @@ export const ChallengeScreen = () => {
         </div>
       )}
 
-      {!loading && !loadError && programs.length > 0 && (
-        <ul className={styles.programList}>
-          {programs.map((program) => {
-            const progress =
-              listProgressByProgram[program.id] ??
-              getChallengeListProgress([], []);
-            const ctaLabel = getChallengeListCtaLabel(progress);
-            return (
-              <li key={program.id} className={styles.programCard}>
-                <h2 className={styles.programTitle}>{program.title}</h2>
-                {program.description ? (
-                  <p className={styles.programDescription}>{program.description}</p>
-                ) : null}
-                <ProgramProgressBar progress={progress} title={program.title} />
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.listCta}
-                    disabled={!canAccess || busyItemId != null}
-                    aria-label={`${ctaLabel}：${program.title}`}
-                    onClick={() => void openDetail(program.id)}
-                  >
-                    {ctaLabel}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
       {formError && <p className={styles.error}>{formError}</p>}
       {toast && <div className={styles.toast}>{toast}</div>}
     </div>

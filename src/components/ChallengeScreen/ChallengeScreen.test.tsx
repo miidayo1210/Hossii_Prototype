@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 
 const {
   listPublishedChallengeProgramsMock,
@@ -9,6 +17,7 @@ const {
   listMyChallengeRewardsMock,
   listMyChallengeCompletionsMock,
   submitChallengeCommentResponseMock,
+  testStore,
 } = vi.hoisted(() => ({
   listPublishedChallengeProgramsMock: vi.fn(),
   listPublishedChallengeItemsMock: vi.fn(),
@@ -16,21 +25,38 @@ const {
   listMyChallengeRewardsMock: vi.fn(),
   listMyChallengeCompletionsMock: vi.fn(),
   submitChallengeCommentResponseMock: vi.fn(),
+  testStore: {
+    currentUser: { uid: 'user-1', isAdmin: false } as {
+      uid: string;
+      isAdmin: boolean;
+    } | null,
+    activeSpaceId: 'dev-space-public',
+    spaces: [{ id: 'dev-space-public', name: 'Dev Public' }] as Array<{
+      id: string;
+      name: string;
+    }>,
+    activeSpaceMembershipStatus: 'active' as
+      | 'idle'
+      | 'joining'
+      | 'active'
+      | 'none'
+      | 'error',
+  },
 }));
 
 vi.mock('../../core/contexts/useAuth', () => ({
   useAuth: () => ({
-    currentUser: { uid: 'user-1', isAdmin: false },
+    currentUser: testStore.currentUser,
   }),
 }));
 
 vi.mock('../../core/hooks/useHossiiStore', () => ({
   useHossiiStore: () => ({
     state: {
-      activeSpaceId: 'dev-space-public',
-      spaces: [{ id: 'dev-space-public', name: 'Dev Public' }],
+      activeSpaceId: testStore.activeSpaceId,
+      spaces: testStore.spaces,
     },
-    activeSpaceMembershipStatus: 'active',
+    activeSpaceMembershipStatus: testStore.activeSpaceMembershipStatus,
   }),
 }));
 
@@ -85,9 +111,17 @@ const commentItem = {
   updatedAt: new Date(),
 };
 
+function resetTestStore() {
+  testStore.currentUser = { uid: 'user-1', isAdmin: false };
+  testStore.activeSpaceId = 'dev-space-public';
+  testStore.spaces = [{ id: 'dev-space-public', name: 'Dev Public' }];
+  testStore.activeSpaceMembershipStatus = 'active';
+}
+
 describe('ChallengeScreen rewards', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetTestStore();
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
@@ -256,6 +290,7 @@ describe('ChallengeScreen rewards', () => {
 describe('ChallengeScreen list UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetTestStore();
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
@@ -394,6 +429,7 @@ describe('ChallengeScreen focused response UI', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetTestStore();
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem, item2, optionalItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
@@ -717,5 +753,236 @@ describe('ChallengeScreen focused response UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
     expect(await screen.findByText('回答を保存しました')).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('ChallengeScreen list loading races', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTestStore();
+    listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
+    listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
+    listMyChallengeResponsesMock.mockResolvedValue([]);
+    listMyChallengeRewardsMock.mockResolvedValue([]);
+    listMyChallengeCompletionsMock.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it('does not treat membership waiting as formal empty', async () => {
+    testStore.activeSpaceMembershipStatus = 'joining';
+    listPublishedChallengeProgramsMock.mockResolvedValue([]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('挑戦状を準備しています…')).toBeTruthy();
+    expect(
+      screen.queryByText('いま挑戦できる挑戦状はありません'),
+    ).toBeNull();
+    expect(listPublishedChallengeProgramsMock).not.toHaveBeenCalled();
+  });
+
+  it('starts fetch when membership becomes active after joining', async () => {
+    testStore.activeSpaceMembershipStatus = 'joining';
+    const { rerender } = render(<ChallengeScreen />);
+    expect(await screen.findByText('挑戦状を準備しています…')).toBeTruthy();
+    expect(listPublishedChallengeProgramsMock).not.toHaveBeenCalled();
+
+    testStore.activeSpaceMembershipStatus = 'active';
+    rerender(<ChallengeScreen />);
+    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(listPublishedChallengeProgramsMock).toHaveBeenCalled();
+  });
+
+  it('does not fetch when access is denied', async () => {
+    testStore.activeSpaceMembershipStatus = 'none';
+    render(<ChallengeScreen />);
+    expect(
+      await screen.findByText('このスペースの参加者のみ挑戦状に回答できます。'),
+    ).toBeTruthy();
+    expect(listPublishedChallengeProgramsMock).not.toHaveBeenCalled();
+  });
+
+  it('shows empty only after active membership and zero published programs', async () => {
+    listPublishedChallengeProgramsMock.mockResolvedValue([]);
+    render(<ChallengeScreen />);
+    expect(
+      await screen.findByText('いま挑戦できる挑戦状はありません'),
+    ).toBeTruthy();
+  });
+
+  it('does not refetch when only activeSpace object identity changes', async () => {
+    const { rerender } = render(<ChallengeScreen />);
+    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    const callsAfterFirst = listPublishedChallengeProgramsMock.mock.calls.length;
+
+    testStore.spaces = [{ id: 'dev-space-public', name: 'Dev Public Renamed' }];
+    rerender(<ChallengeScreen />);
+    await act(async () => {});
+    expect(listPublishedChallengeProgramsMock.mock.calls.length).toBe(callsAfterFirst);
+    expect(screen.getByRole('button', { name: /挑戦する/ })).toBeTruthy();
+    expect(screen.queryByText('挑戦状をひろっています…')).toBeNull();
+  });
+
+  it('refetches when space id changes and does not keep previous list', async () => {
+    const otherProgram = {
+      ...publishedProgram,
+      id: 'p2',
+      spaceId: 'space-b',
+      title: '別スペースの挑戦状',
+    };
+    listPublishedChallengeProgramsMock.mockImplementation(async (id: string) => {
+      if (id === 'space-b') return [otherProgram];
+      return [publishedProgram];
+    });
+
+    const { rerender } = render(<ChallengeScreen />);
+    expect(await screen.findByText('公開ストーリー')).toBeTruthy();
+
+    testStore.activeSpaceId = 'space-b';
+    testStore.spaces = [{ id: 'space-b', name: 'Space B' }];
+    rerender(<ChallengeScreen />);
+
+    expect(await screen.findByText('別スペースの挑戦状')).toBeTruthy();
+    expect(screen.queryByText('公開ストーリー')).toBeNull();
+  });
+
+  it('ignores a stale slower request from a previous space', async () => {
+    let resolveSpaceA: (value: unknown[]) => void = () => {};
+    const spaceAPending = new Promise<unknown[]>((resolve) => {
+      resolveSpaceA = resolve;
+    });
+    listPublishedChallengeProgramsMock.mockImplementation((id: string) => {
+      if (id === 'dev-space-public') return spaceAPending;
+      return Promise.resolve([
+        {
+          ...publishedProgram,
+          id: 'p2',
+          spaceId: 'space-b',
+          title: '別スペースの挑戦状',
+        },
+      ]);
+    });
+
+    const { rerender } = render(<ChallengeScreen />);
+    expect(await screen.findByText('挑戦状をひろっています…')).toBeTruthy();
+
+    testStore.activeSpaceId = 'space-b';
+    testStore.spaces = [{ id: 'space-b', name: 'Space B' }];
+    rerender(<ChallengeScreen />);
+    expect(await screen.findByText('別スペースの挑戦状')).toBeTruthy();
+
+    await act(async () => {
+      resolveSpaceA([publishedProgram]);
+    });
+    expect(screen.queryByText('公開ストーリー')).toBeNull();
+    expect(screen.getByText('別スペースの挑戦状')).toBeTruthy();
+  });
+
+  it('ignores stale error from an older request', async () => {
+    let rejectSpaceA: (error: Error) => void = () => {};
+    const spaceAPending = new Promise<unknown[]>((_, reject) => {
+      rejectSpaceA = reject;
+    });
+    listPublishedChallengeProgramsMock.mockImplementation((id: string) => {
+      if (id === 'dev-space-public') return spaceAPending;
+      return Promise.resolve([
+        {
+          ...publishedProgram,
+          id: 'p2',
+          spaceId: 'space-b',
+          title: '別スペースの挑戦状',
+        },
+      ]);
+    });
+
+    const { rerender } = render(<ChallengeScreen />);
+    await screen.findByText('挑戦状をひろっています…');
+
+    testStore.activeSpaceId = 'space-b';
+    testStore.spaces = [{ id: 'space-b', name: 'Space B' }];
+    rerender(<ChallengeScreen />);
+    expect(await screen.findByText('別スペースの挑戦状')).toBeTruthy();
+
+    await act(async () => {
+      rejectSpaceA(new Error('old failure'));
+    });
+    expect(screen.queryByText('挑戦状を読み込めませんでした')).toBeNull();
+    expect(screen.getByText('別スペースの挑戦状')).toBeTruthy();
+  });
+
+  it('keeps existing list visible while refreshing', async () => {
+    let resolveRefresh: (value: unknown[]) => void = () => {};
+    listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /挑戦する/ }));
+    await screen.findByRole('heading', { level: 1, name: '公開ストーリー' });
+
+    listPublishedChallengeProgramsMock.mockImplementation(
+      () =>
+        new Promise<unknown[]>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '← 一覧へ戻る' }));
+
+    expect(await screen.findByText('最新の挑戦状を確認しています…')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: '公開ストーリー' })).toBeTruthy();
+    expect(screen.queryByText('挑戦状をひろっています…')).toBeNull();
+
+    await act(async () => {
+      resolveRefresh([publishedProgram]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('最新の挑戦状を確認しています…')).toBeNull();
+    });
+  });
+
+  it('retries after error and ignores the previous in-flight failure', async () => {
+    let rejectFirst: (error: Error) => void = () => {};
+    listPublishedChallengeProgramsMock.mockImplementationOnce(
+      () =>
+        new Promise<unknown[]>((_, reject) => {
+          rejectFirst = reject;
+        }),
+    );
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('挑戦状をひろっています…')).toBeTruthy();
+
+    listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
+    // Force the pending first request to fail after retry is available via error UI path:
+    // complete first as failure, then retry.
+    await act(async () => {
+      rejectFirst(new Error('network'));
+    });
+    expect(await screen.findByText('挑戦状を読み込めませんでした')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
+    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+  });
+
+  it('does not update state after unmount', async () => {
+    let resolvePrograms: (value: unknown[]) => void = () => {};
+    listPublishedChallengeProgramsMock.mockImplementation(
+      () =>
+        new Promise<unknown[]>((resolve) => {
+          resolvePrograms = resolve;
+        }),
+    );
+
+    const { unmount } = render(<ChallengeScreen />);
+    expect(await screen.findByText('挑戦状をひろっています…')).toBeTruthy();
+    unmount();
+
+    await act(async () => {
+      resolvePrograms([publishedProgram]);
+    });
+    expect(screen.queryByText('公開ストーリー')).toBeNull();
   });
 });
