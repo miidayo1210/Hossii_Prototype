@@ -345,7 +345,7 @@ describe('ChallengeScreen list UI', () => {
     listPublishedChallengeProgramsMock.mockResolvedValue([]);
     render(<ChallengeScreen />);
     expect(
-      await screen.findByText('いま挑戦できるストーリーはありません'),
+      await screen.findByText('いま挑戦できる挑戦状はありません'),
     ).toBeTruthy();
     expect(
       screen.getByText('新しい挑戦状が届くまで、少し待っていてね'),
@@ -413,6 +413,8 @@ describe('ChallengeScreen focused response UI', () => {
     expect(screen.getByRole('textbox')).toBeTruthy();
     expect(screen.getByDisplayValue('')).toBeTruthy();
     expect(screen.getByLabelText('管理者にだけ共有')).toBeTruthy();
+    expect(screen.getAllByText('クリアに必要').length).toBeGreaterThan(0);
+    expect(screen.getByText(/「管理者にだけ共有」を選ぶと/)).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /この質問に答える/ })).toHaveLength(2);
   });
 
