@@ -30,9 +30,16 @@ function StampSlotCell({
 }) {
   const typeLabel = slot.item.itemType === 'question' ? '質問' : 'ミッション';
   const requiredLabel = slot.item.isRequired ? 'クリアに必要' : 'おまけ';
+  const canPress = slot.achieved
+    ? Boolean(onSelectAchieved)
+    : Boolean(onSelectPending);
   const ariaLabel = slot.achieved
-    ? `${slot.item.title}のスタンプを振り返る、${typeLabel}、${requiredLabel}、獲得済み`
-    : `${slot.item.title}に答える、${typeLabel}、${requiredLabel}、未獲得`;
+    ? canPress
+      ? `${slot.item.title}のスタンプを振り返る、${typeLabel}、${requiredLabel}、獲得済み`
+      : `${slot.item.title}のスタンプ、${typeLabel}、${requiredLabel}、獲得済み`
+    : canPress
+      ? `${slot.item.title}に答える、${typeLabel}、${requiredLabel}、未獲得`
+      : `${slot.item.title}、${typeLabel}、${requiredLabel}、未獲得`;
 
   const stampVisual =
     slot.achieved && slot.hossiiKey ? (
@@ -50,27 +57,39 @@ function StampSlotCell({
       />
     );
 
+  const inner = (
+    <>
+      <span className={styles.slotIndex} aria-hidden="true">
+        {slot.index}
+      </span>
+      {slot.achieved ? (
+        <span className={styles.gotMark} aria-hidden="true">
+          {slot.hossiiKey ? '✓' : '!'}
+        </span>
+      ) : null}
+      <div className={styles.stampArea}>{stampVisual}</div>
+    </>
+  );
+
   return (
     <li className={`${styles.slot} ${slot.achieved ? styles.slotAchieved : styles.slotPending}`}>
-      <button
-        type="button"
-        className={styles.slotButton}
-        aria-label={ariaLabel}
-        onClick={() => {
-          if (slot.achieved) onSelectAchieved?.(slot);
-          else onSelectPending?.(slot);
-        }}
-      >
-        <span className={styles.slotIndex} aria-hidden="true">
-          {slot.index}
-        </span>
-        {slot.achieved ? (
-          <span className={styles.gotMark} aria-hidden="true">
-            {slot.hossiiKey ? '✓' : '!'}
-          </span>
-        ) : null}
-        <div className={styles.stampArea}>{stampVisual}</div>
-      </button>
+      {canPress ? (
+        <button
+          type="button"
+          className={styles.slotButton}
+          aria-label={ariaLabel}
+          onClick={() => {
+            if (slot.achieved) onSelectAchieved?.(slot);
+            else onSelectPending?.(slot);
+          }}
+        >
+          {inner}
+        </button>
+      ) : (
+        <div className={styles.slotButton} aria-label={ariaLabel}>
+          {inner}
+        </div>
+      )}
     </li>
   );
 }
@@ -165,6 +184,8 @@ export const ChallengeStampCard = ({
   const previewLimit = getStampPreviewLimit(slots.length);
   const previewSlots = slots.slice(0, previewLimit);
   const moreCount = Math.max(slots.length - previewLimit, 0);
+  const hasInteractiveStamps =
+    Boolean(onSelectAchieved) || Boolean(onSelectPending);
 
   return (
     <section className={styles.section} aria-label="Hossiiスタンプカード">
@@ -191,42 +212,59 @@ export const ChallengeStampCard = ({
       {!expanded && !autoExpand ? (
         <div className={styles.previewBlock}>
           <ul className={styles.previewRow} aria-label="スタンププレビュー">
-            {previewSlots.map((slot) => (
-              <li key={slot.item.id}>
-                <button
-                  type="button"
-                  className={`${styles.previewSlot} ${
-                    slot.achieved
-                      ? styles.previewSlotAchieved
-                      : styles.previewSlotPending
-                  }`}
-                  aria-label={
-                    slot.achieved
-                      ? `${slot.item.title}のスタンプを振り返る`
-                      : `${slot.item.title}に答える`
-                  }
-                  onClick={() => {
-                    if (slot.achieved) onSelectAchieved?.(slot);
-                    else onSelectPending?.(slot);
-                  }}
-                >
-                  {slot.achieved && slot.hossiiKey ? (
-                    <img
-                      className={styles.previewImage}
-                      src={getChallengeHossiiImageUrl(slot.hossiiKey)}
-                      alt=""
-                    />
+            {previewSlots.map((slot) => {
+              const canPress = slot.achieved
+                ? Boolean(onSelectAchieved)
+                : Boolean(onSelectPending);
+              const previewClass = `${styles.previewSlot} ${
+                slot.achieved
+                  ? styles.previewSlotAchieved
+                  : styles.previewSlotPending
+              }`;
+              const previewLabel = slot.achieved
+                ? canPress
+                  ? `${slot.item.title}のスタンプを振り返る`
+                  : `${slot.item.title}のスタンプ`
+                : canPress
+                  ? `${slot.item.title}に答える`
+                  : `${slot.item.title}`;
+              const previewInner =
+                slot.achieved && slot.hossiiKey ? (
+                  <img
+                    className={styles.previewImage}
+                    src={getChallengeHossiiImageUrl(slot.hossiiKey)}
+                    alt=""
+                  />
+                ) : (
+                  <span
+                    className={`${styles.previewEmpty} ${
+                      slot.achieved ? styles.previewEmptyAchieved : ''
+                    }`}
+                    aria-hidden="true"
+                  />
+                );
+              return (
+                <li key={slot.item.id}>
+                  {canPress ? (
+                    <button
+                      type="button"
+                      className={previewClass}
+                      aria-label={previewLabel}
+                      onClick={() => {
+                        if (slot.achieved) onSelectAchieved?.(slot);
+                        else onSelectPending?.(slot);
+                      }}
+                    >
+                      {previewInner}
+                    </button>
                   ) : (
-                    <span
-                      className={`${styles.previewEmpty} ${
-                        slot.achieved ? styles.previewEmptyAchieved : ''
-                      }`}
-                      aria-hidden="true"
-                    />
+                    <div className={previewClass} aria-label={previewLabel}>
+                      {previewInner}
+                    </div>
                   )}
-                </button>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
           {moreCount > 0 ? (
             <p className={styles.moreLabel}>ほか{moreCount}個</p>
@@ -236,7 +274,9 @@ export const ChallengeStampCard = ({
 
       {(expanded || autoExpand) && (
         <div id={panelId}>
-          <p className={styles.hint}>スタンプを押して、思い出をひらこう</p>
+          {hasInteractiveStamps ? (
+            <p className={styles.hint}>スタンプを押して、思い出をひらこう</p>
+          ) : null}
           <ul
             className={styles.grid}
             style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}

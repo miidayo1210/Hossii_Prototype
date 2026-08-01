@@ -19,6 +19,8 @@ type Props = {
   slots: ChallengeStampSlot[];
   responsesByItemId: Record<string, ChallengeResponse | undefined>;
   onBack: () => void;
+  /** Defaults to 「← 挑戦状へ戻る」 */
+  backLabel?: string;
   onOpenRecord?: (itemId: string) => void;
 };
 
@@ -58,6 +60,7 @@ export function ChallengeTrajectoryView({
   slots,
   responsesByItemId,
   onBack,
+  backLabel = '← 挑戦状へ戻る',
   onOpenRecord,
 }: Props) {
   const progress = getChallengeStampProgress(slots);
@@ -77,7 +80,7 @@ export function ChallengeTrajectoryView({
     <div className={styles.page}>
       <div className={styles.chrome}>
         <button type="button" className={styles.backButton} onClick={onBack}>
-          ← 挑戦状へ戻る
+          {backLabel}
         </button>
       </div>
 
