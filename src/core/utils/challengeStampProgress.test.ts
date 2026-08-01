@@ -9,6 +9,7 @@ import {
   getChallengeListProgress,
   getChallengeStampProgress,
   getStampGridColumns,
+  pickNextChallengeFocusItemId,
 } from './challengeStampProgress';
 
 function item(
@@ -201,5 +202,17 @@ describe('challengeStampProgress', () => {
     expect(getChallengeListCtaLabel(getChallengeListProgress(optionalOnly, []))).toBe(
       '挑戦する',
     );
+  });
+
+  it('picks next focus item by required then optional stable order', () => {
+    const items = [
+      item({ id: 'o1', title: 'おまけ1', isRequired: false, sortOrder: 0 }),
+      item({ id: 'r2', title: '必須2', isRequired: true, sortOrder: 2 }),
+      item({ id: 'r1', title: '必須1', isRequired: true, sortOrder: 1 }),
+    ];
+    expect(pickNextChallengeFocusItemId(items, [])).toBe('r1');
+    expect(pickNextChallengeFocusItemId(items, ['r1'])).toBe('r2');
+    expect(pickNextChallengeFocusItemId(items, ['r1', 'r2'])).toBe('o1');
+    expect(pickNextChallengeFocusItemId(items, ['r1', 'r2', 'o1'])).toBeNull();
   });
 });

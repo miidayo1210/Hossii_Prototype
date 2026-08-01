@@ -158,3 +158,34 @@ export function getChallengeListCtaLabel(progress: ChallengeListProgress): strin
   if (progress.started) return 'つづける';
   return '挑戦する';
 }
+
+/** Next item to emphasize on the participant detail screen. */
+export function pickNextChallengeFocusItemId(
+  items: readonly ChallengeItem[],
+  answeredItemIds: ReadonlySet<string> | readonly string[],
+): string | null {
+  const answered =
+    answeredItemIds instanceof Set
+      ? answeredItemIds
+      : new Set(answeredItemIds);
+  const sorted = [...items].sort(compareChallengeItems);
+  const nextRequired = sorted.find(
+    (item) => item.isRequired && !answered.has(item.id),
+  );
+  if (nextRequired) return nextRequired.id;
+  const nextOptional = sorted.find(
+    (item) => !item.isRequired && !answered.has(item.id),
+  );
+  return nextOptional?.id ?? null;
+}
+
+export function hasUnansweredRequiredChallengeItems(
+  items: readonly ChallengeItem[],
+  answeredItemIds: ReadonlySet<string> | readonly string[],
+): boolean {
+  const answered =
+    answeredItemIds instanceof Set
+      ? answeredItemIds
+      : new Set(answeredItemIds);
+  return items.some((item) => item.isRequired && !answered.has(item.id));
+}

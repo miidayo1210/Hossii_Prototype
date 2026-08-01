@@ -6,7 +6,6 @@ import type {
   ChallengeResponse,
   ChallengeResponseVisibility,
 } from '../../core/types/challengeResponse';
-import { CHALLENGE_RESPONSE_COMMENT_MAX_LENGTH } from '../../core/types/challengeResponse';
 import {
   listMyChallengeResponses,
   listPublishedChallengeItems,
@@ -21,11 +20,15 @@ import { getChallengeHossiiImageUrl } from '../../core/assets/challengeHossiiKey
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
 import {
   buildChallengeStampSlots,
+  compareChallengeItems,
   getChallengeListCtaLabel,
   getChallengeListProgress,
+  hasUnansweredRequiredChallengeItems,
+  pickNextChallengeFocusItemId,
   type ChallengeListProgress,
 } from '../../core/utils/challengeStampProgress';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
+import { ChallengeItemCard } from './ChallengeItemCard';
 import { ChallengeStampCard } from './ChallengeStampCard';
 import styles from './ChallengeScreen.module.css';
 
@@ -37,15 +40,22 @@ const LIST_LOAD_ERROR_TITLE = '挑戦状を読み込めませんでした';
 const LIST_LOAD_ERROR_HINT = '時間をおいて、もう一度試してください';
 const LIST_DECOR_HOSSII = getChallengeHossiiImageUrl('emotion/kirakira');
 
-function visibilityHelp(visibility: ChallengeResponseVisibility): string {
-  if (visibility === 'self_only') {
-    return 'この回答は、あなただけが見ることができます。';
+function toParticipantSaveError(message: string): string {
+  const lower = message.toLowerCase();
+  if (/must not be empty|comment is required|empty/.test(lower)) {
+    return 'コメントを入力してください';
   }
-  return 'この回答は、あなたとスペース管理者だけが見ることができます。';
-}
-
-function visibilityLabel(visibility: ChallengeResponseVisibility): string {
-  return visibility === 'self_only' ? '自分だけ' : '管理者だけ';
+  if (/at most|too long|length|500|501/.test(lower)) {
+    return 'コメントは500文字以内で入力してください';
+  }
+  if (/権限|permission|rls|policy|jwt|auth/.test(lower)) {
+    return 'この回答を保存する権限がありません';
+  }
+  if (/relation|postgres|pgrst|supabase|stack|syntax|uuid/.test(lower)) {
+    return '回答を保存できませんでした。時間をおいてもう一度試してください';
+  }
+  if (/[ぁ-んァ-ン一-龥]/.test(message)) return message;
+  return '回答を保存できませんでした。時間をおいてもう一度試してください';
 }
 
 function ListIntro({ menu = true }: { menu?: boolean }) {
@@ -135,6 +145,10 @@ export const ChallengeScreen = () => {
     {},
   );
   const [rewardModal, setRewardModal] = useState<ChallengeReward | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [pendingActiveAfterModal, setPendingActiveAfterModal] = useState<
+    string | null
+  >(null);
 
   const stampSlots = useMemo(
     () =>
@@ -145,6 +159,28 @@ export const ChallengeScreen = () => {
       ),
     [items, myCompletions, myRewards],
   );
+
+  const sortedItems = useMemo(
+    () => [...items].sort(compareChallengeItems),
+    [items],
+  );
+
+  const answeredIds = useMemo(
+    () => new Set(Object.keys(myResponses)),
+    [myResponses],
+  );
+
+  const focusItemId = useMemo(
+    () => pickNextChallengeFocusItemId(sortedItems, answeredIds),
+    [sortedItems, answeredIds],
+  );
+
+  const focusSectionKind = useMemo(() => {
+    if (!focusItemId) return null;
+    return hasUnansweredRequiredChallengeItems(sortedItems, answeredIds)
+      ? 'required'
+      : 'optional';
+  }, [focusItemId, sortedItems, answeredIds]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -206,6 +242,8 @@ export const ChallengeScreen = () => {
     setDrafts({});
     setFormError(null);
     setRewardModal(null);
+    setActiveItemId(null);
+    setPendingActiveAfterModal(null);
     setPrograms([]);
     setListProgressByProgram({});
     setLoadError(null);
@@ -254,12 +292,32 @@ export const ChallengeScreen = () => {
       setMyRewards(rewardByItem);
       setMyCompletions(completionByItem);
       setDrafts(nextDrafts);
+      setActiveItemId(
+        pickNextChallengeFocusItemId(
+          programItems,
+          Object.keys(byItem),
+        ),
+      );
+      setPendingActiveAfterModal(null);
       setView({ kind: 'detail', programId });
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : '読み込みに失敗しました');
+    } catch {
+      setFormError('挑戦状の詳細を読み込めませんでした');
     } finally {
       setBusyItemId(null);
     }
+  };
+
+  const closeRewardModal = (goToList: boolean) => {
+    setRewardModal(null);
+    if (goToList) {
+      setPendingActiveAfterModal(null);
+      setActiveItemId(null);
+      setView({ kind: 'list' });
+      void reloadList();
+      return;
+    }
+    setActiveItemId(pendingActiveAfterModal);
+    setPendingActiveAfterModal(null);
   };
 
   const saveResponse = async (item: ChallengeItem) => {
@@ -268,6 +326,15 @@ export const ChallengeScreen = () => {
       comment: '',
       visibility: 'manager_only' as const,
     };
+    const trimmed = draft.comment.trim();
+    if (!trimmed) {
+      setFormError('コメントを入力してください');
+      return;
+    }
+    if (trimmed.length > 500) {
+      setFormError('コメントは500文字以内で入力してください');
+      return;
+    }
     const hadResponse = Boolean(myResponses[item.id]);
     setBusyItemId(item.id);
     setFormError(null);
@@ -278,11 +345,11 @@ export const ChallengeScreen = () => {
         visibility: draft.visibility,
       });
       if (!result.ok) {
-        setFormError(result.error);
+        setFormError(toParticipantSaveError(result.error));
         return;
       }
-      setMyResponses((prev) => ({
-        ...prev,
+      const nextResponses: Record<string, ChallengeResponse> = {
+        ...myResponses,
         [item.id]: {
           id: result.value.response.id,
           itemId: result.value.response.itemId,
@@ -292,7 +359,8 @@ export const ChallengeScreen = () => {
           createdAt: result.value.response.createdAt,
           updatedAt: result.value.response.updatedAt,
         },
-      }));
+      };
+      setMyResponses(nextResponses);
       setMyRewards((prev) => ({ ...prev, [item.id]: result.value.reward }));
       setMyCompletions((prev) => ({
         ...prev,
@@ -305,10 +373,18 @@ export const ChallengeScreen = () => {
           visibility: result.value.response.visibility,
         },
       }));
+      const nextFocus = pickNextChallengeFocusItemId(
+        items,
+        Object.keys(nextResponses),
+      );
       if (result.value.isNewReward) {
+        setPendingActiveAfterModal(nextFocus);
         setRewardModal(result.value.reward);
+      } else if (hadResponse) {
+        showToast('回答を更新しました');
       } else {
-        showToast(hadResponse ? '回答を更新しました' : '回答を保存しました');
+        setActiveItemId(nextFocus);
+        showToast('回答を保存しました');
       }
     } finally {
       setBusyItemId(null);
@@ -343,6 +419,49 @@ export const ChallengeScreen = () => {
   }
 
   if (view.kind === 'detail' && activeProgram) {
+    const focusItem = focusItemId
+      ? sortedItems.find((item) => item.id === focusItemId) ?? null
+      : null;
+    const answeredItems = sortedItems.filter((item) => answeredIds.has(item.id));
+    const queuedItems = sortedItems.filter(
+      (item) => !answeredIds.has(item.id) && item.id !== focusItemId,
+    );
+    const detailProgress = getChallengeListProgress(
+      sortedItems,
+      answeredIds,
+    );
+
+    const renderItemCard = (
+      item: ChallengeItem,
+      index: number,
+      emphasized: boolean,
+    ) => {
+      const draft = drafts[item.id] ?? {
+        comment: '',
+        visibility: 'manager_only' as const,
+      };
+      return (
+        <ChallengeItemCard
+          key={item.id}
+          item={item}
+          index={index}
+          existing={myResponses[item.id]}
+          draft={draft}
+          saving={busyItemId === item.id}
+          expanded={activeItemId === item.id}
+          emphasized={emphasized}
+          panelId={`challenge-item-panel-${item.id}`}
+          orphanRewardNote={!myResponses[item.id] && Boolean(myRewards[item.id])}
+          onExpand={() => setActiveItemId(item.id)}
+          onCollapse={() => setActiveItemId(null)}
+          onDraftChange={(next) =>
+            setDrafts((prev) => ({ ...prev, [item.id]: next }))
+          }
+          onSave={() => void saveResponse(item)}
+        />
+      );
+    };
+
     return (
       <div className={styles.container}>
         <div className={styles.header}>
@@ -352,6 +471,8 @@ export const ChallengeScreen = () => {
               className={styles.backButton}
               onClick={() => {
                 setView({ kind: 'list' });
+                setActiveItemId(null);
+                setPendingActiveAfterModal(null);
                 void reloadList();
               }}
             >
@@ -365,108 +486,100 @@ export const ChallengeScreen = () => {
           <TopRightMenu />
         </div>
 
-        {formError && <p className={styles.error}>{formError}</p>}
+        {formError && (
+          <p className={styles.error} role="alert">
+            {formError}
+          </p>
+        )}
 
         <ChallengeStampCard slots={stampSlots} />
 
-        <ul className={styles.itemList}>
-          {items.map((item) => {
-            const draft = drafts[item.id] ?? {
-              comment: '',
-              visibility: 'manager_only' as const,
-            };
-            const existing = myResponses[item.id];
-            const achieved = Boolean(myCompletions[item.id]);
-            const saving = busyItemId === item.id;
-            return (
-              <li key={item.id} className={styles.card}>
-                <div className={styles.meta}>
-                  <span className={styles.badge}>
-                    {item.itemType === 'question' ? '質問' : 'ミッション'}
-                  </span>
-                  <span className={styles.badge}>
-                    {item.isRequired ? '必須' : 'おまけ'}
-                  </span>
-                  <span className={styles.badge}>
-                    {existing ? '回答済み' : '未回答'}
-                  </span>
-                  <span className={styles.badge}>
-                    {achieved ? 'スタンプ獲得済' : 'スタンプ未獲得'}
-                  </span>
-                </div>
-                <strong>{item.title}</strong>
-                {item.description && <p className={styles.muted}>{item.description}</p>}
-                {item.reason && (
-                  <p className={styles.muted}>なぜ取り組むのか：{item.reason}</p>
-                )}
-                {existing && (
-                  <p className={styles.existingAnswer}>
-                    保存済み（{visibilityLabel(existing.visibility)}）
-                    {'\n'}
-                    {existing.comment}
-                  </p>
-                )}
-                {!existing && myRewards[item.id] && (
-                  <p className={styles.muted}>
-                    この項目のHossiiは取得済みです（回答は未保存の状態でも報酬は保持されます）。
-                  </p>
-                )}
-                <div className={styles.itemForm}>
-                  <label className={styles.label}>
-                    コメント回答
-                    <textarea
-                      className={styles.textarea}
-                      rows={4}
-                      maxLength={CHALLENGE_RESPONSE_COMMENT_MAX_LENGTH}
-                      value={draft.comment}
-                      disabled={saving}
-                      onChange={(e) =>
-                        setDrafts((prev) => ({
-                          ...prev,
-                          [item.id]: { ...draft, comment: e.target.value },
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className={styles.label}>
-                    公開範囲
-                    <select
-                      className={styles.select}
-                      value={draft.visibility}
-                      disabled={saving}
-                      onChange={(e) =>
-                        setDrafts((prev) => ({
-                          ...prev,
-                          [item.id]: {
-                            ...draft,
-                            visibility: e.target.value as ChallengeResponseVisibility,
-                          },
-                        }))
-                      }
-                    >
-                      <option value="manager_only">管理者だけ</option>
-                      <option value="self_only">自分だけ</option>
-                    </select>
-                  </label>
-                  <p className={styles.visibilityHelp}>
-                    {visibilityHelp(draft.visibility)}
-                  </p>
-                  <div className={styles.actions}>
-                    <button
-                      type="button"
-                      className={styles.primaryButton}
-                      disabled={saving || !draft.comment.trim()}
-                      onClick={() => void saveResponse(item)}
-                    >
-                      {saving ? '保存中…' : existing ? '回答を更新' : '回答を保存'}
-                    </button>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-        {toast && <div className={styles.toast}>{toast}</div>}
+        {sortedItems.length === 0 ? (
+          <div className={styles.detailEmpty}>
+            この挑戦状には、まだ質問がありません
+          </div>
+        ) : (
+          <>
+            {detailProgress.isComplete && !focusItem ? (
+              <p className={styles.detailStatus} aria-live="polite">
+                挑戦状をクリアしました。回答済みの内容を振り返れます。
+              </p>
+            ) : detailProgress.isComplete && focusItem ? (
+              <p className={styles.detailStatus} aria-live="polite">
+                必須の挑戦はクリアしました
+              </p>
+            ) : null}
+
+            {focusItem ? (
+              <section
+                className={styles.focusSection}
+                aria-labelledby="challenge-focus-heading"
+              >
+                <h2 id="challenge-focus-heading" className={styles.focusHeading}>
+                  {focusSectionKind === 'optional' ? 'おまけの挑戦' : '次の挑戦'}
+                </h2>
+                <p className={styles.focusLead}>
+                  {focusSectionKind === 'optional'
+                    ? 'もっとHossiiを集めたい人へ'
+                    : 'まずはこの質問に答えてみよう'}
+                </p>
+                <ul className={styles.itemList}>
+                  {renderItemCard(
+                    focusItem,
+                    sortedItems.findIndex((item) => item.id === focusItem.id) + 1,
+                    true,
+                  )}
+                </ul>
+              </section>
+            ) : null}
+
+            {answeredItems.length > 0 ? (
+              <section
+                className={styles.groupSection}
+                aria-labelledby="challenge-answered-heading"
+              >
+                <h2 id="challenge-answered-heading" className={styles.groupHeading}>
+                  回答済み
+                </h2>
+                <ul className={styles.itemList}>
+                  {answeredItems.map((item) =>
+                    renderItemCard(
+                      item,
+                      sortedItems.findIndex((entry) => entry.id === item.id) + 1,
+                      false,
+                    ),
+                  )}
+                </ul>
+              </section>
+            ) : null}
+
+            {queuedItems.length > 0 ? (
+              <section
+                className={styles.groupSection}
+                aria-labelledby="challenge-queued-heading"
+              >
+                <h2 id="challenge-queued-heading" className={styles.groupHeading}>
+                  これから答える
+                </h2>
+                <ul className={styles.itemList}>
+                  {queuedItems.map((item) =>
+                    renderItemCard(
+                      item,
+                      sortedItems.findIndex((entry) => entry.id === item.id) + 1,
+                      false,
+                    ),
+                  )}
+                </ul>
+              </section>
+            ) : null}
+          </>
+        )}
+
+        {toast && (
+          <div className={styles.toast} aria-live="polite">
+            {toast}
+          </div>
+        )}
         {rewardModal && (
           <div className={styles.rewardOverlay} role="dialog" aria-modal="true">
             <div className={styles.rewardCard}>
@@ -481,18 +594,14 @@ export const ChallengeScreen = () => {
                 <button
                   type="button"
                   className={styles.primaryButton}
-                  onClick={() => setRewardModal(null)}
+                  onClick={() => closeRewardModal(false)}
                 >
                   閉じる
                 </button>
                 <button
                   type="button"
                   className={styles.ghostButton}
-                  onClick={() => {
-                    setRewardModal(null);
-                    setView({ kind: 'list' });
-                    void reloadList();
-                  }}
+                  onClick={() => closeRewardModal(true)}
                 >
                   次の挑戦状へ
                 </button>
