@@ -21,14 +21,22 @@ import type { ChallengeCompletion, ChallengeReward } from '../../core/types/chal
 import {
   buildChallengeStampSlots,
   compareChallengeItems,
+  formatOptionalLeftoverLabel,
+  formatRewardCelebrationProgressLabel,
   getChallengeListCtaLabel,
   getChallengeListProgress,
+  getChallengeStampProgress,
   hasUnansweredRequiredChallengeItems,
   pickNextChallengeFocusItemId,
+  resolveChallengeRewardCelebrationKind,
   type ChallengeListProgress,
 } from '../../core/utils/challengeStampProgress';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { ChallengeItemCard } from './ChallengeItemCard';
+import {
+  ChallengeRewardModal,
+  type ChallengeRewardModalModel,
+} from './ChallengeRewardModal';
 import {
   ChallengeProgressSummary,
   ChallengeStampCard,
@@ -147,11 +155,10 @@ export const ChallengeScreen = () => {
   const [myCompletions, setMyCompletions] = useState<Record<string, ChallengeCompletion>>(
     {},
   );
-  const [rewardModal, setRewardModal] = useState<ChallengeReward | null>(null);
+  const [rewardModal, setRewardModal] = useState<ChallengeRewardModalModel | null>(
+    null,
+  );
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
-  const [pendingActiveAfterModal, setPendingActiveAfterModal] = useState<
-    string | null
-  >(null);
 
   const stampSlots = useMemo(
     () =>
@@ -246,7 +253,6 @@ export const ChallengeScreen = () => {
     setFormError(null);
     setRewardModal(null);
     setActiveItemId(null);
-    setPendingActiveAfterModal(null);
     setPrograms([]);
     setListProgressByProgram({});
     setLoadError(null);
@@ -301,7 +307,7 @@ export const ChallengeScreen = () => {
           Object.keys(byItem),
         ),
       );
-      setPendingActiveAfterModal(null);
+      setRewardModal(null);
       setView({ kind: 'detail', programId });
     } catch {
       setFormError('挑戦状の詳細を読み込めませんでした');
@@ -310,17 +316,32 @@ export const ChallengeScreen = () => {
     }
   };
 
-  const closeRewardModal = (goToList: boolean) => {
+  const returnToList = () => {
     setRewardModal(null);
-    if (goToList) {
-      setPendingActiveAfterModal(null);
-      setActiveItemId(null);
-      setView({ kind: 'list' });
-      void reloadList();
+    setActiveItemId(null);
+    setView({ kind: 'list' });
+    void reloadList();
+  };
+
+  const closeRewardModal = (action: 'primary' | 'secondary' | 'dismiss') => {
+    const modal = rewardModal;
+    setRewardModal(null);
+    if (!modal) return;
+    if (action === 'secondary') {
+      returnToList();
       return;
     }
-    setActiveItemId(pendingActiveAfterModal);
-    setPendingActiveAfterModal(null);
+    if (modal.kind === 'complete') {
+      setActiveItemId(null);
+      window.requestAnimationFrame(() => {
+        document.getElementById('challenge-answered-heading')?.focus();
+      });
+      return;
+    }
+    setActiveItemId(modal.nextFocusItemId);
+    window.requestAnimationFrame(() => {
+      document.getElementById('challenge-focus-heading')?.focus();
+    });
   };
 
   const saveResponse = async (item: ChallengeItem) => {
@@ -363,12 +384,17 @@ export const ChallengeScreen = () => {
           updatedAt: result.value.response.updatedAt,
         },
       };
-      setMyResponses(nextResponses);
-      setMyRewards((prev) => ({ ...prev, [item.id]: result.value.reward }));
-      setMyCompletions((prev) => ({
-        ...prev,
+      const nextRewards: Record<string, ChallengeReward> = {
+        ...myRewards,
+        [item.id]: result.value.reward,
+      };
+      const nextCompletions: Record<string, ChallengeCompletion> = {
+        ...myCompletions,
         [item.id]: result.value.completion,
-      }));
+      };
+      setMyResponses(nextResponses);
+      setMyRewards(nextRewards);
+      setMyCompletions(nextCompletions);
       setDrafts((prev) => ({
         ...prev,
         [item.id]: {
@@ -381,8 +407,26 @@ export const ChallengeScreen = () => {
         Object.keys(nextResponses),
       );
       if (result.value.isNewReward) {
-        setPendingActiveAfterModal(nextFocus);
-        setRewardModal(result.value.reward);
+        const nextSlots = buildChallengeStampSlots(
+          items,
+          Object.values(nextCompletions),
+          Object.values(nextRewards),
+        );
+        const nextProgress = getChallengeStampProgress(nextSlots);
+        setRewardModal({
+          hossiiKey: result.value.reward.hossiiKey,
+          itemTitle: item.title,
+          kind: resolveChallengeRewardCelebrationKind(
+            nextProgress,
+            nextFocus != null,
+          ),
+          progressLabel: formatRewardCelebrationProgressLabel(
+            nextProgress,
+            items.length,
+          ),
+          optionalLeftoverLabel: formatOptionalLeftoverLabel(nextProgress),
+          nextFocusItemId: nextFocus,
+        });
       } else if (hadResponse) {
         showToast('回答を更新しました');
       } else {
@@ -475,7 +519,7 @@ export const ChallengeScreen = () => {
               onClick={() => {
                 setView({ kind: 'list' });
                 setActiveItemId(null);
-                setPendingActiveAfterModal(null);
+                setRewardModal(null);
                 void reloadList();
               }}
             >
@@ -518,7 +562,11 @@ export const ChallengeScreen = () => {
                 className={styles.focusSection}
                 aria-labelledby="challenge-focus-heading"
               >
-                <h2 id="challenge-focus-heading" className={styles.focusHeading}>
+                <h2
+                  id="challenge-focus-heading"
+                  className={styles.focusHeading}
+                  tabIndex={-1}
+                >
                   {focusSectionKind === 'optional' ? 'おまけの挑戦' : '次の挑戦'}
                 </h2>
                 <p className={styles.focusLead}>
@@ -543,7 +591,11 @@ export const ChallengeScreen = () => {
                 className={styles.groupSection}
                 aria-labelledby="challenge-answered-heading"
               >
-                <h2 id="challenge-answered-heading" className={styles.groupHeading}>
+                <h2
+                  id="challenge-answered-heading"
+                  className={styles.groupHeading}
+                  tabIndex={-1}
+                >
                   回答済み
                 </h2>
                 <ul className={styles.itemList}>
@@ -586,33 +638,12 @@ export const ChallengeScreen = () => {
           </div>
         )}
         {rewardModal && (
-          <div className={styles.rewardOverlay} role="dialog" aria-modal="true">
-            <div className={styles.rewardCard}>
-              <p className={styles.rewardEyebrow}>Hossiiゲット！</p>
-              <img
-                className={styles.rewardImage}
-                src={getChallengeHossiiImageUrl(rewardModal.hossiiKey)}
-                alt="新しいHossii"
-              />
-              <p className={styles.rewardTitle}>新しいHossiiが仲間になりました</p>
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => closeRewardModal(false)}
-                >
-                  閉じる
-                </button>
-                <button
-                  type="button"
-                  className={styles.ghostButton}
-                  onClick={() => closeRewardModal(true)}
-                >
-                  次の挑戦状へ
-                </button>
-              </div>
-            </div>
-          </div>
+          <ChallengeRewardModal
+            model={rewardModal}
+            onPrimary={() => closeRewardModal('primary')}
+            onSecondary={() => closeRewardModal('secondary')}
+            onDismiss={() => closeRewardModal('dismiss')}
+          />
         )}
       </div>
     );

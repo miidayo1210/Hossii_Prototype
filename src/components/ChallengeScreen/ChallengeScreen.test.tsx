@@ -140,8 +140,11 @@ describe('ChallengeScreen rewards', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答本文' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
 
-    expect(await screen.findByText('Hossiiゲット！')).toBeTruthy();
-    expect(screen.getByText('新しいHossiiが仲間になりました')).toBeTruthy();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: '挑戦状コンプリート！' })).toBeTruthy();
+    expect(within(dialog).getByText('1 / 1 完了')).toBeTruthy();
+    expect(within(dialog).getByText(/質問1/)).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: '回答を振り返る' })).toBeTruthy();
     expect(submitChallengeCommentResponseMock).toHaveBeenCalledWith({
       itemId: 'i1',
       comment: '回答本文',
@@ -227,7 +230,8 @@ describe('ChallengeScreen rewards', () => {
     await waitFor(() => {
       expect(submitChallengeCommentResponseMock).toHaveBeenCalled();
     });
-    expect(screen.queryByText('Hossiiゲット！')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Hossiiをゲット！' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '挑戦状コンプリート！' })).toBeNull();
     expect(await screen.findByText('回答を更新しました')).toBeTruthy();
   });
 
@@ -245,7 +249,7 @@ describe('ChallengeScreen rewards', () => {
 
     expect(await screen.findByText('この回答を保存する権限がありません')).toBeTruthy();
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('残すべき入力');
-    expect(screen.queryByText('Hossiiゲット！')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
 
@@ -551,12 +555,165 @@ describe('ChallengeScreen focused response UI', () => {
     await screen.findByRole('heading', { name: '次の挑戦' });
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答本文' } });
     fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
-    expect(await screen.findByText('Hossiiゲット！')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Hossiiをゲット！' })).toBeTruthy();
+    expect(screen.getByText('必須 1 / 2')).toBeTruthy();
     fireEvent.click(
-      within(screen.getByRole('dialog')).getByRole('button', { name: '閉じる' }),
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'つづける' }),
     );
     expect(await screen.findByRole('heading', { name: '次の挑戦' })).toBeTruthy();
     expect(screen.getByRole('heading', { level: 3, name: '質問2' })).toBeTruthy();
     expect(screen.getByRole('textbox')).toBeTruthy();
+  });
+
+  it('shows clear celebration and focuses optional item', async () => {
+    listMyChallengeResponsesMock.mockResolvedValue([
+      {
+        id: 'r1',
+        itemId: 'i1',
+        userId: 'user-1',
+        visibility: 'manager_only',
+        comment: '回答1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    listMyChallengeRewardsMock.mockResolvedValue([
+      {
+        id: 'rw1',
+        completionId: 'c1',
+        userId: 'user-1',
+        itemId: 'i1',
+        hossiiKey: 'emotion/wow',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    submitChallengeCommentResponseMock.mockResolvedValue({
+      ok: true,
+      value: {
+        response: {
+          id: 'r2',
+          itemId: 'i2',
+          userId: 'user-1',
+          visibility: 'manager_only',
+          comment: '回答2',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        completion: {
+          id: 'c2',
+          itemId: 'i2',
+          userId: 'user-1',
+          responseId: 'r2',
+          completedAt: new Date(),
+          createdAt: new Date(),
+        },
+        reward: {
+          id: 'rw2',
+          completionId: 'c2',
+          userId: 'user-1',
+          itemId: 'i2',
+          hossiiKey: 'idle/idle_smile',
+          awardedAt: new Date(),
+          createdAt: new Date(),
+        },
+        isNewReward: true,
+        wasInsert: true,
+      },
+    });
+
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: /つづける/ }));
+    await screen.findByRole('heading', { name: '次の挑戦' });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答2' } });
+    fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
+
+    const clearDialog = await screen.findByRole('dialog');
+    expect(within(clearDialog).getByRole('heading', { name: '挑戦状クリア！' })).toBeTruthy();
+    expect(within(clearDialog).getByText('必須 2 / 2 達成')).toBeTruthy();
+    expect(within(clearDialog).getByText('おまけの挑戦があと1つあります')).toBeTruthy();
+    fireEvent.click(
+      within(clearDialog).getByRole('button', {
+        name: 'おまけに挑戦する',
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 3, name: 'おまけ質問' })).toBeTruthy();
+  });
+
+  it('does not show reward modal when re-answering without new reward', async () => {
+    listMyChallengeResponsesMock.mockResolvedValue([]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: null,
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    listMyChallengeRewardsMock.mockResolvedValue([
+      {
+        id: 'rw1',
+        completionId: 'c1',
+        userId: 'user-1',
+        itemId: 'i1',
+        hossiiKey: 'emotion/wow',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    submitChallengeCommentResponseMock.mockResolvedValue({
+      ok: true,
+      value: {
+        response: {
+          id: 'r1',
+          itemId: 'i1',
+          userId: 'user-1',
+          visibility: 'manager_only',
+          comment: '再回答',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        completion: {
+          id: 'c1',
+          itemId: 'i1',
+          userId: 'user-1',
+          responseId: 'r1',
+          completedAt: new Date(),
+          createdAt: new Date(),
+        },
+        reward: {
+          id: 'rw1',
+          completionId: 'c1',
+          userId: 'user-1',
+          itemId: 'i1',
+          hossiiKey: 'emotion/wow',
+          awardedAt: new Date(),
+          createdAt: new Date(),
+        },
+        isNewReward: false,
+        wasInsert: true,
+      },
+    });
+
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: /つづける|挑戦する/ }));
+    await screen.findByRole('heading', { name: '次の挑戦' });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '再回答' } });
+    fireEvent.click(screen.getByRole('button', { name: /回答を保存/ }));
+    expect(await screen.findByText('回答を保存しました')).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

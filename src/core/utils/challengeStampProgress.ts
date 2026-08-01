@@ -145,6 +145,42 @@ export function shouldAutoExpandStampDetails(total: number): boolean {
   return total > 0 && total <= 4;
 }
 
+/** Post-award celebration modal branch (UI-4). Reuses stamp completion rules. */
+export type ChallengeRewardCelebrationKind =
+  | 'continue'
+  | 'clear_optional'
+  | 'complete';
+
+export function resolveChallengeRewardCelebrationKind(
+  progress: ChallengeStampProgress,
+  hasNextFocusItem: boolean,
+): ChallengeRewardCelebrationKind {
+  if (!progress.isComplete) return 'continue';
+  if (hasNextFocusItem) return 'clear_optional';
+  return 'complete';
+}
+
+/** Compact progress line for the reward celebration modal. */
+export function formatRewardCelebrationProgressLabel(
+  progress: ChallengeStampProgress,
+  totalItems: number,
+): string {
+  if (progress.isComplete) {
+    if (
+      !progress.treatsAllAsOptional &&
+      progress.optionalTotal - progress.optionalDone > 0
+    ) {
+      return `必須 ${progress.requiredDone} / ${progress.requiredTotal} 達成`;
+    }
+    return `${totalItems} / ${totalItems} 完了`;
+  }
+  if (progress.treatsAllAsOptional) {
+    const done = progress.optionalDone + progress.requiredDone;
+    return `達成 ${done} / ${totalItems}`;
+  }
+  return `必須 ${progress.requiredDone} / ${progress.requiredTotal}`;
+}
+
 /** List-card progress derived with the same completion rules as stamp progress. */
 export type ChallengeListProgress = {
   total: number;

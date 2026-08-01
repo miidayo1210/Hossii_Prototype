@@ -11,8 +11,10 @@ import {
   getChallengeListProgress,
   getChallengeStampProgress,
   getStampGridColumns,
+  formatRewardCelebrationProgressLabel,
   getStampPreviewLimit,
   pickNextChallengeFocusItemId,
+  resolveChallengeRewardCelebrationKind,
   shouldAutoExpandStampDetails,
 } from './challengeStampProgress';
 
@@ -269,5 +271,42 @@ describe('challengeStampProgress', () => {
     expect(shouldAutoExpandStampDetails(0)).toBe(false);
     expect(shouldAutoExpandStampDetails(4)).toBe(true);
     expect(shouldAutoExpandStampDetails(5)).toBe(false);
+  });
+
+  it('resolves reward celebration kind from stamp progress', () => {
+    const items = [
+      item({ id: 'r1', title: '必須1', isRequired: true }),
+      item({ id: 'r2', title: '必須2', isRequired: true, sortOrder: 1 }),
+      item({ id: 'o1', title: 'おまけ', isRequired: false, sortOrder: 2 }),
+    ];
+    const mid = getChallengeStampProgress(
+      buildChallengeStampSlots(items, [completion('r1')], [reward('r1')]),
+    );
+    expect(resolveChallengeRewardCelebrationKind(mid, true)).toBe('continue');
+    expect(formatRewardCelebrationProgressLabel(mid, 3)).toBe('必須 1 / 2');
+
+    const cleared = getChallengeStampProgress(
+      buildChallengeStampSlots(
+        items,
+        [completion('r1'), completion('r2')],
+        [reward('r1'), reward('r2')],
+      ),
+    );
+    expect(resolveChallengeRewardCelebrationKind(cleared, true)).toBe(
+      'clear_optional',
+    );
+    expect(formatRewardCelebrationProgressLabel(cleared, 3)).toBe(
+      '必須 2 / 2 達成',
+    );
+
+    const allDone = getChallengeStampProgress(
+      buildChallengeStampSlots(
+        items,
+        [completion('r1'), completion('r2'), completion('o1')],
+        [reward('r1'), reward('r2'), reward('o1')],
+      ),
+    );
+    expect(resolveChallengeRewardCelebrationKind(allDone, false)).toBe('complete');
+    expect(formatRewardCelebrationProgressLabel(allDone, 3)).toBe('3 / 3 完了');
   });
 });
