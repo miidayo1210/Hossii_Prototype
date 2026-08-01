@@ -135,7 +135,7 @@ describe('ChallengeScreen rewards', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: '挑戦する' }));
+    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '回答本文' } });
     fireEvent.click(screen.getByRole('button', { name: '回答を保存' }));
@@ -217,7 +217,8 @@ describe('ChallengeScreen rewards', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: 'つづける' }));
+    // Single required item is complete → list CTA is「振り返る」
+    fireEvent.click(await screen.findByRole('button', { name: /振り返る/ }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '更新後' } });
     fireEvent.click(screen.getByRole('button', { name: '回答を更新' }));
@@ -236,7 +237,7 @@ describe('ChallengeScreen rewards', () => {
     });
 
     render(<ChallengeScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: '挑戦する' }));
+    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
     await screen.findByRole('textbox');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '残すべき入力' } });
     fireEvent.click(screen.getByRole('button', { name: '回答を保存' }));
@@ -244,5 +245,129 @@ describe('ChallengeScreen rewards', () => {
     expect(await screen.findByText('権限がありません')).toBeTruthy();
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('残すべき入力');
     expect(screen.queryByText('Hossiiゲット！')).toBeNull();
+  });
+});
+
+describe('ChallengeScreen list UI', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
+    listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
+    listMyChallengeResponsesMock.mockResolvedValue([]);
+    listMyChallengeRewardsMock.mockResolvedValue([]);
+    listMyChallengeCompletionsMock.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('shows participant intro without MVP developer note', async () => {
+    render(<ChallengeScreen />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Hossiiからの挑戦状' }),
+    ).toBeTruthy();
+    expect(screen.getByText('コメントで答えて、Hossiiを集めよう')).toBeTruthy();
+    expect(screen.queryByText(/全体ON\/OFF/)).toBeNull();
+    expect(screen.queryByText('公開中')).toBeNull();
+  });
+
+  it('clamps long description and shows not-started progress', async () => {
+    const longDescription = 'あ'.repeat(120);
+    listPublishedChallengeProgramsMock.mockResolvedValue([
+      { ...publishedProgram, description: longDescription },
+    ]);
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+    ]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText(longDescription)).toBeTruthy();
+    expect(screen.getByText('0 / 2 達成')).toBeTruthy();
+    expect(screen.getByText('全2問')).toBeTruthy();
+    expect(
+      screen.getByRole('progressbar', { name: '公開ストーリーの進捗：0 / 2 達成' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: '挑戦する：公開ストーリー' })).toBeTruthy();
+  });
+
+  it('shows continue CTA for partial progress', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: '質問2', sortOrder: 1 },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('1 / 2 達成')).toBeTruthy();
+    expect(screen.getByText('あと1つ')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'つづける：公開ストーリー' })).toBeTruthy();
+  });
+
+  it('shows clear state and review CTA when required items are done', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      commentItem,
+      { ...commentItem, id: 'i2', title: 'おまけ', isRequired: false, sortOrder: 1 },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('クリア済み')).toBeTruthy();
+    expect(screen.getByText('1 / 2 達成')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '振り返る：公開ストーリー' })).toBeTruthy();
+  });
+
+  it('shows empty state when there are no published programs', async () => {
+    listPublishedChallengeProgramsMock.mockResolvedValue([]);
+    render(<ChallengeScreen />);
+    expect(
+      await screen.findByText('いま挑戦できるストーリーはありません'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('新しい挑戦状が届くまで、少し待っていてね'),
+    ).toBeTruthy();
+  });
+
+  it('shows friendly error and retries', async () => {
+    listPublishedChallengeProgramsMock.mockRejectedValue(
+      new Error('relation "challenge_programs" does not exist'),
+    );
+
+    render(<ChallengeScreen />);
+    expect(await screen.findByText('挑戦状を読み込めませんでした')).toBeTruthy();
+    expect(screen.getByText('時間をおいて、もう一度試してください')).toBeTruthy();
+    expect(screen.queryByText(/challenge_programs/)).toBeNull();
+
+    listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
+    expect(await screen.findByRole('button', { name: /挑戦する/ })).toBeTruthy();
+  });
+
+  it('omits empty description block', async () => {
+    listPublishedChallengeProgramsMock.mockResolvedValue([
+      { ...publishedProgram, description: null },
+    ]);
+    const { container } = render(<ChallengeScreen />);
+    await screen.findByRole('button', { name: /挑戦する/ });
+    expect(container.querySelector('[class*="programDescription"]')).toBeNull();
   });
 });

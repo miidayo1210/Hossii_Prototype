@@ -107,3 +107,54 @@ export function formatRemainingLabel(progress: ChallengeStampProgress): string {
   }
   return `あと${progress.remainingRequired}つでクリア`;
 }
+
+/** List-card progress derived with the same completion rules as stamp progress. */
+export type ChallengeListProgress = {
+  total: number;
+  achieved: number;
+  /** Remaining items needed for clear (required, or all when no required). */
+  remaining: number;
+  started: boolean;
+  isComplete: boolean;
+};
+
+export function getChallengeListProgress(
+  items: readonly Pick<ChallengeItem, 'id' | 'isRequired'>[],
+  completedItemIds: ReadonlySet<string> | readonly string[],
+): ChallengeListProgress {
+  const completed =
+    completedItemIds instanceof Set
+      ? completedItemIds
+      : new Set(completedItemIds);
+  const total = items.length;
+  const achieved = items.reduce(
+    (count, item) => count + (completed.has(item.id) ? 1 : 0),
+    0,
+  );
+  const required = items.filter((item) => item.isRequired);
+  const requiredDone = required.reduce(
+    (count, item) => count + (completed.has(item.id) ? 1 : 0),
+    0,
+  );
+  const treatsAllAsOptional = total > 0 && required.length === 0;
+  const isComplete = treatsAllAsOptional
+    ? items.every((item) => completed.has(item.id))
+    : required.length > 0 && requiredDone === required.length;
+  const remaining = treatsAllAsOptional
+    ? Math.max(total - achieved, 0)
+    : Math.max(required.length - requiredDone, 0);
+
+  return {
+    total,
+    achieved,
+    remaining,
+    started: achieved > 0,
+    isComplete,
+  };
+}
+
+export function getChallengeListCtaLabel(progress: ChallengeListProgress): string {
+  if (progress.isComplete) return '振り返る';
+  if (progress.started) return 'つづける';
+  return '挑戦する';
+}

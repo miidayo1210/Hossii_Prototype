@@ -19,7 +19,12 @@ import {
 } from '../../core/utils/challengeRewardsApi';
 import { getChallengeHossiiImageUrl } from '../../core/assets/challengeHossiiKeys';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
-import { buildChallengeStampSlots } from '../../core/utils/challengeStampProgress';
+import {
+  buildChallengeStampSlots,
+  getChallengeListCtaLabel,
+  getChallengeListProgress,
+  type ChallengeListProgress,
+} from '../../core/utils/challengeStampProgress';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
 import { ChallengeStampCard } from './ChallengeStampCard';
 import styles from './ChallengeScreen.module.css';
@@ -27,6 +32,10 @@ import styles from './ChallengeScreen.module.css';
 type View =
   | { kind: 'list' }
   | { kind: 'detail'; programId: string };
+
+const LIST_LOAD_ERROR_TITLE = '挑戦状を読み込めませんでした';
+const LIST_LOAD_ERROR_HINT = '時間をおいて、もう一度試してください';
+const LIST_DECOR_HOSSII = getChallengeHossiiImageUrl('emotion/kirakira');
 
 function visibilityHelp(visibility: ChallengeResponseVisibility): string {
   if (visibility === 'self_only') {
@@ -39,6 +48,65 @@ function visibilityLabel(visibility: ChallengeResponseVisibility): string {
   return visibility === 'self_only' ? '自分だけ' : '管理者だけ';
 }
 
+function ListIntro({ menu = true }: { menu?: boolean }) {
+  return (
+    <div className={styles.header}>
+      <div className={styles.listIntro}>
+        <div className={styles.listIntroText}>
+          <h1 className={styles.listTitle}>Hossiiからの挑戦状</h1>
+          <p className={styles.listLead}>コメントで答えて、Hossiiを集めよう</p>
+        </div>
+        <img className={styles.listDecor} src={LIST_DECOR_HOSSII} alt="" />
+      </div>
+      {menu ? <TopRightMenu /> : null}
+    </div>
+  );
+}
+
+function ProgramProgressBar({
+  progress,
+  title,
+}: {
+  progress: ChallengeListProgress;
+  title: string;
+}) {
+  const ratio =
+    progress.total > 0 ? Math.min(progress.achieved / progress.total, 1) : 0;
+  const statusText = progress.isComplete
+    ? 'クリア済み'
+    : progress.total === 0
+      ? '項目はまだありません'
+      : progress.started
+        ? `あと${progress.remaining}つ`
+        : `全${progress.total}問`;
+
+  return (
+    <div className={styles.progressBlock}>
+      <div className={styles.progressMeta}>
+        <span>
+          {progress.achieved} / {progress.total} 達成
+        </span>
+        <span className={progress.isComplete ? styles.progressClear : undefined}>
+          {statusText}
+        </span>
+      </div>
+      <div
+        className={styles.progressTrack}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={progress.total}
+        aria-valuenow={progress.achieved}
+        aria-label={`${title}の進捗：${progress.achieved} / ${progress.total} 達成`}
+      >
+        <div
+          className={styles.progressFill}
+          style={{ width: `${ratio * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export const ChallengeScreen = () => {
   const { currentUser } = useAuth();
   const { state, activeSpaceMembershipStatus } = useHossiiStore();
@@ -46,8 +114,9 @@ export const ChallengeScreen = () => {
 
   const [view, setView] = useState<View>({ kind: 'list' });
   const [programs, setPrograms] = useState<ChallengeProgram[]>([]);
-  const [answeredCounts, setAnsweredCounts] = useState<Record<string, number>>({});
-  const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
+  const [listProgressByProgram, setListProgressByProgram] = useState<
+    Record<string, ChallengeListProgress>
+  >({});
   const [items, setItems] = useState<ChallengeItem[]>([]);
   const [myResponses, setMyResponses] = useState<Record<string, ChallengeResponse>>({});
   const [activeProgram, setActiveProgram] = useState<ChallengeProgram | null>(null);
@@ -91,6 +160,7 @@ export const ChallengeScreen = () => {
   const reloadList = useCallback(async () => {
     if (!activeSpace || !currentUser?.uid) {
       setPrograms([]);
+      setListProgressByProgram({});
       setLoading(false);
       return;
     }
@@ -99,22 +169,23 @@ export const ChallengeScreen = () => {
     try {
       const listed = await listPublishedChallengePrograms(activeSpace.id);
       setPrograms(listed);
-      const counts: Record<string, number> = {};
-      const answered: Record<string, number> = {};
+      const progressByProgram: Record<string, ChallengeListProgress> = {};
       await Promise.all(
         listed.map(async (program) => {
           const programItems = await listPublishedChallengeItems(program.id);
           const itemIds = programItems.map((i) => i.id);
-          counts[program.id] = programItems.length;
           const completions = await listMyChallengeCompletions(itemIds);
-          answered[program.id] = completions.length;
+          progressByProgram[program.id] = getChallengeListProgress(
+            programItems,
+            completions.map((completion) => completion.itemId),
+          );
         }),
       );
-      setItemCounts(counts);
-      setAnsweredCounts(answered);
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : '読み込みに失敗しました');
+      setListProgressByProgram(progressByProgram);
+    } catch {
+      setLoadError(LIST_LOAD_ERROR_TITLE);
       setPrograms([]);
+      setListProgressByProgram({});
     } finally {
       setLoading(false);
     }
@@ -124,7 +195,7 @@ export const ChallengeScreen = () => {
     void reloadList();
   }, [reloadList]);
 
-  // Space switch must not keep previous space detail / stamp state.
+  // Space switch must not keep previous space detail / stamp / list progress.
   useEffect(() => {
     setView({ kind: 'list' });
     setActiveProgram(null);
@@ -135,7 +206,11 @@ export const ChallengeScreen = () => {
     setDrafts({});
     setFormError(null);
     setRewardModal(null);
-  }, [activeSpace?.id]);
+    setPrograms([]);
+    setListProgressByProgram({});
+    setLoadError(null);
+    setLoading(Boolean(activeSpace?.id && currentUser?.uid));
+  }, [activeSpace?.id, currentUser?.uid]);
 
   const openDetail = async (programId: string) => {
     setFormError(null);
@@ -243,12 +318,7 @@ export const ChallengeScreen = () => {
   if (!currentUser?.uid) {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <div className={styles.titleBlock}>
-            <h1 className={styles.title}>学びを深める、Hossiiからの挑戦状！</h1>
-          </div>
-          <TopRightMenu />
-        </div>
+        <ListIntro />
         <p className={styles.muted}>ログインしたスペース参加者のみ利用できます。</p>
       </div>
     );
@@ -257,12 +327,7 @@ export const ChallengeScreen = () => {
   if (!activeSpace) {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <div className={styles.titleBlock}>
-            <h1 className={styles.title}>学びを深める、Hossiiからの挑戦状！</h1>
-          </div>
-          <TopRightMenu />
-        </div>
+        <ListIntro />
         <p className={styles.muted}>スペースを選択してください。</p>
       </div>
     );
@@ -271,12 +336,7 @@ export const ChallengeScreen = () => {
   if (activeSpaceMembershipStatus === 'none' || activeSpaceMembershipStatus === 'error') {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <div className={styles.titleBlock}>
-            <h1 className={styles.title}>学びを深める、Hossiiからの挑戦状！</h1>
-          </div>
-          <TopRightMenu />
-        </div>
+        <ListIntro />
         <p className={styles.muted}>このスペースの参加者のみ挑戦状に回答できます。</p>
       </div>
     );
@@ -446,60 +506,70 @@ export const ChallengeScreen = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <div className={styles.titleBlock}>
-          <h1 className={styles.title}>学びを深める、Hossiiからの挑戦状！</h1>
-          <p className={styles.subtitle}>
-            公開中の質問・ミッションにコメントで答えられます。
-          </p>
-        </div>
-        <TopRightMenu />
-      </div>
+      <ListIntro />
 
-      {/* MVP暫定: 全体ON/OFF未実装。ナビも published program の SELECT 可否から導出する。 */}
-      <p className={styles.mvpNote}>
-        ※挑戦状機能の全体ON/OFFは未実装です。公開中ストーリーがあるときだけナビに表示されます。
-      </p>
-
-      {loading && <p className={styles.muted}>読み込み中…</p>}
-      {loadError && <p className={styles.error}>{loadError}</p>}
-      {!loading && !loadError && programs.length === 0 && (
-        <div className={styles.empty}>
-          いま公開中の挑戦状はありません。
+      {loading && (
+        <div className={styles.listLoading} aria-busy="true" aria-live="polite">
+          <p className={styles.muted}>挑戦状をひろっています…</p>
+          <div className={styles.skeletonCard} />
+          <div className={styles.skeletonCard} />
         </div>
       )}
 
-      <ul className={styles.programList}>
-        {programs.map((program) => {
-          const total = itemCounts[program.id] ?? 0;
-          const answered = answeredCounts[program.id] ?? 0;
-          const started = answered > 0;
-          return (
-            <li key={program.id} className={styles.card}>
-              <div className={styles.meta}>
-                <span className={styles.badge}>公開中</span>
-                <span>
-                  達成 {answered} / {total}
-                </span>
-              </div>
-              <strong>{program.title}</strong>
-              {program.description && (
-                <p className={styles.muted}>{program.description}</p>
-              )}
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  disabled={!canAccess || busyItemId != null}
-                  onClick={() => void openDetail(program.id)}
-                >
-                  {started ? 'つづける' : '挑戦する'}
-                </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      {!loading && loadError && (
+        <div className={styles.listError} role="alert">
+          <p className={styles.listErrorTitle}>{LIST_LOAD_ERROR_TITLE}</p>
+          <p className={styles.muted}>{LIST_LOAD_ERROR_HINT}</p>
+          <button
+            type="button"
+            className={styles.listRetryButton}
+            onClick={() => void reloadList()}
+          >
+            もう一度読み込む
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && programs.length === 0 && (
+        <div className={styles.emptyState}>
+          <img className={styles.emptyDecor} src={LIST_DECOR_HOSSII} alt="" />
+          <p className={styles.emptyTitle}>いま挑戦できるストーリーはありません</p>
+          <p className={styles.muted}>
+            新しい挑戦状が届くまで、少し待っていてね
+          </p>
+        </div>
+      )}
+
+      {!loading && !loadError && programs.length > 0 && (
+        <ul className={styles.programList}>
+          {programs.map((program) => {
+            const progress =
+              listProgressByProgram[program.id] ??
+              getChallengeListProgress([], []);
+            const ctaLabel = getChallengeListCtaLabel(progress);
+            return (
+              <li key={program.id} className={styles.programCard}>
+                <h2 className={styles.programTitle}>{program.title}</h2>
+                {program.description ? (
+                  <p className={styles.programDescription}>{program.description}</p>
+                ) : null}
+                <ProgramProgressBar progress={progress} title={program.title} />
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.listCta}
+                    disabled={!canAccess || busyItemId != null}
+                    aria-label={`${ctaLabel}：${program.title}`}
+                    onClick={() => void openDetail(program.id)}
+                  >
+                    {ctaLabel}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {formError && <p className={styles.error}>{formError}</p>}
       {toast && <div className={styles.toast}>{toast}</div>}
     </div>
