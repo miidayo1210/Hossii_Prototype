@@ -10,6 +10,7 @@ import {
   listMyChallengeResponses,
   listPublishedChallengeItems,
   listPublishedChallengePrograms,
+  deleteChallengeResponse,
 } from '../../core/utils/challengeResponsesApi';
 import {
   listMyChallengeCompletions,
@@ -76,6 +77,18 @@ function toParticipantSaveError(message: string): string {
   }
   if (/[ぁ-んァ-ン一-龥]/.test(message)) return message;
   return '回答を保存できませんでした。時間をおいてもう一度試してください';
+}
+
+function toParticipantDeleteError(message: string): string {
+  const lower = message.toLowerCase();
+  if (/権限|permission|rls|policy|jwt|auth/.test(lower)) {
+    return 'この回答を削除する権限がありません';
+  }
+  if (/relation|postgres|pgrst|supabase|stack|syntax|uuid|network|fetch/.test(lower)) {
+    return '回答を削除できませんでした。時間をおいてもう一度試してください';
+  }
+  if (/[ぁ-んァ-ン一-龥]/.test(message)) return message;
+  return '回答を削除できませんでした。時間をおいてもう一度試してください';
 }
 
 function ListIntro({ menu = true }: { menu?: boolean }) {
@@ -204,6 +217,11 @@ export const ChallengeScreen = () => {
   const answeredIds = useMemo(
     () => new Set(Object.keys(myResponses)),
     [myResponses],
+  );
+
+  const completedIds = useMemo(
+    () => new Set(Object.keys(myCompletions)),
+    [myCompletions],
   );
 
   const focusItemId = useMemo(
@@ -504,6 +522,55 @@ export const ChallengeScreen = () => {
     }
   };
 
+  const rewriteResponse = (item: ChallengeItem) => {
+    if (busyItemId) return;
+    const existing = myResponses[item.id];
+    if (!existing) return;
+    setFormError(null);
+    setDrafts((prev) => ({
+      ...prev,
+      [item.id]: {
+        comment: existing.comment,
+        visibility: existing.visibility,
+      },
+    }));
+    setActiveItemId(item.id);
+  };
+
+  const deleteResponse = async (item: ChallengeItem) => {
+    if (busyItemId) {
+      throw new Error('ほかの操作が終わるまでお待ちください');
+    }
+    const existing = myResponses[item.id];
+    if (!existing) {
+      throw new Error('削除できる回答が見つかりません');
+    }
+    setBusyItemId(item.id);
+    setFormError(null);
+    try {
+      const result = await deleteChallengeResponse(existing.id);
+      if (!result.ok) {
+        throw new Error(toParticipantDeleteError(result.error));
+      }
+      setMyResponses((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+      setDrafts((prev) => ({
+        ...prev,
+        [item.id]: {
+          comment: '',
+          visibility: 'manager_only',
+        },
+      }));
+      setActiveItemId((current) => (current === item.id ? null : current));
+      showToast('回答を削除しました');
+    } finally {
+      setBusyItemId(null);
+    }
+  };
+
   if (!currentUser?.uid) {
     return (
       <div className={styles.container}>
@@ -541,7 +608,7 @@ export const ChallengeScreen = () => {
     );
     const detailProgress = getChallengeListProgress(
       sortedItems,
-      answeredIds,
+      completedIds,
     );
 
     const renderItemCard = (
@@ -553,6 +620,10 @@ export const ChallengeScreen = () => {
         comment: '',
         visibility: 'manager_only' as const,
       };
+      const hasResponse = Boolean(myResponses[item.id]);
+      const stampEarned =
+        !hasResponse &&
+        (Boolean(myCompletions[item.id]) || Boolean(myRewards[item.id]));
       return (
         <ChallengeItemCard
           key={item.id}
@@ -564,13 +635,15 @@ export const ChallengeScreen = () => {
           expanded={activeItemId === item.id}
           emphasized={emphasized}
           panelId={`challenge-item-panel-${item.id}`}
-          orphanRewardNote={!myResponses[item.id] && Boolean(myRewards[item.id])}
+          stampEarned={stampEarned}
           onExpand={() => setActiveItemId(item.id)}
           onCollapse={() => setActiveItemId(null)}
           onDraftChange={(next) =>
             setDrafts((prev) => ({ ...prev, [item.id]: next }))
           }
           onSave={() => void saveResponse(item)}
+          onRewrite={() => rewriteResponse(item)}
+          onDelete={() => deleteResponse(item)}
         />
       );
     };
@@ -844,7 +917,7 @@ export const ChallengeScreen = () => {
       )}
 
       {formError && <p className={styles.error}>{formError}</p>}
-      {toast && <div className={styles.toast}>{toast}</div>}
+      {toast && <div className={styles.toast} aria-live="polite">{toast}</div>}
     </div>
   );
 };
