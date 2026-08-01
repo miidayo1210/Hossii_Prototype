@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import type { ChallengeItem, ChallengeProgram } from '../../core/types/challengeProgram';
-import type { ChallengeResponse } from '../../core/types/challengeResponse';
+import type {
+  ChallengeResponse,
+  ChallengeResponseVisibility,
+} from '../../core/types/challengeResponse';
 import {
   listMyChallengeResponses,
   listPublishedChallengeItems,
