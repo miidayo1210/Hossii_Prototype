@@ -120,8 +120,8 @@ describe('ChallengeProgressSummary', () => {
     expect(screen.getByText('あと2つでクリア')).toBeTruthy();
   });
 
-  it('shows clear copy when all required done with optional leftover', () => {
-    render(
+  it('hides summary when required clear (banner owns clear state)', () => {
+    const { container } = render(
       <ChallengeProgressSummary
         slots={[
           achievedSlot('r1', '必須', 1),
@@ -146,9 +146,7 @@ describe('ChallengeProgressSummary', () => {
         ]}
       />,
     );
-    expect(screen.getByText('クリア！')).toBeTruthy();
-    expect(screen.getByText(/1つのHossiiを集めました/)).toBeTruthy();
-    expect(screen.getByText(/おまけの挑戦があと2つあります/)).toBeTruthy();
+    expect(container.firstChild).toBeNull();
   });
 
   it('treats required-zero programs as all-item completion', () => {
@@ -172,8 +170,8 @@ describe('ChallengeProgressSummary', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('shows all-item clear when every slot is achieved', () => {
-    render(
+  it('hides summary when every slot is achieved', () => {
+    const { container } = render(
       <ChallengeProgressSummary
         slots={[
           achievedSlot('i1', 'a', 1, { hossiiKey: 'idle/idle_smile' }),
@@ -184,9 +182,7 @@ describe('ChallengeProgressSummary', () => {
         ]}
       />,
     );
-    expect(screen.getByText('クリア！')).toBeTruthy();
-    expect(screen.getByText('2つのHossiiを集めました')).toBeTruthy();
-    expect(screen.queryByText(/おまけの挑戦があと/)).toBeNull();
+    expect(container.firstChild).toBeNull();
   });
 });
 
@@ -201,7 +197,6 @@ describe('ChallengeStampCard', () => {
         ]}
       />,
     );
-    expect(screen.getByText('まだ')).toBeTruthy();
     expect(screen.getByText('1')).toBeTruthy();
     expect(screen.queryByText('朝の気持ち')).toBeNull();
     expect(screen.queryByText('質問・クリアに必要')).toBeNull();
@@ -237,8 +232,8 @@ describe('ChallengeStampCard', () => {
     expect(screen.getByText('1 / 2 獲得')).toBeTruthy();
     const img = container.querySelector('img');
     expect(img?.getAttribute('src')).toContain('/hossii/emotion/wow.png');
-    expect(screen.getByText('GET!')).toBeTruthy();
-    expect(screen.getByText('まだ')).toBeTruthy();
+    expect(screen.getByText('✓')).toBeTruthy();
+    expect(screen.queryByText('GET!')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /朝の気持ちのスタンプを振り返る/ }));
     expect(onSelectAchieved).toHaveBeenCalledTimes(1);
@@ -299,8 +294,8 @@ describe('ChallengeStampCard', () => {
       ),
     ).toBe('true');
     expect(screen.getByText('スタンプを押して、思い出をひらこう')).toBeTruthy();
-    expect(screen.getByText('GET!')).toBeTruthy();
-    expect(screen.getAllByText('まだ').length).toBe(4);
+    expect(screen.getByText('✓')).toBeTruthy();
+    expect(screen.queryByText('GET!')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'スタンプを閉じる' }));
     expect(screen.getByRole('button', { name: 'スタンプを見る' })).toBeTruthy();
@@ -345,13 +340,13 @@ describe('ChallengeStampCard', () => {
     expect(preview.querySelectorAll('img').length).toBe(2);
   });
 
-  it('shows achieved fallback text when completion exists without reward image', () => {
+  it('shows achieved fallback mark when completion exists without reward image', () => {
     render(
       <ChallengeStampCard
         slots={[achievedSlot('i1', '画像なし', 1, { hossiiKey: null })]}
       />,
     );
-    expect(screen.getByText('獲得済み（画像なし）')).toBeTruthy();
+    expect(screen.getByText('!')).toBeTruthy();
     expect(screen.queryByRole('img')).toBeNull();
   });
 });

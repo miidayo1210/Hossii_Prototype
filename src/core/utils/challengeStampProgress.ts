@@ -99,14 +99,15 @@ export function getChallengeStampProgress(
 /** Desktop column guidance; callers may clamp for narrow viewports. */
 export function getStampGridColumns(itemCount: number, narrow = false): number {
   if (itemCount <= 0) return 1;
-  // Stamp-centric layout: keep fewer columns so Hossii can stay large.
+  // Mobile: collect stamps in ~3 columns (≈1/3 width each).
   if (narrow) {
     if (itemCount <= 1) return 1;
-    return 2;
+    if (itemCount === 2) return 2;
+    return 3;
   }
-  if (itemCount <= 4) return 2;
-  if (itemCount <= 9) return 3;
-  return 4;
+  if (itemCount <= 3) return 3;
+  if (itemCount <= 8) return 4;
+  return 5;
 }
 
 export function formatRemainingLabel(progress: ChallengeStampProgress): string {
