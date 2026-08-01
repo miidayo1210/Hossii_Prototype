@@ -1,9 +1,11 @@
+import type { ReactNode } from 'react';
 import type { ChallengeItem } from '../../core/types/challengeProgram';
 import type {
   ChallengeResponse,
   ChallengeResponseVisibility,
 } from '../../core/types/challengeResponse';
 import { CHALLENGE_RESPONSE_COMMENT_MAX_LENGTH } from '../../core/types/challengeResponse';
+import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
 import styles from './ChallengeItemCard.module.css';
 
 export type ChallengeItemDraft = {
@@ -20,11 +22,14 @@ type Props = {
   expanded: boolean;
   emphasized: boolean;
   panelId: string;
-  orphanRewardNote?: boolean;
+  /** responseなしでも completion／reward があるとき */
+  stampEarned?: boolean;
   onExpand: () => void;
   onCollapse: () => void;
   onDraftChange: (draft: ChallengeItemDraft) => void;
   onSave: () => void;
+  onRewrite: () => void;
+  onDelete: () => Promise<void> | void;
 };
 
 function visibilityHelp(visibility: ChallengeResponseVisibility): string {
@@ -38,33 +43,44 @@ function visibilityLabel(visibility: ChallengeResponseVisibility): string {
   return visibility === 'self_only' ? '自分だけに残す' : '管理者にだけ共有';
 }
 
+function formatExcerpt(comment: string | null | undefined): string {
+  const text = (comment ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return '（回答なし）';
+  return text;
+}
+
 function ItemHeader({
   item,
   index,
   answered,
+  actions,
 }: {
   item: ChallengeItem;
   index: number;
   answered: boolean;
+  actions?: ReactNode;
 }) {
   return (
-    <div className={styles.headerRow}>
-      <span className={styles.index} aria-hidden="true">
-        {index}
-      </span>
-      <span
-        className={`${styles.statusBadge} ${
-          answered ? styles.statusAnswered : styles.statusPending
-        }`}
-      >
-        {answered ? '回答済み' : '未回答'}
-      </span>
-      <span className={styles.metaBadge}>
-        {item.itemType === 'question' ? '質問' : 'ミッション'}
-      </span>
-      <span className={styles.metaBadge}>
-        {item.isRequired ? 'クリアに必要' : 'おまけ'}
-      </span>
+    <div className={styles.headerBar}>
+      <div className={styles.headerRow}>
+        <span className={styles.index} aria-hidden="true">
+          {index}
+        </span>
+        <span
+          className={`${styles.statusBadge} ${
+            answered ? styles.statusAnswered : styles.statusPending
+          }`}
+        >
+          {answered ? '回答済み' : '未回答'}
+        </span>
+        <span className={styles.metaBadge}>
+          {item.itemType === 'question' ? '質問' : 'ミッション'}
+        </span>
+        <span className={styles.metaBadge}>
+          {item.isRequired ? 'クリアに必要' : 'おまけ'}
+        </span>
+      </div>
+      {actions}
     </div>
   );
 }
@@ -164,7 +180,7 @@ function ResponseEditor({
   draft,
   existing,
   saving,
-  orphanRewardNote,
+  stampEarned,
   onDraftChange,
   onSave,
 }: {
@@ -172,7 +188,7 @@ function ResponseEditor({
   draft: ChallengeItemDraft;
   existing: ChallengeResponse | undefined;
   saving: boolean;
-  orphanRewardNote?: boolean;
+  stampEarned?: boolean;
   onDraftChange: (draft: ChallengeItemDraft) => void;
   onSave: () => void;
 }) {
@@ -188,10 +204,8 @@ function ResponseEditor({
           {existing.comment}
         </p>
       ) : null}
-      {!existing && orphanRewardNote ? (
-        <p className={styles.note}>
-          この項目のHossiiは取得済みです（回答は未保存の状態でも報酬は保持されます）。
-        </p>
+      {!existing && stampEarned ? (
+        <p className={styles.stampEarnedNote}>スタンプ獲得済み</p>
       ) : null}
       {item.responseType === 'comment' ? (
         <CommentResponseSlot
@@ -237,37 +251,71 @@ export function ChallengeItemCard({
   expanded,
   emphasized,
   panelId,
-  orphanRewardNote,
+  stampEarned,
   onExpand,
   onCollapse,
   onDraftChange,
   onSave,
+  onRewrite,
+  onDelete,
 }: Props) {
   const answered = Boolean(existing);
-  const toggleLabel = answered ? '回答を見る・書き直す' : 'この質問に答える';
+  const actionMenu = answered ? (
+    <ChallengeResponseActionMenu
+      itemTitle={item.title}
+      disabled={saving}
+      onRewrite={onRewrite}
+      onDelete={onDelete}
+    />
+  ) : null;
 
   if (!expanded) {
     return (
       <li
         className={`${styles.card} ${emphasized ? styles.cardEmphasized : ''}`}
       >
-        <ItemHeader item={item} index={index} answered={answered} />
+        <ItemHeader
+          item={item}
+          index={index}
+          answered={answered}
+          actions={actionMenu}
+        />
         <h3 className={styles.title}>{item.title}</h3>
         <ItemDescription item={item} compact />
-        {answered ? (
-          <p className={styles.compactVisibility}>
-            公開範囲：{visibilityLabel(existing!.visibility)}
-          </p>
-        ) : null}
-        <button
-          type="button"
-          className={styles.toggleButton}
-          aria-expanded={false}
-          aria-controls={panelId}
-          onClick={onExpand}
-        >
-          {toggleLabel}
-        </button>
+        {answered && existing ? (
+          <>
+            <button
+              type="button"
+              className={styles.excerptButton}
+              aria-expanded={false}
+              aria-controls={panelId}
+              aria-label={`「${item.title}」の回答を振り返る`}
+              onClick={onExpand}
+            >
+              <span className={styles.excerptText}>
+                {formatExcerpt(existing.comment)}
+              </span>
+            </button>
+            <p className={styles.compactVisibility}>
+              {visibilityLabel(existing.visibility)}
+            </p>
+          </>
+        ) : (
+          <>
+            {stampEarned ? (
+              <p className={styles.stampEarnedNote}>スタンプ獲得済み</p>
+            ) : null}
+            <button
+              type="button"
+              className={styles.toggleButton}
+              aria-expanded={false}
+              aria-controls={panelId}
+              onClick={onExpand}
+            >
+              この質問に答える
+            </button>
+          </>
+        )}
       </li>
     );
   }
@@ -278,7 +326,12 @@ export function ChallengeItemCard({
         emphasized ? styles.cardEmphasized : ''
       }`}
     >
-      <ItemHeader item={item} index={index} answered={answered} />
+      <ItemHeader
+        item={item}
+        index={index}
+        answered={answered}
+        actions={actionMenu}
+      />
       <h3 className={styles.title}>{item.title}</h3>
       <ItemDescription item={item} compact={false} />
       <div id={panelId}>
@@ -287,7 +340,7 @@ export function ChallengeItemCard({
           draft={draft}
           existing={existing}
           saving={saving}
-          orphanRewardNote={orphanRewardNote}
+          stampEarned={stampEarned}
           onDraftChange={onDraftChange}
           onSave={onSave}
         />

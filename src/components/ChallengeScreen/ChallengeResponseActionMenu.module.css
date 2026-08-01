@@ -1,0 +1,185 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid #e9d5ff;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #6d28d9;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.08);
+}
+
+.trigger:hover:not(:disabled) {
+  background: #faf5ff;
+  border-color: #d8b4fe;
+}
+
+.trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.trigger:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
+}
+
+.menu {
+  position: fixed;
+  z-index: 1300;
+  width: 200px;
+  padding: 0.35rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(88, 28, 135, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: #faf5ff;
+  outline: none;
+}
+
+.menuItemDanger {
+  color: #be123c;
+}
+
+.menuItemDanger:hover,
+.menuItemDanger:focus-visible {
+  background: #fff1f2;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  backdrop-filter: blur(3px);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 1.1rem;
+  padding: 1.35rem 1.25rem 1.2rem;
+  box-shadow: 0 20px 48px rgba(88, 28, 135, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+.dialogBody {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: #4b5563;
+}
+
+.dialogError {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b42318;
+  line-height: 1.45;
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.cancelButton,
+.deleteButton {
+  min-height: 44px;
+  border-radius: 9999px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelButton {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+
+.deleteButton {
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  box-shadow: 0 3px 0 #be123c;
+}
+
+.deleteButton:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #be123c;
+}
+
+.cancelButton:disabled,
+.deleteButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.cancelButton:focus-visible,
+.deleteButton:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
+}
