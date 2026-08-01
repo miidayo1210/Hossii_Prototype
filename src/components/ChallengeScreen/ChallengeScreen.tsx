@@ -30,7 +30,10 @@ import {
   formatOptionalLeftoverLabel,
   formatRewardCelebrationProgressLabel,
   getChallengeListCtaLabel,
+  getChallengeListOpenLabel,
   getChallengeListProgress,
+  getChallengeListStatusHint,
+  getChallengeListStatusLabel,
   getChallengeStampProgress,
   hasUnansweredRequiredChallengeItems,
   pickNextChallengeFocusItemId,
@@ -90,6 +93,18 @@ function ListIntro({ menu = true }: { menu?: boolean }) {
   );
 }
 
+function listProgressCountLabel(progress: ChallengeListProgress): string {
+  if (progress.total <= 0) return '0 / 0 達成';
+  if (
+    progress.listStatus === 'cleared' &&
+    progress.requiredTotal > 0 &&
+    !progress.isCompletedAll
+  ) {
+    return `必須 ${progress.requiredDone} / ${progress.requiredTotal} 達成`;
+  }
+  return `${progress.achieved} / ${progress.total} 達成`;
+}
+
 function ProgramProgressBar({
   progress,
   title,
@@ -99,37 +114,31 @@ function ProgramProgressBar({
 }) {
   const ratio =
     progress.total > 0 ? Math.min(progress.achieved / progress.total, 1) : 0;
-  const statusText = progress.isComplete
-    ? 'クリア済み'
-    : progress.total === 0
-      ? '項目はまだありません'
-      : progress.started
-        ? `あと${progress.remaining}つ`
-        : `全${progress.total}問`;
+  const countLabel = listProgressCountLabel(progress);
+  const hint = getChallengeListStatusHint(progress);
+  const fillClass =
+    progress.listStatus === 'completed'
+      ? `${styles.progressFill} ${styles.progressFillComplete}`
+      : progress.listStatus === 'cleared'
+        ? `${styles.progressFill} ${styles.progressFillCleared}`
+        : styles.progressFill;
 
   return (
     <div className={styles.progressBlock}>
       <div className={styles.progressMeta}>
-        <span>
-          {progress.achieved} / {progress.total} 達成
-        </span>
-        <span className={progress.isComplete ? styles.progressClear : undefined}>
-          {statusText}
-        </span>
+        <span>{countLabel}</span>
       </div>
       <div
         className={styles.progressTrack}
         role="progressbar"
         aria-valuemin={0}
-        aria-valuemax={progress.total}
+        aria-valuemax={Math.max(progress.total, 0)}
         aria-valuenow={progress.achieved}
-        aria-label={`${title}の進捗：${progress.achieved} / ${progress.total} 達成`}
+        aria-label={`${title}の進捗：${countLabel}`}
       >
-        <div
-          className={styles.progressFill}
-          style={{ width: `${ratio * 100}%` }}
-        />
+        <div className={fillClass} style={{ width: `${ratio * 100}%` }} />
       </div>
+      <p className={styles.progressHint}>{hint}</p>
     </div>
   );
 }
@@ -766,9 +775,27 @@ export const ChallengeScreen = () => {
               const progress =
                 listProgressByProgram[program.id] ??
                 getChallengeListProgress([], []);
-              const ctaLabel = getChallengeListCtaLabel(progress);
+              const ctaLabel = getChallengeListCtaLabel();
+              const openLabel = getChallengeListOpenLabel(program.title);
+              const statusLabel = getChallengeListStatusLabel(
+                progress.listStatus,
+                progress.total,
+              );
+              const statusClass =
+                progress.total <= 0
+                  ? styles.statusBadgePreparing
+                  : progress.listStatus === 'completed'
+                    ? styles.statusBadgeCompleted
+                    : progress.listStatus === 'cleared'
+                      ? styles.statusBadgeCleared
+                      : progress.listStatus === 'in_progress'
+                        ? styles.statusBadgeInProgress
+                        : styles.statusBadgeNotStarted;
               return (
                 <li key={program.id} className={styles.programCard}>
+                  <span className={`${styles.statusBadge} ${statusClass}`}>
+                    {statusLabel}
+                  </span>
                   <h2 className={styles.programTitle}>{program.title}</h2>
                   {program.description ? (
                     <p className={styles.programDescription}>{program.description}</p>
@@ -779,7 +806,7 @@ export const ChallengeScreen = () => {
                       type="button"
                       className={styles.listCta}
                       disabled={!canAccess || busyItemId != null}
-                      aria-label={`${ctaLabel}：${program.title}`}
+                      aria-label={openLabel}
                       onClick={() => void openDetail(program.id)}
                     >
                       {ctaLabel}

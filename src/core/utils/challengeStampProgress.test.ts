@@ -8,7 +8,10 @@ import {
   formatOptionalLeftoverLabel,
   formatRemainingLabel,
   getChallengeListCtaLabel,
+  getChallengeListOpenLabel,
   getChallengeListProgress,
+  getChallengeListStatusHint,
+  getChallengeListStatusLabel,
   getChallengeStampProgress,
   getStampGridColumns,
   formatRewardCelebrationProgressLabel,
@@ -170,43 +173,83 @@ describe('challengeStampProgress', () => {
     expect(getStampGridColumns(20, true)).toBe(4);
   });
 
-  it('derives list progress with the same completion rules', () => {
-    expect(getChallengeListProgress([], [])).toEqual({
+  it('derives exclusive list status from completions (not responses)', () => {
+    expect(getChallengeListProgress([], [])).toMatchObject({
       total: 0,
       achieved: 0,
       remaining: 0,
       started: false,
       isComplete: false,
+      isCleared: false,
+      isCompletedAll: false,
+      listStatus: 'not_started',
     });
+    expect(getChallengeListStatusLabel('not_started', 0)).toBe('準備中');
+    expect(getChallengeListStatusHint(getChallengeListProgress([], []))).toBe(
+      'まだ挑戦できる項目がありません',
+    );
 
     const withRequired = [
       item({ id: 'r1', title: '必須1', isRequired: true }),
       item({ id: 'r2', title: '必須2', isRequired: true }),
       item({ id: 'o1', title: 'おまけ', isRequired: false }),
     ];
+
+    const notStarted = getChallengeListProgress(withRequired, []);
+    expect(notStarted.listStatus).toBe('not_started');
+    expect(getChallengeListStatusLabel(notStarted.listStatus)).toBe('まだこれから');
+    expect(getChallengeListStatusHint(notStarted)).toBe('最初の挑戦から始めてみよう');
+    expect(getChallengeListCtaLabel()).toBe('開く');
+
     const mid = getChallengeListProgress(withRequired, ['r1']);
-    expect(mid).toEqual({
+    expect(mid).toMatchObject({
       total: 3,
       achieved: 1,
       remaining: 1,
       started: true,
       isComplete: false,
+      isCleared: false,
+      isCompletedAll: false,
+      listStatus: 'in_progress',
+      requiredTotal: 2,
+      requiredDone: 1,
+      optionalTotal: 1,
+      optionalDone: 0,
+      remainingOptional: 1,
     });
-    expect(getChallengeListCtaLabel(mid)).toBe('つづける');
+    expect(getChallengeListStatusLabel(mid.listStatus)).toBe('挑戦中');
+    expect(getChallengeListStatusHint(mid)).toBe('あと2つ');
+    expect(getChallengeListCtaLabel()).toBe('開く');
 
-    const clear = getChallengeListProgress(withRequired, ['r1', 'r2']);
-    expect(clear.isComplete).toBe(true);
-    expect(clear.achieved).toBe(2);
-    expect(getChallengeListCtaLabel(clear)).toBe('振り返る');
+    const cleared = getChallengeListProgress(withRequired, ['r1', 'r2']);
+    expect(cleared.listStatus).toBe('cleared');
+    expect(cleared.isCleared).toBe(true);
+    expect(cleared.isCompletedAll).toBe(false);
+    expect(getChallengeListStatusLabel(cleared.listStatus)).toBe('クリア済み');
+    expect(getChallengeListStatusHint(cleared)).toBe('おまけがあと1つあります');
+    expect(getChallengeListCtaLabel()).toBe('開く');
+
+    const completed = getChallengeListProgress(withRequired, ['r1', 'r2', 'o1']);
+    expect(completed.listStatus).toBe('completed');
+    expect(completed.isCompletedAll).toBe(true);
+    expect(getChallengeListStatusLabel(completed.listStatus)).toBe('コンプリート');
+    expect(getChallengeListStatusHint(completed)).toBe('すべての挑戦を達成しました');
+    expect(getChallengeListCtaLabel()).toBe('開く');
 
     const optionalOnly = [
       item({ id: 'o1', title: 'a', isRequired: false }),
       item({ id: 'o2', title: 'b', isRequired: false }),
     ];
-    expect(getChallengeListProgress(optionalOnly, ['o1']).isComplete).toBe(false);
-    expect(getChallengeListProgress(optionalOnly, ['o1', 'o2']).isComplete).toBe(true);
-    expect(getChallengeListCtaLabel(getChallengeListProgress(optionalOnly, []))).toBe(
-      '挑戦する',
+    const optionalMid = getChallengeListProgress(optionalOnly, ['o1']);
+    expect(optionalMid.listStatus).toBe('in_progress');
+    expect(optionalMid.isComplete).toBe(false);
+    const optionalDone = getChallengeListProgress(optionalOnly, ['o1', 'o2']);
+    expect(optionalDone.listStatus).toBe('completed');
+    expect(optionalDone.isComplete).toBe(true);
+    expect(getChallengeListStatusLabel(optionalDone.listStatus)).toBe('コンプリート');
+
+    expect(getChallengeListOpenLabel('下妻アカデミーの挑戦状')).toBe(
+      '「下妻アカデミーの挑戦状」を開く',
     );
   });
 
