@@ -1,0 +1,250 @@
+.card {
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 1.1rem;
+  padding: 0.95rem 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 3px 16px rgba(168, 85, 247, 0.06);
+}
+
+.cardEmphasized {
+  border-color: rgba(236, 72, 153, 0.35);
+  box-shadow: 0 6px 28px rgba(168, 85, 247, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.cardExpanded {
+  padding-bottom: 1.1rem;
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.index {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.statusBadge,
+.metaBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.statusAnswered {
+  background: #f3e8ff;
+  color: #6d28d9;
+}
+
+.statusPending {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.metaBadge {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 500;
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+.description,
+.descriptionClamp {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.descriptionClamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.compactVisibility {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.toggleButton,
+.collapseButton {
+  margin-top: 0.75rem;
+  min-height: 44px;
+  width: 100%;
+  border-radius: 9999px;
+  border: 1px solid #e9d5ff;
+  background: #faf5ff;
+  color: #6d28d9;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.55rem 0.9rem;
+}
+
+.toggleButton:focus-visible,
+.collapseButton:focus-visible,
+.saveButton:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 3px;
+}
+
+.collapseButton {
+  margin-top: 0.85rem;
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #475569;
+  font-weight: 600;
+}
+
+.responseSlot {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #f1e7ff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.reason,
+.note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.existingAnswer {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  background: #f5f3ff;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  color: #334155;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d8b4fe;
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  resize: vertical;
+  min-height: 6rem;
+  background: #fff;
+}
+
+.charCount {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  align-self: flex-end;
+}
+
+.visibilityFieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-inline-size: 0;
+}
+
+.visibilityLegend {
+  padding: 0;
+  margin-bottom: 0.45rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.radioRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.visibilityHelp {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.45;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.saveButton {
+  border: none;
+  border-radius: 9999px;
+  padding: 0.7rem 1.2rem;
+  min-height: 44px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  box-shadow: 0 4px 0 #7c3aed;
+}
+
+.saveButton:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #7c3aed;
+}
+
+.saveButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saveButton {
+    transition: none;
+  }
+}
