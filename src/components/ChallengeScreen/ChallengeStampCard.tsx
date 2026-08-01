@@ -30,11 +30,6 @@ function StampSlotCell({
 }) {
   const typeLabel = slot.item.itemType === 'question' ? '質問' : 'ミッション';
   const requiredLabel = slot.item.isRequired ? 'クリアに必要' : 'おまけ';
-  const stateLabel = slot.achieved
-    ? slot.hossiiKey
-      ? 'GET!'
-      : '獲得済み'
-    : 'まだ';
   const ariaLabel = slot.achieved
     ? `${slot.item.title}のスタンプを振り返る、${typeLabel}、${requiredLabel}、獲得済み`
     : `${slot.item.title}に答える、${typeLabel}、${requiredLabel}、未獲得`;
@@ -69,17 +64,12 @@ function StampSlotCell({
         <span className={styles.slotIndex} aria-hidden="true">
           {slot.index}
         </span>
-        <div className={styles.stampArea}>
-          {stampVisual}
-          <span
-            className={`${styles.stateChip} ${
-              slot.achieved ? styles.stateChipGot : styles.stateChipEmpty
-            }`}
-          >
-            {stateLabel}
-            {slot.achieved && !slot.hossiiKey ? '（画像なし）' : ''}
+        {slot.achieved ? (
+          <span className={styles.gotMark} aria-hidden="true">
+            {slot.hossiiKey ? '✓' : '!'}
           </span>
-        </div>
+        ) : null}
+        <div className={styles.stampArea}>{stampVisual}</div>
       </button>
     </li>
   );
@@ -110,28 +100,22 @@ export function ChallengeProgressSummary({ slots }: Props) {
       ? `必須 ${progress.requiredDone} / ${progress.requiredTotal} · おまけ ${progress.optionalDone} / ${progress.optionalTotal}`
       : `必須 ${progress.requiredDone} / ${progress.requiredTotal}`;
 
-  const statusShort = progress.isComplete
-    ? 'クリア！'
-    : `あと${progress.remainingRequired}つでクリア`;
+  // Complete state is shown by the detail clear banner (avoid duplicate "クリア").
+  if (progress.isComplete) {
+    return null;
+  }
 
   return (
     <section
-      className={`${styles.summary} ${
-        progress.isComplete ? styles.summaryClear : ''
-      }`}
+      className={styles.summary}
       aria-label={`挑戦状の進捗：${status}`}
     >
       <div className={styles.progressRow}>
         <span>
           <span className={styles.progressStrong}>{countLabel}</span>
         </span>
-        <span
-          className={`${styles.statusInline} ${
-            progress.isComplete ? styles.statusInlineClear : ''
-          }`}
-          aria-live="polite"
-        >
-          {statusShort}
+        <span className={styles.statusInline} aria-live="polite">
+          あと{progress.remainingRequired}つでクリア
         </span>
       </div>
       <div
@@ -153,7 +137,7 @@ export function ChallengeProgressSummary({ slots }: Props) {
           style={{ width: `${Math.min(clearRatio, 1) * 100}%` }}
         />
       </div>
-      {progress.isComplete && (collected || optionalLeftover) ? (
+      {collected || optionalLeftover ? (
         <p className={styles.collectedLine}>
           {[collected, optionalLeftover].filter(Boolean).join(' · ')}
         </p>
@@ -169,7 +153,6 @@ export const ChallengeStampCard = ({
 }: Props) => {
   const narrow = useMediaQuery('(max-width: 640px)');
   const panelId = useId();
-  const progress = getChallengeStampProgress(slots);
   const columns = getStampGridColumns(slots.length, narrow);
   const achievedCount = slots.filter((slot) => slot.achieved).length;
   const autoExpand = shouldAutoExpandStampDetails(slots.length);
@@ -254,11 +237,6 @@ export const ChallengeStampCard = ({
       {(expanded || autoExpand) && (
         <div id={panelId}>
           <p className={styles.hint}>スタンプを押して、思い出をひらこう</p>
-          {progress.isComplete ? (
-            <p className={styles.detailClearNote} aria-live="polite">
-              {formatRemainingLabel(progress)}
-            </p>
-          ) : null}
           <ul
             className={styles.grid}
             style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}

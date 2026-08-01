@@ -612,9 +612,14 @@ describe('ChallengeScreen focused response UI', () => {
     fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
     expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
     expect(screen.getByText('もっとHossiiを集めたい人へ')).toBeTruthy();
-    expect(screen.getByText(/必須の挑戦はクリア/)).toBeTruthy();
+    expect(screen.getByText(/必須クリア/)).toBeTruthy();
     expect(screen.getByRole('button', { name: '完成した軌跡を見る' })).toBeTruthy();
     expect(screen.getByRole('textbox')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '完成した軌跡を見る' }));
+    expect(await screen.findByLabelText('完成した軌跡')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: '公開ストーリー' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '← 挑戦状へ戻る' }));
+    expect(await screen.findByRole('heading', { name: 'おまけの挑戦' })).toBeTruthy();
   });
 
   it('keeps answered records collapsed until opened', async () => {

@@ -28,6 +28,7 @@ import {
 import {
   buildChallengeStampSlots,
   compareChallengeItems,
+  formatCollectedHossiiLabel,
   formatOptionalLeftoverLabel,
   formatRewardCelebrationProgressLabel,
   getChallengeListCtaLabel,
@@ -60,13 +61,13 @@ import {
   ChallengeProgressSummary,
   ChallengeStampCard,
 } from './ChallengeStampCard';
+import { ChallengeTrajectoryView } from './ChallengeTrajectoryView';
 import styles from './ChallengeScreen.module.css';
-
-const TRAJECTORY_SOON_TOAST = '軌跡ページは次の更新でひらきます';
 
 type View =
   | { kind: 'list' }
-  | { kind: 'detail'; programId: string };
+  | { kind: 'detail'; programId: string }
+  | { kind: 'trajectory'; programId: string };
 
 const LIST_LOAD_ERROR_TITLE = '挑戦状を読み込めませんでした';
 const LIST_LOAD_ERROR_HINT = '時間をおいて、もう一度試してください';
@@ -643,6 +644,26 @@ export const ChallengeScreen = () => {
     );
   }
 
+  if (view.kind === 'trajectory' && activeProgram) {
+    return (
+      <div className={styles.container}>
+        <ChallengeTrajectoryView
+          program={activeProgram}
+          slots={stampSlots}
+          responsesByItemId={myResponses}
+          onBack={() => {
+            setView({ kind: 'detail', programId: activeProgram.id });
+          }}
+        />
+        {toast && (
+          <div className={styles.toast} aria-live="polite">
+            {toast}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (view.kind === 'detail' && activeProgram) {
     const focusItem = focusItemId
       ? sortedItems.find((item) => item.id === focusItemId) ?? null
@@ -677,7 +698,12 @@ export const ChallengeScreen = () => {
         return compareChallengeItems(a.item, b.item);
       });
 
-    const openTrajectorySoon = () => showToast(TRAJECTORY_SOON_TOAST);
+    const openTrajectory = () => {
+      setRecallModal(null);
+      setRewardModal(null);
+      setView({ kind: 'trajectory', programId: activeProgram.id });
+    };
+    const collectedLabel = formatCollectedHossiiLabel(stampSlots);
 
     const renderHeroCard = (item: ChallengeItem) => {
       const draft = drafts[item.id] ?? {
@@ -753,7 +779,32 @@ export const ChallengeScreen = () => {
           </p>
         )}
 
-        <ChallengeProgressSummary slots={stampSlots} />
+        {stampProgress.isComplete ? (
+          <section
+            className={styles.clearBanner}
+            aria-label="挑戦状のクリア状態"
+          >
+            <div className={styles.clearBannerText}>
+              <span className={styles.clearAccent}>クリア</span>
+              <span className={styles.clearBannerMeta}>
+                {focusItem
+                  ? '必須クリア · 軌跡ができあがっています'
+                  : '軌跡がそろいました'}
+                {collectedLabel ? ` · ${collectedLabel}` : ''}
+              </span>
+            </div>
+            <button
+              id="challenge-trajectory-cta"
+              type="button"
+              className={styles.trajectoryPrimary}
+              onClick={openTrajectory}
+            >
+              完成した軌跡を見る
+            </button>
+          </section>
+        ) : (
+          <ChallengeProgressSummary slots={stampSlots} />
+        )}
 
         {sortedItems.length === 0 ? (
           <div className={styles.detailEmpty}>
@@ -761,30 +812,6 @@ export const ChallengeScreen = () => {
           </div>
         ) : (
           <>
-            {stampProgress.isComplete ? (
-              <section
-                className={styles.clearHero}
-                aria-labelledby="challenge-trajectory-cta-label"
-              >
-                <p
-                  id="challenge-trajectory-cta-label"
-                  className={styles.clearHeroLead}
-                >
-                  {focusItem
-                    ? '必須の挑戦はクリア！軌跡ができあがっています'
-                    : '挑戦状クリア！あなたの軌跡がそろいました'}
-                </p>
-                <button
-                  id="challenge-trajectory-cta"
-                  type="button"
-                  className={styles.trajectoryPrimary}
-                  onClick={openTrajectorySoon}
-                >
-                  完成した軌跡を見る
-                </button>
-              </section>
-            ) : null}
-
             {heroItem ? (
               <section
                 className={`${styles.focusSection} ${styles.focusHero}`}
@@ -818,7 +845,7 @@ export const ChallengeScreen = () => {
               <button
                 type="button"
                 className={styles.trajectoryLink}
-                onClick={openTrajectorySoon}
+                onClick={openTrajectory}
               >
                 わたしの軌跡を見る
               </button>
