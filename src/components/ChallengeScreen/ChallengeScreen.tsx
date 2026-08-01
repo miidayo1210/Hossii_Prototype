@@ -53,10 +53,16 @@ import {
   type ChallengeRecallModalModel,
 } from './ChallengeRecallModal';
 import {
+  ChallengeRecordsSection,
+  type ChallengeRecordRow,
+} from './ChallengeRecordsSection';
+import {
   ChallengeProgressSummary,
   ChallengeStampCard,
 } from './ChallengeStampCard';
 import styles from './ChallengeScreen.module.css';
+
+const TRAJECTORY_SOON_TOAST = '軌跡ページは次の更新でひらきます';
 
 type View =
   | { kind: 'list' }
@@ -225,11 +231,6 @@ export const ChallengeScreen = () => {
   const answeredIds = useMemo(
     () => new Set(Object.keys(myResponses)),
     [myResponses],
-  );
-
-  const completedIds = useMemo(
-    () => new Set(Object.keys(myCompletions)),
-    [myCompletions],
   );
 
   const focusItemId = useMemo(
@@ -429,7 +430,7 @@ export const ChallengeScreen = () => {
     if (modal.kind === 'complete') {
       setActiveItemId(null);
       window.requestAnimationFrame(() => {
-        document.getElementById('challenge-answered-heading')?.focus();
+        document.getElementById('challenge-trajectory-cta')?.focus();
       });
       return;
     }
@@ -646,20 +647,39 @@ export const ChallengeScreen = () => {
     const focusItem = focusItemId
       ? sortedItems.find((item) => item.id === focusItemId) ?? null
       : null;
-    const answeredItems = sortedItems.filter((item) => answeredIds.has(item.id));
-    const queuedItems = sortedItems.filter(
-      (item) => !answeredIds.has(item.id) && item.id !== focusItemId,
+    const heroItem =
+      (activeItemId
+        ? sortedItems.find((item) => item.id === activeItemId) ?? null
+        : null) ?? focusItem;
+    const heroIsRewrite = Boolean(
+      heroItem && myResponses[heroItem.id] && activeItemId === heroItem.id,
     );
-    const detailProgress = getChallengeListProgress(
-      sortedItems,
-      completedIds,
-    );
+    const stampProgress = getChallengeStampProgress(stampSlots);
+    const recordRows: ChallengeRecordRow[] = sortedItems
+      .filter(
+        (item) =>
+          Boolean(myResponses[item.id]) || Boolean(myCompletions[item.id]),
+      )
+      .map((item) => {
+        const response = myResponses[item.id] ?? null;
+        const completion = myCompletions[item.id] ?? null;
+        const date =
+          completion?.completedAt ??
+          response?.updatedAt ??
+          response?.createdAt ??
+          null;
+        return { item, response, completion, date };
+      })
+      .sort((a, b) => {
+        const aTime = a.date?.getTime() ?? 0;
+        const bTime = b.date?.getTime() ?? 0;
+        if (aTime !== bTime) return aTime - bTime;
+        return compareChallengeItems(a.item, b.item);
+      });
 
-    const renderItemCard = (
-      item: ChallengeItem,
-      index: number,
-      emphasized: boolean,
-    ) => {
+    const openTrajectorySoon = () => showToast(TRAJECTORY_SOON_TOAST);
+
+    const renderHeroCard = (item: ChallengeItem) => {
       const draft = drafts[item.id] ?? {
         comment: '',
         visibility: 'manager_only' as const,
@@ -672,26 +692,35 @@ export const ChallengeScreen = () => {
         <ChallengeItemCard
           key={item.id}
           item={item}
-          index={index}
+          index={sortedItems.findIndex((entry) => entry.id === item.id) + 1}
           existing={myResponses[item.id]}
           draft={draft}
           saving={busyItemId === item.id}
-          expanded={activeItemId === item.id}
-          emphasized={emphasized}
+          expanded={activeItemId === item.id || !hasResponse}
+          emphasized
           panelId={`challenge-item-panel-${item.id}`}
           stampEarned={stampEarned}
+          showManageActions={false}
           onExpand={() => setActiveItemId(item.id)}
-          onCollapse={() => setActiveItemId(null)}
+          onCollapse={() => setActiveItemId(focusItemId)}
           onDraftChange={(next) =>
             setDrafts((prev) => ({ ...prev, [item.id]: next }))
           }
           onSave={() => void saveResponse(item)}
-          onRewrite={() => rewriteResponse(item)}
-          onDelete={() => deleteResponse(item)}
-          onRecall={() => openRecallForItem(item.id)}
         />
       );
     };
+
+    const heroHeading = heroIsRewrite
+      ? '回答を書き直す'
+      : focusSectionKind === 'optional'
+        ? 'おまけの挑戦'
+        : '次の挑戦';
+    const heroLead = heroIsRewrite
+      ? '記録をそっと更新しよう'
+      : focusSectionKind === 'optional'
+        ? 'もっとHossiiを集めたい人へ'
+        : 'まずはこの質問に答えてみよう';
 
     return (
       <div className={styles.container}>
@@ -732,19 +761,33 @@ export const ChallengeScreen = () => {
           </div>
         ) : (
           <>
-            {detailProgress.isComplete && !focusItem ? (
-              <p className={styles.detailStatus} aria-live="polite">
-                挑戦状をクリアしました。回答済みの内容を振り返れます。
-              </p>
-            ) : detailProgress.isComplete && focusItem ? (
-              <p className={styles.detailStatus} aria-live="polite">
-                必須の挑戦はクリアしました
-              </p>
+            {stampProgress.isComplete ? (
+              <section
+                className={styles.clearHero}
+                aria-labelledby="challenge-trajectory-cta-label"
+              >
+                <p
+                  id="challenge-trajectory-cta-label"
+                  className={styles.clearHeroLead}
+                >
+                  {focusItem
+                    ? '必須の挑戦はクリア！軌跡ができあがっています'
+                    : '挑戦状クリア！あなたの軌跡がそろいました'}
+                </p>
+                <button
+                  id="challenge-trajectory-cta"
+                  type="button"
+                  className={styles.trajectoryPrimary}
+                  onClick={openTrajectorySoon}
+                >
+                  完成した軌跡を見る
+                </button>
+              </section>
             ) : null}
 
-            {focusItem ? (
+            {heroItem ? (
               <section
-                className={styles.focusSection}
+                className={`${styles.focusSection} ${styles.focusHero}`}
                 aria-labelledby="challenge-focus-heading"
               >
                 <h2
@@ -752,20 +795,10 @@ export const ChallengeScreen = () => {
                   className={styles.focusHeading}
                   tabIndex={-1}
                 >
-                  {focusSectionKind === 'optional' ? 'おまけの挑戦' : '次の挑戦'}
+                  {heroHeading}
                 </h2>
-                <p className={styles.focusLead}>
-                  {focusSectionKind === 'optional'
-                    ? 'もっとHossiiを集めたい人へ'
-                    : 'まずはこの質問に答えてみよう'}
-                </p>
-                <ul className={styles.itemList}>
-                  {renderItemCard(
-                    focusItem,
-                    sortedItems.findIndex((item) => item.id === focusItem.id) + 1,
-                    true,
-                  )}
-                </ul>
+                <p className={styles.focusLead}>{heroLead}</p>
+                <ul className={styles.itemList}>{renderHeroCard(heroItem)}</ul>
               </section>
             ) : null}
 
@@ -776,48 +809,19 @@ export const ChallengeScreen = () => {
               onSelectPending={openPendingFromSlot}
             />
 
-            {answeredItems.length > 0 ? (
-              <section
-                className={styles.groupSection}
-                aria-labelledby="challenge-answered-heading"
-              >
-                <h2
-                  id="challenge-answered-heading"
-                  className={styles.groupHeading}
-                  tabIndex={-1}
-                >
-                  回答済み
-                </h2>
-                <ul className={styles.itemList}>
-                  {answeredItems.map((item) =>
-                    renderItemCard(
-                      item,
-                      sortedItems.findIndex((entry) => entry.id === item.id) + 1,
-                      false,
-                    ),
-                  )}
-                </ul>
-              </section>
-            ) : null}
+            <ChallengeRecordsSection
+              records={recordRows}
+              onOpenRecord={(itemId) => openRecallForItem(itemId)}
+            />
 
-            {queuedItems.length > 0 ? (
-              <section
-                className={styles.groupSection}
-                aria-labelledby="challenge-queued-heading"
+            {!stampProgress.isComplete ? (
+              <button
+                type="button"
+                className={styles.trajectoryLink}
+                onClick={openTrajectorySoon}
               >
-                <h2 id="challenge-queued-heading" className={styles.groupHeading}>
-                  これから答える
-                </h2>
-                <ul className={styles.itemList}>
-                  {queuedItems.map((item) =>
-                    renderItemCard(
-                      item,
-                      sortedItems.findIndex((entry) => entry.id === item.id) + 1,
-                      false,
-                    ),
-                  )}
-                </ul>
-              </section>
+                わたしの軌跡を見る
+              </button>
             ) : null}
           </>
         )}
@@ -848,6 +852,11 @@ export const ChallengeScreen = () => {
               setRecallModal(null);
               setActiveItemId(itemId);
             }}
+            onDelete={
+              recallModal.response
+                ? () => deleteResponse(recallModal.item)
+                : undefined
+            }
             onDismiss={() => setRecallModal(null)}
           />
         )}

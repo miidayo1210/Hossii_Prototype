@@ -169,8 +169,9 @@ describe('challengeStampProgress', () => {
     expect(getStampGridColumns(3)).toBe(2);
     expect(getStampGridColumns(7)).toBe(3);
     expect(getStampGridColumns(12)).toBe(4);
-    expect(getStampGridColumns(20)).toBe(5);
-    expect(getStampGridColumns(20, true)).toBe(4);
+    expect(getStampGridColumns(20)).toBe(4);
+    expect(getStampGridColumns(1, true)).toBe(1);
+    expect(getStampGridColumns(20, true)).toBe(2);
   });
 
   it('derives exclusive list status from completions (not responses)', () => {

@@ -30,10 +30,14 @@ function StampSlotCell({
 }) {
   const typeLabel = slot.item.itemType === 'question' ? '質問' : 'ミッション';
   const requiredLabel = slot.item.isRequired ? 'クリアに必要' : 'おまけ';
-  const stateLabel = slot.achieved ? '獲得済み' : '未獲得';
+  const stateLabel = slot.achieved
+    ? slot.hossiiKey
+      ? 'GET!'
+      : '獲得済み'
+    : 'まだ';
   const ariaLabel = slot.achieved
-    ? `${slot.item.title}のスタンプを振り返る`
-    : `${slot.item.title}に答える`;
+    ? `${slot.item.title}のスタンプを振り返る、${typeLabel}、${requiredLabel}、獲得済み`
+    : `${slot.item.title}に答える、${typeLabel}、${requiredLabel}、未獲得`;
 
   const stampVisual =
     slot.achieved && slot.hossiiKey ? (
@@ -52,7 +56,7 @@ function StampSlotCell({
     );
 
   return (
-    <li className={`${styles.slot} ${slot.achieved ? styles.slotAchieved : ''}`}>
+    <li className={`${styles.slot} ${slot.achieved ? styles.slotAchieved : styles.slotPending}`}>
       <button
         type="button"
         className={styles.slotButton}
@@ -65,15 +69,11 @@ function StampSlotCell({
         <span className={styles.slotIndex} aria-hidden="true">
           {slot.index}
         </span>
-        <p className={styles.slotTitle}>{slot.item.title}</p>
-        <span className={styles.slotMeta}>
-          {typeLabel}・{requiredLabel}
-        </span>
         <div className={styles.stampArea}>
           {stampVisual}
           <span
-            className={`${styles.stateText} ${
-              slot.achieved ? '' : styles.stateTextEmpty
+            className={`${styles.stateChip} ${
+              slot.achieved ? styles.stateChipGot : styles.stateChipEmpty
             }`}
           >
             {stateLabel}
@@ -104,39 +104,35 @@ export function ChallengeProgressSummary({ slots }: Props) {
       ? progress.requiredDone / progress.requiredTotal
       : 0;
 
+  const countLabel = progress.treatsAllAsOptional
+    ? `達成 ${progress.optionalDone + progress.requiredDone} / ${slots.length}`
+    : progress.optionalTotal > 0
+      ? `必須 ${progress.requiredDone} / ${progress.requiredTotal} · おまけ ${progress.optionalDone} / ${progress.optionalTotal}`
+      : `必須 ${progress.requiredDone} / ${progress.requiredTotal}`;
+
+  const statusShort = progress.isComplete
+    ? 'クリア！'
+    : `あと${progress.remainingRequired}つでクリア`;
+
   return (
     <section
       className={`${styles.summary} ${
         progress.isComplete ? styles.summaryClear : ''
       }`}
-      aria-label="挑戦状の進捗"
+      aria-label={`挑戦状の進捗：${status}`}
     >
       <div className={styles.progressRow}>
-        {progress.treatsAllAsOptional ? (
-          <span>
-            達成{' '}
-            <span className={styles.progressStrong}>
-              {progress.optionalDone + progress.requiredDone} / {slots.length}
-            </span>
-          </span>
-        ) : (
-          <>
-            <span>
-              必須{' '}
-              <span className={styles.progressStrong}>
-                {progress.requiredDone} / {progress.requiredTotal}
-              </span>
-            </span>
-            {progress.optionalTotal > 0 && (
-              <span>
-                おまけ{' '}
-                <span className={styles.progressStrong}>
-                  {progress.optionalDone} / {progress.optionalTotal}
-                </span>
-              </span>
-            )}
-          </>
-        )}
+        <span>
+          <span className={styles.progressStrong}>{countLabel}</span>
+        </span>
+        <span
+          className={`${styles.statusInline} ${
+            progress.isComplete ? styles.statusInlineClear : ''
+          }`}
+          aria-live="polite"
+        >
+          {statusShort}
+        </span>
       </div>
       <div
         className={styles.summaryTrack}
@@ -157,17 +153,10 @@ export function ChallengeProgressSummary({ slots }: Props) {
           style={{ width: `${Math.min(clearRatio, 1) * 100}%` }}
         />
       </div>
-      <p
-        className={`${styles.statusLine} ${
-          progress.isComplete ? '' : styles.statusLinePending
-        }`}
-        aria-live="polite"
-      >
-        {status}
-      </p>
-      {collected ? <p className={styles.collectedLine}>{collected}</p> : null}
-      {optionalLeftover ? (
-        <p className={styles.optionalLine}>{optionalLeftover}</p>
+      {progress.isComplete && (collected || optionalLeftover) ? (
+        <p className={styles.collectedLine}>
+          {[collected, optionalLeftover].filter(Boolean).join(' · ')}
+        </p>
       ) : null}
     </section>
   );
@@ -224,7 +213,9 @@ export const ChallengeStampCard = ({
                 <button
                   type="button"
                   className={`${styles.previewSlot} ${
-                    slot.achieved ? styles.previewSlotAchieved : ''
+                    slot.achieved
+                      ? styles.previewSlotAchieved
+                      : styles.previewSlotPending
                   }`}
                   aria-label={
                     slot.achieved
@@ -250,9 +241,6 @@ export const ChallengeStampCard = ({
                       aria-hidden="true"
                     />
                   )}
-                  <span className={styles.previewState}>
-                    {slot.achieved ? '獲得済み' : 'まだ'}
-                  </span>
                 </button>
               </li>
             ))}
@@ -265,9 +253,7 @@ export const ChallengeStampCard = ({
 
       {(expanded || autoExpand) && (
         <div id={panelId}>
-          <p className={styles.hint}>
-            スタンプを押すと、挑戦の記憶を振り返れます
-          </p>
+          <p className={styles.hint}>スタンプを押して、思い出をひらこう</p>
           {progress.isComplete ? (
             <p className={styles.detailClearNote} aria-live="polite">
               {formatRemainingLabel(progress)}
