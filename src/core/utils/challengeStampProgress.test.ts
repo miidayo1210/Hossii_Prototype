@@ -4,12 +4,16 @@ import type { ChallengeCompletion, ChallengeReward } from '../types/challengeRew
 import {
   buildChallengeStampSlots,
   compareChallengeItems,
+  formatCollectedHossiiLabel,
+  formatOptionalLeftoverLabel,
   formatRemainingLabel,
   getChallengeListCtaLabel,
   getChallengeListProgress,
   getChallengeStampProgress,
   getStampGridColumns,
+  getStampPreviewLimit,
   pickNextChallengeFocusItemId,
+  shouldAutoExpandStampDetails,
 } from './challengeStampProgress';
 
 function item(
@@ -214,5 +218,56 @@ describe('challengeStampProgress', () => {
     expect(pickNextChallengeFocusItemId(items, ['r1'])).toBe('r2');
     expect(pickNextChallengeFocusItemId(items, ['r1', 'r2'])).toBe('o1');
     expect(pickNextChallengeFocusItemId(items, ['r1', 'r2', 'o1'])).toBeNull();
+  });
+
+  it('formats remaining, optional leftover, and collected labels', () => {
+    const incomplete = getChallengeStampProgress(
+      buildChallengeStampSlots(
+        [
+          item({ id: 'r1', title: '必須1', isRequired: true }),
+          item({ id: 'r2', title: '必須2', isRequired: true, sortOrder: 1 }),
+        ],
+        [completion('r1')],
+        [reward('r1')],
+      ),
+    );
+    expect(formatRemainingLabel(incomplete)).toBe('あと1つでクリア');
+    expect(formatOptionalLeftoverLabel(incomplete)).toBeNull();
+
+    const clearWithOptional = getChallengeStampProgress(
+      buildChallengeStampSlots(
+        [
+          item({ id: 'r1', title: '必須', isRequired: true }),
+          item({ id: 'o1', title: 'おまけ', isRequired: false, sortOrder: 1 }),
+        ],
+        [completion('r1')],
+        [reward('r1')],
+      ),
+    );
+    expect(formatRemainingLabel(clearWithOptional)).toContain(
+      'すべての必須の挑戦を達成しました',
+    );
+    expect(formatOptionalLeftoverLabel(clearWithOptional)).toBe(
+      'おまけの挑戦があと1つあります',
+    );
+
+    const slots = buildChallengeStampSlots(
+      [
+        item({ id: 'r1', title: '必須', isRequired: true }),
+        item({ id: 'o1', title: 'おまけ', isRequired: false, sortOrder: 1 }),
+      ],
+      [completion('r1')],
+      [reward('r1')],
+    );
+    expect(formatCollectedHossiiLabel(slots)).toBe('1つのHossiiを集めました');
+  });
+
+  it('limits stamp preview and auto-expand thresholds', () => {
+    expect(getStampPreviewLimit(0)).toBe(0);
+    expect(getStampPreviewLimit(3)).toBe(3);
+    expect(getStampPreviewLimit(10)).toBe(4);
+    expect(shouldAutoExpandStampDetails(0)).toBe(false);
+    expect(shouldAutoExpandStampDetails(4)).toBe(true);
+    expect(shouldAutoExpandStampDetails(5)).toBe(false);
   });
 });

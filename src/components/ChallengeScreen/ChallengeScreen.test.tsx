@@ -412,6 +412,23 @@ describe('ChallengeScreen focused response UI', () => {
     expect(screen.getAllByRole('button', { name: /この質問に答える/ })).toHaveLength(2);
   });
 
+  it('places compact progress and next challenge before stamp details', async () => {
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: /挑戦する/ }));
+    await screen.findByRole('heading', { name: '次の挑戦' });
+
+    const progress = screen.getByLabelText('挑戦状の進捗');
+    const focus = screen.getByRole('heading', { name: '次の挑戦' });
+    const stamps = screen.getByLabelText('Hossiiスタンプカード');
+    const answered = screen.getByRole('heading', { name: 'これから答える' });
+
+    expect(progress.compareDocumentPosition(focus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(focus.compareDocumentPosition(stamps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(stamps.compareDocumentPosition(answered) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('あと2つでクリア')).toBeTruthy();
+    expect(screen.getByText('一度もらったHossiiは残ります')).toBeTruthy();
+  });
+
   it('moves focus to optional after required items are answered', async () => {
     listMyChallengeResponsesMock.mockResolvedValue([
       {

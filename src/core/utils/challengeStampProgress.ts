@@ -42,6 +42,17 @@ export function buildChallengeStampSlots(
   const completionByItem = new Map(completions.map((c) => [c.itemId, c]));
   const rewardByItem = new Map(rewards.map((r) => [r.itemId, r]));
 
+  if (import.meta.env.DEV) {
+    for (const reward of rewards) {
+      if (!completionByItem.has(reward.itemId)) {
+        console.warn(
+          '[challenge] reward without matching completion',
+          reward.itemId,
+        );
+      }
+    }
+  }
+
   return [...items].sort(compareChallengeItems).map((item, index) => {
     const completion = completionByItem.get(item.id) ?? null;
     const reward = rewardByItem.get(item.id) ?? null;
@@ -103,9 +114,35 @@ export function formatRemainingLabel(progress: ChallengeStampProgress): string {
   if (progress.isComplete) {
     return progress.treatsAllAsOptional
       ? '挑戦状クリア！すべてのミッションを達成しました'
-      : '挑戦状クリア！すべての必須ミッションを達成しました';
+      : '挑戦状クリア！すべての必須の挑戦を達成しました';
   }
   return `あと${progress.remainingRequired}つでクリア`;
+}
+
+/** Optional leftover after required clear; null when not applicable. */
+export function formatOptionalLeftoverLabel(
+  progress: ChallengeStampProgress,
+): string | null {
+  if (!progress.isComplete || progress.treatsAllAsOptional) return null;
+  const left = progress.optionalTotal - progress.optionalDone;
+  if (left <= 0) return null;
+  return `おまけの挑戦があと${left}つあります`;
+}
+
+export function formatCollectedHossiiLabel(slots: readonly ChallengeStampSlot[]): string {
+  const collected = slots.filter((slot) => slot.achieved).length;
+  return `${collected}つのHossiiを集めました`;
+}
+
+/** How many stamp slots to show in the collapsed preview. */
+export function getStampPreviewLimit(total: number): number {
+  if (total <= 0) return 0;
+  return Math.min(4, total);
+}
+
+/** Auto-expand stamp details when the set is small. */
+export function shouldAutoExpandStampDetails(total: number): boolean {
+  return total > 0 && total <= 4;
 }
 
 /** List-card progress derived with the same completion rules as stamp progress. */
