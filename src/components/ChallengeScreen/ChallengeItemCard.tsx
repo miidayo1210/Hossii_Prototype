@@ -10,6 +10,7 @@ import {
   challengeResponseVisibilityParticipantExplanation,
 } from '../../core/utils/challengeVisibility';
 import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
+import { ChallengeSpaceMembersAnswers } from './ChallengeSpaceMembersAnswers';
 import styles from './ChallengeItemCard.module.css';
 
 export type ChallengeItemDraft = {
@@ -29,6 +30,10 @@ type Props = {
   panelId: string;
   /** responseなしでも completion／reward があるとき */
   stampEarned?: boolean;
+  /** Peer-visible space_members answers for this item (RLS-filtered). */
+  spaceMemberAnswers?: ChallengeResponse[];
+  currentUserId?: string | null;
+  responderNames?: Readonly<Record<string, string>>;
   onExpand: () => void;
   onCollapse: () => void;
   onDraftChange: (draft: ChallengeItemDraft) => void;
@@ -222,6 +227,9 @@ export function ChallengeItemCard({
   emphasized,
   panelId,
   stampEarned,
+  spaceMemberAnswers = [],
+  currentUserId = null,
+  responderNames = {},
   onExpand,
   onCollapse,
   onDraftChange,
@@ -232,6 +240,13 @@ export function ChallengeItemCard({
   showManageActions = true,
 }: Props) {
   const answered = Boolean(existing);
+  const peerAnswers = (
+    <ChallengeSpaceMembersAnswers
+      answers={spaceMemberAnswers}
+      currentUserId={currentUserId}
+      responderNames={responderNames}
+    />
+  );
   const actionMenu =
     answered && showManageActions && onRewrite && onDelete ? (
       <ChallengeResponseActionMenu
@@ -288,6 +303,7 @@ export function ChallengeItemCard({
             </button>
           </>
         )}
+        {peerAnswers}
       </li>
     );
   }
@@ -318,6 +334,7 @@ export function ChallengeItemCard({
           onSave={onSave}
         />
       </div>
+      {peerAnswers}
       {!emphasized ? (
         <button
           type="button"

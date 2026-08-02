@@ -88,4 +88,63 @@ describe('ChallengeItemCard visibility notice', () => {
       screen.queryByText('この回答は、スペースに参加しているみんなへ共有されます。'),
     ).toBeNull();
   });
+
+  it('shows peer space_members answers and hides when empty', () => {
+    const peer: ChallengeResponse = {
+      id: 'r2',
+      itemId: 'i1',
+      userId: 'peer',
+      visibility: 'space_members',
+      comment: 'みんなへ',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const { rerender } = render(
+      <ChallengeItemCard
+        item={item}
+        index={1}
+        existing={undefined}
+        draft={{ comment: '' }}
+        resolvedVisibility="manager_only"
+        saving={false}
+        expanded
+        emphasized
+        panelId="panel-1"
+        spaceMemberAnswers={[peer]}
+        currentUserId="me"
+        responderNames={{ peer: '参加者A' }}
+        onExpand={() => undefined}
+        onCollapse={() => undefined}
+        onDraftChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /みんなの回答 1件/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /みんなの回答 1件/ }));
+    expect(screen.getByText('みんなへ')).toBeTruthy();
+    expect(screen.getByText('参加者A')).toBeTruthy();
+
+    rerender(
+      <ChallengeItemCard
+        item={item}
+        index={1}
+        existing={undefined}
+        draft={{ comment: '' }}
+        resolvedVisibility="manager_only"
+        saving={false}
+        expanded
+        emphasized
+        panelId="panel-1"
+        spaceMemberAnswers={[]}
+        currentUserId="me"
+        responderNames={{}}
+        onExpand={() => undefined}
+        onCollapse={() => undefined}
+        onDraftChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /みんなの回答/ })).toBeNull();
+  });
 });
