@@ -464,14 +464,19 @@ export const ChallengeScreen = () => {
       setFormError('コメントは500文字以内で入力してください');
       return;
     }
-    const hadResponse = Boolean(myResponses[item.id]);
+    const existingResponse = myResponses[item.id];
+    const hadResponse = Boolean(existingResponse);
     setBusyItemId(item.id);
     setFormError(null);
     try {
-      // RPC ignores p_visibility and stamps from item/program settings (or keeps on rewrite).
+      // Phase 2 RPC ignores p_visibility. Pre-Phase 2 RPC still writes it on upsert,
+      // so rewrite must echo the stamped snapshot to avoid widening self_only.
       const result = await submitChallengeCommentResponse({
         itemId: item.id,
         comment: draft.comment,
+        ...(existingResponse
+          ? { visibility: existingResponse.visibility }
+          : {}),
       });
       if (!result.ok) {
         setFormError(toParticipantSaveError(result.error));

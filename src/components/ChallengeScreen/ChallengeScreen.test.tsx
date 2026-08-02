@@ -766,8 +766,95 @@ describe('ChallengeScreen focused response UI', () => {
       target: { value: '書き直し後' },
     });
     fireEvent.click(screen.getByRole('button', { name: /回答を更新/ }));
+    expect(submitChallengeCommentResponseMock).toHaveBeenCalledWith({
+      itemId: 'i1',
+      comment: '書き直し後',
+      visibility: 'manager_only',
+    });
     expect(await screen.findByText('回答を更新しました')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Hossiiをゲット！' })).toBeNull();
+  });
+
+  it('echoes stamped self_only visibility when rewriting for pre-Phase2 RPC compat', async () => {
+    listMyChallengeResponsesMock.mockResolvedValue([
+      {
+        id: 'r1',
+        itemId: 'i1',
+        userId: 'user-1',
+        visibility: 'self_only',
+        comment: '秘密',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    listMyChallengeCompletionsMock.mockResolvedValue([
+      {
+        id: 'c1',
+        itemId: 'i1',
+        userId: 'user-1',
+        responseId: 'r1',
+        completedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    listMyChallengeRewardsMock.mockResolvedValue([
+      {
+        id: 'rw1',
+        completionId: 'c1',
+        userId: 'user-1',
+        itemId: 'i1',
+        hossiiKey: 'emotion/wow',
+        awardedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+    submitChallengeCommentResponseMock.mockResolvedValue({
+      ok: true,
+      value: {
+        response: {
+          id: 'r1',
+          itemId: 'i1',
+          userId: 'user-1',
+          visibility: 'self_only',
+          comment: '秘密2',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        completion: {
+          id: 'c1',
+          itemId: 'i1',
+          userId: 'user-1',
+          responseId: 'r1',
+          completedAt: new Date(),
+          createdAt: new Date(),
+        },
+        reward: {
+          id: 'rw1',
+          completionId: 'c1',
+          userId: 'user-1',
+          itemId: 'i1',
+          hossiiKey: 'emotion/wow',
+          awardedAt: new Date(),
+          createdAt: new Date(),
+        },
+        isNewReward: false,
+        wasInsert: false,
+      },
+    });
+
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
+    const dialog = await openRecordRecall('質問1');
+    fireEvent.click(within(dialog).getByRole('button', { name: /の回答操作/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '書き直す' }));
+    await screen.findByRole('textbox');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '秘密2' } });
+    fireEvent.click(screen.getByRole('button', { name: /回答を更新/ }));
+    expect(submitChallengeCommentResponseMock).toHaveBeenCalledWith({
+      itemId: 'i1',
+      comment: '秘密2',
+      visibility: 'self_only',
+    });
   });
 
   it('deletes response while keeping completion reward and list progress', async () => {
