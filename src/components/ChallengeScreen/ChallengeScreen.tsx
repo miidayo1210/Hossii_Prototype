@@ -7,6 +7,7 @@ import {
   listMyChallengeResponses,
   listPublishedChallengeItems,
   listPublishedChallengePrograms,
+  listSpaceMemberChallengeResponses,
   deleteChallengeResponse,
 } from '../../core/utils/challengeResponsesApi';
 import {
@@ -15,6 +16,10 @@ import {
   submitChallengeCommentResponse,
 } from '../../core/utils/challengeRewardsApi';
 import { resolveChallengeResponseVisibility } from '../../core/utils/challengeVisibility';
+import {
+  fetchChallengeResponderNicknames,
+  groupChallengeResponsesByItemId,
+} from '../../core/utils/challengeSpaceMemberAnswers';
 import { getChallengeHossiiImageUrl } from '../../core/assets/challengeHossiiKeys';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
 import {
@@ -203,6 +208,12 @@ export const ChallengeScreen = () => {
     null,
   );
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [spaceMemberAnswersByItem, setSpaceMemberAnswersByItem] = useState<
+    Record<string, ChallengeResponse[]>
+  >({});
+  const [responderNames, setResponderNames] = useState<Record<string, string>>(
+    {},
+  );
 
   const listRequestIdRef = useRef(0);
   const programsRef = useRef(programs);
@@ -362,10 +373,14 @@ export const ChallengeScreen = () => {
       }
       const programItems = await listPublishedChallengeItems(programId);
       const itemIds = programItems.map((i) => i.id);
-      const [mine, rewards, completions] = await Promise.all([
+      const [mine, rewards, completions, peerAnswers] = await Promise.all([
         listMyChallengeResponses(itemIds),
         listMyChallengeRewards(itemIds),
         listMyChallengeCompletions(itemIds),
+        listSpaceMemberChallengeResponses(itemIds).catch((error) => {
+          console.error('[ChallengeScreen] peer answers:', error);
+          return [] as ChallengeResponse[];
+        }),
       ]);
       const byItem: Record<string, ChallengeResponse> = {};
       const rewardByItem: Record<string, ChallengeReward> = {};
@@ -382,12 +397,19 @@ export const ChallengeScreen = () => {
           comment: existing?.comment ?? '',
         };
       }
+      const peerByItem = groupChallengeResponsesByItemId(peerAnswers);
+      const peerNames = await fetchChallengeResponderNicknames(
+        spaceId,
+        peerAnswers.map((answer) => answer.userId),
+      ).catch(() => ({} as Record<string, string>));
       setActiveProgram(program);
       setItems(programItems);
       setMyResponses(byItem);
       setMyRewards(rewardByItem);
       setMyCompletions(completionByItem);
       setDrafts(nextDrafts);
+      setSpaceMemberAnswersByItem(peerByItem);
+      setResponderNames(peerNames);
       setRewardModal(null);
       setRecallModal(null);
       const listProgress = getChallengeListProgress(
@@ -414,10 +436,28 @@ export const ChallengeScreen = () => {
     }
   };
 
+  const refreshSpaceMemberAnswers = async (itemIds: string[]) => {
+    if (!spaceId || itemIds.length === 0) return;
+    try {
+      const peerAnswers = await listSpaceMemberChallengeResponses(itemIds);
+      const peerByItem = groupChallengeResponsesByItemId(peerAnswers);
+      const peerNames = await fetchChallengeResponderNicknames(
+        spaceId,
+        peerAnswers.map((answer) => answer.userId),
+      );
+      setSpaceMemberAnswersByItem(peerByItem);
+      setResponderNames(peerNames);
+    } catch (error) {
+      console.error('[ChallengeScreen] refresh peer answers:', error);
+    }
+  };
+
   const returnToList = () => {
     setRewardModal(null);
     setRecallModal(null);
     setActiveItemId(null);
+    setSpaceMemberAnswersByItem({});
+    setResponderNames({});
     setView({ kind: 'list' });
     void reloadList();
   };
@@ -511,6 +551,9 @@ export const ChallengeScreen = () => {
           comment: result.value.response.comment,
         },
       }));
+      if (result.value.response.visibility === 'space_members') {
+        void refreshSpaceMemberAnswers(items.map((entry) => entry.id));
+      }
       const nextFocus = pickNextChallengeFocusItemId(
         items,
         Object.keys(nextResponses),
@@ -597,6 +640,9 @@ export const ChallengeScreen = () => {
           comment: '',
         },
       }));
+      if (existing.visibility === 'space_members') {
+        void refreshSpaceMemberAnswers(items.map((entry) => entry.id));
+      }
       setActiveItemId((current) => (current === item.id ? null : current));
       showToast('回答を削除しました');
     } finally {
@@ -701,6 +747,11 @@ export const ChallengeScreen = () => {
         {recallModal && (
           <ChallengeRecallModal
             model={recallModal}
+            spaceMemberAnswers={
+              spaceMemberAnswersByItem[recallModal.item.id] ?? []
+            }
+            currentUserId={userId}
+            responderNames={responderNames}
             onRewrite={() => {
               const item = recallModal.item;
               setRecallModal(null);
@@ -785,6 +836,9 @@ export const ChallengeScreen = () => {
           emphasized
           panelId={`challenge-item-panel-${item.id}`}
           stampEarned={stampEarned}
+          spaceMemberAnswers={spaceMemberAnswersByItem[item.id] ?? []}
+          currentUserId={userId}
+          responderNames={responderNames}
           showManageActions={false}
           onExpand={() => setActiveItemId(item.id)}
           onCollapse={() => setActiveItemId(focusItemId)}
@@ -914,6 +968,11 @@ export const ChallengeScreen = () => {
         {recallModal && (
           <ChallengeRecallModal
             model={recallModal}
+            spaceMemberAnswers={
+              spaceMemberAnswersByItem[recallModal.item.id] ?? []
+            }
+            currentUserId={userId}
+            responderNames={responderNames}
             onRewrite={() => {
               const item = recallModal.item;
               setRecallModal(null);
@@ -923,6 +982,7 @@ export const ChallengeScreen = () => {
               const itemId = recallModal.item.id;
               setRecallModal(null);
               setActiveItemId(itemId);
+              setView({ kind: 'detail', programId: activeProgram.id });
             }}
             onDelete={
               recallModal.response

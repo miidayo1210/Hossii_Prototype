@@ -184,3 +184,33 @@ export async function listManagerChallengeResponses(
 
   return (data as ChallengeResponseRow[]).map(rowToChallengeResponse);
 }
+
+/**
+ * Peer-visible answers for challenge items.
+ * Client requests visibility=space_members only; RLS is the authority for
+ * active-member / space boundaries (self_only and manager_only stay hidden).
+ */
+export async function listSpaceMemberChallengeResponses(
+  itemIds: string[],
+): Promise<ChallengeResponse[]> {
+  const ids = itemIds.map((id) => id.trim()).filter(Boolean);
+  if (ids.length === 0) return [];
+  if (!isSupabaseConfigured) return [];
+
+  const { data, error } = await supabase
+    .from('challenge_responses')
+    .select('*')
+    .in('item_id', ids)
+    .eq('visibility', 'space_members')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error(
+      '[challengeResponsesApi] listSpaceMemberChallengeResponses:',
+      error.message,
+    );
+    throw new Error(error.message);
+  }
+
+  return (data as ChallengeResponseRow[]).map(rowToChallengeResponse);
+}

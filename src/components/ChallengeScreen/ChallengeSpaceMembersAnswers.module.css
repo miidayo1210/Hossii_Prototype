@@ -1,0 +1,123 @@
+.section {
+  margin: 0.75rem 0 0;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(233, 213, 255, 0.85);
+  background: rgba(250, 245, 255, 0.72);
+  overflow: hidden;
+}
+
+.toggle {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: #6d28d9;
+  text-align: left;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: -2px;
+}
+
+.toggleLabel {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.chevron {
+  color: #a78bfa;
+  font-size: 0.9rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.65rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.row {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.rowMine {
+  border-color: rgba(236, 72, 153, 0.28);
+  background: rgba(253, 242, 248, 0.95);
+}
+
+.meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6d28d9;
+}
+
+.mineBadge {
+  margin-left: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #db2777;
+}
+
+.date {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.comment {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #334155;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.moreButton {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 0.15rem;
+  border: none;
+  border-radius: 9999px;
+  background: rgba(243, 232, 255, 0.9);
+  color: #6d28d9;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.moreButton:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle,
+  .moreButton {
+    transition: none;
+  }
+}

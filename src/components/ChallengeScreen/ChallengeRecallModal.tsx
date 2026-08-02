@@ -5,6 +5,7 @@ import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
 import { challengeResponseVisibilityLabel } from '../../core/utils/challengeVisibility';
 import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
+import { ChallengeSpaceMembersAnswers } from './ChallengeSpaceMembersAnswers';
 import styles from './ChallengeRecallModal.module.css';
 
 export type ChallengeRecallModalModel = {
@@ -16,6 +17,9 @@ export type ChallengeRecallModalModel = {
 
 type Props = {
   model: ChallengeRecallModalModel;
+  spaceMemberAnswers?: ChallengeResponse[];
+  currentUserId?: string | null;
+  responderNames?: Readonly<Record<string, string>>;
   onRewrite: () => void;
   onAnswerAgain: () => void;
   onDelete?: () => Promise<void> | void;
@@ -36,6 +40,9 @@ function formatAwardedAt(date: Date): string {
 
 export function ChallengeRecallModal({
   model,
+  spaceMemberAnswers = [],
+  currentUserId = null,
+  responderNames = {},
   onRewrite,
   onAnswerAgain,
   onDelete,
@@ -213,6 +220,14 @@ export function ChallengeRecallModal({
             ) : (
               <p className={styles.answerDeleted}>回答は削除済みです</p>
             )}
+          </div>
+
+          <div className={styles.peerAnswers}>
+            <ChallengeSpaceMembersAnswers
+              answers={spaceMemberAnswers}
+              currentUserId={currentUserId}
+              responderNames={responderNames}
+            />
           </div>
         </div>
       </div>
