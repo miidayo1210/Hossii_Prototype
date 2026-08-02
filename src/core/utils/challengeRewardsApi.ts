@@ -7,6 +7,15 @@ import type {
 } from '../types/challengeReward';
 import { normalizeCreateChallengeResponseInput } from './challengeResponseValidation';
 import type { ChallengeMutationResult } from './challengeProgramsApi';
+import {
+  deleteChallengePhotoObject,
+  uploadChallengePhotoObject,
+} from './challengePhotoStorageApi';
+import {
+  CHALLENGE_PHOTO_COMMENT,
+  buildChallengePhotoStoragePath,
+  isValidChallengePhotoStoragePath,
+} from './challengePhoto';
 
 export type ChallengeCompletionRow = {
   id: string;
@@ -34,6 +43,7 @@ type SubmitRpcPayload = {
     user_id: string;
     visibility: string;
     comment: string;
+    photo_path?: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -74,6 +84,7 @@ function mapSubmitPayload(payload: SubmitRpcPayload): SubmitChallengeCommentResu
       userId: payload.response.user_id,
       visibility: payload.response.visibility as ChallengeResponseVisibility,
       comment: payload.response.comment,
+      photoPath: payload.response.photo_path ?? null,
       createdAt: new Date(payload.response.created_at),
       updatedAt: new Date(payload.response.updated_at),
     },
@@ -167,6 +178,98 @@ export async function submitChallengeChoice3(input: {
 
   return { ok: true, value: mapSubmitPayload(data as SubmitRpcPayload) };
 }
+
+/**
+ * Participant write path for photo items (foundation; UI not wired yet).
+ * Client uploads JPEG to private bucket first, then this RPC links the path.
+ * Upsert rewrite (visibility frozen). Completion/reward at most once.
+ * On rewrite, previous photo_path is best-effort deleted after successful RPC.
+ */
+export async function submitChallengePhoto(input: {
+  itemId: string;
+  photoPath: string;
+  /** Previous path to remove after successful rewrite (best-effort). */
+  previousPhotoPath?: string | null;
+}): Promise<ChallengeMutationResult<SubmitChallengeCommentResult>> {
+  const itemId = input.itemId.trim();
+  const photoPath = input.photoPath.trim();
+  if (!itemId) {
+    return { ok: false, error: 'itemId is required' };
+  }
+  if (!photoPath || !isValidChallengePhotoStoragePath(photoPath)) {
+    return { ok: false, error: 'photoPath is invalid' };
+  }
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: 'Supabase is not configured' };
+  }
+
+  const { data, error } = await supabase.rpc('submit_challenge_photo', {
+    p_item_id: itemId,
+    p_photo_path: photoPath,
+  });
+
+  if (error) {
+    console.error('[challengeRewardsApi] submitChallengePhoto:', error.message);
+    if (error.code === '42501') {
+      return { ok: false, error: '権限がありません', code: error.code };
+    }
+    return { ok: false, error: error.message || '回答の保存に失敗しました', code: error.code };
+  }
+  if (!data) {
+    return { ok: false, error: '回答の保存に失敗しました' };
+  }
+
+  const previous = input.previousPhotoPath?.trim() ?? '';
+  if (previous && previous !== photoPath) {
+    const removed = await deleteChallengePhotoObject(previous);
+    if (!removed.ok) {
+      console.warn(
+        '[challengeRewardsApi] submitChallengePhoto: best-effort old photo delete failed:',
+        removed.error,
+      );
+    }
+  }
+
+  return { ok: true, value: mapSubmitPayload(data as SubmitRpcPayload) };
+}
+
+/**
+ * Upload JPEG bytes to the private challenge-photos bucket at a canonical path.
+ * Does not create a response row — call submitChallengePhoto after.
+ */
+export async function uploadChallengePhotoForItem(input: {
+  spaceId: string;
+  itemId: string;
+  userId: string;
+  objectId: string;
+  body: Blob | ArrayBuffer | ArrayBufferView;
+}): Promise<
+  ChallengeMutationResult<{ photoPath: string }>
+> {
+  let photoPath: string;
+  try {
+    photoPath = buildChallengePhotoStoragePath({
+      spaceId: input.spaceId,
+      itemId: input.itemId,
+      userId: input.userId,
+      objectId: input.objectId,
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'photoPath is invalid',
+    };
+  }
+
+  const uploaded = await uploadChallengePhotoObject(photoPath, input.body);
+  if (!uploaded.ok) {
+    return { ok: false, error: uploaded.error };
+  }
+  return { ok: true, value: { photoPath } };
+}
+
+/** Fixed comment used by photo RPC (exported for tests / UI later). */
+export { CHALLENGE_PHOTO_COMMENT };
 
 /**
  * Participant write path for complete_button items.

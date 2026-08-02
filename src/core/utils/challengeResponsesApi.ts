@@ -18,6 +18,7 @@ export type ChallengeResponseRow = {
   user_id: string;
   visibility: string;
   comment: string;
+  photo_path?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -29,6 +30,7 @@ export function rowToChallengeResponse(row: ChallengeResponseRow): ChallengeResp
     userId: row.user_id,
     visibility: row.visibility as ChallengeResponseVisibility,
     comment: row.comment,
+    photoPath: row.photo_path ?? null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -129,8 +131,11 @@ export async function getMyChallengeResponse(
 
 /**
  * Owner DELETE only. INSERT/UPDATE are RPC-only
- * (`submit_challenge_comment_response`) so answers cannot exist without
- * completion/reward. DELETE keeps completion/reward (response_id SET NULL).
+ * so answers cannot exist without completion/reward.
+ * DELETE keeps completion/reward (response_id SET NULL).
+ *
+ * Photo answers: Storage object must be removed successfully before the row
+ * (orphan GC is a later concern; do not leave a row pointing at a missing object).
  */
 export async function deleteChallengeResponse(
   responseId: string,
@@ -140,6 +145,30 @@ export async function deleteChallengeResponse(
   }
   if (!isSupabaseConfigured) {
     return { ok: false, error: 'Supabase is not configured' };
+  }
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('challenge_responses')
+    .select('id, photo_path')
+    .eq('id', responseId.trim())
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error('[challengeResponsesApi] deleteChallengeResponse fetch:', fetchError.message);
+    return mutationFailure(fetchError, '回答の削除に失敗しました');
+  }
+  if (!existing) {
+    return { ok: false, error: '回答を削除できませんでした' };
+  }
+
+  const photoPath =
+    typeof existing.photo_path === 'string' ? existing.photo_path.trim() : '';
+  if (photoPath) {
+    const { deleteChallengePhotoObject } = await import('./challengePhotoStorageApi');
+    const removed = await deleteChallengePhotoObject(photoPath);
+    if (!removed.ok) {
+      return { ok: false, error: removed.error || '写真の削除に失敗しました' };
+    }
   }
 
   const { data, error } = await supabase
