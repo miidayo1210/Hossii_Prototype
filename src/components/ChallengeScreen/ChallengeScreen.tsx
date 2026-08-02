@@ -342,6 +342,8 @@ export const ChallengeScreen = () => {
     setRewardModal(null);
     setRecallModal(null);
     setActiveItemId(null);
+    setSpaceMemberAnswersByItem({});
+    setResponderNames({});
     setPrograms([]);
     setListProgressByProgram({});
     setListBoundSpaceId(null);
