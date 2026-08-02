@@ -127,6 +127,48 @@ export async function submitChallengeCommentResponse(input: {
 }
 
 /**
+ * Participant write path for choice3 items.
+ * Upsert rewrite (visibility frozen). Completion/reward at most once.
+ */
+export async function submitChallengeChoice3(input: {
+  itemId: string;
+  optionIndex: number;
+}): Promise<ChallengeMutationResult<SubmitChallengeCommentResult>> {
+  const itemId = input.itemId.trim();
+  if (!itemId) {
+    return { ok: false, error: 'itemId is required' };
+  }
+  if (
+    !Number.isInteger(input.optionIndex) ||
+    input.optionIndex < 0 ||
+    input.optionIndex > 2
+  ) {
+    return { ok: false, error: 'optionIndex must be 0, 1, or 2' };
+  }
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: 'Supabase is not configured' };
+  }
+
+  const { data, error } = await supabase.rpc('submit_challenge_choice3', {
+    p_item_id: itemId,
+    p_option_index: input.optionIndex,
+  });
+
+  if (error) {
+    console.error('[challengeRewardsApi] submitChallengeChoice3:', error.message);
+    if (error.code === '42501') {
+      return { ok: false, error: '権限がありません', code: error.code };
+    }
+    return { ok: false, error: error.message || '回答の保存に失敗しました', code: error.code };
+  }
+  if (!data) {
+    return { ok: false, error: '回答の保存に失敗しました' };
+  }
+
+  return { ok: true, value: mapSubmitPayload(data as SubmitRpcPayload) };
+}
+
+/**
  * Participant write path for complete_button items.
  * Insert-or-return (no rewrite). Completion/reward at most once.
  */

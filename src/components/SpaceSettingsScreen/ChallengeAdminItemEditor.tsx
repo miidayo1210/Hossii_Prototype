@@ -13,6 +13,12 @@ import {
 } from '../../core/types/challengeResponse';
 import { CHALLENGE_ITEM_BODY_MAX_LENGTH } from '../../core/utils/challengeAdminDisplay';
 import {
+  CHALLENGE_CHOICE3_OPTION_COUNT,
+  CHALLENGE_CHOICE3_OPTION_MAX_LENGTH,
+  emptyChallengeChoice3Options,
+  type ChallengeChoice3Options,
+} from '../../core/utils/challengeChoice3';
+import {
   challengeResponseVisibilityHelp,
   challengeResponseVisibilityLabel,
   resolveChallengeResponseVisibility,
@@ -28,13 +34,25 @@ export type ChallengeAdminItemFormState = {
   responseType: ChallengeResponseType;
   /** null = inherit program default */
   responseVisibility: ChallengeResponseVisibility | null;
+  /** choice3 labels (exactly 3 slots in the form). */
+  choiceOptions: ChallengeChoice3Options;
 };
 
 function responseTypeLabel(responseType: ChallengeResponseType): string {
   if (responseType === 'complete_button') return '完了ボタン';
   if (responseType === 'comment') return 'コメント';
-  if (responseType === 'choice3') return '3択（未対応）';
+  if (responseType === 'choice3') return '3択';
   return '写真（未対応）';
+}
+
+function responseTypeHelp(responseType: ChallengeResponseType): string {
+  if (responseType === 'complete_button') {
+    return '参加者が「完了する」を押すだけで達成します';
+  }
+  if (responseType === 'choice3') {
+    return '参加者が3つの選択肢から1つ選んで回答します';
+  }
+  return '参加者がコメントを書いて回答します';
 }
 
 type Props = {
@@ -195,7 +213,7 @@ export function ChallengeAdminItemEditor({
 
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>回答形式</legend>
-        <div className={styles.typeGrid}>
+        <div className={styles.typeGrid3}>
           {CHALLENGE_ADMIN_SELECTABLE_RESPONSE_TYPES.map((option) => (
             <label
               key={option}
@@ -208,21 +226,62 @@ export function ChallengeAdminItemEditor({
                 name={`item-response-type-${titleId}`}
                 checked={value.responseType === option}
                 disabled={busy}
-                onChange={() => onChange({ ...value, responseType: option })}
+                onChange={() =>
+                  onChange({
+                    ...value,
+                    responseType: option,
+                    choiceOptions:
+                      option === 'choice3' &&
+                      value.choiceOptions.every((entry) => !entry.trim())
+                        ? emptyChallengeChoice3Options()
+                        : value.choiceOptions,
+                  })
+                }
               />
               <span className={styles.choiceTitle}>
                 {responseTypeLabel(option)}
               </span>
               <span className={styles.choiceBody}>
-                {option === 'complete_button'
-                  ? '参加者が「完了する」を押すだけで達成します'
-                  : '参加者がコメントを書いて回答します'}
+                {responseTypeHelp(option)}
               </span>
             </label>
           ))}
         </div>
-        <p className={styles.help}>3択・写真はまだ選択できません。</p>
+        <p className={styles.help}>写真形式はまだ選択できません。</p>
       </fieldset>
+
+      {value.responseType === 'choice3' ? (
+        <fieldset className={styles.fieldset}>
+          <legend className={styles.legend}>選択肢（3つ）</legend>
+          <p className={styles.help}>
+            参加者が選ぶ文言です。回答時にこのラベルがそのまま保存されます。
+          </p>
+          {Array.from({ length: CHALLENGE_CHOICE3_OPTION_COUNT }, (_, index) => (
+            <div key={`choice-option-${index}`} className={styles.label}>
+              <label htmlFor={`${titleId}-option-${index}`}>
+                選択肢{index + 1}
+              </label>
+              <input
+                id={`${titleId}-option-${index}`}
+                className={styles.input}
+                value={value.choiceOptions[index] ?? ''}
+                maxLength={CHALLENGE_CHOICE3_OPTION_MAX_LENGTH}
+                placeholder={`例：選択肢${index + 1}`}
+                disabled={busy}
+                onChange={(event) => {
+                  const next = [...value.choiceOptions] as ChallengeChoice3Options;
+                  next[index] = event.target.value;
+                  onChange({ ...value, choiceOptions: next });
+                }}
+              />
+              <span className={styles.counter}>
+                {(value.choiceOptions[index] ?? '').length} /{' '}
+                {CHALLENGE_CHOICE3_OPTION_MAX_LENGTH}
+              </span>
+            </div>
+          ))}
+        </fieldset>
+      ) : null}
 
       <div className={styles.preview} aria-label="参加者への表示イメージ">
         <p className={styles.previewLabel}>参加者への表示イメージ</p>

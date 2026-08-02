@@ -8,6 +8,7 @@ export const CHALLENGE_COMPLETE_BUTTON_LABEL = '完了する';
 export const CHALLENGE_PARTICIPANT_RESPONSE_TYPES = [
   'comment',
   'complete_button',
+  'choice3',
 ] as const;
 
 export type ChallengeParticipantResponseType =

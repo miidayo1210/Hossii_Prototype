@@ -82,7 +82,7 @@ export async function listPublishedChallengeItems(
     .from('challenge_items')
     .select('*')
     .eq('program_id', programId.trim())
-    .in('response_type', ['comment', 'complete_button'])
+    .in('response_type', ['comment', 'complete_button', 'choice3'])
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
 

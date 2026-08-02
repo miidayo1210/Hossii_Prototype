@@ -63,7 +63,7 @@ describe('challengeValidation', () => {
     ).toBe(false);
   });
 
-  it('accepts complete_button and choice3 response types', () => {
+  it('accepts complete_button and choice3 with exactly 3 options', () => {
     expect(
       normalizeCreateChallengeItemInput({
         programId: 'p1',
@@ -77,7 +77,21 @@ describe('challengeValidation', () => {
         title: 'q',
         responseType: 'choice3',
       }).ok,
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      normalizeCreateChallengeItemInput({
+        programId: 'p1',
+        title: 'q',
+        responseType: 'choice3',
+        responseConfig: { options: ['A', 'B', 'C'] },
+      }),
+    ).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        responseType: 'choice3',
+        responseConfig: { options: ['A', 'B', 'C'] },
+      }),
+    });
   });
 
   it('rejects negative sortOrder', () => {

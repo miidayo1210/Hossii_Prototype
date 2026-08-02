@@ -9,6 +9,10 @@ import {
   CHALLENGE_COMPLETE_BUTTON_LABEL,
 } from '../../core/utils/challengeCompleteButton';
 import {
+  findChallengeChoice3OptionIndex,
+  parseChallengeChoice3Options,
+} from '../../core/utils/challengeChoice3';
+import {
   challengeResponseVisibilityLabel,
   challengeResponseVisibilityParticipantExplanation,
 } from '../../core/utils/challengeVisibility';
@@ -152,6 +156,52 @@ function CommentResponseSlot({
   );
 }
 
+function Choice3ResponseSlot({
+  itemId,
+  options,
+  selectedLabel,
+  disabled,
+  onSelect,
+}: {
+  itemId: string;
+  options: readonly string[];
+  selectedLabel: string;
+  disabled: boolean;
+  onSelect: (label: string) => void;
+}) {
+  const selectedIndex = findChallengeChoice3OptionIndex(options, selectedLabel);
+  return (
+    <fieldset className={styles.choiceFieldset}>
+      <legend className={styles.choiceLegend}>選択肢から1つ選ぶ</legend>
+      <div className={styles.choiceList} role="radiogroup" aria-label="回答の選択肢">
+        {options.map((option, index) => {
+          const inputId = `choice3-${itemId}-${index}`;
+          const checked = selectedIndex === index;
+          return (
+            <label
+              key={inputId}
+              className={`${styles.choiceOption} ${
+                checked ? styles.choiceOptionSelected : ''
+              }`}
+              htmlFor={inputId}
+            >
+              <input
+                id={inputId}
+                type="radio"
+                name={`choice3-${itemId}`}
+                checked={checked}
+                disabled={disabled}
+                onChange={() => onSelect(option)}
+              />
+              <span className={styles.choiceOptionLabel}>{option}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 function ResponseEditor({
   item,
   draft,
@@ -206,6 +256,58 @@ function ResponseEditor({
           </>
         )}
         {existing ? <VisibilityNotice visibility={visibility} /> : null}
+      </div>
+    );
+  }
+
+  if (item.responseType === 'choice3') {
+    const options = parseChallengeChoice3Options(item.responseConfig);
+    return (
+      <div className={styles.responseSlot}>
+        {item.reason ? (
+          <p className={styles.reason}>なぜ取り組むのか：{item.reason}</p>
+        ) : null}
+        {existing ? (
+          <p className={styles.existingAnswer} aria-live="polite">
+            保存済み（{challengeResponseVisibilityLabel(existing.visibility)}）
+            {'\n'}
+            {existing.comment}
+          </p>
+        ) : null}
+        {!existing && stampEarned ? (
+          <p className={styles.stampEarnedNote}>スタンプ獲得済み</p>
+        ) : null}
+        {options ? (
+          <Choice3ResponseSlot
+            itemId={item.id}
+            options={options}
+            selectedLabel={draft.comment}
+            disabled={saving}
+            onSelect={(comment) => onDraftChange({ ...draft, comment })}
+          />
+        ) : (
+          <p className={styles.note}>選択肢を読み込めませんでした。</p>
+        )}
+        <VisibilityNotice visibility={visibility} />
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            disabled={
+              saving ||
+              !options ||
+              findChallengeChoice3OptionIndex(options, draft.comment) < 0
+            }
+            aria-label={
+              existing
+                ? `${item.title}の回答を更新`
+                : `${item.title}の回答を保存`
+            }
+            onClick={onSave}
+          >
+            {saving ? '保存中…' : existing ? '回答を更新' : '回答を保存'}
+          </button>
+        </div>
       </div>
     );
   }

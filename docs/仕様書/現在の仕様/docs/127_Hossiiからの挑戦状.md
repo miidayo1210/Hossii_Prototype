@@ -487,8 +487,8 @@ MVPでは、次のみを対象とする。
 | 順 | 内部名 | 呼称 | 状態 |
 | --- | --- | --- | --- |
 | 1 | `comment` | コメント | ✅ Production実装済み |
-| 2 | `complete_button` | 完了ボタン | 📌 実装中（PR-A） |
-| 3 | `choice3` | 3択 | 🟡 次（PR-B） |
+| 2 | `complete_button` | 完了ボタン | ✅ Production実装済み |
+| 3 | `choice3` | 3択 | 📌 実装中（PR-B） |
 | 4 | `photo` | 写真 | 🟡 後続（Storage検討が必要） |
 
 CHECK は `comment / complete_button / choice3 / photo`。旧候補名 `completion` / `single_choice` は使わない。  
@@ -517,13 +517,19 @@ Production ではコメント回答を運用する。参加者は文章を入力
 * Recall／挑戦の記録／みんなの回答では「完了しました」を表示
 * 管理者承認・完了後コメント／写真は対象外
 
-## 11.3 3択 🟡
+## 11.3 3択 📌
 
-* 管理者が選択肢を3つ設定する（`response_config`）
+確定仕様：
+
+* 管理者が選択肢をちょうど3つ設定する（`response_config.options`）
 * 参加者が1つを選ぶ
-* 選択ラベルは `challenge_responses.comment` にスナップショット保存（PR-B）
+* 選択ラベルは `challenge_responses.comment` にスナップショット保存
+* 書込は `submit_challenge_choice3` RPC（`p_option_index` 0..2）
+* 再回答で選択変更可。既存回答の `visibility` は維持。削除後の新規回答は現在設定を stamp
+* 初回のみ completion／reward。削除後の再回答でも reward は再付与しない
+* Recall／挑戦の記録／みんなの回答では選択ラベル（comment）を表示
 
-❓ 未決定：正解の有無、集計UI。再回答で選択変更は可（方針確定済み）。
+❓ 未決定／今回対象外：正解判定、集計UI、回答後コメント。
 
 ## 11.4 写真 🟡
 

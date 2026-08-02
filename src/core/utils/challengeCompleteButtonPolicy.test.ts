@@ -49,6 +49,7 @@ describe('challengeCompleteButton helpers', () => {
     expect(CHALLENGE_PARTICIPANT_RESPONSE_TYPES).toEqual([
       'comment',
       'complete_button',
+      'choice3',
     ]);
   });
 });

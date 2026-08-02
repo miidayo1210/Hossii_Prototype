@@ -1,6 +1,10 @@
 /** Display helpers for challenge admin UI (no DB source of truth). */
 
-import { CHALLENGE_TITLE_MAX_LENGTH } from '../types/challengeProgram';
+import {
+  CHALLENGE_TITLE_MAX_LENGTH,
+  type ChallengeResponseType,
+} from '../types/challengeProgram';
+import { normalizeChallengeChoice3Options } from './challengeChoice3';
 
 /** UI guidance for description/reason (DB text is unbounded). */
 export const CHALLENGE_ITEM_BODY_MAX_LENGTH = 1000;
@@ -56,6 +60,8 @@ export function validateChallengeItemForm(input: {
   title: string;
   description: string;
   reason: string;
+  responseType?: ChallengeResponseType;
+  choiceOptions?: readonly string[];
 }): string | null {
   const title = input.title.trim();
   if (!title) return '参加者に表示する問い・ミッションを入力してください';
@@ -67,6 +73,10 @@ export function validateChallengeItemForm(input: {
   }
   if (input.reason.length > CHALLENGE_ITEM_BODY_MAX_LENGTH) {
     return `この挑戦のねらいは${CHALLENGE_ITEM_BODY_MAX_LENGTH}文字以内で入力してください`;
+  }
+  if (input.responseType === 'choice3') {
+    const options = normalizeChallengeChoice3Options(input.choiceOptions ?? []);
+    if (!options.ok) return options.message;
   }
   return null;
 }

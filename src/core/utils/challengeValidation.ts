@@ -13,6 +13,7 @@ import {
 } from '../types/challengeProgram';
 import type { ChallengeResponseVisibility } from '../types/challengeResponse';
 import { CHALLENGE_RESPONSE_VISIBILITY_DEFAULT } from '../types/challengeResponse';
+import { normalizeChallengeChoice3Options } from './challengeChoice3';
 import { isChallengeResponseVisibility } from './challengeVisibility';
 
 export type ChallengeValidationResult<T> =
@@ -240,6 +241,32 @@ export function normalizeCreateChallengeItemInput(
     return { ok: false, message: 'invalid challenge response config' };
   }
 
+  if (responseType === 'choice3') {
+    const options = normalizeChallengeChoice3Options(
+      responseConfig && typeof responseConfig === 'object'
+        ? (responseConfig as { options?: unknown }).options
+        : undefined,
+    );
+    if (!options.ok) {
+      return { ok: false, message: options.message };
+    }
+    return {
+      ok: true,
+      value: {
+        programId: programId.value,
+        itemType,
+        title: title.value,
+        description: description.value ?? null,
+        reason: reason.value ?? null,
+        responseType,
+        isRequired: input.isRequired ?? true,
+        sortOrder: sortOrder.value ?? 0,
+        responseVisibility: responseVisibility.value ?? null,
+        responseConfig: { options: [...options.value] },
+      },
+    };
+  }
+
   return {
     ok: true,
     value: {
@@ -339,6 +366,19 @@ export function normalizeUpdateChallengeItemInput(
       return { ok: false, message: 'invalid challenge response config' };
     }
     out.responseConfig = input.responseConfig;
+  }
+
+  const effectiveResponseType = out.responseType ?? input.responseType;
+  if (effectiveResponseType === 'choice3' && out.responseConfig !== undefined) {
+    const options = normalizeChallengeChoice3Options(
+      out.responseConfig && typeof out.responseConfig === 'object'
+        ? (out.responseConfig as { options?: unknown }).options
+        : undefined,
+    );
+    if (!options.ok) {
+      return { ok: false, message: options.message };
+    }
+    out.responseConfig = { options: [...options.value] };
   }
 
   if (

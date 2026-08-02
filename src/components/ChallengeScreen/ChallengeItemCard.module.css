@@ -226,6 +226,57 @@
   align-self: flex-end;
 }
 
+.choiceFieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.choiceLegend {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.choiceList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.choiceOption {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(216, 180, 254, 0.85);
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+}
+
+.choiceOption input {
+  accent-color: #7c3aed;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
+.choiceOptionSelected {
+  border-color: rgba(168, 85, 247, 0.7);
+  background: rgba(250, 245, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.18);
+}
+
+.choiceOptionLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .visibilityNotice {
   margin: 0;
   padding: 0.75rem 0.85rem;
