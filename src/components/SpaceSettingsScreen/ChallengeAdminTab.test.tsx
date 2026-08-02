@@ -415,7 +415,9 @@ describe('ChallengeAdminTab', () => {
     fireEvent.click(screen.getByRole('button', { name: '編集をつづける' }));
     fireEvent.click(await screen.findByRole('button', { name: 'ミッションを追加' }));
     expect(screen.getByRole('heading', { name: '項目の内容を入力' })).toBeTruthy();
-    expect(screen.getByText('回答方法：コメント')).toBeTruthy();
+    expect(screen.getByText('回答形式')).toBeTruthy();
+    expect(screen.getByText('コメント')).toBeTruthy();
+    expect(screen.getByText('完了ボタン')).toBeTruthy();
     fireEvent.change(
       screen.getByLabelText('参加者に表示する問い・ミッション'),
       { target: { value: '新しいミッション' } },

@@ -140,6 +140,11 @@ export function ChallengeRecallModal({
               <div className={styles.menuWrap}>
                 <ChallengeResponseActionMenu
                   itemTitle={itemTitle}
+                  variant={
+                    model.item.responseType === 'complete_button'
+                      ? 'deleteOnly'
+                      : 'full'
+                  }
                   onRewrite={() => runAndSkipRestore(onRewrite)}
                   onDelete={async () => {
                     await onDelete();
@@ -152,6 +157,11 @@ export function ChallengeRecallModal({
                 <ChallengeResponseActionMenu
                   itemTitle={itemTitle}
                   variant="answerAgain"
+                  answerAgainLabel={
+                    model.item.responseType === 'complete_button'
+                      ? 'もう一度完了する'
+                      : 'もう一度答える'
+                  }
                   onRewrite={() => {}}
                   onDelete={() => {}}
                   onAnswerAgain={() => runAndSkipRestore(onAnswerAgain)}

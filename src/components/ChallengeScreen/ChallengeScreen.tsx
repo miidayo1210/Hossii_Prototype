@@ -14,6 +14,7 @@ import {
   listMyChallengeCompletions,
   listMyChallengeRewards,
   submitChallengeCommentResponse,
+  submitChallengeCompleteButton,
 } from '../../core/utils/challengeRewardsApi';
 import { resolveChallengeResponseVisibility } from '../../core/utils/challengeVisibility';
 import {
@@ -496,6 +497,96 @@ export const ChallengeScreen = () => {
 
   const saveResponse = async (item: ChallengeItem) => {
     if (busyItemId) return;
+    const existingResponse = myResponses[item.id];
+    const hadResponse = Boolean(existingResponse);
+
+    if (item.responseType === 'complete_button') {
+      if (hadResponse) return;
+      setBusyItemId(item.id);
+      setFormError(null);
+      try {
+        const result = await submitChallengeCompleteButton({ itemId: item.id });
+        if (!result.ok) {
+          setFormError(toParticipantSaveError(result.error));
+          return;
+        }
+        const nextResponses: Record<string, ChallengeResponse> = {
+          ...myResponses,
+          [item.id]: {
+            id: result.value.response.id,
+            itemId: result.value.response.itemId,
+            userId: result.value.response.userId,
+            visibility: result.value.response.visibility,
+            comment: result.value.response.comment,
+            createdAt: result.value.response.createdAt,
+            updatedAt: result.value.response.updatedAt,
+          },
+        };
+        const nextRewards: Record<string, ChallengeReward> = {
+          ...myRewards,
+          [item.id]: result.value.reward,
+        };
+        const nextCompletions: Record<string, ChallengeCompletion> = {
+          ...myCompletions,
+          [item.id]: result.value.completion,
+        };
+        setMyResponses(nextResponses);
+        setMyRewards(nextRewards);
+        setMyCompletions(nextCompletions);
+        setDrafts((prev) => ({
+          ...prev,
+          [item.id]: { comment: result.value.response.comment },
+        }));
+        if (result.value.response.visibility === 'space_members') {
+          void refreshSpaceMemberAnswers(items.map((entry) => entry.id));
+        }
+        const nextFocus = pickNextChallengeFocusItemId(
+          items,
+          Object.keys(nextResponses),
+        );
+        if (result.value.isNewReward) {
+          const nextSlots = buildChallengeStampSlots(
+            items,
+            Object.values(nextCompletions),
+            Object.values(nextRewards),
+          );
+          const nextProgress = getChallengeStampProgress(nextSlots);
+          setRewardModal({
+            hossiiKey: result.value.reward.hossiiKey,
+            itemTitle: item.title,
+            kind: resolveChallengeRewardCelebrationKind(
+              nextProgress,
+              nextFocus != null,
+            ),
+            progressLabel: formatRewardCelebrationProgressLabel(
+              nextProgress,
+              items.length,
+            ),
+            optionalLeftoverLabel: formatOptionalLeftoverLabel(nextProgress),
+            nextFocusItemId: nextFocus,
+          });
+        } else {
+          const nextSlots = buildChallengeStampSlots(
+            items,
+            Object.values(nextCompletions),
+            Object.values(nextRewards),
+          );
+          const nextProgress = getChallengeStampProgress(nextSlots);
+          showToast(
+            result.value.wasInsert ? '完了しました' : 'すでに完了しています',
+          );
+          if (result.value.wasInsert && nextProgress.isComplete && activeProgram) {
+            openRecordsPage(activeProgram.id);
+          } else if (result.value.wasInsert) {
+            setActiveItemId(nextFocus);
+          }
+        }
+      } finally {
+        setBusyItemId(null);
+      }
+      return;
+    }
+
     const draft = drafts[item.id] ?? { comment: '' };
     const trimmed = draft.comment.trim();
     if (!trimmed) {
@@ -506,8 +597,6 @@ export const ChallengeScreen = () => {
       setFormError('コメントは500文字以内で入力してください');
       return;
     }
-    const existingResponse = myResponses[item.id];
-    const hadResponse = Boolean(existingResponse);
     setBusyItemId(item.id);
     setFormError(null);
     try {
@@ -604,6 +693,7 @@ export const ChallengeScreen = () => {
 
   const rewriteResponse = (item: ChallengeItem) => {
     if (busyItemId) return;
+    if (item.responseType === 'complete_button') return;
     const existing = myResponses[item.id];
     if (!existing) return;
     setFormError(null);

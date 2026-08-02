@@ -58,9 +58,26 @@ describe('challengeValidation', () => {
       normalizeCreateChallengeItemInput({
         programId: 'p1',
         title: 'q',
-        responseType: 'choice3' as 'comment',
+        responseType: 'quiz' as 'comment',
       }).ok,
     ).toBe(false);
+  });
+
+  it('accepts complete_button and choice3 response types', () => {
+    expect(
+      normalizeCreateChallengeItemInput({
+        programId: 'p1',
+        title: 'q',
+        responseType: 'complete_button',
+      }).ok,
+    ).toBe(true);
+    expect(
+      normalizeCreateChallengeItemInput({
+        programId: 'p1',
+        title: 'q',
+        responseType: 'choice3',
+      }).ok,
+    ).toBe(true);
   });
 
   it('rejects negative sortOrder', () => {
@@ -159,6 +176,7 @@ describe('row mapping', () => {
       description: 'desc',
       reason: 'why',
       responseVisibility: null,
+      responseConfig: null,
     });
   });
 });
@@ -229,6 +247,7 @@ describe('payload builders', () => {
       is_required: true,
       sort_order: 0,
       response_visibility: null,
+      response_config: null,
     });
   });
 });

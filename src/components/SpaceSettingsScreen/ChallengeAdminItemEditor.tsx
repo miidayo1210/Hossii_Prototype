@@ -1,6 +1,12 @@
 import { useId, useState } from 'react';
-import type { ChallengeItemType } from '../../core/types/challengeProgram';
-import { CHALLENGE_TITLE_MAX_LENGTH } from '../../core/types/challengeProgram';
+import type {
+  ChallengeItemType,
+  ChallengeResponseType,
+} from '../../core/types/challengeProgram';
+import {
+  CHALLENGE_ADMIN_SELECTABLE_RESPONSE_TYPES,
+  CHALLENGE_TITLE_MAX_LENGTH,
+} from '../../core/types/challengeProgram';
 import {
   CHALLENGE_RESPONSE_VISIBILITIES,
   type ChallengeResponseVisibility,
@@ -19,9 +25,17 @@ export type ChallengeAdminItemFormState = {
   description: string;
   reason: string;
   isRequired: boolean;
+  responseType: ChallengeResponseType;
   /** null = inherit program default */
   responseVisibility: ChallengeResponseVisibility | null;
 };
+
+function responseTypeLabel(responseType: ChallengeResponseType): string {
+  if (responseType === 'complete_button') return '完了ボタン';
+  if (responseType === 'comment') return 'コメント';
+  if (responseType === 'choice3') return '3択（未対応）';
+  return '写真（未対応）';
+}
 
 type Props = {
   mode: 'create' | 'edit';
@@ -179,7 +193,36 @@ export function ChallengeAdminItemEditor({
         </div>
       </fieldset>
 
-      <p className={styles.responseMethod}>回答方法：コメント</p>
+      <fieldset className={styles.fieldset}>
+        <legend className={styles.legend}>回答形式</legend>
+        <div className={styles.typeGrid}>
+          {CHALLENGE_ADMIN_SELECTABLE_RESPONSE_TYPES.map((option) => (
+            <label
+              key={option}
+              className={`${styles.choiceCard} ${
+                value.responseType === option ? styles.choiceCardSelected : ''
+              }`}
+            >
+              <input
+                type="radio"
+                name={`item-response-type-${titleId}`}
+                checked={value.responseType === option}
+                disabled={busy}
+                onChange={() => onChange({ ...value, responseType: option })}
+              />
+              <span className={styles.choiceTitle}>
+                {responseTypeLabel(option)}
+              </span>
+              <span className={styles.choiceBody}>
+                {option === 'complete_button'
+                  ? '参加者が「完了する」を押すだけで達成します'
+                  : '参加者がコメントを書いて回答します'}
+              </span>
+            </label>
+          ))}
+        </div>
+        <p className={styles.help}>3択・写真はまだ選択できません。</p>
+      </fieldset>
 
       <div className={styles.preview} aria-label="参加者への表示イメージ">
         <p className={styles.previewLabel}>参加者への表示イメージ</p>
@@ -188,7 +231,8 @@ export function ChallengeAdminItemEditor({
           {value.title.trim() || copy.placeholder}
         </p>
         <p className={styles.previewMeta}>
-          {value.isRequired ? 'クリアに必要' : 'おまけ'} ／ コメントで回答 ／{' '}
+          {value.isRequired ? 'クリアに必要' : 'おまけ'} ／{' '}
+          {responseTypeLabel(value.responseType)}で回答 ／{' '}
           {challengeResponseVisibilityLabel(effectiveVisibility)}
         </p>
       </div>

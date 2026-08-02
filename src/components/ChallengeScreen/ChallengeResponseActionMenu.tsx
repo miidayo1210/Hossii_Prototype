@@ -12,11 +12,13 @@ import styles from './ChallengeResponseActionMenu.module.css';
 type Props = {
   itemTitle: string;
   disabled?: boolean;
-  /** full: 書き直す+削除 / answerAgain: もう一度答えるのみ */
-  variant?: 'full' | 'answerAgain';
+  /** full: 書き直す+削除 / deleteOnly: 削除のみ / answerAgain: もう一度答えるのみ */
+  variant?: 'full' | 'deleteOnly' | 'answerAgain';
   onRewrite: () => void;
   onDelete: () => Promise<void> | void;
   onAnswerAgain?: () => void;
+  /** Overrides the answerAgain menu label (e.g. complete_button). */
+  answerAgainLabel?: string;
 };
 
 type Mode = 'idle' | 'confirmDelete';
@@ -42,6 +44,7 @@ export function ChallengeResponseActionMenu({
   onRewrite,
   onDelete,
   onAnswerAgain,
+  answerAgainLabel = 'もう一度答える',
 }: Props) {
   const menuId = useId();
   const titleId = useId();
@@ -121,10 +124,13 @@ export function ChallengeResponseActionMenu({
     return () => document.removeEventListener('keydown', onKey);
   }, [mode, busy]);
 
+  const menuItemCount =
+    variant === 'full' ? 2 : 1;
+
   const handleMenuKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setFocusedIndex((i) => Math.min(i + 1, 1));
+      setFocusedIndex((i) => Math.min(i + 1, menuItemCount - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setFocusedIndex((i) => Math.max(i - 1, 0));
@@ -133,9 +139,18 @@ export function ChallengeResponseActionMenu({
       setFocusedIndex(0);
     } else if (e.key === 'End') {
       e.preventDefault();
-      setFocusedIndex(1);
+      setFocusedIndex(menuItemCount - 1);
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      if (variant === 'deleteOnly') {
+        handleOpenDelete();
+        return;
+      }
+      if (variant === 'answerAgain') {
+        closeMenu(false);
+        onAnswerAgain?.();
+        return;
+      }
       if (focusedIndex === 0) handleRewrite();
       else handleOpenDelete();
     }
@@ -224,7 +239,17 @@ export function ChallengeResponseActionMenu({
                     onAnswerAgain?.();
                   }}
                 >
-                  もう一度答える
+                  {answerAgainLabel}
+                </button>
+              ) : variant === 'deleteOnly' ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                  tabIndex={0}
+                  onClick={handleOpenDelete}
+                >
+                  回答を削除
                 </button>
               ) : (
                 <>

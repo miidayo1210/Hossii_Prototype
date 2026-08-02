@@ -126,6 +126,39 @@ export async function submitChallengeCommentResponse(input: {
   return { ok: true, value: mapSubmitPayload(data as SubmitRpcPayload) };
 }
 
+/**
+ * Participant write path for complete_button items.
+ * Insert-or-return (no rewrite). Completion/reward at most once.
+ */
+export async function submitChallengeCompleteButton(input: {
+  itemId: string;
+}): Promise<ChallengeMutationResult<SubmitChallengeCommentResult>> {
+  const itemId = input.itemId.trim();
+  if (!itemId) {
+    return { ok: false, error: 'itemId is required' };
+  }
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: 'Supabase is not configured' };
+  }
+
+  const { data, error } = await supabase.rpc('submit_challenge_complete_button', {
+    p_item_id: itemId,
+  });
+
+  if (error) {
+    console.error('[challengeRewardsApi] submitChallengeCompleteButton:', error.message);
+    if (error.code === '42501') {
+      return { ok: false, error: '権限がありません', code: error.code };
+    }
+    return { ok: false, error: error.message || '完了に失敗しました', code: error.code };
+  }
+  if (!data) {
+    return { ok: false, error: '完了に失敗しました' };
+  }
+
+  return { ok: true, value: mapSubmitPayload(data as SubmitRpcPayload) };
+}
+
 export async function listMyChallengeRewards(
   itemIds?: string[],
 ): Promise<ChallengeReward[]> {

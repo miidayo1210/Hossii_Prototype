@@ -75,6 +75,7 @@ const EMPTY_ITEM_FORM: ChallengeAdminItemFormState = {
   description: '',
   reason: '',
   isRequired: true,
+  responseType: 'comment',
   responseVisibility: null,
 };
 
@@ -426,6 +427,10 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       description: item.description ?? '',
       reason: item.reason ?? '',
       isRequired: item.isRequired,
+      responseType:
+        item.responseType === 'complete_button' || item.responseType === 'comment'
+          ? item.responseType
+          : 'comment',
       responseVisibility: item.responseVisibility,
     });
     setShowItemForm(true);
@@ -453,8 +458,9 @@ export const ChallengeAdminTab = ({ space }: Props) => {
         description: itemForm.description,
         reason: itemForm.reason,
         isRequired: itemForm.isRequired,
-        responseType: 'comment',
+        responseType: itemForm.responseType,
         responseVisibility: itemForm.responseVisibility,
+        responseConfig: null,
       });
       setBusy(false);
       if (!result.ok) {
@@ -472,9 +478,10 @@ export const ChallengeAdminTab = ({ space }: Props) => {
         description: itemForm.description,
         reason: itemForm.reason,
         isRequired: itemForm.isRequired,
-        responseType: 'comment',
+        responseType: itemForm.responseType,
         sortOrder: nextSort,
         responseVisibility: itemForm.responseVisibility,
+        responseConfig: null,
       });
       setBusy(false);
       if (!result.ok) {
@@ -520,9 +527,15 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setFormError('公開するには質問またはミッションが1件以上必要です');
       return;
     }
-    const commentItems = items.filter((item) => item.responseType === 'comment');
-    if (commentItems.length === 0) {
-      setFormError('公開するにはコメント形式の項目が1件以上必要です');
+    const answerableItems = items.filter(
+      (item) =>
+        item.responseType === 'comment' ||
+        item.responseType === 'complete_button',
+    );
+    if (answerableItems.length === 0) {
+      setFormError(
+        '公開するにはコメントまたは完了ボタン形式の項目が1件以上必要です',
+      );
       return;
     }
     if (

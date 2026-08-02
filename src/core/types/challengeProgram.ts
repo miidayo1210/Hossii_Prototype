@@ -10,9 +10,12 @@ export type ChallengeItemType = 'question' | 'mission';
 
 export type ChallengeResponseType =
   | 'comment'
-  | 'photo'
-  | 'single_choice'
-  | 'completion';
+  | 'complete_button'
+  | 'choice3'
+  | 'photo';
+
+/** Type-specific item settings (choice3 options, optional button copy, etc.). */
+export type ChallengeResponseConfig = Record<string, unknown>;
 
 export const CHALLENGE_PROGRAM_STATUSES = [
   'draft',
@@ -28,9 +31,15 @@ export const CHALLENGE_ITEM_TYPES = [
 
 export const CHALLENGE_RESPONSE_TYPES = [
   'comment',
+  'complete_button',
+  'choice3',
   'photo',
-  'single_choice',
-  'completion',
+] as const satisfies readonly ChallengeResponseType[];
+
+/** Admin UI may create/edit these today. choice3/photo stay unavailable. */
+export const CHALLENGE_ADMIN_SELECTABLE_RESPONSE_TYPES = [
+  'comment',
+  'complete_button',
 ] as const satisfies readonly ChallengeResponseType[];
 
 export const CHALLENGE_TITLE_MAX_LENGTH = 200;
@@ -61,6 +70,8 @@ export type ChallengeItem = {
   sortOrder: number;
   /** Item override; null inherits program.defaultResponseVisibility. */
   responseVisibility: ChallengeResponseVisibility | null;
+  /** Type-specific settings; null when unused. */
+  responseConfig: ChallengeResponseConfig | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -89,6 +100,7 @@ export type CreateChallengeItemInput = {
   isRequired?: boolean;
   sortOrder?: number;
   responseVisibility?: ChallengeResponseVisibility | null;
+  responseConfig?: ChallengeResponseConfig | null;
 };
 
 export type UpdateChallengeItemInput = {
@@ -100,4 +112,5 @@ export type UpdateChallengeItemInput = {
   isRequired?: boolean;
   sortOrder?: number;
   responseVisibility?: ChallengeResponseVisibility | null;
+  responseConfig?: ChallengeResponseConfig | null;
 };
