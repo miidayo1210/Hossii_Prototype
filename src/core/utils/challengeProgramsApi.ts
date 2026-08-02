@@ -173,6 +173,40 @@ export function buildUpdateChallengeItemPayload(input: {
   return payload;
 }
 
+const CHALLENGE_VISIBILITY_WRITE_KEYS = [
+  'default_response_visibility',
+  'response_visibility',
+] as const;
+
+/** True when PostgREST/Postgres reports Phase 2 visibility columns are absent. */
+export function isMissingChallengeVisibilityColumnError(error: {
+  message?: string;
+  code?: string;
+}): boolean {
+  const message = (error.message ?? '').toLowerCase();
+  const mentionsVisibilityColumn =
+    message.includes('default_response_visibility') ||
+    message.includes('response_visibility');
+  return (
+    error.code === 'PGRST204' ||
+    error.code === '42703' ||
+    (mentionsVisibilityColumn &&
+      (message.includes('column') ||
+        message.includes('schema cache') ||
+        message.includes('could not find')))
+  );
+}
+
+export function stripChallengeVisibilityWriteKeys<
+  T extends Record<string, unknown>,
+>(payload: T): T {
+  const next = { ...payload };
+  for (const key of CHALLENGE_VISIBILITY_WRITE_KEYS) {
+    delete next[key];
+  }
+  return next;
+}
+
 function formatChallengeError(error: { message: string; code?: string }, fallback: string): string {
   if (error.code === '42501') {
     return '権限がありません';
@@ -189,6 +223,34 @@ function mutationFailure(
     error: formatChallengeError(error, fallback),
     ...(error.code ? { code: error.code } : {}),
   };
+}
+
+type WriteResult = {
+  data: unknown;
+  error: { message: string; code?: string } | null;
+};
+
+/**
+ * Insert/update with visibility columns; if Production lacks Phase 2 columns,
+ * retry once without those keys so existing admin create/update still works.
+ */
+async function writeChallengePayload(options: {
+  payload: Record<string, unknown>;
+  write: (payload: Record<string, unknown>) => Promise<WriteResult>;
+  emptyAfterStripError: string;
+}): Promise<WriteResult> {
+  const first = await options.write(options.payload);
+  if (!first.error || !isMissingChallengeVisibilityColumnError(first.error)) {
+    return first;
+  }
+  const stripped = stripChallengeVisibilityWriteKeys(options.payload);
+  if (Object.keys(stripped).length === 0) {
+    return {
+      data: null,
+      error: { message: options.emptyAfterStripError, code: first.error.code },
+    };
+  }
+  return options.write(stripped);
 }
 
 export async function listChallengePrograms(spaceId: string): Promise<ChallengeProgram[]> {
@@ -240,11 +302,18 @@ export async function createChallengeProgram(
   }
 
   const payload = buildCreateChallengeProgramPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_programs')
-    .insert(payload)
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_programs')
+        .insert(nextPayload)
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] createChallengeProgram error:', error.message);
@@ -275,12 +344,19 @@ export async function updateChallengeProgram(
   }
 
   const payload = buildUpdateChallengeProgramPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_programs')
-    .update(payload)
-    .eq('id', programId.trim())
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_programs')
+        .update(nextPayload)
+        .eq('id', programId.trim())
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] updateChallengeProgram error:', error.message);
@@ -407,11 +483,18 @@ export async function createChallengeItem(
   }
 
   const payload = buildCreateChallengeItemPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_items')
-    .insert(payload)
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_items')
+        .insert(nextPayload)
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] createChallengeItem error:', error.message);
@@ -442,12 +525,19 @@ export async function updateChallengeItem(
   }
 
   const payload = buildUpdateChallengeItemPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_items')
-    .update(payload)
-    .eq('id', itemId.trim())
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_items')
+        .update(nextPayload)
+        .eq('id', itemId.trim())
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] updateChallengeItem error:', error.message);

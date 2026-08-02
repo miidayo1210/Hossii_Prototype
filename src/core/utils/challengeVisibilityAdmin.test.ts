@@ -17,8 +17,10 @@ import {
   buildCreateChallengeProgramPayload,
   buildUpdateChallengeItemPayload,
   buildUpdateChallengeProgramPayload,
+  isMissingChallengeVisibilityColumnError,
   rowToChallengeItem,
   rowToChallengeProgram,
+  stripChallengeVisibilityWriteKeys,
 } from './challengeProgramsApi';
 import { hasUnsavedProgramEdits } from './challengeAdminDisplay';
 
@@ -143,5 +145,21 @@ describe('challenge program/item visibility validation and API payloads', () => 
         savedDefaultResponseVisibility: 'manager_only',
       }),
     ).toBe(true);
+  });
+
+  it('strips visibility write keys when Phase 2 columns are missing', () => {
+    expect(
+      isMissingChallengeVisibilityColumnError({
+        code: 'PGRST204',
+        message: "Could not find the 'default_response_visibility' column",
+      }),
+    ).toBe(true);
+    expect(
+      stripChallengeVisibilityWriteKeys({
+        title: 't',
+        default_response_visibility: 'space_members',
+        response_visibility: 'self_only',
+      }),
+    ).toEqual({ title: 't' });
   });
 });
