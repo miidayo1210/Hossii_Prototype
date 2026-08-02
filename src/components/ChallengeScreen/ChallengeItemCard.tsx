@@ -5,12 +5,15 @@ import type {
   ChallengeResponseVisibility,
 } from '../../core/types/challengeResponse';
 import { CHALLENGE_RESPONSE_COMMENT_MAX_LENGTH } from '../../core/types/challengeResponse';
+import {
+  challengeResponseVisibilityLabel,
+  challengeResponseVisibilityParticipantExplanation,
+} from '../../core/utils/challengeVisibility';
 import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
 import styles from './ChallengeItemCard.module.css';
 
 export type ChallengeItemDraft = {
   comment: string;
-  visibility: ChallengeResponseVisibility;
 };
 
 type Props = {
@@ -18,6 +21,8 @@ type Props = {
   index: number;
   existing: ChallengeResponse | undefined;
   draft: ChallengeItemDraft;
+  /** Effective setting for new answers (item override → program default). */
+  resolvedVisibility: ChallengeResponseVisibility;
   saving: boolean;
   expanded: boolean;
   emphasized: boolean;
@@ -35,17 +40,6 @@ type Props = {
   /** 詳細では記録Modal側に寄せるため false 可 */
   showManageActions?: boolean;
 };
-
-function visibilityHelp(visibility: ChallengeResponseVisibility): string {
-  if (visibility === 'self_only') {
-    return '「自分だけに残す」を選ぶと、この回答はあなただけが見られます。';
-  }
-  return '「管理者にだけ共有」を選ぶと、スペース管理者にもこの回答が見られます。';
-}
-
-function visibilityLabel(visibility: ChallengeResponseVisibility): string {
-  return visibility === 'self_only' ? '自分だけに残す' : '管理者にだけ共有';
-}
 
 function formatExcerpt(comment: string | null | undefined): string {
   const text = (comment ?? '').replace(/\s+/g, ' ').trim();
@@ -104,47 +98,18 @@ function ItemDescription({
   );
 }
 
-function VisibilitySelector({
-  itemId,
-  value,
-  disabled,
-  onChange,
+function VisibilityNotice({
+  visibility,
 }: {
-  itemId: string;
-  value: ChallengeResponseVisibility;
-  disabled: boolean;
-  onChange: (value: ChallengeResponseVisibility) => void;
+  visibility: ChallengeResponseVisibility;
 }) {
-  const helpId = `visibility-help-${itemId}`;
   return (
-    <fieldset className={styles.visibilityFieldset} disabled={disabled}>
-      <legend className={styles.visibilityLegend}>公開範囲</legend>
-      <div className={styles.radioRow}>
-        <label className={styles.radioLabel}>
-          <input
-            type="radio"
-            name={`visibility-${itemId}`}
-            value="manager_only"
-            checked={value === 'manager_only'}
-            onChange={() => onChange('manager_only')}
-          />
-          管理者にだけ共有
-        </label>
-        <label className={styles.radioLabel}>
-          <input
-            type="radio"
-            name={`visibility-${itemId}`}
-            value="self_only"
-            checked={value === 'self_only'}
-            onChange={() => onChange('self_only')}
-          />
-          自分だけに残す
-        </label>
-      </div>
-      <p id={helpId} className={styles.visibilityHelp}>
-        {visibilityHelp(value)}
+    <div className={styles.visibilityNotice} aria-live="polite">
+      <p className={styles.visibilityLegend}>公開範囲</p>
+      <p className={styles.visibilityHelp}>
+        {challengeResponseVisibilityParticipantExplanation(visibility)}
       </p>
-    </fieldset>
+    </div>
   );
 }
 
@@ -183,6 +148,7 @@ function ResponseEditor({
   item,
   draft,
   existing,
+  resolvedVisibility,
   saving,
   stampEarned,
   onDraftChange,
@@ -191,11 +157,15 @@ function ResponseEditor({
   item: ChallengeItem;
   draft: ChallengeItemDraft;
   existing: ChallengeResponse | undefined;
+  resolvedVisibility: ChallengeResponseVisibility;
   saving: boolean;
   stampEarned?: boolean;
   onDraftChange: (draft: ChallengeItemDraft) => void;
   onSave: () => void;
 }) {
+  // Rewrite keeps the stamped snapshot; new answers show current settings.
+  const visibility = existing?.visibility ?? resolvedVisibility;
+
   return (
     <div className={styles.responseSlot}>
       {item.reason ? (
@@ -203,7 +173,7 @@ function ResponseEditor({
       ) : null}
       {existing ? (
         <p className={styles.existingAnswer} aria-live="polite">
-          保存済み（{visibilityLabel(existing.visibility)}）
+          保存済み（{challengeResponseVisibilityLabel(existing.visibility)}）
           {'\n'}
           {existing.comment}
         </p>
@@ -221,12 +191,7 @@ function ResponseEditor({
       ) : (
         <p className={styles.note}>この回答形式にはまだ対応していません。</p>
       )}
-      <VisibilitySelector
-        itemId={item.id}
-        value={draft.visibility}
-        disabled={saving}
-        onChange={(visibility) => onDraftChange({ ...draft, visibility })}
-      />
+      <VisibilityNotice visibility={visibility} />
       <div className={styles.actions}>
         <button
           type="button"
@@ -251,6 +216,7 @@ export function ChallengeItemCard({
   index,
   existing,
   draft,
+  resolvedVisibility,
   saving,
   expanded,
   emphasized,
@@ -303,7 +269,7 @@ export function ChallengeItemCard({
               </span>
             </button>
             <p className={styles.compactVisibility}>
-              {visibilityLabel(existing.visibility)}
+              {challengeResponseVisibilityLabel(existing.visibility)}
             </p>
           </>
         ) : (
@@ -345,6 +311,7 @@ export function ChallengeItemCard({
           item={item}
           draft={draft}
           existing={existing}
+          resolvedVisibility={resolvedVisibility}
           saving={saving}
           stampEarned={stampEarned}
           onDraftChange={onDraftChange}

@@ -2,10 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../core/contexts/useAuth';
 import { useHossiiStore } from '../../core/hooks/useHossiiStore';
 import type { ChallengeItem, ChallengeProgram } from '../../core/types/challengeProgram';
-import type {
-  ChallengeResponse,
-  ChallengeResponseVisibility,
-} from '../../core/types/challengeResponse';
+import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import {
   listMyChallengeResponses,
   listPublishedChallengeItems,
@@ -17,6 +14,7 @@ import {
   listMyChallengeRewards,
   submitChallengeCommentResponse,
 } from '../../core/utils/challengeRewardsApi';
+import { resolveChallengeResponseVisibility } from '../../core/utils/challengeVisibility';
 import { getChallengeHossiiImageUrl } from '../../core/assets/challengeHossiiKeys';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
 import {
@@ -193,9 +191,7 @@ export const ChallengeScreen = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [drafts, setDrafts] = useState<
-    Record<string, { comment: string; visibility: ChallengeResponseVisibility }>
-  >({});
+  const [drafts, setDrafts] = useState<Record<string, { comment: string }>>({});
   const [myRewards, setMyRewards] = useState<Record<string, ChallengeReward>>({});
   const [myCompletions, setMyCompletions] = useState<Record<string, ChallengeCompletion>>(
     {},
@@ -374,10 +370,7 @@ export const ChallengeScreen = () => {
       const byItem: Record<string, ChallengeResponse> = {};
       const rewardByItem: Record<string, ChallengeReward> = {};
       const completionByItem: Record<string, ChallengeCompletion> = {};
-      const nextDrafts: Record<
-        string,
-        { comment: string; visibility: ChallengeResponseVisibility }
-      > = {};
+      const nextDrafts: Record<string, { comment: string }> = {};
       for (const entry of programItems) {
         const existing = mine.find((r) => r.itemId === entry.id);
         if (existing) byItem[entry.id] = existing;
@@ -387,7 +380,6 @@ export const ChallengeScreen = () => {
         if (completion) completionByItem[entry.id] = completion;
         nextDrafts[entry.id] = {
           comment: existing?.comment ?? '',
-          visibility: existing?.visibility ?? 'manager_only',
         };
       }
       setActiveProgram(program);
@@ -462,10 +454,7 @@ export const ChallengeScreen = () => {
 
   const saveResponse = async (item: ChallengeItem) => {
     if (busyItemId) return;
-    const draft = drafts[item.id] ?? {
-      comment: '',
-      visibility: 'manager_only' as const,
-    };
+    const draft = drafts[item.id] ?? { comment: '' };
     const trimmed = draft.comment.trim();
     if (!trimmed) {
       setFormError('コメントを入力してください');
@@ -475,14 +464,19 @@ export const ChallengeScreen = () => {
       setFormError('コメントは500文字以内で入力してください');
       return;
     }
-    const hadResponse = Boolean(myResponses[item.id]);
+    const existingResponse = myResponses[item.id];
+    const hadResponse = Boolean(existingResponse);
     setBusyItemId(item.id);
     setFormError(null);
     try {
+      // Phase 2 RPC ignores p_visibility. Pre-Phase 2 RPC still writes it on upsert,
+      // so rewrite must echo the stamped snapshot to avoid widening self_only.
       const result = await submitChallengeCommentResponse({
         itemId: item.id,
         comment: draft.comment,
-        visibility: draft.visibility,
+        ...(existingResponse
+          ? { visibility: existingResponse.visibility }
+          : {}),
       });
       if (!result.ok) {
         setFormError(toParticipantSaveError(result.error));
@@ -515,7 +509,6 @@ export const ChallengeScreen = () => {
         ...prev,
         [item.id]: {
           comment: result.value.response.comment,
-          visibility: result.value.response.visibility,
         },
       }));
       const nextFocus = pickNextChallengeFocusItemId(
@@ -573,7 +566,6 @@ export const ChallengeScreen = () => {
       ...prev,
       [item.id]: {
         comment: existing.comment,
-        visibility: existing.visibility,
       },
     }));
     setActiveItemId(item.id);
@@ -603,7 +595,6 @@ export const ChallengeScreen = () => {
         ...prev,
         [item.id]: {
           comment: '',
-          visibility: 'manager_only',
         },
       }));
       setActiveItemId((current) => (current === item.id ? null : current));
@@ -771,14 +762,16 @@ export const ChallengeScreen = () => {
     const collectedLabel = formatCollectedHossiiLabel(stampSlots);
 
     const renderHeroCard = (item: ChallengeItem) => {
-      const draft = drafts[item.id] ?? {
-        comment: '',
-        visibility: 'manager_only' as const,
-      };
+      const draft = drafts[item.id] ?? { comment: '' };
       const hasResponse = Boolean(myResponses[item.id]);
       const stampEarned =
         !hasResponse &&
         (Boolean(myCompletions[item.id]) || Boolean(myRewards[item.id]));
+      const resolvedVisibility = resolveChallengeResponseVisibility({
+        itemResponseVisibility: item.responseVisibility,
+        programDefaultResponseVisibility:
+          activeProgram?.defaultResponseVisibility,
+      });
       return (
         <ChallengeItemCard
           key={item.id}
@@ -786,6 +779,7 @@ export const ChallengeScreen = () => {
           index={sortedItems.findIndex((entry) => entry.id === item.id) + 1}
           existing={myResponses[item.id]}
           draft={draft}
+          resolvedVisibility={resolvedVisibility}
           saving={busyItemId === item.id}
           expanded={activeItemId === item.id || !hasResponse}
           emphasized

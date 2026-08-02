@@ -67,3 +67,17 @@ export function challengeResponseVisibilityHelp(
       return '回答者本人だけが見られます（管理者にも表示しません）';
   }
 }
+
+/** Short participant-facing explanation (no chooser; settings decide). */
+export function challengeResponseVisibilityParticipantExplanation(
+  visibility: ChallengeResponseVisibility,
+): string {
+  switch (visibility) {
+    case 'space_members':
+      return 'この回答は、スペースに参加しているみんなへ共有されます。';
+    case 'manager_only':
+      return 'この回答は、あなたとスペース管理者だけが見ることができます。';
+    case 'self_only':
+      return 'この回答は、あなただけが見ることができます。';
+  }
+}

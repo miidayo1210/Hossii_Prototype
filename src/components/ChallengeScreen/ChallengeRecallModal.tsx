@@ -3,6 +3,7 @@ import { getChallengeHossiiImageUrl, isChallengeHossiiKey } from '../../core/ass
 import type { ChallengeItem } from '../../core/types/challengeProgram';
 import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
+import { challengeResponseVisibilityLabel } from '../../core/utils/challengeVisibility';
 import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
 import styles from './ChallengeRecallModal.module.css';
 
@@ -20,10 +21,6 @@ type Props = {
   onDelete?: () => Promise<void> | void;
   onDismiss: () => void;
 };
-
-function visibilityLabel(visibility: ChallengeResponse['visibility']): string {
-  return visibility === 'self_only' ? '自分だけに残す' : '管理者にだけ共有';
-}
 
 function formatAwardedAt(date: Date): string {
   try {
@@ -210,7 +207,7 @@ export function ChallengeRecallModal({
                   {model.response.comment || '（回答なし）'}
                 </p>
                 <p className={styles.visibility}>
-                  {visibilityLabel(model.response.visibility)}
+                  {challengeResponseVisibilityLabel(model.response.visibility)}
                 </p>
               </>
             ) : (
