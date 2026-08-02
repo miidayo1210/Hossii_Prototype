@@ -1,3 +1,5 @@
+import type { ChallengeResponseVisibility } from './challengeResponse';
+
 export type ChallengeProgramStatus =
   | 'draft'
   | 'published'
@@ -40,6 +42,8 @@ export type ChallengeProgram = {
   title: string;
   description: string | null;
   status: ChallengeProgramStatus;
+  /** Program-wide default for new response stamps. */
+  defaultResponseVisibility: ChallengeResponseVisibility;
   createdBy: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -55,6 +59,8 @@ export type ChallengeItem = {
   responseType: ChallengeResponseType;
   isRequired: boolean;
   sortOrder: number;
+  /** Item override; null inherits program.defaultResponseVisibility. */
+  responseVisibility: ChallengeResponseVisibility | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -64,11 +70,13 @@ export type CreateChallengeProgramInput = {
   spaceId: string;
   title: string;
   description?: string | null;
+  defaultResponseVisibility?: ChallengeResponseVisibility;
 };
 
 export type UpdateChallengeProgramInput = {
   title?: string;
   description?: string | null;
+  defaultResponseVisibility?: ChallengeResponseVisibility;
 };
 
 export type CreateChallengeItemInput = {
@@ -80,6 +88,7 @@ export type CreateChallengeItemInput = {
   responseType?: ChallengeResponseType;
   isRequired?: boolean;
   sortOrder?: number;
+  responseVisibility?: ChallengeResponseVisibility | null;
 };
 
 export type UpdateChallengeItemInput = {
@@ -90,4 +99,5 @@ export type UpdateChallengeItemInput = {
   responseType?: ChallengeResponseType;
   isRequired?: boolean;
   sortOrder?: number;
+  responseVisibility?: ChallengeResponseVisibility | null;
 };

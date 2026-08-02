@@ -90,6 +90,7 @@ function makeProgram(overrides: Partial<ChallengeProgram> = {}): ChallengeProgra
     title: '下書きストーリー',
     description: '説明',
     status: 'draft',
+    defaultResponseVisibility: 'manager_only',
     createdBy: 'admin-1',
     createdAt: new Date('2026-07-31T00:00:00.000Z'),
     updatedAt: new Date('2026-07-31T01:00:00.000Z'),
@@ -107,6 +108,7 @@ const commentItem = {
   responseType: 'comment' as const,
   isRequired: true,
   sortOrder: 0,
+  responseVisibility: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -208,9 +210,11 @@ describe('ChallengeAdminTab', () => {
         spaceId: space.id,
         title: '新規下書き',
         description: '',
+        defaultResponseVisibility: 'manager_only',
       });
     });
     expect(await screen.findByRole('button', { name: '下書きを保存' })).toBeTruthy();
+    expect(screen.getByLabelText('標準の公開範囲')).toBeTruthy();
   });
 
   it('confirms before deleting a draft program from danger zone', async () => {

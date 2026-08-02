@@ -1,10 +1,16 @@
 import type { ChallengeItem } from '../../core/types/challengeProgram';
+import type { ChallengeResponseVisibility } from '../../core/types/challengeResponse';
 import { clampAdminDescription } from '../../core/utils/challengeAdminDisplay';
+import {
+  challengeResponseVisibilityLabel,
+  resolveChallengeResponseVisibility,
+} from '../../core/utils/challengeVisibility';
 import styles from './ChallengeAdminItemCard.module.css';
 
 type Props = {
   item: ChallengeItem;
   order: number;
+  programDefaultVisibility: ChallengeResponseVisibility;
   readOnly: boolean;
   busy: boolean;
   onEdit: () => void;
@@ -14,6 +20,7 @@ type Props = {
 export function ChallengeAdminItemCard({
   item,
   order,
+  programDefaultVisibility,
   readOnly,
   busy,
   onEdit,
@@ -21,6 +28,13 @@ export function ChallengeAdminItemCard({
 }: Props) {
   const typeLabel = item.itemType === 'question' ? '質問' : 'ミッション';
   const requiredLabel = item.isRequired ? 'クリアに必要' : 'おまけ';
+  const effectiveVisibility = resolveChallengeResponseVisibility({
+    itemResponseVisibility: item.responseVisibility,
+    programDefaultResponseVisibility: programDefaultVisibility,
+  });
+  const visibilityLabel = item.responseVisibility
+    ? challengeResponseVisibilityLabel(item.responseVisibility)
+    : `標準（${challengeResponseVisibilityLabel(effectiveVisibility)}）`;
   const summary =
     clampAdminDescription(item.description, 60) ??
     clampAdminDescription(item.reason, 60);
@@ -41,6 +55,7 @@ export function ChallengeAdminItemCard({
           {requiredLabel}
         </span>
         <span className={styles.muted}>コメントで回答</span>
+        <span className={styles.muted}>{visibilityLabel}</span>
       </div>
       <h3 className={styles.title}>{item.title}</h3>
       {summary ? <p className={styles.summary}>{summary}</p> : null}

@@ -126,11 +126,14 @@ export function formatChallengeResponderLabel(
 export function hasUnsavedProgramEdits(input: {
   title: string;
   description: string;
+  defaultResponseVisibility: string;
   savedTitle: string;
   savedDescription: string | null;
+  savedDefaultResponseVisibility: string;
 }): boolean {
   return (
     input.title !== input.savedTitle ||
-    input.description !== (input.savedDescription ?? '')
+    input.description !== (input.savedDescription ?? '') ||
+    input.defaultResponseVisibility !== input.savedDefaultResponseVisibility
   );
 }

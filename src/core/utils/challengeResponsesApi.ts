@@ -161,8 +161,8 @@ export async function deleteChallengeResponse(
 }
 
 /**
- * Manager list for one item. RLS returns only manager_only rows (+ own).
- * Callers must not infer self_only existence from empty results.
+ * Manager list for one item. RLS hides self_only from managers.
+ * Includes manager_only and space_members rows the caller is allowed to read.
  */
 export async function listManagerChallengeResponses(
   itemId: string,
@@ -174,7 +174,7 @@ export async function listManagerChallengeResponses(
     .from('challenge_responses')
     .select('*')
     .eq('item_id', itemId.trim())
-    .eq('visibility', 'manager_only')
+    .in('visibility', ['manager_only', 'space_members'])
     .order('created_at', { ascending: false });
 
   if (error) {

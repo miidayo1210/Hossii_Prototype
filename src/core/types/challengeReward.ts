@@ -22,7 +22,7 @@ export type SubmitChallengeCommentResult = {
     id: string;
     itemId: string;
     userId: string;
-    visibility: 'self_only' | 'manager_only';
+    visibility: 'self_only' | 'manager_only' | 'space_members';
     comment: string;
     createdAt: Date;
     updatedAt: Date;

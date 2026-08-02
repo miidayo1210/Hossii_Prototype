@@ -11,6 +11,9 @@ import {
   type UpdateChallengeItemInput,
   type UpdateChallengeProgramInput,
 } from '../types/challengeProgram';
+import type { ChallengeResponseVisibility } from '../types/challengeResponse';
+import { CHALLENGE_RESPONSE_VISIBILITY_DEFAULT } from '../types/challengeResponse';
+import { isChallengeResponseVisibility } from './challengeVisibility';
 
 export type ChallengeValidationResult<T> =
   | { ok: true; value: T }
@@ -47,6 +50,33 @@ function normalizeNullableText(
   return { ok: true, value: trimmed === '' ? null : trimmed };
 }
 
+function normalizeRequiredVisibility(
+  value: ChallengeResponseVisibility | undefined,
+): ChallengeValidationResult<ChallengeResponseVisibility> {
+  const resolved = value ?? CHALLENGE_RESPONSE_VISIBILITY_DEFAULT;
+  if (!isChallengeResponseVisibility(resolved)) {
+    return {
+      ok: false,
+      message: 'visibility must be space_members, manager_only, or self_only',
+    };
+  }
+  return { ok: true, value: resolved };
+}
+
+function normalizeOptionalVisibility(
+  value: ChallengeResponseVisibility | null | undefined,
+): ChallengeValidationResult<ChallengeResponseVisibility | null | undefined> {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (value === null) return { ok: true, value: null };
+  if (!isChallengeResponseVisibility(value)) {
+    return {
+      ok: false,
+      message: 'visibility must be space_members, manager_only, or self_only',
+    };
+  }
+  return { ok: true, value };
+}
+
 export function isChallengeProgramStatus(value: unknown): value is ChallengeProgramStatus {
   return (
     typeof value === 'string' &&
@@ -71,6 +101,7 @@ export function normalizeCreateChallengeProgramInput(
   spaceId: string;
   title: string;
   description: string | null;
+  defaultResponseVisibility: ChallengeResponseVisibility;
 }> {
   const spaceId = requireNonEmptyId(input.spaceId, 'spaceId');
   if (!spaceId.ok) return spaceId;
@@ -81,12 +112,18 @@ export function normalizeCreateChallengeProgramInput(
   const description = normalizeNullableText(input.description);
   if (!description.ok) return description;
 
+  const defaultResponseVisibility = normalizeRequiredVisibility(
+    input.defaultResponseVisibility,
+  );
+  if (!defaultResponseVisibility.ok) return defaultResponseVisibility;
+
   return {
     ok: true,
     value: {
       spaceId: spaceId.value,
       title: title.value,
       description: description.value ?? null,
+      defaultResponseVisibility: defaultResponseVisibility.value,
     },
   };
 }
@@ -96,8 +133,13 @@ export function normalizeUpdateChallengeProgramInput(
 ): ChallengeValidationResult<{
   title?: string;
   description?: string | null;
+  defaultResponseVisibility?: ChallengeResponseVisibility;
 }> {
-  const out: { title?: string; description?: string | null } = {};
+  const out: {
+    title?: string;
+    description?: string | null;
+    defaultResponseVisibility?: ChallengeResponseVisibility;
+  } = {};
 
   if (input.title !== undefined) {
     const title = normalizeTitle(input.title);
@@ -111,7 +153,17 @@ export function normalizeUpdateChallengeProgramInput(
     out.description = description.value ?? null;
   }
 
-  if (out.title === undefined && out.description === undefined) {
+  if (input.defaultResponseVisibility !== undefined) {
+    const visibility = normalizeRequiredVisibility(input.defaultResponseVisibility);
+    if (!visibility.ok) return visibility;
+    out.defaultResponseVisibility = visibility.value;
+  }
+
+  if (
+    out.title === undefined &&
+    out.description === undefined &&
+    out.defaultResponseVisibility === undefined
+  ) {
     return { ok: false, message: 'no fields to update' };
   }
 
@@ -146,6 +198,7 @@ export function normalizeCreateChallengeItemInput(
   responseType: ChallengeResponseType;
   isRequired: boolean;
   sortOrder: number;
+  responseVisibility: ChallengeResponseVisibility | null;
 }> {
   const programId = requireNonEmptyId(input.programId, 'programId');
   if (!programId.ok) return programId;
@@ -172,6 +225,11 @@ export function normalizeCreateChallengeItemInput(
   const sortOrder = normalizeSortOrder(input.sortOrder ?? 0);
   if (!sortOrder.ok) return sortOrder;
 
+  const responseVisibility = normalizeOptionalVisibility(
+    input.responseVisibility === undefined ? null : input.responseVisibility,
+  );
+  if (!responseVisibility.ok) return responseVisibility;
+
   return {
     ok: true,
     value: {
@@ -183,6 +241,7 @@ export function normalizeCreateChallengeItemInput(
       responseType,
       isRequired: input.isRequired ?? true,
       sortOrder: sortOrder.value ?? 0,
+      responseVisibility: responseVisibility.value ?? null,
     },
   };
 }
@@ -197,6 +256,7 @@ export function normalizeUpdateChallengeItemInput(
   responseType?: ChallengeResponseType;
   isRequired?: boolean;
   sortOrder?: number;
+  responseVisibility?: ChallengeResponseVisibility | null;
 }> {
   const out: {
     itemType?: ChallengeItemType;
@@ -206,6 +266,7 @@ export function normalizeUpdateChallengeItemInput(
     responseType?: ChallengeResponseType;
     isRequired?: boolean;
     sortOrder?: number;
+    responseVisibility?: ChallengeResponseVisibility | null;
   } = {};
 
   if (input.title !== undefined) {
@@ -250,6 +311,12 @@ export function normalizeUpdateChallengeItemInput(
     out.sortOrder = sortOrder.value;
   }
 
+  if (input.responseVisibility !== undefined) {
+    const responseVisibility = normalizeOptionalVisibility(input.responseVisibility);
+    if (!responseVisibility.ok) return responseVisibility;
+    out.responseVisibility = responseVisibility.value ?? null;
+  }
+
   if (
     out.title === undefined &&
     out.itemType === undefined &&
@@ -257,7 +324,8 @@ export function normalizeUpdateChallengeItemInput(
     out.description === undefined &&
     out.reason === undefined &&
     out.isRequired === undefined &&
-    out.sortOrder === undefined
+    out.sortOrder === undefined &&
+    out.responseVisibility === undefined
   ) {
     return { ok: false, message: 'no fields to update' };
   }

@@ -20,6 +20,7 @@ const item: ChallengeItem = {
   responseType: 'comment',
   isRequired: true,
   sortOrder: 0,
+  responseVisibility: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

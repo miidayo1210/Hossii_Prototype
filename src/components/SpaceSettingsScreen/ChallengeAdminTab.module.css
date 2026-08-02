@@ -27,6 +27,32 @@
   line-height: 1.5;
 }
 
+.visibilitySelect {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+
+.visibilitySelect:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.visibilityHelp {
+  display: block;
+  margin-top: 0.4rem;
+  color: #6b7280;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
 .error {
   margin: 0.5rem 0;
   color: #b91c1c;

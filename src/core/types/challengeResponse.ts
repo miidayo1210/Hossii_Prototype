@@ -1,9 +1,16 @@
-export type ChallengeResponseVisibility = 'self_only' | 'manager_only';
+export type ChallengeResponseVisibility =
+  | 'space_members'
+  | 'manager_only'
+  | 'self_only';
 
 export const CHALLENGE_RESPONSE_VISIBILITIES = [
-  'self_only',
+  'space_members',
   'manager_only',
+  'self_only',
 ] as const satisfies readonly ChallengeResponseVisibility[];
+
+export const CHALLENGE_RESPONSE_VISIBILITY_DEFAULT: ChallengeResponseVisibility =
+  'manager_only';
 
 export const CHALLENGE_RESPONSE_COMMENT_MAX_LENGTH = 500;
 
@@ -18,7 +25,10 @@ export type ChallengeResponse = {
   updatedAt: Date;
 };
 
-/** Create input — userId is DB/auth owned; never client-set. */
+/**
+ * Create input — userId is DB/auth owned; never client-set.
+ * visibility is optional for older clients; RPC ignores it and stamps from settings.
+ */
 export type CreateChallengeResponseInput = {
   itemId: string;
   comment: string;
@@ -27,5 +37,6 @@ export type CreateChallengeResponseInput = {
 
 export type UpdateChallengeResponseInput = {
   comment?: string;
+  /** @deprecated RPC freezes stamped visibility on rewrite; prefer comment-only updates. */
   visibility?: ChallengeResponseVisibility;
 };

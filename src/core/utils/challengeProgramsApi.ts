@@ -10,6 +10,7 @@ import type {
   UpdateChallengeItemInput,
   UpdateChallengeProgramInput,
 } from '../types/challengeProgram';
+import type { ChallengeResponseVisibility } from '../types/challengeResponse';
 import {
   normalizeChallengeProgramStatus,
   normalizeCreateChallengeItemInput,
@@ -17,6 +18,10 @@ import {
   normalizeUpdateChallengeItemInput,
   normalizeUpdateChallengeProgramInput,
 } from './challengeValidation';
+import {
+  coerceChallengeResponseVisibility,
+  coerceOptionalChallengeResponseVisibility,
+} from './challengeVisibility';
 
 export type ChallengeProgramRow = {
   id: string;
@@ -24,6 +29,7 @@ export type ChallengeProgramRow = {
   title: string;
   description: string | null;
   status: string;
+  default_response_visibility?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -39,6 +45,7 @@ export type ChallengeItemRow = {
   response_type: string;
   is_required: boolean;
   sort_order: number;
+  response_visibility?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -56,6 +63,9 @@ export function rowToChallengeProgram(row: ChallengeProgramRow): ChallengeProgra
     title: row.title,
     description: row.description,
     status: row.status as ChallengeProgramStatus,
+    defaultResponseVisibility: coerceChallengeResponseVisibility(
+      row.default_response_visibility,
+    ),
     createdBy: row.created_by,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -73,6 +83,9 @@ export function rowToChallengeItem(row: ChallengeItemRow): ChallengeItem {
     responseType: row.response_type as ChallengeResponseType,
     isRequired: row.is_required,
     sortOrder: row.sort_order,
+    responseVisibility: coerceOptionalChallengeResponseVisibility(
+      row.response_visibility,
+    ),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -83,21 +96,32 @@ export function buildCreateChallengeProgramPayload(input: {
   spaceId: string;
   title: string;
   description: string | null;
-}): { space_id: string; title: string; description: string | null } {
+  defaultResponseVisibility: ChallengeResponseVisibility;
+}): {
+  space_id: string;
+  title: string;
+  description: string | null;
+  default_response_visibility: ChallengeResponseVisibility;
+} {
   return {
     space_id: input.spaceId,
     title: input.title,
     description: input.description,
+    default_response_visibility: input.defaultResponseVisibility,
   };
 }
 
 export function buildUpdateChallengeProgramPayload(input: {
   title?: string;
   description?: string | null;
+  defaultResponseVisibility?: ChallengeResponseVisibility;
 }): Record<string, string | null> {
   const payload: Record<string, string | null> = {};
   if (input.title !== undefined) payload.title = input.title;
   if (input.description !== undefined) payload.description = input.description;
+  if (input.defaultResponseVisibility !== undefined) {
+    payload.default_response_visibility = input.defaultResponseVisibility;
+  }
   return payload;
 }
 
@@ -110,6 +134,7 @@ export function buildCreateChallengeItemPayload(input: {
   responseType: ChallengeResponseType;
   isRequired: boolean;
   sortOrder: number;
+  responseVisibility: ChallengeResponseVisibility | null;
 }): Record<string, string | number | boolean | null> {
   return {
     program_id: input.programId,
@@ -120,6 +145,7 @@ export function buildCreateChallengeItemPayload(input: {
     response_type: input.responseType,
     is_required: input.isRequired,
     sort_order: input.sortOrder,
+    response_visibility: input.responseVisibility,
   };
 }
 
@@ -131,6 +157,7 @@ export function buildUpdateChallengeItemPayload(input: {
   responseType?: ChallengeResponseType;
   isRequired?: boolean;
   sortOrder?: number;
+  responseVisibility?: ChallengeResponseVisibility | null;
 }): Record<string, string | number | boolean | null> {
   const payload: Record<string, string | number | boolean | null> = {};
   if (input.itemType !== undefined) payload.item_type = input.itemType;
@@ -140,7 +167,44 @@ export function buildUpdateChallengeItemPayload(input: {
   if (input.responseType !== undefined) payload.response_type = input.responseType;
   if (input.isRequired !== undefined) payload.is_required = input.isRequired;
   if (input.sortOrder !== undefined) payload.sort_order = input.sortOrder;
+  if (input.responseVisibility !== undefined) {
+    payload.response_visibility = input.responseVisibility;
+  }
   return payload;
+}
+
+const CHALLENGE_VISIBILITY_WRITE_KEYS = [
+  'default_response_visibility',
+  'response_visibility',
+] as const;
+
+/** True when PostgREST/Postgres reports Phase 2 visibility columns are absent. */
+export function isMissingChallengeVisibilityColumnError(error: {
+  message?: string;
+  code?: string;
+}): boolean {
+  const message = (error.message ?? '').toLowerCase();
+  const mentionsVisibilityColumn =
+    message.includes('default_response_visibility') ||
+    message.includes('response_visibility');
+  return (
+    error.code === 'PGRST204' ||
+    error.code === '42703' ||
+    (mentionsVisibilityColumn &&
+      (message.includes('column') ||
+        message.includes('schema cache') ||
+        message.includes('could not find')))
+  );
+}
+
+export function stripChallengeVisibilityWriteKeys<
+  T extends Record<string, unknown>,
+>(payload: T): T {
+  const next = { ...payload };
+  for (const key of CHALLENGE_VISIBILITY_WRITE_KEYS) {
+    delete next[key];
+  }
+  return next;
 }
 
 function formatChallengeError(error: { message: string; code?: string }, fallback: string): string {
@@ -159,6 +223,34 @@ function mutationFailure(
     error: formatChallengeError(error, fallback),
     ...(error.code ? { code: error.code } : {}),
   };
+}
+
+type WriteResult = {
+  data: unknown;
+  error: { message: string; code?: string } | null;
+};
+
+/**
+ * Insert/update with visibility columns; if Production lacks Phase 2 columns,
+ * retry once without those keys so existing admin create/update still works.
+ */
+async function writeChallengePayload(options: {
+  payload: Record<string, unknown>;
+  write: (payload: Record<string, unknown>) => Promise<WriteResult>;
+  emptyAfterStripError: string;
+}): Promise<WriteResult> {
+  const first = await options.write(options.payload);
+  if (!first.error || !isMissingChallengeVisibilityColumnError(first.error)) {
+    return first;
+  }
+  const stripped = stripChallengeVisibilityWriteKeys(options.payload);
+  if (Object.keys(stripped).length === 0) {
+    return {
+      data: null,
+      error: { message: options.emptyAfterStripError, code: first.error.code },
+    };
+  }
+  return options.write(stripped);
 }
 
 export async function listChallengePrograms(spaceId: string): Promise<ChallengeProgram[]> {
@@ -210,11 +302,18 @@ export async function createChallengeProgram(
   }
 
   const payload = buildCreateChallengeProgramPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_programs')
-    .insert(payload)
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_programs')
+        .insert(nextPayload)
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] createChallengeProgram error:', error.message);
@@ -245,12 +344,19 @@ export async function updateChallengeProgram(
   }
 
   const payload = buildUpdateChallengeProgramPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_programs')
-    .update(payload)
-    .eq('id', programId.trim())
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_programs')
+        .update(nextPayload)
+        .eq('id', programId.trim())
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] updateChallengeProgram error:', error.message);
@@ -377,11 +483,18 @@ export async function createChallengeItem(
   }
 
   const payload = buildCreateChallengeItemPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_items')
-    .insert(payload)
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_items')
+        .insert(nextPayload)
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] createChallengeItem error:', error.message);
@@ -412,12 +525,19 @@ export async function updateChallengeItem(
   }
 
   const payload = buildUpdateChallengeItemPayload(normalized.value);
-  const { data, error } = await supabase
-    .from('challenge_items')
-    .update(payload)
-    .eq('id', itemId.trim())
-    .select('*')
-    .maybeSingle();
+  const { data, error } = await writeChallengePayload({
+    payload,
+    emptyAfterStripError: '公開範囲設定はこの環境ではまだ利用できません',
+    write: async (nextPayload) => {
+      const result = await supabase
+        .from('challenge_items')
+        .update(nextPayload)
+        .eq('id', itemId.trim())
+        .select('*')
+        .maybeSingle();
+      return { data: result.data, error: result.error };
+    },
+  });
 
   if (error) {
     console.error('[challengeProgramsApi] updateChallengeItem error:', error.message);
