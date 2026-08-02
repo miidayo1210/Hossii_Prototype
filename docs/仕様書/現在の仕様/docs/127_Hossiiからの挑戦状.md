@@ -489,7 +489,7 @@ MVPでは、次のみを対象とする。
 | 1 | `comment` | コメント | ✅ Production実装済み |
 | 2 | `complete_button` | 完了ボタン | ✅ Production実装済み |
 | 3 | `choice3` | 3択 | ✅ Production実装済み |
-| 4 | `photo` | 写真 | 📌 土台実装中（private bucket / RPC。管理UI・参加UIは後続） |
+| 4 | `photo` | 写真 | 📌 実装中（管理UI・参加UI・表示） |
 
 CHECK は `comment / complete_button / choice3 / photo`。旧候補名 `completion` / `single_choice` は使わない。  
 項目設定用に `challenge_items.response_config`（jsonb, NULL可）を持つ。complete_button では当面未使用。
@@ -553,15 +553,15 @@ Production ではコメント回答を運用する。参加者は文章を入力
     - `manager_only` → 本人＋管理者  
     - `space_members` → 本人＋active member＋管理者  
   - 他 space へ漏れない
-* `visibility = space_members` の写真は「みんなの回答」に表示対象（UIは後続）
-* EXIF はクライアント再圧縮で除去する方針（UI実装時）
+* `visibility = space_members` の写真は「みんなの回答」に表示する
+* EXIF はクライアント再圧縮（`compressImage`）で除去する
+* 管理UIで `photo` を選択可能。参加者はアップロード／差し替え／削除できる
+* Recall／挑戦の記録／みんなの回答では signed URL で画像を表示する
 * 削除方針:  
   - 通常削除は Storage 削除成功後に response を削除  
   - 差し替えは新画像保存＋response 更新後、旧画像をベストエフォート削除  
   - private bucket 内の孤児掃除は後続課題
 * photo 以外の既存形式（comment / complete_button / choice3）を壊さない
-
-本PRスコープ外: 管理UI／参加者UI／画像表示コンポーネント。
 
 ❓ 未決定／今回対象外: 複数枚、任意コメント、Production適用、孤児GC。
 

@@ -420,6 +420,7 @@ describe('ChallengeAdminTab', () => {
     expect(screen.getByText('コメント')).toBeTruthy();
     expect(screen.getByText('完了ボタン')).toBeTruthy();
     expect(screen.getByText('3択')).toBeTruthy();
+    expect(screen.getByText('写真')).toBeTruthy();
     fireEvent.change(
       screen.getByLabelText('参加者に表示する問い・ミッション'),
       { target: { value: '新しいミッション' } },

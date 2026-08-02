@@ -177,6 +177,10 @@
   overflow-wrap: anywhere;
 }
 
+.answerPhoto {
+  margin: 0;
+}
+
 .visibility {
   margin: 0.55rem 0 0;
   font-size: 0.8rem;

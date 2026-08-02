@@ -1,0 +1,41 @@
+.image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(233, 213, 255, 0.9);
+  background: rgba(250, 245, 255, 0.65);
+}
+
+.sizeSm {
+  max-width: 7.5rem;
+  max-height: 5.5rem;
+  border-radius: 0.7rem;
+}
+
+.sizeMd {
+  max-width: 18rem;
+  max-height: 14rem;
+}
+
+.sizeLg {
+  max-width: 100%;
+  max-height: 22rem;
+}
+
+.loading,
+.fallback {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(250, 245, 255, 0.7);
+  color: #7c3aed;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.fallback {
+  color: #64748b;
+}

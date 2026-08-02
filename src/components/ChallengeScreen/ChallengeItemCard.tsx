@@ -17,11 +17,16 @@ import {
   challengeResponseVisibilityParticipantExplanation,
 } from '../../core/utils/challengeVisibility';
 import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
+import { ChallengePhotoImage } from './ChallengePhotoImage';
 import { ChallengeSpaceMembersAnswers } from './ChallengeSpaceMembersAnswers';
 import styles from './ChallengeItemCard.module.css';
 
 export type ChallengeItemDraft = {
   comment: string;
+  /** Local file selected for photo answer (not yet uploaded). */
+  photoFile?: File | null;
+  /** Object URL for local photo preview; revoke when clearing. */
+  photoPreviewUrl?: string | null;
 };
 
 type Props = {
@@ -202,6 +207,63 @@ function Choice3ResponseSlot({
   );
 }
 
+function PhotoResponseSlot({
+  itemId,
+  draft,
+  existing,
+  disabled,
+  onDraftChange,
+}: {
+  itemId: string;
+  draft: ChallengeItemDraft;
+  existing: ChallengeResponse | undefined;
+  disabled: boolean;
+  onDraftChange: (draft: ChallengeItemDraft) => void;
+}) {
+  const inputId = `challenge-photo-${itemId}`;
+  const hasLocal = Boolean(draft.photoFile && draft.photoPreviewUrl);
+  const savedPath = existing?.photoPath?.trim() || '';
+
+  return (
+    <div className={styles.photoSlot}>
+      {hasLocal ? (
+        <img
+          src={draft.photoPreviewUrl!}
+          alt="選択中の写真プレビュー"
+          className={styles.photoPreview}
+        />
+      ) : savedPath ? (
+        <ChallengePhotoImage photoPath={savedPath} size="md" alt="保存済みの回答写真" />
+      ) : (
+        <p className={styles.note}>写真を1枚選んでください</p>
+      )}
+      <label className={styles.photoPickerLabel} htmlFor={inputId}>
+        <input
+          id={inputId}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className={styles.photoInput}
+          disabled={disabled}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file) return;
+            if (draft.photoPreviewUrl) {
+              URL.revokeObjectURL(draft.photoPreviewUrl);
+            }
+            onDraftChange({
+              ...draft,
+              photoFile: file,
+              photoPreviewUrl: URL.createObjectURL(file),
+            });
+          }}
+        />
+        {hasLocal || savedPath ? '写真を差し替える' : '写真を選ぶ'}
+      </label>
+    </div>
+  );
+}
+
 function ResponseEditor({
   item,
   draft,
@@ -306,6 +368,47 @@ function ResponseEditor({
             onClick={onSave}
           >
             {saving ? '保存中…' : existing ? '回答を更新' : '回答を保存'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (item.responseType === 'photo') {
+    return (
+      <div className={styles.responseSlot}>
+        {item.reason ? (
+          <p className={styles.reason}>なぜ取り組むのか：{item.reason}</p>
+        ) : null}
+        {existing ? (
+          <p className={styles.existingAnswer} aria-live="polite">
+            保存済み（{challengeResponseVisibilityLabel(existing.visibility)}）
+          </p>
+        ) : null}
+        {!existing && stampEarned ? (
+          <p className={styles.stampEarnedNote}>スタンプ獲得済み</p>
+        ) : null}
+        <PhotoResponseSlot
+          itemId={item.id}
+          draft={draft}
+          existing={existing}
+          disabled={saving}
+          onDraftChange={onDraftChange}
+        />
+        <VisibilityNotice visibility={visibility} />
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            disabled={saving || !draft.photoFile}
+            aria-label={
+              existing
+                ? `${item.title}の写真を更新`
+                : `${item.title}の写真を保存`
+            }
+            onClick={onSave}
+          >
+            {saving ? '保存中…' : existing ? '写真を更新' : '写真を保存'}
           </button>
         </div>
       </div>
@@ -435,9 +538,19 @@ export function ChallengeItemCard({
               onClick={onRecall}
               disabled={!onRecall}
             >
-              <span className={styles.excerptText}>
-                {formatExcerpt(existing.comment)}
-              </span>
+              {item.responseType === 'photo' && existing.photoPath ? (
+                <span className={styles.excerptPhoto}>
+                  <ChallengePhotoImage
+                    photoPath={existing.photoPath}
+                    size="sm"
+                    alt="回答写真"
+                  />
+                </span>
+              ) : (
+                <span className={styles.excerptText}>
+                  {formatExcerpt(existing.comment)}
+                </span>
+              )}
             </button>
             <p className={styles.compactVisibility}>
               {challengeResponseVisibilityLabel(existing.visibility)}

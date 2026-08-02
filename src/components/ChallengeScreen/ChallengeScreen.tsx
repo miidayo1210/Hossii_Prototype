@@ -16,7 +16,11 @@ import {
   submitChallengeChoice3,
   submitChallengeCommentResponse,
   submitChallengeCompleteButton,
+  submitChallengePhoto,
+  uploadChallengePhotoForItem,
 } from '../../core/utils/challengeRewardsApi';
+import { compressImage } from '../../core/utils/imageStorageApi';
+import type { SubmitChallengeCommentResult } from '../../core/types/challengeReward';
 import {
   findChallengeChoice3OptionIndex,
   parseChallengeChoice3Options,
@@ -53,7 +57,10 @@ import {
   type ChallengeStampSlot,
 } from '../../core/utils/challengeStampProgress';
 import { TopRightMenu } from '../Navigation/TopRightMenu';
-import { ChallengeItemCard } from './ChallengeItemCard';
+import {
+  ChallengeItemCard,
+  type ChallengeItemDraft,
+} from './ChallengeItemCard';
 import {
   ChallengeRewardModal,
   type ChallengeRewardModalModel,
@@ -90,6 +97,10 @@ function toParticipantSaveError(message: string): string {
   if (/at most|too long|length|500|501/.test(lower)) {
     return 'コメントは500文字以内で入力してください';
   }
+  if (/photo|画像|jpeg|image|upload|アップロード/.test(lower)) {
+    if (/[ぁ-んァ-ン一-龥]/.test(message)) return message;
+    return '写真を保存できませんでした。別の画像でもう一度試してください';
+  }
   if (/権限|permission|rls|policy|jwt|auth/.test(lower)) {
     return 'この回答を保存する権限がありません';
   }
@@ -98,6 +109,21 @@ function toParticipantSaveError(message: string): string {
   }
   if (/[ぁ-んァ-ン一-龥]/.test(message)) return message;
   return '回答を保存できませんでした。時間をおいてもう一度試してください';
+}
+
+function mapSubmitResponse(
+  response: SubmitChallengeCommentResult['response'],
+): ChallengeResponse {
+  return {
+    id: response.id,
+    itemId: response.itemId,
+    userId: response.userId,
+    visibility: response.visibility,
+    comment: response.comment,
+    photoPath: response.photoPath ?? null,
+    createdAt: response.createdAt,
+    updatedAt: response.updatedAt,
+  };
 }
 
 function toParticipantDeleteError(message: string): string {
@@ -202,7 +228,7 @@ export const ChallengeScreen = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [drafts, setDrafts] = useState<Record<string, { comment: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, ChallengeItemDraft>>({});
   const [myRewards, setMyRewards] = useState<Record<string, ChallengeReward>>({});
   const [myCompletions, setMyCompletions] = useState<Record<string, ChallengeCompletion>>(
     {},
@@ -694,6 +720,128 @@ export const ChallengeScreen = () => {
       return;
     }
 
+    if (item.responseType === 'photo') {
+      if (!spaceId || !userId) {
+        setFormError('ログインが必要です');
+        return;
+      }
+      const draft = drafts[item.id] ?? { comment: '' };
+      if (!draft.photoFile) {
+        setFormError(
+          hadResponse
+            ? '差し替える写真を選んでください'
+            : '写真を選んでください',
+        );
+        return;
+      }
+      setBusyItemId(item.id);
+      setFormError(null);
+      try {
+        let body: Blob;
+        try {
+          body = await compressImage(draft.photoFile);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : '写真の処理に失敗しました';
+          setFormError(toParticipantSaveError(message));
+          return;
+        }
+        const uploaded = await uploadChallengePhotoForItem({
+          spaceId,
+          itemId: item.id,
+          userId,
+          objectId: crypto.randomUUID(),
+          body,
+        });
+        if (!uploaded.ok) {
+          setFormError(toParticipantSaveError(uploaded.error));
+          return;
+        }
+        const result = await submitChallengePhoto({
+          itemId: item.id,
+          photoPath: uploaded.value.photoPath,
+          previousPhotoPath: existingResponse?.photoPath,
+        });
+        if (!result.ok) {
+          setFormError(toParticipantSaveError(result.error));
+          return;
+        }
+        const nextResponses: Record<string, ChallengeResponse> = {
+          ...myResponses,
+          [item.id]: mapSubmitResponse(result.value.response),
+        };
+        const nextRewards: Record<string, ChallengeReward> = {
+          ...myRewards,
+          [item.id]: result.value.reward,
+        };
+        const nextCompletions: Record<string, ChallengeCompletion> = {
+          ...myCompletions,
+          [item.id]: result.value.completion,
+        };
+        setMyResponses(nextResponses);
+        setMyRewards(nextRewards);
+        setMyCompletions(nextCompletions);
+        if (draft.photoPreviewUrl) {
+          URL.revokeObjectURL(draft.photoPreviewUrl);
+        }
+        setDrafts((prev) => ({
+          ...prev,
+          [item.id]: {
+            comment: result.value.response.comment,
+            photoFile: null,
+            photoPreviewUrl: null,
+          },
+        }));
+        if (result.value.response.visibility === 'space_members') {
+          void refreshSpaceMemberAnswers(items.map((entry) => entry.id));
+        }
+        const nextFocus = pickNextChallengeFocusItemId(
+          items,
+          Object.keys(nextResponses),
+        );
+        if (result.value.isNewReward) {
+          const nextSlots = buildChallengeStampSlots(
+            items,
+            Object.values(nextCompletions),
+            Object.values(nextRewards),
+          );
+          const nextProgress = getChallengeStampProgress(nextSlots);
+          setRewardModal({
+            hossiiKey: result.value.reward.hossiiKey,
+            itemTitle: item.title,
+            kind: resolveChallengeRewardCelebrationKind(
+              nextProgress,
+              nextFocus != null,
+            ),
+            progressLabel: formatRewardCelebrationProgressLabel(
+              nextProgress,
+              items.length,
+            ),
+            optionalLeftoverLabel: formatOptionalLeftoverLabel(nextProgress),
+            nextFocusItemId: nextFocus,
+          });
+        } else if (hadResponse) {
+          showToast('写真を更新しました');
+        } else {
+          const nextSlots = buildChallengeStampSlots(
+            items,
+            Object.values(nextCompletions),
+            Object.values(nextRewards),
+          );
+          const nextProgress = getChallengeStampProgress(nextSlots);
+          showToast('写真を保存しました');
+          if (nextProgress.isComplete && activeProgram) {
+            openRecordsPage(activeProgram.id);
+          } else {
+            setActiveItemId(nextFocus);
+          }
+        }
+      } finally {
+        setBusyItemId(null);
+      }
+      return;
+    }
+
     const draft = drafts[item.id] ?? { comment: '' };
     const trimmed = draft.comment.trim();
     if (!trimmed) {
@@ -804,12 +952,20 @@ export const ChallengeScreen = () => {
     const existing = myResponses[item.id];
     if (!existing) return;
     setFormError(null);
-    setDrafts((prev) => ({
-      ...prev,
-      [item.id]: {
-        comment: existing.comment,
-      },
-    }));
+    setDrafts((prev) => {
+      const previous = prev[item.id];
+      if (previous?.photoPreviewUrl) {
+        URL.revokeObjectURL(previous.photoPreviewUrl);
+      }
+      return {
+        ...prev,
+        [item.id]: {
+          comment: item.responseType === 'photo' ? '' : existing.comment,
+          photoFile: null,
+          photoPreviewUrl: null,
+        },
+      };
+    });
     setActiveItemId(item.id);
   };
 
@@ -833,12 +989,20 @@ export const ChallengeScreen = () => {
         delete next[item.id];
         return next;
       });
-      setDrafts((prev) => ({
-        ...prev,
-        [item.id]: {
-          comment: '',
-        },
-      }));
+      setDrafts((prev) => {
+        const previous = prev[item.id];
+        if (previous?.photoPreviewUrl) {
+          URL.revokeObjectURL(previous.photoPreviewUrl);
+        }
+        return {
+          ...prev,
+          [item.id]: {
+            comment: '',
+            photoFile: null,
+            photoPreviewUrl: null,
+          },
+        };
+      });
       if (existing.visibility === 'space_members') {
         void refreshSpaceMemberAnswers(items.map((entry) => entry.id));
       }

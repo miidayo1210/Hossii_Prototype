@@ -7,6 +7,7 @@ import {
   type ChallengeStampSlot,
 } from '../../core/utils/challengeStampProgress';
 import { ChallengeStampCard } from './ChallengeStampCard';
+import { ChallengePhotoImage } from './ChallengePhotoImage';
 import styles from './ChallengeTrajectoryView.module.css';
 
 type ChallengeTrajectoryEntry = {
@@ -145,9 +146,19 @@ export function ChallengeTrajectoryView({
                       </div>
                       <h3 className={styles.entryTitle}>{item.title}</h3>
                       {response ? (
-                        <p className={styles.entryAnswer}>
-                          {response.comment || '（回答なし）'}
-                        </p>
+                        item.responseType === 'photo' && response.photoPath ? (
+                          <div className={styles.entryPhoto}>
+                            <ChallengePhotoImage
+                              photoPath={response.photoPath}
+                              size="sm"
+                              alt="回答写真"
+                            />
+                          </div>
+                        ) : (
+                          <p className={styles.entryAnswer}>
+                            {response.comment || '（回答なし）'}
+                          </p>
+                        )
                       ) : (
                         <p className={styles.entryDeleted}>回答は削除済みです</p>
                       )}

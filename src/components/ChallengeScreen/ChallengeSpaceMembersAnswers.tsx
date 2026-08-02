@@ -5,6 +5,7 @@ import {
   formatChallengeAnswerDate,
   formatSpaceMemberAnswerLabel,
 } from '../../core/utils/challengeSpaceMemberAnswers';
+import { ChallengePhotoImage } from './ChallengePhotoImage';
 import styles from './ChallengeSpaceMembersAnswers.module.css';
 
 type Props = {
@@ -76,9 +77,19 @@ export function ChallengeSpaceMembersAnswers({
                     <span className={styles.date}>{dateLabel}</span>
                   ) : null}
                 </div>
-                <p className={styles.comment}>
-                  {answer.comment.trim() || '（回答なし）'}
-                </p>
+                {answer.photoPath ? (
+                  <div className={styles.photo}>
+                    <ChallengePhotoImage
+                      photoPath={answer.photoPath}
+                      size="md"
+                      alt={`${label}の回答写真`}
+                    />
+                  </div>
+                ) : (
+                  <p className={styles.comment}>
+                    {answer.comment.trim() || '（回答なし）'}
+                  </p>
+                )}
               </li>
             );
           })}
