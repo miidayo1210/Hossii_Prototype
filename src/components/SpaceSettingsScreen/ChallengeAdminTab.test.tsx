@@ -575,6 +575,16 @@ describe('ChallengeAdminTab', () => {
       expect(updateChallengeItemMock).toHaveBeenCalledWith('i1', { sortOrder: 1 });
     });
     expect(await screen.findByLabelText(/1\. ミッション 二番目/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '質問を追加' }));
+    const upWhileEditing = screen.getAllByRole('button', { name: '上へ' });
+    const downWhileEditing = screen.getAllByRole('button', { name: '下へ' });
+    expect(upWhileEditing.every((button) => (button as HTMLButtonElement).disabled)).toBe(
+      true,
+    );
+    expect(
+      downWhileEditing.every((button) => (button as HTMLButtonElement).disabled),
+    ).toBe(true);
   });
 
   it('shows choice3 and unsaved issues in publish checks before publish', async () => {

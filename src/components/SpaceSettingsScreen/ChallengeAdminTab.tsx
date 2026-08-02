@@ -907,8 +907,8 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                       }
                       readOnly={!isDraft}
                       busy={busy}
-                      canMoveUp={index > 0}
-                      canMoveDown={index < items.length - 1}
+                      canMoveUp={index > 0 && !showItemForm}
+                      canMoveDown={index < items.length - 1 && !showItemForm}
                       onEdit={() => startEditItem(item)}
                       onDelete={() => void handleDeleteItem(item)}
                       onMoveUp={() => void handleMoveItem(item.id, 'up')}
