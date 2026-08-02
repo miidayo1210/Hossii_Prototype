@@ -488,8 +488,8 @@ MVPでは、次のみを対象とする。
 | --- | --- | --- | --- |
 | 1 | `comment` | コメント | ✅ Production実装済み |
 | 2 | `complete_button` | 完了ボタン | ✅ Production実装済み |
-| 3 | `choice3` | 3択 | 📌 実装中（PR-B） |
-| 4 | `photo` | 写真 | 🟡 後続（Storage検討が必要） |
+| 3 | `choice3` | 3択 | ✅ Production実装済み |
+| 4 | `photo` | 写真 | 📌 土台実装中（private bucket / RPC。管理UI・参加UIは後続） |
 
 CHECK は `comment / complete_button / choice3 / photo`。旧候補名 `completion` / `single_choice` は使わない。  
 項目設定用に `challenge_items.response_config`（jsonb, NULL可）を持つ。complete_button では当面未使用。
@@ -531,11 +531,39 @@ Production ではコメント回答を運用する。参加者は文章を入力
 
 ❓ 未決定／今回対象外：正解判定、集計UI、回答後コメント。
 
-## 11.4 写真 🟡
+## 11.4 写真 📌
 
-Storage・圧縮・公開範囲・削除・EXIF・容量制限の検討が必要なため、complete_button / choice3 の後とする。
+確定仕様（MVP・土台）：
 
-過去案にあった「初期実装で最大3枚」等の細部は ❓／参考とし、実装PR前に再確定する。
+* MVPは写真1枚。任意コメントなし
+* `challenge_responses.comment` には固定文言「写真」を保存
+* `challenge_responses.photo_path` に Storage object path を保存
+* **専用 private bucket `challenge-photos` を使用**。既存 public bucket（`hossii-images`）は流用しない  
+  （`self_only` / `manager_only` / `space_members` の明示公開範囲と、URLを知れば誰でも閲覧できる public URL モデルが整合しないため）
+* path 規則: `challenge/{spaceId}/{itemId}/{userId}/{uuid}.jpg`
+* 書込は `submit_challenge_photo(p_item_id, p_photo_path)` RPC  
+  - item が `photo` であること、path prefix／所有者、object の存在を検証  
+  - INSERT 時に visibility を stamp。UPDATE（再回答）時は visibility を維持  
+  - completion／reward は初回のみ。削除後の新規回答は現在設定を stamp（reward は再付与しない）
+* 表示時は回答 RLS と同じ閲覧権限を確認したうえで **signed URL** を取得する
+* Storage RLS:  
+  - upload／update／delete は回答者本人の path のみ  
+  - SELECT／signed URL は response.visibility と space 権限に従う  
+    - `self_only` → 本人  
+    - `manager_only` → 本人＋管理者  
+    - `space_members` → 本人＋active member＋管理者  
+  - 他 space へ漏れない
+* `visibility = space_members` の写真は「みんなの回答」に表示対象（UIは後続）
+* EXIF はクライアント再圧縮で除去する方針（UI実装時）
+* 削除方針:  
+  - 通常削除は Storage 削除成功後に response を削除  
+  - 差し替えは新画像保存＋response 更新後、旧画像をベストエフォート削除  
+  - private bucket 内の孤児掃除は後続課題
+* photo 以外の既存形式（comment / complete_button / choice3）を壊さない
+
+本PRスコープ外: 管理UI／参加者UI／画像表示コンポーネント。
+
+❓ 未決定／今回対象外: 複数枚、任意コメント、Production適用、孤児GC。
 
 ---
 
@@ -1608,7 +1636,7 @@ Hossiiは、一度取り組んだ軌跡として扱う。
 | マイHossii | Hossiiの見た目設定。コレクションの正本ではない |
 | Hossiiガイド吹き出し | 案内・問いかけUI。回答・達成・報酬基盤とは別 |
 | Pane | 挑戦状の設置先として流用する |
-| 写真Storage | 回答写真で既存方式を拡張して流用する予定 |
+| 写真Storage | 挑戦状写真は専用 private bucket `challenge-photos`＋signed URL。投稿用 public `hossii-images` とは分離 |
 | 権限ヘルパ | 現行のスペース管理可否判定を流用する予定 |
 
 ---

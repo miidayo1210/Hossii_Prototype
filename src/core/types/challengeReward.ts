@@ -24,6 +24,7 @@ export type SubmitChallengeCommentResult = {
     userId: string;
     visibility: 'self_only' | 'manager_only' | 'space_members';
     comment: string;
+    photoPath?: string | null;
     createdAt: Date;
     updatedAt: Date;
   };

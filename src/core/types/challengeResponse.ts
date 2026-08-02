@@ -21,6 +21,8 @@ export type ChallengeResponse = {
   userId: string;
   visibility: ChallengeResponseVisibility;
   comment: string;
+  /** Storage path in challenge-photos; null/undefined for non-photo responses. */
+  photoPath?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

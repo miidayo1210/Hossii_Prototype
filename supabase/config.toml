@@ -117,6 +117,12 @@ public = true
 file_size_limit = "5MiB"
 allowed_mime_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
 
+# challenge-photos バケット（挑戦状写真回答専用・private・signed URL）
+[storage.buckets.challenge-photos]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/jpeg"]
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true
