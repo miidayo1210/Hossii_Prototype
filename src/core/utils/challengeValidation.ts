@@ -199,6 +199,7 @@ export function normalizeCreateChallengeItemInput(
   isRequired: boolean;
   sortOrder: number;
   responseVisibility: ChallengeResponseVisibility | null;
+  responseConfig: Record<string, unknown> | null;
 }> {
   const programId = requireNonEmptyId(input.programId, 'programId');
   if (!programId.ok) return programId;
@@ -230,6 +231,15 @@ export function normalizeCreateChallengeItemInput(
   );
   if (!responseVisibility.ok) return responseVisibility;
 
+  const responseConfig =
+    input.responseConfig === undefined ? null : input.responseConfig;
+  if (
+    responseConfig != null &&
+    (typeof responseConfig !== 'object' || Array.isArray(responseConfig))
+  ) {
+    return { ok: false, message: 'invalid challenge response config' };
+  }
+
   return {
     ok: true,
     value: {
@@ -242,6 +252,7 @@ export function normalizeCreateChallengeItemInput(
       isRequired: input.isRequired ?? true,
       sortOrder: sortOrder.value ?? 0,
       responseVisibility: responseVisibility.value ?? null,
+      responseConfig,
     },
   };
 }
@@ -257,6 +268,7 @@ export function normalizeUpdateChallengeItemInput(
   isRequired?: boolean;
   sortOrder?: number;
   responseVisibility?: ChallengeResponseVisibility | null;
+  responseConfig?: Record<string, unknown> | null;
 }> {
   const out: {
     itemType?: ChallengeItemType;
@@ -267,6 +279,7 @@ export function normalizeUpdateChallengeItemInput(
     isRequired?: boolean;
     sortOrder?: number;
     responseVisibility?: ChallengeResponseVisibility | null;
+    responseConfig?: Record<string, unknown> | null;
   } = {};
 
   if (input.title !== undefined) {
@@ -317,6 +330,17 @@ export function normalizeUpdateChallengeItemInput(
     out.responseVisibility = responseVisibility.value ?? null;
   }
 
+  if (input.responseConfig !== undefined) {
+    if (
+      input.responseConfig != null &&
+      (typeof input.responseConfig !== 'object' ||
+        Array.isArray(input.responseConfig))
+    ) {
+      return { ok: false, message: 'invalid challenge response config' };
+    }
+    out.responseConfig = input.responseConfig;
+  }
+
   if (
     out.title === undefined &&
     out.itemType === undefined &&
@@ -325,7 +349,8 @@ export function normalizeUpdateChallengeItemInput(
     out.reason === undefined &&
     out.isRequired === undefined &&
     out.sortOrder === undefined &&
-    out.responseVisibility === undefined
+    out.responseVisibility === undefined &&
+    out.responseConfig === undefined
   ) {
     return { ok: false, message: 'no fields to update' };
   }

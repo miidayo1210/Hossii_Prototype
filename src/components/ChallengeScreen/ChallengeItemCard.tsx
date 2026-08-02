@@ -6,6 +6,9 @@ import type {
 } from '../../core/types/challengeResponse';
 import { CHALLENGE_RESPONSE_COMMENT_MAX_LENGTH } from '../../core/types/challengeResponse';
 import {
+  CHALLENGE_COMPLETE_BUTTON_LABEL,
+} from '../../core/utils/challengeCompleteButton';
+import {
   challengeResponseVisibilityLabel,
   challengeResponseVisibilityParticipantExplanation,
 } from '../../core/utils/challengeVisibility';
@@ -171,6 +174,42 @@ function ResponseEditor({
   // Rewrite keeps the stamped snapshot; new answers show current settings.
   const visibility = existing?.visibility ?? resolvedVisibility;
 
+  if (item.responseType === 'complete_button') {
+    return (
+      <div className={styles.responseSlot}>
+        {item.reason ? (
+          <p className={styles.reason}>なぜ取り組むのか：{item.reason}</p>
+        ) : null}
+        {existing ? (
+          <p className={styles.existingAnswer} aria-live="polite">
+            完了済み（{challengeResponseVisibilityLabel(existing.visibility)}）
+            {'\n'}
+            {existing.comment}
+          </p>
+        ) : (
+          <>
+            {stampEarned ? (
+              <p className={styles.stampEarnedNote}>スタンプ獲得済み</p>
+            ) : null}
+            <VisibilityNotice visibility={visibility} />
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.saveButton}
+                disabled={saving}
+                aria-label={`${item.title}を完了する`}
+                onClick={onSave}
+              >
+                {saving ? '完了中…' : CHALLENGE_COMPLETE_BUTTON_LABEL}
+              </button>
+            </div>
+          </>
+        )}
+        {existing ? <VisibilityNotice visibility={visibility} /> : null}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.responseSlot}>
       {item.reason ? (
@@ -201,7 +240,11 @@ function ResponseEditor({
         <button
           type="button"
           className={styles.saveButton}
-          disabled={saving || !draft.comment.trim()}
+          disabled={
+            saving ||
+            item.responseType !== 'comment' ||
+            !draft.comment.trim()
+          }
           aria-label={
             existing
               ? `${item.title}の回答を更新`
@@ -240,6 +283,7 @@ export function ChallengeItemCard({
   showManageActions = true,
 }: Props) {
   const answered = Boolean(existing);
+  const isCompleteButton = item.responseType === 'complete_button';
   const peerAnswers = (
     <ChallengeSpaceMembersAnswers
       answers={spaceMemberAnswers}
@@ -248,13 +292,23 @@ export function ChallengeItemCard({
     />
   );
   const actionMenu =
-    answered && showManageActions && onRewrite && onDelete ? (
-      <ChallengeResponseActionMenu
-        itemTitle={item.title}
-        disabled={saving}
-        onRewrite={onRewrite}
-        onDelete={onDelete}
-      />
+    answered && showManageActions && onDelete ? (
+      isCompleteButton ? (
+        <ChallengeResponseActionMenu
+          itemTitle={item.title}
+          disabled={saving}
+          variant="deleteOnly"
+          onRewrite={() => undefined}
+          onDelete={onDelete}
+        />
+      ) : onRewrite ? (
+        <ChallengeResponseActionMenu
+          itemTitle={item.title}
+          disabled={saving}
+          onRewrite={onRewrite}
+          onDelete={onDelete}
+        />
+      ) : null
     ) : null;
 
   if (!expanded) {
@@ -299,7 +353,7 @@ export function ChallengeItemCard({
               aria-controls={panelId}
               onClick={onExpand}
             >
-              この質問に答える
+              {isCompleteButton ? CHALLENGE_COMPLETE_BUTTON_LABEL : 'この質問に答える'}
             </button>
           </>
         )}

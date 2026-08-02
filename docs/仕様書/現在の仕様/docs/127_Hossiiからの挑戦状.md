@@ -482,18 +482,21 @@ MVPでは、次のみを対象とする。
 
 ## 11.0 追加優先順位 📌
 
-正式な実装順は次のとおり。DB上の `response_type` 名と利用者向け呼称を併記する。
+正式な実装順と DB 内部名（`challenge_items.response_type`）は次のとおり。
 
-| 順 | 内部名（候補） | 呼称 | 状態 |
+| 順 | 内部名 | 呼称 | 状態 |
 | --- | --- | --- | --- |
 | 1 | `comment` | コメント | ✅ Production実装済み |
-| 2 | `complete_button`（現行CHECK上は `completion`） | 完了ボタン | 🟡 次に追加 |
-| 3 | `choice3`（現行CHECK上は `single_choice`） | 3択 | 🟡 |
+| 2 | `complete_button` | 完了ボタン | 📌 実装中（PR-A） |
+| 3 | `choice3` | 3択 | 🟡 次（PR-B） |
 | 4 | `photo` | 写真 | 🟡 後続（Storage検討が必要） |
+
+CHECK は `comment / complete_button / choice3 / photo`。旧候補名 `completion` / `single_choice` は使わない。  
+項目設定用に `challenge_items.response_config`（jsonb, NULL可）を持つ。complete_button では当面未使用。
 
 ## 11.1 コメント ✅
 
-Production ではコメント回答のみを運用する。参加者は文章を入力して保存する。
+Production ではコメント回答を運用する。参加者は文章を入力して保存する。
 
 実装済みの要点：
 
@@ -501,26 +504,26 @@ Production ではコメント回答のみを運用する。参加者は文章を
 * 回答の作成・更新は `submit_challenge_comment_response` RPC のみ
 * 初回保存で completion／reward を作成（冪等）
 
-## 11.2 完了ボタン 🟡
+## 11.2 完了ボタン 📌
 
-推奨仕様候補：
+確定仕様：
 
-* 「できた！」等の完了操作で達成する
-* 任意の一言メモを付けられる
-
-❓ 未決定（実装前に確定する）：
-
-* メモの保存先（responses.comment 流用か別列か）
-* 押し直し・取消の可否
-* completion との関係（押下＝即達成か）
-* 管理者承認の有無
+* 参加者は「完了する」ボタンのみ（コメント入力なし）
+* 回答本文は `challenge_responses.comment` に固定文言「完了しました」を保存
+* 書込は `submit_challenge_complete_button` RPC。既存 response がある場合は書き換えず返す
+* 初回のみ completion／reward。削除後の再完了でも reward は再付与しない
+* 削除は可能（…メニュー）。書き直し操作は置かない
+* 削除後は再度「完了する」を表示する
+* Recall／挑戦の記録／みんなの回答では「完了しました」を表示
+* 管理者承認・完了後コメント／写真は対象外
 
 ## 11.3 3択 🟡
 
-* 管理者が選択肢を3つ設定する
+* 管理者が選択肢を3つ設定する（`response_config`）
 * 参加者が1つを選ぶ
+* 選択ラベルは `challenge_responses.comment` にスナップショット保存（PR-B）
 
-❓ 未決定：選択後の変更可否、正解の有無、集計UI。
+❓ 未決定：正解の有無、集計UI。再回答で選択変更は可（方針確定済み）。
 
 ## 11.4 写真 🟡
 

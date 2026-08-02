@@ -4,6 +4,7 @@ import type {
   ChallengeItemType,
   ChallengeProgram,
   ChallengeProgramStatus,
+  ChallengeResponseConfig,
   ChallengeResponseType,
   CreateChallengeItemInput,
   CreateChallengeProgramInput,
@@ -46,9 +47,18 @@ export type ChallengeItemRow = {
   is_required: boolean;
   sort_order: number;
   response_visibility?: string | null;
+  response_config?: ChallengeResponseConfig | null;
   created_at: string;
   updated_at: string;
 };
+
+function coerceResponseConfig(
+  value: ChallengeResponseConfig | null | undefined,
+): ChallengeResponseConfig | null {
+  if (value == null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) return null;
+  return value;
+}
 
 export type ChallengeMutationResult<T> =
   | { ok: true; value: T }
@@ -86,6 +96,7 @@ export function rowToChallengeItem(row: ChallengeItemRow): ChallengeItem {
     responseVisibility: coerceOptionalChallengeResponseVisibility(
       row.response_visibility,
     ),
+    responseConfig: coerceResponseConfig(row.response_config),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -135,7 +146,8 @@ export function buildCreateChallengeItemPayload(input: {
   isRequired: boolean;
   sortOrder: number;
   responseVisibility: ChallengeResponseVisibility | null;
-}): Record<string, string | number | boolean | null> {
+  responseConfig: ChallengeResponseConfig | null;
+}): Record<string, string | number | boolean | ChallengeResponseConfig | null> {
   return {
     program_id: input.programId,
     item_type: input.itemType,
@@ -146,6 +158,7 @@ export function buildCreateChallengeItemPayload(input: {
     is_required: input.isRequired,
     sort_order: input.sortOrder,
     response_visibility: input.responseVisibility,
+    response_config: input.responseConfig,
   };
 }
 
@@ -158,8 +171,12 @@ export function buildUpdateChallengeItemPayload(input: {
   isRequired?: boolean;
   sortOrder?: number;
   responseVisibility?: ChallengeResponseVisibility | null;
-}): Record<string, string | number | boolean | null> {
-  const payload: Record<string, string | number | boolean | null> = {};
+  responseConfig?: ChallengeResponseConfig | null;
+}): Record<string, string | number | boolean | ChallengeResponseConfig | null> {
+  const payload: Record<
+    string,
+    string | number | boolean | ChallengeResponseConfig | null
+  > = {};
   if (input.itemType !== undefined) payload.item_type = input.itemType;
   if (input.title !== undefined) payload.title = input.title;
   if (input.description !== undefined) payload.description = input.description;
@@ -169,6 +186,9 @@ export function buildUpdateChallengeItemPayload(input: {
   if (input.sortOrder !== undefined) payload.sort_order = input.sortOrder;
   if (input.responseVisibility !== undefined) {
     payload.response_visibility = input.responseVisibility;
+  }
+  if (input.responseConfig !== undefined) {
+    payload.response_config = input.responseConfig;
   }
   return payload;
 }
