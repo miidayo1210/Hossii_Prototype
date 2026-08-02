@@ -118,6 +118,21 @@ const commentItem = {
   updatedAt: new Date(),
 };
 
+async function openDraftEditor() {
+  fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+  expect(await screen.findByRole('button', { name: '下書きを保存' })).toBeTruthy();
+}
+
+async function goToItemsStep() {
+  fireEvent.click(screen.getByRole('button', { name: '次へ：項目' }));
+  expect(await screen.findByRole('heading', { name: 'Step2 項目' })).toBeTruthy();
+}
+
+async function goToConfirmStep() {
+  fireEvent.click(screen.getByRole('button', { name: /^3\s*確認$/ }));
+  expect(await screen.findByRole('heading', { name: 'Step3 確認' })).toBeTruthy();
+}
+
 describe('ChallengeAdminTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -218,8 +233,8 @@ describe('ChallengeAdminTab', () => {
         defaultResponseVisibility: 'manager_only',
       });
     });
-    expect(await screen.findByRole('button', { name: '下書きを保存' })).toBeTruthy();
-    expect(screen.getByLabelText('標準の公開範囲')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Step2 項目' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '質問を追加' })).toBeTruthy();
   });
 
   it('confirms before deleting a draft program from danger zone', async () => {
@@ -267,8 +282,8 @@ describe('ChallengeAdminTab', () => {
 
     render(<ChallengeAdminTab space={space} />);
     await screen.findByText('下書きストーリー');
-    fireEvent.click(screen.getByRole('button', { name: '編集をつづける' }));
-    expect(await screen.findByRole('heading', { name: '参加者へ公開' })).toBeTruthy();
+    await openDraftEditor();
+    await goToConfirmStep();
     expect(
       (screen.getByRole('button', { name: 'この挑戦状を公開する' }) as HTMLButtonElement)
         .disabled,
@@ -278,7 +293,8 @@ describe('ChallengeAdminTab', () => {
     fireEvent.click(screen.getByRole('button', { name: '← 一覧へ戻る' }));
     await screen.findByText('下書きストーリー');
     listChallengeItemsMock.mockResolvedValue([commentItem]);
-    fireEvent.click(screen.getByRole('button', { name: '編集をつづける' }));
+    await openDraftEditor();
+    await goToConfirmStep();
     updateChallengeProgramStatusMock.mockResolvedValue({
       ok: true,
       value: { ...program, status: 'published' },
@@ -299,15 +315,15 @@ describe('ChallengeAdminTab', () => {
 
     render(<ChallengeAdminTab space={space} />);
     await screen.findByText('下書きストーリー');
-    fireEvent.click(screen.getByRole('button', { name: '編集をつづける' }));
-    await screen.findByRole('button', { name: 'この挑戦状を公開する' });
+    await openDraftEditor();
     fireEvent.change(screen.getAllByRole('textbox')[0], {
       target: { value: '未保存タイトル' },
     });
+    fireEvent.click(screen.getByRole('button', { name: /^3\s*確認$/ }));
     expect(
-      (screen.getByRole('button', { name: 'この挑戦状を公開する' }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+      await screen.findByText(/先に「下書きを保存」してから次へ進んでください/),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'この挑戦状を公開する' })).toBeNull();
     expect(updateChallengeProgramStatusMock).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
@@ -417,7 +433,8 @@ describe('ChallengeAdminTab', () => {
 
     render(<ChallengeAdminTab space={space} />);
     await screen.findByText('下書きストーリー');
-    fireEvent.click(screen.getByRole('button', { name: '編集をつづける' }));
+    await openDraftEditor();
+    await goToItemsStep();
     fireEvent.click(await screen.findByRole('button', { name: 'ミッションを追加' }));
     expect(screen.getByRole('heading', { name: '項目の内容を入力' })).toBeTruthy();
     expect(screen.getByText('回答形式')).toBeTruthy();
@@ -464,7 +481,8 @@ describe('ChallengeAdminTab', () => {
     });
 
     render(<ChallengeAdminTab space={space} />);
-    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    await openDraftEditor();
+    await goToItemsStep();
     fireEvent.click(await screen.findByRole('button', { name: '質問を追加' }));
     fireEvent.click(screen.getByRole('radio', { name: /3択/ }));
     fireEvent.change(
@@ -509,12 +527,14 @@ describe('ChallengeAdminTab', () => {
     ]);
 
     render(<ChallengeAdminTab space={space} />);
-    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    await openDraftEditor();
+    await goToItemsStep();
     expect(
       await screen.findByText(/参加者には上からこの順番で表示されます/),
     ).toBeTruthy();
     expect(screen.getByLabelText(/1\. 質問 朝の質問/)).toBeTruthy();
     expect(screen.getByLabelText(/2\. ミッション おまけミッション/)).toBeTruthy();
+    await goToConfirmStep();
     expect(screen.getByText('公開前チェック')).toBeTruthy();
     expect(screen.getByText(/質問・ミッションが2件あります/)).toBeTruthy();
     expect(screen.getByText(/クリアに必要な項目が1件あります/)).toBeTruthy();
@@ -526,7 +546,8 @@ describe('ChallengeAdminTab', () => {
     listChallengeItemsMock.mockResolvedValue([]);
 
     render(<ChallengeAdminTab space={space} />);
-    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    await openDraftEditor();
+    await goToItemsStep();
     fireEvent.click(await screen.findByRole('button', { name: '質問を追加' }));
     fireEvent.change(
       screen.getByLabelText('参加者に表示する問い・ミッション'),
@@ -556,7 +577,8 @@ describe('ChallengeAdminTab', () => {
     updateChallengeItemMock.mockResolvedValue({ ok: true, value: first });
 
     render(<ChallengeAdminTab space={space} />);
-    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    await openDraftEditor();
+    await goToItemsStep();
     await screen.findByLabelText(/1\. 質問 先頭/);
 
     const upButtons = screen.getAllByRole('button', { name: '上へ' });
@@ -601,7 +623,8 @@ describe('ChallengeAdminTab', () => {
     ]);
 
     render(<ChallengeAdminTab space={space} />);
-    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    await openDraftEditor();
+    await goToConfirmStep();
     expect(
       (await screen.findAllByText(/選択肢が3つ揃っていません/)).length,
     ).toBeGreaterThan(0);
@@ -610,11 +633,33 @@ describe('ChallengeAdminTab', () => {
         .disabled,
     ).toBe(true);
 
+    fireEvent.click(screen.getByRole('button', { name: /^1\s*基本$/ }));
     fireEvent.change(screen.getAllByRole('textbox')[0], {
       target: { value: '未保存タイトル' },
     });
+    fireEvent.click(screen.getByRole('button', { name: /^3\s*確認$/ }));
     expect(
-      screen.getAllByText(/先に「下書きを保存」してください/).length,
-    ).toBeGreaterThan(0);
+      await screen.findByText(/先に「下書きを保存」してから次へ進んでください/),
+    ).toBeTruthy();
+  });
+
+  it('opens participant preview from confirm step with saved draft data', async () => {
+    const program = makeProgram();
+    listChallengeProgramsMock.mockResolvedValue([program]);
+    listChallengeItemsMock.mockResolvedValue([commentItem]);
+
+    render(<ChallengeAdminTab space={space} />);
+    await openDraftEditor();
+    await goToConfirmStep();
+    fireEvent.click(screen.getByRole('button', { name: '参加者画面をプレビュー' }));
+    expect(
+      await screen.findByRole('dialog', { name: '参加者画面プレビュー' }),
+    ).toBeTruthy();
+    expect(screen.getByTestId('challenge-screen-preview')).toBeTruthy();
+    expect(screen.getByText('参加者プレビュー')).toBeTruthy();
+    expect(screen.getByText('朝の質問')).toBeTruthy();
+    expect(
+      screen.getByText(/プレビューのため、回答の保存・アップロードはできません/),
+    ).toBeTruthy();
   });
 });

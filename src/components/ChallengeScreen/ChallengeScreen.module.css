@@ -20,6 +20,18 @@
   min-width: 12rem;
 }
 
+.previewBadge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.45rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.12);
+  color: #3730a3;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .title {
   margin: 0;
   font-size: 1.25rem;
