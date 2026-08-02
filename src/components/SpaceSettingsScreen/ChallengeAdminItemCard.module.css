@@ -77,6 +77,7 @@
   margin-top: 0.7rem;
 }
 
+.moveButton,
 .editButton,
 .deleteButton {
   min-height: 40px;
@@ -85,6 +86,12 @@
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.moveButton {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
 }
 
 .editButton {
@@ -99,12 +106,14 @@
   color: #b91c1c;
 }
 
+.moveButton:focus-visible,
 .editButton:focus-visible,
 .deleteButton:focus-visible {
   outline: 2px solid #a855f7;
   outline-offset: 2px;
 }
 
+.moveButton:disabled,
 .editButton:disabled,
 .deleteButton:disabled {
   opacity: 0.55;
@@ -116,6 +125,7 @@
     flex-direction: column;
   }
 
+  .moveButton,
   .editButton,
   .deleteButton {
     width: 100%;

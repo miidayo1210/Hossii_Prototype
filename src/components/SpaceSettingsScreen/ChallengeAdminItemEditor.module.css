@@ -13,6 +13,42 @@
   color: #111827;
 }
 
+.lockedType {
+  margin: 0 0 0.9rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.lockedTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.lockedTypeHelp {
+  margin: 0.4rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: #374151;
+  line-height: 1.45;
+}
+
+.responseHint {
+  margin: -0.35rem 0 0.9rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.7rem;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .fieldset {
   margin: 0 0 0.9rem;
   padding: 0;

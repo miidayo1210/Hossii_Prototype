@@ -28,9 +28,10 @@ import { listManagerChallengeResponses } from '../../core/utils/challengeRespons
 import { fetchParticipantAccounts } from '../../core/utils/participantAccountsApi';
 import { fetchSpaceMembershipNicknames } from '../../core/utils/spaceMembershipsApi';
 import {
-  buildChallengePublishChecks,
+  challengeItemTypeHelp,
   clampAdminDescription,
   countChallengeItemStats,
+  evaluateChallengePublishReadiness,
   formatChallengeResponderLabel,
   hasUnsavedProgramEdits,
   itemFormHasContent,
@@ -553,53 +554,91 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     setItems(await listChallengeItems(editingProgram.id));
   };
 
-  const handlePublish = async () => {
+  const handleMoveItem = async (itemId: string, direction: 'up' | 'down') => {
     if (!editingProgram || busy) return;
-    if (editingProgram.status !== 'draft') return;
-    if (!programTitle.trim()) {
-      setFormError('タイトルを入力してください');
+    if (editingProgram.status !== 'draft') {
+      setFormError('下書き以外では並び替えできません');
       return;
     }
-    if (items.length === 0) {
-      setFormError('公開するには質問またはミッションが1件以上必要です');
+    if (showItemForm) {
+      setFormError('項目の編集中は並び替えできません。保存または入力をやめてください。');
       return;
     }
-    const answerableItems = items.filter(
-      (item) =>
-        item.responseType === 'comment' ||
-        item.responseType === 'complete_button' ||
-        item.responseType === 'choice3' ||
-        item.responseType === 'photo',
-    );
-    if (answerableItems.length === 0) {
-      setFormError(
-        '公開するにはコメント・完了ボタン・3択・写真形式の項目が1件以上必要です',
-      );
+    const index = items.findIndex((item) => item.id === itemId);
+    if (index < 0) return;
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= items.length) return;
+
+    const current = items[index];
+    const neighbor = items[swapIndex];
+    if (!current || !neighbor) return;
+
+    setBusy(true);
+    setFormError(null);
+    const first = await updateChallengeItem(current.id, {
+      sortOrder: neighbor.sortOrder,
+    });
+    if (!first.ok) {
+      setBusy(false);
+      setFormError(first.error);
+      showToast(first.error);
       return;
     }
-    const invalidChoice3 = items.find(
-      (item) =>
-        item.responseType === 'choice3' &&
-        !parseChallengeChoice3Options(item.responseConfig),
-    );
-    if (invalidChoice3) {
-      setFormError(
-        `「${invalidChoice3.title}」の選択肢が3つ揃っていません。公開前に編集してください。`,
-      );
+    const second = await updateChallengeItem(neighbor.id, {
+      sortOrder: current.sortOrder,
+    });
+    setBusy(false);
+    if (!second.ok) {
+      setFormError(second.error);
+      showToast(second.error);
+      setItems(await listChallengeItems(editingProgram.id));
       return;
     }
-    if (
-      hasUnsavedProgramEdits({
+    setItems(await listChallengeItems(editingProgram.id));
+  };
+
+  const publishGateInput = useMemo(() => {
+    if (!editingProgram) return null;
+    return {
+      title: programTitle,
+      items: items.map((item) => ({
+        title: item.title,
+        isRequired: item.isRequired,
+        responseType: item.responseType,
+        responseConfig: item.responseConfig,
+      })),
+      hasUnsavedProgramEdits: hasUnsavedProgramEdits({
         title: programTitle,
         description: programDescription,
         defaultResponseVisibility: programDefaultVisibility,
         savedTitle: editingProgram.title,
         savedDescription: editingProgram.description,
         savedDefaultResponseVisibility: editingProgram.defaultResponseVisibility,
-      }) ||
-      showItemForm
-    ) {
-      setFormError('先に下書きを保存してください。未保存の変更がある状態では公開できません。');
+      }),
+      hasOpenItemForm: showItemForm,
+    };
+  }, [
+    editingProgram,
+    items,
+    programDescription,
+    programDefaultVisibility,
+    programTitle,
+    showItemForm,
+  ]);
+
+  const publishReadiness = useMemo(
+    () =>
+      publishGateInput
+        ? evaluateChallengePublishReadiness(publishGateInput)
+        : null,
+    [publishGateInput],
+  );
+
+  const handlePublish = async () => {
+    if (!editingProgram || busy || !publishReadiness) return;
+    if (editingProgram.status !== 'draft') return;
+    if (!publishReadiness.canPublish) {
+      setFormError(publishReadiness.blockReason ?? '公開できません');
       return;
     }
     const ok = window.confirm(
@@ -619,23 +658,6 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     showToast('挑戦状を公開しました');
     void loadManagerResponsesForItems(items);
   };
-
-  const programDirty = useMemo(() => {
-    if (!editingProgram) return false;
-    return hasUnsavedProgramEdits({
-      title: programTitle,
-      description: programDescription,
-      defaultResponseVisibility: programDefaultVisibility,
-      savedTitle: editingProgram.title,
-      savedDescription: editingProgram.description,
-      savedDefaultResponseVisibility: editingProgram.defaultResponseVisibility,
-    });
-  }, [
-    editingProgram,
-    programTitle,
-    programDescription,
-    programDefaultVisibility,
-  ]);
 
   if (!canManage) {
     return (
@@ -739,18 +761,8 @@ export const ChallengeAdminTab = ({ space }: Props) => {
 
   if (view.kind === 'edit' && editingProgram) {
     const isDraft = editingProgram.status === 'draft';
-    const itemStats = countChallengeItemStats(items);
-    const publishChecks = buildChallengePublishChecks({
-      title: programTitle,
-      itemTotal: itemStats.total,
-      requiredTotal: itemStats.required,
-    });
-    const canPublish =
-      isDraft &&
-      programTitle.trim().length > 0 &&
-      items.length > 0 &&
-      !programDirty &&
-      !showItemForm;
+    const publishChecks = publishReadiness?.checks ?? [];
+    const canPublish = Boolean(isDraft && publishReadiness?.canPublish);
 
     return (
       <>
@@ -857,11 +869,14 @@ export const ChallengeAdminTab = ({ space }: Props) => {
             <div className={styles.typeExplain}>
               <p>
                 <strong>質問</strong>
-                考えたことや気づきを、コメントで書いてもらう項目です
+                {challengeItemTypeHelp('question')}
               </p>
               <p>
                 <strong>ミッション</strong>
-                行動したことや、できたことを報告してもらう項目です
+                {challengeItemTypeHelp('mission')}
+              </p>
+              <p className={styles.muted}>
+                回答形式（コメント／完了ボタン／3択／写真）は、項目を追加したあとに選べます。
               </p>
             </div>
 
@@ -873,7 +888,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
               <h3 className={styles.itemListHeading}>作成済み項目</h3>
               {items.length > 0 ? (
                 <p className={styles.muted}>
-                  参加者には上からこの順番で表示されます
+                  参加者には上からこの順番で表示されます。「上へ／下へ」で並べ替えできます。
                 </p>
               ) : null}
             </div>
@@ -892,8 +907,12 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                       }
                       readOnly={!isDraft}
                       busy={busy}
+                      canMoveUp={index > 0 && !showItemForm}
+                      canMoveDown={index < items.length - 1 && !showItemForm}
                       onEdit={() => startEditItem(item)}
                       onDelete={() => void handleDeleteItem(item)}
+                      onMoveUp={() => void handleMoveItem(item.id, 'up')}
+                      onMoveDown={() => void handleMoveItem(item.id, 'down')}
                     />
                     {isDraft &&
                     showItemForm &&
@@ -917,6 +936,9 @@ export const ChallengeAdminTab = ({ space }: Props) => {
             {isDraft && (
               <div className={styles.addBlock}>
                 <h3 className={styles.itemListHeading}>新しい項目を追加</h3>
+                <p className={styles.muted}>
+                  種類を選んで追加します。回答形式は次の入力画面で設定します。
+                </p>
                 <div className={styles.actions}>
                   <button
                     type="button"
@@ -972,16 +994,11 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                   ))}
                 </ul>
               </div>
-              {programDirty && (
-                <p className={styles.warning}>
-                  未保存の変更があります。先に「下書きを保存」してください。
+              {!canPublish && publishReadiness?.blockReason ? (
+                <p className={styles.warning} role="status">
+                  {publishReadiness.blockReason}
                 </p>
-              )}
-              {showItemForm && (
-                <p className={styles.warning}>
-                  項目の編集中です。保存または入力をやめてから公開してください。
-                </p>
-              )}
+              ) : null}
               <div className={styles.actions}>
                 <button
                   type="button"
@@ -1090,8 +1107,9 @@ export const ChallengeAdminTab = ({ space }: Props) => {
         </div>
 
         <p className={styles.introHint}>
-          質問：考えたことや気づきを書いてもらう項目 ／
-          ミッション：行動したことや達成を報告してもらう項目
+          質問：考えたことや気づきを答えてもらう項目 ／
+          ミッション：行動や達成に取り組んでもらう項目 ／
+          回答形式はコメント・完了ボタン・3択・写真から選べます
         </p>
 
         {loading && (
@@ -1153,7 +1171,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                     </span>
                     <span className={styles.muted}>項目 {stats.total} 件</span>
                     <span className={styles.muted}>
-                      必須 {stats.required} ／ おまけ {stats.optional}
+                      クリアに必要 {stats.required} ／ おまけ {stats.optional}
                     </span>
                     <span className={styles.muted}>
                       更新 {formatUpdatedAt(program.updatedAt)}
