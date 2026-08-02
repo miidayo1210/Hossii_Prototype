@@ -108,6 +108,7 @@ const publishedProgram = {
   title: '公開ストーリー',
   description: null,
   status: 'published' as const,
+  defaultResponseVisibility: 'manager_only' as const,
   createdBy: 'admin',
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -123,6 +124,7 @@ const commentItem = {
   responseType: 'comment' as const,
   isRequired: true,
   sortOrder: 0,
+  responseVisibility: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -198,8 +200,10 @@ describe('ChallengeScreen rewards', () => {
     expect(submitChallengeCommentResponseMock).toHaveBeenCalledWith({
       itemId: 'i1',
       comment: '回答本文',
-      visibility: 'manager_only',
     });
+    expect(submitChallengeCommentResponseMock.mock.calls[0]?.[0]).not.toHaveProperty(
+      'visibility',
+    );
   });
 
   it('does not show reward modal on update without new reward', async () => {
@@ -548,12 +552,27 @@ describe('ChallengeScreen focused response UI', () => {
     expect(await screen.findByRole('heading', { name: '次の挑戦' })).toBeTruthy();
     expect(screen.getByRole('textbox')).toBeTruthy();
     expect(screen.getByDisplayValue('')).toBeTruthy();
-    expect(screen.getByLabelText('管理者にだけ共有')).toBeTruthy();
+    expect(screen.queryByRole('radio')).toBeNull();
     expect(screen.getAllByText('クリアに必要').length).toBeGreaterThan(0);
-    expect(screen.getByText(/「管理者にだけ共有」を選ぶと/)).toBeTruthy();
+    expect(
+      screen.getByText('この回答は、あなたとスペース管理者だけが見ることができます。'),
+    ).toBeTruthy();
     expect(screen.getByRole('button', { name: '挑戦の記録' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'これから答える' })).toBeNull();
     expect(screen.queryByRole('heading', { name: '回答済み' })).toBeNull();
+  });
+
+  it('explains item visibility override without letting participants choose', async () => {
+    listPublishedChallengeItemsMock.mockResolvedValue([
+      { ...commentItem, responseVisibility: 'space_members' },
+    ]);
+    render(<ChallengeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: /開く/ }));
+    await screen.findByRole('textbox');
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(
+      screen.getByText('この回答は、スペースに参加しているみんなへ共有されます。'),
+    ).toBeTruthy();
   });
 
   it('places compact progress and next challenge before stamp details', async () => {
@@ -661,9 +680,10 @@ describe('ChallengeScreen focused response UI', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /の回答操作/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: '書き直す' }));
     expect(await screen.findByRole('textbox')).toBeTruthy();
+    expect(screen.queryByRole('radio')).toBeNull();
     expect(
-      (screen.getByLabelText('自分だけに残す') as HTMLInputElement).checked,
-    ).toBe(true);
+      screen.getByText('この回答は、あなただけが見ることができます。'),
+    ).toBeTruthy();
   });
 
   it('rewrites from action menu without reward modal', async () => {

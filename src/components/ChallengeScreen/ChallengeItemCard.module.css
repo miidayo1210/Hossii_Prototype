@@ -226,43 +226,26 @@
   align-self: flex-end;
 }
 
-.visibilityFieldset {
+.visibilityNotice {
   margin: 0;
-  padding: 0;
-  border: none;
-  min-inline-size: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.9rem;
+  background: rgba(250, 245, 255, 0.9);
+  border: 1px solid rgba(233, 213, 255, 0.9);
 }
 
 .visibilityLegend {
-  padding: 0;
-  margin-bottom: 0.45rem;
-  font-size: 0.85rem;
-  color: #334155;
-}
-
-.radioRow {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.radioLabel {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 44px;
-  font-size: 0.9rem;
-  color: #374151;
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6d28d9;
 }
 
 .visibilityHelp {
-  margin: 0.45rem 0 0;
-  font-size: 0.8rem;
+  margin: 0;
+  font-size: 0.85rem;
   color: #475569;
-  line-height: 1.45;
-  background: #f8fafc;
-  border-radius: 0.75rem;
-  padding: 0.65rem 0.75rem;
+  line-height: 1.5;
 }
 
 .actions {
