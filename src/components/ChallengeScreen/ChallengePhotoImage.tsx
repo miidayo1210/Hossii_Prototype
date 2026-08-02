@@ -10,6 +10,12 @@ type Props = {
   size?: 'sm' | 'md' | 'lg';
 };
 
+type LoadState = {
+  path: string;
+  signedUrl: string | null;
+  failed: boolean;
+};
+
 /**
  * Loads a short-lived signed URL for a private challenge photo.
  * Authorization is Storage RLS (same as response visibility).
@@ -20,38 +26,30 @@ export function ChallengePhotoImage({
   className,
   size = 'md',
 }: Props) {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const path = photoPath.trim();
+  const [loaded, setLoaded] = useState<LoadState | null>(null);
 
   useEffect(() => {
+    if (!path) return;
     let cancelled = false;
-    const path = photoPath.trim();
-    if (!path) {
-      setSignedUrl(null);
-      setFailed(true);
-      return;
-    }
-    setFailed(false);
-    setSignedUrl(null);
     void createChallengePhotoSignedUrl(path).then((result) => {
       if (cancelled) return;
       if (result.ok) {
-        setSignedUrl(result.signedUrl);
-        setFailed(false);
+        setLoaded({ path, signedUrl: result.signedUrl, failed: false });
       } else {
-        setSignedUrl(null);
-        setFailed(true);
+        setLoaded({ path, signedUrl: null, failed: true });
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [photoPath]);
+  }, [path]);
 
   const sizeClass =
     size === 'sm' ? styles.sizeSm : size === 'lg' ? styles.sizeLg : styles.sizeMd;
+  const current = loaded?.path === path ? loaded : null;
 
-  if (failed) {
+  if (!path) {
     return (
       <p className={`${styles.fallback} ${className ?? ''}`.trim()} role="status">
         写真を表示できません
@@ -59,7 +57,7 @@ export function ChallengePhotoImage({
     );
   }
 
-  if (!signedUrl) {
+  if (!current) {
     return (
       <p className={`${styles.loading} ${className ?? ''}`.trim()} role="status">
         写真を読み込み中…
@@ -67,9 +65,17 @@ export function ChallengePhotoImage({
     );
   }
 
+  if (current.failed || !current.signedUrl) {
+    return (
+      <p className={`${styles.fallback} ${className ?? ''}`.trim()} role="status">
+        写真を表示できません
+      </p>
+    );
+  }
+
   return (
     <img
-      src={signedUrl}
+      src={current.signedUrl}
       alt={alt}
       className={`${styles.image} ${sizeClass} ${className ?? ''}`.trim()}
       loading="lazy"
