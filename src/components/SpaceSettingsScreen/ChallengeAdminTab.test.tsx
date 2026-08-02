@@ -12,6 +12,8 @@ const {
   deleteChallengeProgramMock,
   updateChallengeProgramStatusMock,
   updateChallengeProgramMock,
+  updateChallengeItemMock,
+  deleteChallengeItemMock,
   listManagerChallengeResponsesMock,
   fetchSpaceMembershipNicknamesMock,
   fetchParticipantAccountsMock,
@@ -24,6 +26,8 @@ const {
   deleteChallengeProgramMock: vi.fn(),
   updateChallengeProgramStatusMock: vi.fn(),
   updateChallengeProgramMock: vi.fn(),
+  updateChallengeItemMock: vi.fn(),
+  deleteChallengeItemMock: vi.fn(),
   listManagerChallengeResponsesMock: vi.fn(),
   fetchSpaceMembershipNicknamesMock: vi.fn(),
   fetchParticipantAccountsMock: vi.fn(),
@@ -53,8 +57,8 @@ vi.mock('../../core/utils/challengeProgramsApi', () => ({
     updateChallengeProgramStatusMock(...args),
   deleteChallengeProgram: (...args: unknown[]) => deleteChallengeProgramMock(...args),
   createChallengeItem: (...args: unknown[]) => createChallengeItemMock(...args),
-  updateChallengeItem: vi.fn(),
-  deleteChallengeItem: vi.fn(),
+  updateChallengeItem: (...args: unknown[]) => updateChallengeItemMock(...args),
+  deleteChallengeItem: (...args: unknown[]) => deleteChallengeItemMock(...args),
 }));
 
 vi.mock('../../core/utils/challengeResponsesApi', () => ({
@@ -183,7 +187,7 @@ describe('ChallengeAdminTab', () => {
     render(<ChallengeAdminTab space={space} />);
     expect(await screen.findByText('下書きストーリー')).toBeTruthy();
     expect(screen.getByText('公開ストーリー')).toBeTruthy();
-    expect(screen.getByText(/必須 1 ／ おまけ 1/)).toBeTruthy();
+    expect(screen.getByText(/クリアに必要 1 ／ おまけ 1/)).toBeTruthy();
     expect(screen.getByText('説明なし')).toBeTruthy();
     expect(screen.getByRole('button', { name: '編集をつづける' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '内容・回答を見る' })).toBeTruthy();
@@ -506,7 +510,9 @@ describe('ChallengeAdminTab', () => {
 
     render(<ChallengeAdminTab space={space} />);
     fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
-    expect(await screen.findByText('参加者には上からこの順番で表示されます')).toBeTruthy();
+    expect(
+      await screen.findByText(/参加者には上からこの順番で表示されます/),
+    ).toBeTruthy();
     expect(screen.getByLabelText(/1\. 質問 朝の質問/)).toBeTruthy();
     expect(screen.getByLabelText(/2\. ミッション おまけミッション/)).toBeTruthy();
     expect(screen.getByText('公開前チェック')).toBeTruthy();
@@ -531,6 +537,74 @@ describe('ChallengeAdminTab', () => {
       (screen.getByLabelText('参加者に表示する問い・ミッション') as HTMLInputElement)
         .value,
     ).toBe('途中入力');
-    expect(screen.getByRole('radio', { name: /ミッション/ })).toBeTruthy();
+    expect(screen.getByLabelText('種類：ミッション')).toBeTruthy();
+    expect(screen.queryByRole('radio', { name: /ミッション/ })).toBeNull();
+  });
+
+  it('reorders items with up/down and disables ends', async () => {
+    const program = makeProgram();
+    const first = { ...commentItem, id: 'i1', title: '先頭', sortOrder: 0 };
+    const second = {
+      ...commentItem,
+      id: 'i2',
+      title: '二番目',
+      sortOrder: 1,
+      itemType: 'mission' as const,
+    };
+    listChallengeProgramsMock.mockResolvedValue([program]);
+    listChallengeItemsMock.mockResolvedValue([first, second]);
+    updateChallengeItemMock.mockResolvedValue({ ok: true, value: first });
+
+    render(<ChallengeAdminTab space={space} />);
+    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    await screen.findByLabelText(/1\. 質問 先頭/);
+
+    const upButtons = screen.getAllByRole('button', { name: '上へ' });
+    const downButtons = screen.getAllByRole('button', { name: '下へ' });
+    expect((upButtons[0] as HTMLButtonElement).disabled).toBe(true);
+    expect((downButtons[1] as HTMLButtonElement).disabled).toBe(true);
+
+    listChallengeItemsMock.mockResolvedValue([
+      { ...second, sortOrder: 0 },
+      { ...first, sortOrder: 1 },
+    ]);
+    fireEvent.click(upButtons[1]);
+
+    await waitFor(() => {
+      expect(updateChallengeItemMock).toHaveBeenCalledWith('i2', { sortOrder: 0 });
+      expect(updateChallengeItemMock).toHaveBeenCalledWith('i1', { sortOrder: 1 });
+    });
+    expect(await screen.findByLabelText(/1\. ミッション 二番目/)).toBeTruthy();
+  });
+
+  it('shows choice3 and unsaved issues in publish checks before publish', async () => {
+    const program = makeProgram();
+    listChallengeProgramsMock.mockResolvedValue([program]);
+    listChallengeItemsMock.mockResolvedValue([
+      {
+        ...commentItem,
+        id: 'i-choice',
+        title: '気分は？',
+        responseType: 'choice3',
+        responseConfig: { options: ['良い', '普通'] },
+      },
+    ]);
+
+    render(<ChallengeAdminTab space={space} />);
+    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    expect(
+      (await screen.findAllByText(/選択肢が3つ揃っていません/)).length,
+    ).toBeGreaterThan(0);
+    expect(
+      (screen.getByRole('button', { name: 'この挑戦状を公開する' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], {
+      target: { value: '未保存タイトル' },
+    });
+    expect(
+      screen.getAllByText(/先に「下書きを保存」してください/).length,
+    ).toBeGreaterThan(0);
   });
 });
