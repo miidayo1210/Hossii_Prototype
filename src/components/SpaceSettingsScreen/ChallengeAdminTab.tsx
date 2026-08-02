@@ -39,6 +39,12 @@ import {
   type ChallengeItemCountStats,
 } from '../../core/utils/challengeAdminDisplay';
 import {
+  buildChoice3ResponseConfig,
+  emptyChallengeChoice3Options,
+  parseChallengeChoice3Options,
+  type ChallengeChoice3Options,
+} from '../../core/utils/challengeChoice3';
+import {
   challengeResponseVisibilityHelp,
   challengeResponseVisibilityLabel,
 } from '../../core/utils/challengeVisibility';
@@ -77,7 +83,29 @@ const EMPTY_ITEM_FORM: ChallengeAdminItemFormState = {
   isRequired: true,
   responseType: 'comment',
   responseVisibility: null,
+  choiceOptions: emptyChallengeChoice3Options(),
 };
+
+function isAdminSelectableResponseType(
+  responseType: ChallengeItem['responseType'],
+): responseType is ChallengeAdminItemFormState['responseType'] {
+  return (
+    responseType === 'comment' ||
+    responseType === 'complete_button' ||
+    responseType === 'choice3'
+  );
+}
+
+function choiceOptionsFromItem(item: ChallengeItem): ChallengeChoice3Options {
+  return parseChallengeChoice3Options(item.responseConfig) ?? emptyChallengeChoice3Options();
+}
+
+function responseConfigFromForm(
+  form: ChallengeAdminItemFormState,
+): Record<string, unknown> | null {
+  if (form.responseType !== 'choice3') return null;
+  return buildChoice3ResponseConfig(form.choiceOptions);
+}
 
 const LIST_LOAD_ERROR_TITLE = '挑戦状を読み込めませんでした';
 const LIST_LOAD_ERROR_HINT = '時間をおいて、もう一度お試しください';
@@ -427,11 +455,11 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       description: item.description ?? '',
       reason: item.reason ?? '',
       isRequired: item.isRequired,
-      responseType:
-        item.responseType === 'complete_button' || item.responseType === 'comment'
-          ? item.responseType
-          : 'comment',
+      responseType: isAdminSelectableResponseType(item.responseType)
+        ? item.responseType
+        : 'comment',
       responseVisibility: item.responseVisibility,
+      choiceOptions: choiceOptionsFromItem(item),
     });
     setShowItemForm(true);
   };
@@ -442,9 +470,17 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setItemFormError('下書き以外では項目を変更できません');
       return;
     }
-    const validationError = validateChallengeItemForm(itemForm);
+    const validationError = validateChallengeItemForm({
+      ...itemForm,
+      choiceOptions: itemForm.choiceOptions,
+    });
     if (validationError) {
       setItemFormError(validationError);
+      return;
+    }
+    const responseConfig = responseConfigFromForm(itemForm);
+    if (itemForm.responseType === 'choice3' && !responseConfig) {
+      setItemFormError('選択肢を3つ入力してください');
       return;
     }
     setBusy(true);
@@ -460,7 +496,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
         isRequired: itemForm.isRequired,
         responseType: itemForm.responseType,
         responseVisibility: itemForm.responseVisibility,
-        responseConfig: null,
+        responseConfig,
       });
       setBusy(false);
       if (!result.ok) {
@@ -481,7 +517,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
         responseType: itemForm.responseType,
         sortOrder: nextSort,
         responseVisibility: itemForm.responseVisibility,
-        responseConfig: null,
+        responseConfig,
       });
       setBusy(false);
       if (!result.ok) {
@@ -530,11 +566,23 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     const answerableItems = items.filter(
       (item) =>
         item.responseType === 'comment' ||
-        item.responseType === 'complete_button',
+        item.responseType === 'complete_button' ||
+        item.responseType === 'choice3',
     );
     if (answerableItems.length === 0) {
       setFormError(
-        '公開するにはコメントまたは完了ボタン形式の項目が1件以上必要です',
+        '公開するにはコメント・完了ボタン・3択形式の項目が1件以上必要です',
+      );
+      return;
+    }
+    const invalidChoice3 = items.find(
+      (item) =>
+        item.responseType === 'choice3' &&
+        !parseChallengeChoice3Options(item.responseConfig),
+    );
+    if (invalidChoice3) {
+      setFormError(
+        `「${invalidChoice3.title}」の選択肢が3つ揃っていません。公開前に編集してください。`,
       );
       return;
     }

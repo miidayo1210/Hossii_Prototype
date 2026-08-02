@@ -32,6 +32,18 @@
   gap: 0.55rem;
 }
 
+.typeGrid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+@media (max-width: 720px) {
+  .typeGrid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .choiceCard {
   display: flex;
   flex-direction: column;

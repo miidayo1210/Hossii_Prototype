@@ -54,7 +54,15 @@ export function ChallengeAdminItemCard({
         >
           {requiredLabel}
         </span>
-        <span className={styles.muted}>コメントで回答</span>
+        <span className={styles.muted}>
+          {item.responseType === 'complete_button'
+            ? '完了ボタンで回答'
+            : item.responseType === 'choice3'
+              ? '3択で回答'
+              : item.responseType === 'photo'
+                ? '写真で回答（未対応）'
+                : 'コメントで回答'}
+        </span>
         <span className={styles.muted}>{visibilityLabel}</span>
       </div>
       <h3 className={styles.title}>{item.title}</h3>

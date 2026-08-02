@@ -13,9 +13,14 @@ import {
 import {
   listMyChallengeCompletions,
   listMyChallengeRewards,
+  submitChallengeChoice3,
   submitChallengeCommentResponse,
   submitChallengeCompleteButton,
 } from '../../core/utils/challengeRewardsApi';
+import {
+  findChallengeChoice3OptionIndex,
+  parseChallengeChoice3Options,
+} from '../../core/utils/challengeChoice3';
 import { resolveChallengeResponseVisibility } from '../../core/utils/challengeVisibility';
 import {
   fetchChallengeResponderNicknames,
@@ -578,6 +583,108 @@ export const ChallengeScreen = () => {
           if (result.value.wasInsert && nextProgress.isComplete && activeProgram) {
             openRecordsPage(activeProgram.id);
           } else if (result.value.wasInsert) {
+            setActiveItemId(nextFocus);
+          }
+        }
+      } finally {
+        setBusyItemId(null);
+      }
+      return;
+    }
+
+    if (item.responseType === 'choice3') {
+      const options = parseChallengeChoice3Options(item.responseConfig);
+      if (!options) {
+        setFormError('選択肢を読み込めませんでした');
+        return;
+      }
+      const draft = drafts[item.id] ?? { comment: '' };
+      const optionIndex = findChallengeChoice3OptionIndex(options, draft.comment);
+      if (optionIndex < 0) {
+        setFormError('選択肢を1つ選んでください');
+        return;
+      }
+      setBusyItemId(item.id);
+      setFormError(null);
+      try {
+        const result = await submitChallengeChoice3({
+          itemId: item.id,
+          optionIndex,
+        });
+        if (!result.ok) {
+          setFormError(toParticipantSaveError(result.error));
+          return;
+        }
+        const nextResponses: Record<string, ChallengeResponse> = {
+          ...myResponses,
+          [item.id]: {
+            id: result.value.response.id,
+            itemId: result.value.response.itemId,
+            userId: result.value.response.userId,
+            visibility: result.value.response.visibility,
+            comment: result.value.response.comment,
+            createdAt: result.value.response.createdAt,
+            updatedAt: result.value.response.updatedAt,
+          },
+        };
+        const nextRewards: Record<string, ChallengeReward> = {
+          ...myRewards,
+          [item.id]: result.value.reward,
+        };
+        const nextCompletions: Record<string, ChallengeCompletion> = {
+          ...myCompletions,
+          [item.id]: result.value.completion,
+        };
+        setMyResponses(nextResponses);
+        setMyRewards(nextRewards);
+        setMyCompletions(nextCompletions);
+        setDrafts((prev) => ({
+          ...prev,
+          [item.id]: {
+            comment: result.value.response.comment,
+          },
+        }));
+        if (result.value.response.visibility === 'space_members') {
+          void refreshSpaceMemberAnswers(items.map((entry) => entry.id));
+        }
+        const nextFocus = pickNextChallengeFocusItemId(
+          items,
+          Object.keys(nextResponses),
+        );
+        if (result.value.isNewReward) {
+          const nextSlots = buildChallengeStampSlots(
+            items,
+            Object.values(nextCompletions),
+            Object.values(nextRewards),
+          );
+          const nextProgress = getChallengeStampProgress(nextSlots);
+          setRewardModal({
+            hossiiKey: result.value.reward.hossiiKey,
+            itemTitle: item.title,
+            kind: resolveChallengeRewardCelebrationKind(
+              nextProgress,
+              nextFocus != null,
+            ),
+            progressLabel: formatRewardCelebrationProgressLabel(
+              nextProgress,
+              items.length,
+            ),
+            optionalLeftoverLabel: formatOptionalLeftoverLabel(nextProgress),
+            nextFocusItemId: nextFocus,
+          });
+        } else if (hadResponse) {
+          showToast('回答を更新しました');
+        } else {
+          const nextSlots = buildChallengeStampSlots(
+            items,
+            Object.values(nextCompletions),
+            Object.values(nextRewards),
+          );
+          const nextProgress = getChallengeStampProgress(nextSlots);
+          showToast('回答を保存しました');
+          if (nextProgress.isComplete && activeProgram) {
+            openRecordsPage(activeProgram.id);
+          } else {
             setActiveItemId(nextFocus);
           }
         }

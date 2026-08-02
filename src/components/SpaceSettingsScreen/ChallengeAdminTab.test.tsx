@@ -109,6 +109,7 @@ const commentItem = {
   isRequired: true,
   sortOrder: 0,
   responseVisibility: null,
+  responseConfig: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -418,6 +419,7 @@ describe('ChallengeAdminTab', () => {
     expect(screen.getByText('回答形式')).toBeTruthy();
     expect(screen.getByText('コメント')).toBeTruthy();
     expect(screen.getByText('完了ボタン')).toBeTruthy();
+    expect(screen.getByText('3択')).toBeTruthy();
     fireEvent.change(
       screen.getByLabelText('参加者に表示する問い・ミッション'),
       { target: { value: '新しいミッション' } },
@@ -434,6 +436,53 @@ describe('ChallengeAdminTab', () => {
           responseType: 'comment',
           isRequired: false,
           sortOrder: 3,
+          responseConfig: null,
+        }),
+      );
+    });
+  });
+
+  it('creates a choice3 item with three options in responseConfig', async () => {
+    const program = makeProgram();
+    listChallengeProgramsMock.mockResolvedValue([program]);
+    listChallengeItemsMock.mockResolvedValue([]);
+    createChallengeItemMock.mockResolvedValue({
+      ok: true,
+      value: {
+        ...commentItem,
+        id: 'i-choice',
+        itemType: 'question',
+        title: '気分は？',
+        responseType: 'choice3',
+        responseConfig: { options: ['良い', '普通', '悪い'] },
+      },
+    });
+
+    render(<ChallengeAdminTab space={space} />);
+    fireEvent.click(await screen.findByRole('button', { name: '編集をつづける' }));
+    fireEvent.click(await screen.findByRole('button', { name: '質問を追加' }));
+    fireEvent.click(screen.getByRole('radio', { name: /3択/ }));
+    fireEvent.change(
+      screen.getByLabelText('参加者に表示する問い・ミッション'),
+      { target: { value: '気分は？' } },
+    );
+    fireEvent.change(screen.getByLabelText('選択肢1'), {
+      target: { value: '良い' },
+    });
+    fireEvent.change(screen.getByLabelText('選択肢2'), {
+      target: { value: '普通' },
+    });
+    fireEvent.change(screen.getByLabelText('選択肢3'), {
+      target: { value: '悪い' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'この項目を追加' }));
+
+    await waitFor(() => {
+      expect(createChallengeItemMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          responseType: 'choice3',
+          title: '気分は？',
+          responseConfig: { options: ['良い', '普通', '悪い'] },
         }),
       );
     });
