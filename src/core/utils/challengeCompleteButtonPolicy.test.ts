@@ -50,6 +50,7 @@ describe('challengeCompleteButton helpers', () => {
       'comment',
       'complete_button',
       'choice3',
+      'photo',
     ]);
   });
 });

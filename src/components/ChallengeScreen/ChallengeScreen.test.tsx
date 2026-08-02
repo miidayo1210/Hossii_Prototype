@@ -14,18 +14,28 @@ const {
   listPublishedChallengeProgramsMock,
   listPublishedChallengeItemsMock,
   listMyChallengeResponsesMock,
+  listSpaceMemberChallengeResponsesMock,
   listMyChallengeRewardsMock,
   listMyChallengeCompletionsMock,
   submitChallengeCommentResponseMock,
+  submitChallengeChoice3Mock,
+  submitChallengeCompleteButtonMock,
+  submitChallengePhotoMock,
+  uploadChallengePhotoForItemMock,
   deleteChallengeResponseMock,
   testStore,
 } = vi.hoisted(() => ({
   listPublishedChallengeProgramsMock: vi.fn(),
   listPublishedChallengeItemsMock: vi.fn(),
   listMyChallengeResponsesMock: vi.fn(),
+  listSpaceMemberChallengeResponsesMock: vi.fn(),
   listMyChallengeRewardsMock: vi.fn(),
   listMyChallengeCompletionsMock: vi.fn(),
   submitChallengeCommentResponseMock: vi.fn(),
+  submitChallengeChoice3Mock: vi.fn(),
+  submitChallengeCompleteButtonMock: vi.fn(),
+  submitChallengePhotoMock: vi.fn(),
+  uploadChallengePhotoForItemMock: vi.fn(),
   deleteChallengeResponseMock: vi.fn(),
   testStore: {
     currentUser: { uid: 'user-1', isAdmin: false } as {
@@ -76,6 +86,8 @@ vi.mock('../../core/utils/challengeResponsesApi', () => ({
   listPublishedChallengeItems: (...args: unknown[]) =>
     listPublishedChallengeItemsMock(...args),
   listMyChallengeResponses: (...args: unknown[]) => listMyChallengeResponsesMock(...args),
+  listSpaceMemberChallengeResponses: (...args: unknown[]) =>
+    listSpaceMemberChallengeResponsesMock(...args),
   deleteChallengeResponse: (...args: unknown[]) => deleteChallengeResponseMock(...args),
 }));
 
@@ -85,7 +97,27 @@ vi.mock('../../core/utils/challengeRewardsApi', () => ({
     listMyChallengeCompletionsMock(...args),
   submitChallengeCommentResponse: (...args: unknown[]) =>
     submitChallengeCommentResponseMock(...args),
+  submitChallengeChoice3: (...args: unknown[]) => submitChallengeChoice3Mock(...args),
+  submitChallengeCompleteButton: (...args: unknown[]) =>
+    submitChallengeCompleteButtonMock(...args),
+  submitChallengePhoto: (...args: unknown[]) => submitChallengePhotoMock(...args),
+  uploadChallengePhotoForItem: (...args: unknown[]) =>
+    uploadChallengePhotoForItemMock(...args),
 }));
+
+vi.mock('../../core/utils/imageStorageApi', () => ({
+  compressImage: vi.fn(async (file: File) => file),
+}));
+
+vi.mock('../../core/utils/challengeSpaceMemberAnswers', async () => {
+  const actual = await vi.importActual<
+    typeof import('../../core/utils/challengeSpaceMemberAnswers')
+  >('../../core/utils/challengeSpaceMemberAnswers');
+  return {
+    ...actual,
+    fetchChallengeResponderNicknames: vi.fn(async () => ({})),
+  };
+});
 
 import { ChallengeScreen } from './ChallengeScreen';
 
@@ -136,6 +168,10 @@ function resetTestStore() {
   testStore.activeSpaceMembershipStatus = 'active';
 }
 
+beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+
 describe('ChallengeScreen rewards', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -143,6 +179,7 @@ describe('ChallengeScreen rewards', () => {
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
+    listSpaceMemberChallengeResponsesMock.mockResolvedValue([]);
     listMyChallengeRewardsMock.mockResolvedValue([]);
     listMyChallengeCompletionsMock.mockResolvedValue([]);
   });
@@ -321,6 +358,7 @@ describe('ChallengeScreen list UI', () => {
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
+    listSpaceMemberChallengeResponsesMock.mockResolvedValue([]);
     listMyChallengeRewardsMock.mockResolvedValue([]);
     listMyChallengeCompletionsMock.mockResolvedValue([]);
   });
@@ -538,6 +576,7 @@ describe('ChallengeScreen focused response UI', () => {
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem, item2, optionalItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
+    listSpaceMemberChallengeResponsesMock.mockResolvedValue([]);
     listMyChallengeRewardsMock.mockResolvedValue([]);
     listMyChallengeCompletionsMock.mockResolvedValue([]);
   });
@@ -1463,6 +1502,7 @@ describe('ChallengeScreen list loading races', () => {
     listPublishedChallengeProgramsMock.mockResolvedValue([publishedProgram]);
     listPublishedChallengeItemsMock.mockResolvedValue([commentItem]);
     listMyChallengeResponsesMock.mockResolvedValue([]);
+    listSpaceMemberChallengeResponsesMock.mockResolvedValue([]);
     listMyChallengeRewardsMock.mockResolvedValue([]);
     listMyChallengeCompletionsMock.mockResolvedValue([]);
   });

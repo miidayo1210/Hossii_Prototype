@@ -92,7 +92,8 @@ function isAdminSelectableResponseType(
   return (
     responseType === 'comment' ||
     responseType === 'complete_button' ||
-    responseType === 'choice3'
+    responseType === 'choice3' ||
+    responseType === 'photo'
   );
 }
 
@@ -567,11 +568,12 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       (item) =>
         item.responseType === 'comment' ||
         item.responseType === 'complete_button' ||
-        item.responseType === 'choice3',
+        item.responseType === 'choice3' ||
+        item.responseType === 'photo',
     );
     if (answerableItems.length === 0) {
       setFormError(
-        '公開するにはコメント・完了ボタン・3択形式の項目が1件以上必要です',
+        '公開するにはコメント・完了ボタン・3択・写真形式の項目が1件以上必要です',
       );
       return;
     }

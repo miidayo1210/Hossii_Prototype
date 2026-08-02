@@ -42,7 +42,8 @@ function responseTypeLabel(responseType: ChallengeResponseType): string {
   if (responseType === 'complete_button') return '完了ボタン';
   if (responseType === 'comment') return 'コメント';
   if (responseType === 'choice3') return '3択';
-  return '写真（未対応）';
+  if (responseType === 'photo') return '写真';
+  return 'コメント';
 }
 
 function responseTypeHelp(responseType: ChallengeResponseType): string {
@@ -51,6 +52,9 @@ function responseTypeHelp(responseType: ChallengeResponseType): string {
   }
   if (responseType === 'choice3') {
     return '参加者が3つの選択肢から1つ選んで回答します';
+  }
+  if (responseType === 'photo') {
+    return '参加者が写真1枚をアップロードして回答します';
   }
   return '参加者がコメントを書いて回答します';
 }
@@ -213,7 +217,7 @@ export function ChallengeAdminItemEditor({
 
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>回答形式</legend>
-        <div className={styles.typeGrid3}>
+        <div className={styles.typeGrid}>
           {CHALLENGE_ADMIN_SELECTABLE_RESPONSE_TYPES.map((option) => (
             <label
               key={option}
@@ -247,7 +251,11 @@ export function ChallengeAdminItemEditor({
             </label>
           ))}
         </div>
-        <p className={styles.help}>写真形式はまだ選択できません。</p>
+        {value.responseType === 'photo' ? (
+          <p className={styles.help}>
+            MVPは写真1枚です。任意コメントはありません。EXIFは端末側の再圧縮で除去します。
+          </p>
+        ) : null}
       </fieldset>
 
       {value.responseType === 'choice3' ? (

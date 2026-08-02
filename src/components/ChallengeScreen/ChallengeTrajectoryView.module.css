@@ -183,6 +183,10 @@
   overflow-wrap: anywhere;
 }
 
+.entryPhoto {
+  margin: 0.15rem 0 0;
+}
+
 .entryDeleted {
   margin: 0;
   font-size: 0.86rem;

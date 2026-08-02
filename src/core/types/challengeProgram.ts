@@ -36,11 +36,12 @@ export const CHALLENGE_RESPONSE_TYPES = [
   'photo',
 ] as const satisfies readonly ChallengeResponseType[];
 
-/** Admin UI may create/edit these today. photo stays unavailable. */
+/** Admin UI may create/edit these today. */
 export const CHALLENGE_ADMIN_SELECTABLE_RESPONSE_TYPES = [
   'comment',
   'complete_button',
   'choice3',
+  'photo',
 ] as const satisfies readonly ChallengeResponseType[];
 
 export const CHALLENGE_TITLE_MAX_LENGTH = 200;

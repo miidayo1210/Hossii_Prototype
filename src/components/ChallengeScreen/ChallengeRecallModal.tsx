@@ -5,6 +5,7 @@ import type { ChallengeResponse } from '../../core/types/challengeResponse';
 import type { ChallengeCompletion, ChallengeReward } from '../../core/types/challengeReward';
 import { challengeResponseVisibilityLabel } from '../../core/utils/challengeVisibility';
 import { ChallengeResponseActionMenu } from './ChallengeResponseActionMenu';
+import { ChallengePhotoImage } from './ChallengePhotoImage';
 import { ChallengeSpaceMembersAnswers } from './ChallengeSpaceMembersAnswers';
 import styles from './ChallengeRecallModal.module.css';
 
@@ -220,9 +221,20 @@ export function ChallengeRecallModal({
             <p className={styles.answerLabel}>回答</p>
             {hasResponse && model.response ? (
               <>
-                <p className={styles.answerBody}>
-                  {model.response.comment || '（回答なし）'}
-                </p>
+                {model.item.responseType === 'photo' &&
+                model.response.photoPath ? (
+                  <div className={styles.answerPhoto}>
+                    <ChallengePhotoImage
+                      photoPath={model.response.photoPath}
+                      size="lg"
+                      alt="回答写真"
+                    />
+                  </div>
+                ) : (
+                  <p className={styles.answerBody}>
+                    {model.response.comment || '（回答なし）'}
+                  </p>
+                )}
                 <p className={styles.visibility}>
                   {challengeResponseVisibilityLabel(model.response.visibility)}
                 </p>

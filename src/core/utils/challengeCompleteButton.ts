@@ -9,6 +9,7 @@ export const CHALLENGE_PARTICIPANT_RESPONSE_TYPES = [
   'comment',
   'complete_button',
   'choice3',
+  'photo',
 ] as const;
 
 export type ChallengeParticipantResponseType =

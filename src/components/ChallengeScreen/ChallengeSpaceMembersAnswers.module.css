@@ -96,6 +96,10 @@
   overflow-wrap: anywhere;
 }
 
+.photo {
+  margin: 0.15rem 0 0;
+}
+
 .moreButton {
   width: 100%;
   min-height: 40px;
