@@ -56,6 +56,7 @@ import {
   ChallengeAdminItemEditor,
   type ChallengeAdminItemFormState,
 } from './ChallengeAdminItemEditor';
+import { ChallengeParticipantPreviewModal } from './ChallengeParticipantPreviewModal';
 import { SettingsPageHeader } from './SettingsPageHeader';
 import { SettingsSection } from './SettingsSection';
 import sharedStyles from './SettingsShared.module.css';
@@ -70,6 +71,14 @@ type View =
   | { kind: 'list' }
   | { kind: 'create' }
   | { kind: 'edit'; programId: string };
+
+type EditStep = 1 | 2 | 3;
+
+const EDIT_STEPS: ReadonlyArray<{ step: EditStep; label: string }> = [
+  { step: 1, label: '基本' },
+  { step: 2, label: '項目' },
+  { step: 3, label: '確認' },
+];
 
 type ManagerResponseRow = ChallengeResponse & {
   itemTitle: string;
@@ -204,6 +213,8 @@ export const ChallengeAdminTab = ({ space }: Props) => {
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responsesError, setResponsesError] = useState<string | null>(null);
   const [responderNames, setResponderNames] = useState<Record<string, string>>({});
+  const [editStep, setEditStep] = useState<EditStep>(1);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -292,11 +303,15 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     setView({ kind: 'create' });
   };
 
-  const openEdit = async (programId: string) => {
+  const openEdit = async (
+    programId: string,
+    options?: { initialStep?: EditStep },
+  ) => {
     setFormError(null);
     setBusy(true);
     setManagerResponses([]);
     setResponsesError(null);
+    setPreviewOpen(false);
     try {
       const listed = await listChallengePrograms(space.id);
       const program = listed.find((p) => p.id === programId) ?? null;
@@ -314,6 +329,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       setShowItemForm(false);
       setItemForm(EMPTY_ITEM_FORM);
       setItemFormError(null);
+      setEditStep(options?.initialStep ?? 1);
       setView({ kind: 'edit', programId });
       if (program.status === 'published') {
         void loadManagerResponsesForItems(programItems);
@@ -326,6 +342,8 @@ export const ChallengeAdminTab = ({ space }: Props) => {
   const backToList = async () => {
     setView({ kind: 'list' });
     setEditingProgram(null);
+    setEditStep(1);
+    setPreviewOpen(false);
     setItems([]);
     setManagerResponses([]);
     setResponderNames({});
@@ -349,7 +367,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
       return;
     }
     showToast('下書きの挑戦状を作成しました');
-    await openEdit(result.value.id);
+    await openEdit(result.value.id, { initialStep: 2 });
   };
 
   const handleSaveProgram = async () => {
@@ -634,6 +652,42 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     [publishGateInput],
   );
 
+  const programDirty = Boolean(publishGateInput?.hasUnsavedProgramEdits);
+
+  const goToEditStep = (nextStep: EditStep) => {
+    if (!editingProgram || editingProgram.status !== 'draft') {
+      setEditStep(nextStep);
+      return;
+    }
+    if (nextStep === editStep) return;
+
+    if (nextStep > editStep) {
+      if (programDirty) {
+        setFormError('先に「下書きを保存」してから次へ進んでください');
+        return;
+      }
+      if (showItemForm) {
+        setFormError('項目の編集を終えてから次へ進んでください');
+        return;
+      }
+    }
+
+    setFormError(null);
+    setEditStep(nextStep);
+  };
+
+  const openParticipantPreview = () => {
+    if (!editingProgram) return;
+    if (programDirty || showItemForm) {
+      setFormError(
+        'プレビューは保存済みの内容で表示します。先に下書きを保存し、項目編集を終えてください。',
+      );
+      return;
+    }
+    setFormError(null);
+    setPreviewOpen(true);
+  };
+
   const handlePublish = async () => {
     if (!editingProgram || busy || !publishReadiness) return;
     if (editingProgram.status !== 'draft') return;
@@ -763,12 +817,228 @@ export const ChallengeAdminTab = ({ space }: Props) => {
     const isDraft = editingProgram.status === 'draft';
     const publishChecks = publishReadiness?.checks ?? [];
     const canPublish = Boolean(isDraft && publishReadiness?.canPublish);
+    const showBasics = !isDraft || editStep === 1;
+    const showItems = !isDraft || editStep === 2;
+    const showConfirm = isDraft && editStep === 3;
+
+    const basicsSection = (
+      <SettingsSection title={isDraft ? 'Step1 基本' : '挑戦状の内容'}>
+        {!isDraft && (
+          <p className={styles.warning}>
+            公開済みのため、タイトル・説明・項目の追加や削除はできません。管理者に共有された回答は下のセクションで確認できます。
+          </p>
+        )}
+        <label className={formStyles.label}>
+          タイトル（必須）
+          <input
+            className={formStyles.nameInput}
+            value={programTitle}
+            maxLength={CHALLENGE_TITLE_MAX_LENGTH}
+            onChange={(e) => setProgramTitle(e.target.value)}
+            disabled={busy || !isDraft}
+          />
+        </label>
+        <label className={formStyles.label}>
+          説明（任意）
+          <textarea
+            className={formStyles.textarea}
+            value={programDescription}
+            rows={4}
+            onChange={(e) => setProgramDescription(e.target.value)}
+            disabled={busy || !isDraft}
+          />
+        </label>
+        <label className={formStyles.label} htmlFor="challenge-program-visibility">
+          標準の公開範囲
+          <select
+            id="challenge-program-visibility"
+            className={styles.visibilitySelect}
+            value={programDefaultVisibility}
+            disabled={busy || !isDraft}
+            aria-describedby="challenge-program-visibility-help"
+            onChange={(e) =>
+              setProgramDefaultVisibility(
+                e.target.value as ChallengeResponseVisibility,
+              )
+            }
+          >
+            {CHALLENGE_RESPONSE_VISIBILITIES.map((value) => (
+              <option key={value} value={value}>
+                {challengeResponseVisibilityLabel(value)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span
+          id="challenge-program-visibility-help"
+          className={styles.visibilityHelp}
+        >
+          {challengeResponseVisibilityHelp(programDefaultVisibility)}
+          。項目ごとに上書きもできます。参加者は回答時に公開範囲を選べません。
+        </span>
+        {isDraft && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={sharedStyles.primaryButton}
+              onClick={() => void handleSaveProgram()}
+              disabled={busy || !programTitle.trim()}
+            >
+              {busy ? '保存中…' : '下書きを保存'}
+            </button>
+            <button
+              type="button"
+              className={sharedStyles.ghostButton}
+              onClick={() => goToEditStep(2)}
+              disabled={busy}
+            >
+              次へ：項目
+            </button>
+          </div>
+        )}
+      </SettingsSection>
+    );
+
+    const itemsSection = (
+      <SettingsSection title={isDraft ? 'Step2 項目' : '質問・ミッション'}>
+        <div className={styles.typeExplain}>
+          <p>
+            <strong>質問</strong>
+            {challengeItemTypeHelp('question')}
+          </p>
+          <p>
+            <strong>ミッション</strong>
+            {challengeItemTypeHelp('mission')}
+          </p>
+          <p className={styles.muted}>
+            回答形式（コメント／完了ボタン／3択／写真）は、項目を追加したあとに選べます。
+          </p>
+        </div>
+
+        {!isDraft && (
+          <p className={styles.warning}>公開後は内容を変更できません</p>
+        )}
+
+        <div className={styles.itemListHeader}>
+          <h3 className={styles.itemListHeading}>作成済み項目</h3>
+          {items.length > 0 ? (
+            <p className={styles.muted}>
+              参加者には上からこの順番で表示されます。「上へ／下へ」で並べ替えできます。
+            </p>
+          ) : null}
+        </div>
+
+        {items.length === 0 ? (
+          <p className={styles.muted}>まだ項目がありません</p>
+        ) : (
+          <ul className={styles.itemList}>
+            {items.map((item, index) => (
+              <li key={item.id}>
+                <ChallengeAdminItemCard
+                  item={item}
+                  order={index + 1}
+                  programDefaultVisibility={
+                    editingProgram.defaultResponseVisibility
+                  }
+                  readOnly={!isDraft}
+                  busy={busy}
+                  canMoveUp={index > 0 && !showItemForm}
+                  canMoveDown={index < items.length - 1 && !showItemForm}
+                  onEdit={() => startEditItem(item)}
+                  onDelete={() => void handleDeleteItem(item)}
+                  onMoveUp={() => void handleMoveItem(item.id, 'up')}
+                  onMoveDown={() => void handleMoveItem(item.id, 'down')}
+                />
+                {isDraft &&
+                showItemForm &&
+                editingItemId === item.id ? (
+                  <ChallengeAdminItemEditor
+                    mode="edit"
+                    value={itemForm}
+                    programDefaultVisibility={programDefaultVisibility}
+                    busy={busy}
+                    error={itemFormError}
+                    onChange={setItemForm}
+                    onSubmit={() => void handleSaveItem()}
+                    onCancel={closeItemForm}
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {isDraft && (
+          <div className={styles.addBlock}>
+            <h3 className={styles.itemListHeading}>新しい項目を追加</h3>
+            <p className={styles.muted}>
+              種類を選んで追加します。回答形式は次の入力画面で設定します。
+            </p>
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={sharedStyles.primaryButton}
+                onClick={() => startAddItem('question')}
+                disabled={busy}
+              >
+                質問を追加
+              </button>
+              <button
+                type="button"
+                className={sharedStyles.ghostButton}
+                onClick={() => startAddItem('mission')}
+                disabled={busy}
+              >
+                ミッションを追加
+              </button>
+            </div>
+            {showItemForm && !editingItemId ? (
+              <ChallengeAdminItemEditor
+                mode="create"
+                value={itemForm}
+                programDefaultVisibility={programDefaultVisibility}
+                busy={busy}
+                error={itemFormError}
+                onChange={setItemForm}
+                onSubmit={() => void handleSaveItem()}
+                onCancel={closeItemForm}
+              />
+            ) : null}
+          </div>
+        )}
+
+        {isDraft && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={sharedStyles.ghostButton}
+              onClick={() => goToEditStep(1)}
+              disabled={busy}
+            >
+              戻る：基本
+            </button>
+            <button
+              type="button"
+              className={sharedStyles.primaryButton}
+              onClick={() => goToEditStep(3)}
+              disabled={busy}
+            >
+              次へ：確認
+            </button>
+          </div>
+        )}
+      </SettingsSection>
+    );
 
     return (
       <>
         <SettingsPageHeader
           title={editingProgram.title || '挑戦状の編集'}
-          description="参加者に届ける質問やミッションを作成・公開できます"
+          description={
+            isDraft
+              ? '基本 → 項目 → 確認の順で、公開前に参加者画面をプレビューできます'
+              : '参加者に届ける質問やミッションを作成・公開できます'
+          }
         >
           <div className={styles.actions}>
             <button
@@ -797,186 +1067,36 @@ export const ChallengeAdminTab = ({ space }: Props) => {
             </p>
           </section>
 
-          <SettingsSection title={isDraft ? '挑戦状の内容' : '挑戦状の内容'}>
-            {!isDraft && (
-              <p className={styles.warning}>
-                公開済みのため、タイトル・説明・項目の追加や削除はできません。管理者に共有された回答は下のセクションで確認できます。
-              </p>
-            )}
-            <label className={formStyles.label}>
-              タイトル（必須）
-              <input
-                className={formStyles.nameInput}
-                value={programTitle}
-                maxLength={CHALLENGE_TITLE_MAX_LENGTH}
-                onChange={(e) => setProgramTitle(e.target.value)}
-                disabled={busy || !isDraft}
-              />
-            </label>
-            <label className={formStyles.label}>
-              説明（任意）
-              <textarea
-                className={formStyles.textarea}
-                value={programDescription}
-                rows={4}
-                onChange={(e) => setProgramDescription(e.target.value)}
-                disabled={busy || !isDraft}
-              />
-            </label>
-            <label className={formStyles.label} htmlFor="challenge-program-visibility">
-              標準の公開範囲
-              <select
-                id="challenge-program-visibility"
-                className={styles.visibilitySelect}
-                value={programDefaultVisibility}
-                disabled={busy || !isDraft}
-                aria-describedby="challenge-program-visibility-help"
-                onChange={(e) =>
-                  setProgramDefaultVisibility(
-                    e.target.value as ChallengeResponseVisibility,
-                  )
-                }
-              >
-                {CHALLENGE_RESPONSE_VISIBILITIES.map((value) => (
-                  <option key={value} value={value}>
-                    {challengeResponseVisibilityLabel(value)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span
-              id="challenge-program-visibility-help"
-              className={styles.visibilityHelp}
-            >
-              {challengeResponseVisibilityHelp(programDefaultVisibility)}
-              。項目ごとに上書きもできます。参加者は回答時に公開範囲を選べません。
-            </span>
-            {isDraft && (
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={sharedStyles.primaryButton}
-                  onClick={() => void handleSaveProgram()}
-                  disabled={busy || !programTitle.trim()}
-                >
-                  {busy ? '保存中…' : '下書きを保存'}
-                </button>
-              </div>
-            )}
-          </SettingsSection>
-
-          <SettingsSection title="質問・ミッション">
-            <div className={styles.typeExplain}>
-              <p>
-                <strong>質問</strong>
-                {challengeItemTypeHelp('question')}
-              </p>
-              <p>
-                <strong>ミッション</strong>
-                {challengeItemTypeHelp('mission')}
-              </p>
-              <p className={styles.muted}>
-                回答形式（コメント／完了ボタン／3択／写真）は、項目を追加したあとに選べます。
-              </p>
-            </div>
-
-            {!isDraft && (
-              <p className={styles.warning}>公開後は内容を変更できません</p>
-            )}
-
-            <div className={styles.itemListHeader}>
-              <h3 className={styles.itemListHeading}>作成済み項目</h3>
-              {items.length > 0 ? (
-                <p className={styles.muted}>
-                  参加者には上からこの順番で表示されます。「上へ／下へ」で並べ替えできます。
-                </p>
-              ) : null}
-            </div>
-
-            {items.length === 0 ? (
-              <p className={styles.muted}>まだ項目がありません</p>
-            ) : (
-              <ul className={styles.itemList}>
-                {items.map((item, index) => (
-                  <li key={item.id}>
-                    <ChallengeAdminItemCard
-                      item={item}
-                      order={index + 1}
-                      programDefaultVisibility={
-                        editingProgram.defaultResponseVisibility
-                      }
-                      readOnly={!isDraft}
-                      busy={busy}
-                      canMoveUp={index > 0 && !showItemForm}
-                      canMoveDown={index < items.length - 1 && !showItemForm}
-                      onEdit={() => startEditItem(item)}
-                      onDelete={() => void handleDeleteItem(item)}
-                      onMoveUp={() => void handleMoveItem(item.id, 'up')}
-                      onMoveDown={() => void handleMoveItem(item.id, 'down')}
-                    />
-                    {isDraft &&
-                    showItemForm &&
-                    editingItemId === item.id ? (
-                      <ChallengeAdminItemEditor
-                        mode="edit"
-                        value={itemForm}
-                        programDefaultVisibility={programDefaultVisibility}
-                        busy={busy}
-                        error={itemFormError}
-                        onChange={setItemForm}
-                        onSubmit={() => void handleSaveItem()}
-                        onCancel={closeItemForm}
-                      />
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {isDraft && (
-              <div className={styles.addBlock}>
-                <h3 className={styles.itemListHeading}>新しい項目を追加</h3>
-                <p className={styles.muted}>
-                  種類を選んで追加します。回答形式は次の入力画面で設定します。
-                </p>
-                <div className={styles.actions}>
+          {isDraft ? (
+            <nav className={styles.stepNav} aria-label="作成ステップ">
+              {EDIT_STEPS.map(({ step, label }) => {
+                const current = editStep === step;
+                return (
                   <button
+                    key={step}
                     type="button"
-                    className={sharedStyles.primaryButton}
-                    onClick={() => startAddItem('question')}
+                    className={`${styles.stepButton} ${
+                      current ? styles.stepButtonCurrent : ''
+                    }`}
+                    aria-current={current ? 'step' : undefined}
                     disabled={busy}
+                    onClick={() => goToEditStep(step)}
                   >
-                    質問を追加
+                    <span className={styles.stepIndex}>{step}</span>
+                    {label}
                   </button>
-                  <button
-                    type="button"
-                    className={sharedStyles.ghostButton}
-                    onClick={() => startAddItem('mission')}
-                    disabled={busy}
-                  >
-                    ミッションを追加
-                  </button>
-                </div>
-                {showItemForm && !editingItemId ? (
-                  <ChallengeAdminItemEditor
-                    mode="create"
-                    value={itemForm}
-                    programDefaultVisibility={programDefaultVisibility}
-                    busy={busy}
-                    error={itemFormError}
-                    onChange={setItemForm}
-                    onSubmit={() => void handleSaveItem()}
-                    onCancel={closeItemForm}
-                  />
-                ) : null}
-              </div>
-            )}
-          </SettingsSection>
+                );
+              })}
+            </nav>
+          ) : null}
 
-          {isDraft && (
-            <SettingsSection title="参加者へ公開">
+          {showBasics ? basicsSection : null}
+          {showItems ? itemsSection : null}
+
+          {showConfirm ? (
+            <SettingsSection title="Step3 確認">
               <p className={styles.muted}>
-                公開すると、参加者の「挑戦状」に表示されます。
+                公開前チェックと参加者プレビューで内容を確認してから公開します。
                 公開後は質問・ミッションの内容を変更できません。
               </p>
               <div className={styles.publishChecks} aria-label="公開前チェック">
@@ -1002,6 +1122,22 @@ export const ChallengeAdminTab = ({ space }: Props) => {
               <div className={styles.actions}>
                 <button
                   type="button"
+                  className={sharedStyles.ghostButton}
+                  onClick={() => goToEditStep(2)}
+                  disabled={busy}
+                >
+                  戻る：項目
+                </button>
+                <button
+                  type="button"
+                  className={sharedStyles.ghostButton}
+                  onClick={openParticipantPreview}
+                  disabled={busy || programDirty || showItemForm}
+                >
+                  参加者画面をプレビュー
+                </button>
+                <button
+                  type="button"
                   className={sharedStyles.primaryButton}
                   onClick={() => void handlePublish()}
                   disabled={busy || !canPublish}
@@ -1010,7 +1146,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                 </button>
               </div>
             </SettingsSection>
-          )}
+          ) : null}
 
           {!isDraft && (
             <SettingsSection title="管理者に共有された回答">
@@ -1058,7 +1194,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
             </SettingsSection>
           )}
 
-          {isDraft && (
+          {isDraft && editStep === 1 ? (
             <SettingsSection title="その他の操作">
               <p className={styles.muted}>下書きの挑戦状のみ削除できます。</p>
               <div className={styles.actions}>
@@ -1072,7 +1208,7 @@ export const ChallengeAdminTab = ({ space }: Props) => {
                 </button>
               </div>
             </SettingsSection>
-          )}
+          ) : null}
 
           {formError && (
             <p className={styles.error} role="alert" aria-live="polite">
@@ -1085,6 +1221,13 @@ export const ChallengeAdminTab = ({ space }: Props) => {
             {toast}
           </div>
         )}
+        {previewOpen && editingProgram ? (
+          <ChallengeParticipantPreviewModal
+            program={editingProgram}
+            items={items}
+            onClose={() => setPreviewOpen(false)}
+          />
+        ) : null}
       </>
     );
   }

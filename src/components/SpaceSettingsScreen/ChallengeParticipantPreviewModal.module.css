@@ -1,0 +1,50 @@
+.previewModal {
+  max-width: min(440px, 100%);
+  max-height: min(92vh, 920px);
+  display: flex;
+  flex-direction: column;
+}
+
+.previewBody {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.phoneFrame {
+  margin: 0 auto;
+  width: min(100%, 360px);
+  padding: 0.75rem;
+  border-radius: 1.5rem;
+  background: linear-gradient(160deg, #1f2937 0%, #111827 100%);
+  box-shadow: 0 16px 40px rgba(17, 24, 39, 0.28);
+}
+
+.phoneScreen {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+  border-radius: 1.1rem;
+  background:
+    linear-gradient(165deg, #fdf2f8 0%, #ede9fe 42%, #e0f2fe 100%);
+}
+
+.phoneScreen :global([data-testid='challenge-screen-preview']) {
+  min-height: auto;
+  padding-bottom: 2rem;
+}
+
+@media (max-width: 640px) {
+  .previewModal {
+    max-width: 100%;
+    max-height: 96vh;
+  }
+
+  .phoneFrame {
+    width: 100%;
+    padding: 0.5rem;
+  }
+
+  .phoneScreen {
+    max-height: min(68vh, 640px);
+  }
+}

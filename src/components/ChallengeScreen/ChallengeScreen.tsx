@@ -78,6 +78,10 @@ import {
   ChallengeStampCard,
 } from './ChallengeStampCard';
 import { ChallengeTrajectoryView } from './ChallengeTrajectoryView';
+import {
+  ChallengeScreenPreview,
+  type ChallengeScreenPreviewProps,
+} from './ChallengeScreenPreview';
 import styles from './ChallengeScreen.module.css';
 
 type View =
@@ -203,7 +207,25 @@ function ProgramProgressBar({
   );
 }
 
-export const ChallengeScreen = () => {
+export type ChallengeScreenProps = {
+  /**
+   * When set, renders a read-only participant preview from injected draft data.
+   * Skips list/detail fetches and all mutation / peer-answer APIs.
+   */
+  preview?: ChallengeScreenPreviewProps | null;
+};
+
+export const ChallengeScreen = ({ preview = null }: ChallengeScreenProps = {}) => {
+  if (preview) {
+    return (
+      <ChallengeScreenPreview program={preview.program} items={preview.items} />
+    );
+  }
+
+  return <ChallengeScreenLive />;
+};
+
+const ChallengeScreenLive = () => {
   const { currentUser } = useAuth();
   const { state, activeSpaceMembershipStatus } = useHossiiStore();
   const activeSpace = state.spaces.find((s) => s.id === state.activeSpaceId) ?? null;

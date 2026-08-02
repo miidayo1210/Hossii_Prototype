@@ -56,6 +56,11 @@ type Props = {
   onRecall?: () => void;
   /** 詳細では記録Modal側に寄せるため false 可 */
   showManageActions?: boolean;
+  /**
+   * Admin participant preview: show answer UI, but never call save/upload/delete
+   * or peer-answer surfaces.
+   */
+  preview?: boolean;
 };
 
 function formatExcerpt(comment: string | null | undefined): string {
@@ -271,6 +276,7 @@ function ResponseEditor({
   resolvedVisibility,
   saving,
   stampEarned,
+  preview = false,
   onDraftChange,
   onSave,
 }: {
@@ -280,11 +286,18 @@ function ResponseEditor({
   resolvedVisibility: ChallengeResponseVisibility;
   saving: boolean;
   stampEarned?: boolean;
+  preview?: boolean;
   onDraftChange: (draft: ChallengeItemDraft) => void;
   onSave: () => void;
 }) {
   // Rewrite keeps the stamped snapshot; new answers show current settings.
   const visibility = existing?.visibility ?? resolvedVisibility;
+  const controlsDisabled = saving || preview;
+  const previewNote = preview ? (
+    <p className={styles.note} role="note">
+      プレビューのため、回答の保存・アップロードはできません
+    </p>
+  ) : null;
 
   if (item.responseType === 'complete_button') {
     return (
@@ -304,11 +317,12 @@ function ResponseEditor({
               <p className={styles.stampEarnedNote}>スタンプ獲得済み</p>
             ) : null}
             <VisibilityNotice visibility={visibility} />
+            {previewNote}
             <div className={styles.actions}>
               <button
                 type="button"
                 className={styles.saveButton}
-                disabled={saving}
+                disabled={controlsDisabled}
                 aria-label={`${item.title}を完了する`}
                 onClick={onSave}
               >
@@ -344,19 +358,20 @@ function ResponseEditor({
             itemId={item.id}
             options={options}
             selectedLabel={draft.comment}
-            disabled={saving}
+            disabled={controlsDisabled}
             onSelect={(comment) => onDraftChange({ ...draft, comment })}
           />
         ) : (
           <p className={styles.note}>選択肢を読み込めませんでした。</p>
         )}
         <VisibilityNotice visibility={visibility} />
+        {previewNote}
         <div className={styles.actions}>
           <button
             type="button"
             className={styles.saveButton}
             disabled={
-              saving ||
+              controlsDisabled ||
               !options ||
               findChallengeChoice3OptionIndex(options, draft.comment) < 0
             }
@@ -392,15 +407,16 @@ function ResponseEditor({
           itemId={item.id}
           draft={draft}
           existing={existing}
-          disabled={saving}
+          disabled={controlsDisabled}
           onDraftChange={onDraftChange}
         />
         <VisibilityNotice visibility={visibility} />
+        {previewNote}
         <div className={styles.actions}>
           <button
             type="button"
             className={styles.saveButton}
-            disabled={saving || !draft.photoFile}
+            disabled={controlsDisabled || !draft.photoFile}
             aria-label={
               existing
                 ? `${item.title}の写真を更新`
@@ -434,19 +450,20 @@ function ResponseEditor({
         <CommentResponseSlot
           itemId={item.id}
           value={draft.comment}
-          disabled={saving}
+          disabled={controlsDisabled}
           onChange={(comment) => onDraftChange({ ...draft, comment })}
         />
       ) : (
         <p className={styles.note}>この回答形式にはまだ対応していません。</p>
       )}
       <VisibilityNotice visibility={visibility} />
+      {previewNote}
       <div className={styles.actions}>
         <button
           type="button"
           className={styles.saveButton}
           disabled={
-            saving ||
+            controlsDisabled ||
             item.responseType !== 'comment' ||
             !draft.comment.trim()
           }
@@ -486,10 +503,11 @@ export function ChallengeItemCard({
   onDelete,
   onRecall,
   showManageActions = true,
+  preview = false,
 }: Props) {
   const answered = Boolean(existing);
   const isCompleteButton = item.responseType === 'complete_button';
-  const peerAnswers = (
+  const peerAnswers = preview ? null : (
     <ChallengeSpaceMembersAnswers
       answers={spaceMemberAnswers}
       currentUserId={currentUserId}
@@ -497,7 +515,7 @@ export function ChallengeItemCard({
     />
   );
   const actionMenu =
-    answered && showManageActions && onDelete ? (
+    !preview && answered && showManageActions && onDelete ? (
       isCompleteButton ? (
         <ChallengeResponseActionMenu
           itemTitle={item.title}
@@ -599,8 +617,9 @@ export function ChallengeItemCard({
           resolvedVisibility={resolvedVisibility}
           saving={saving}
           stampEarned={stampEarned}
+          preview={preview}
           onDraftChange={onDraftChange}
-          onSave={onSave}
+          onSave={preview ? () => undefined : onSave}
         />
       </div>
       {peerAnswers}
